@@ -143,6 +143,11 @@ input,select{font-family:inherit;outline:none}
 .wx-err{text-align:center;font-size:10px;color:var(--tx3);padding:4px}
 .wx-err button{color:var(--pri);font-weight:700;font-size:10px}
 
+.lang-tog{display:flex;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.25);height:26px}
+.lt-btn{padding:0 8px;font-size:10px;font-weight:800;color:rgba(255,255,255,.5);background:transparent;transition:all .15s}
+.lt-btn:active{opacity:.8}
+.lt-btn.lt-on{background:rgba(255,255,255,.9);color:var(--pri-d)}
+
 /* Install bar */
 .install-wrap{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;padding:5px 8px;padding-bottom:calc(5px + env(safe-area-inset-bottom));background:linear-gradient(180deg,transparent,var(--bg) 30%);z-index:30}
 .install-card{background:var(--card);border:1px solid #ddd;border-radius:var(--r);padding:8px;display:flex;align-items:center;gap:6px;box-shadow:var(--sh)}
@@ -181,7 +186,7 @@ const IMG={icon:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdv
 const SI={"早":IMG.early,"晚":IMG.night,"中":IMG.mid,"休":IMG.off};
 const SC={"早":"e","晚":"n","中":"m","休":"o"};
 const L={
-zh:{app:"My Shift",sub:"我的班表",desc:"選擇輪班制度，三步自動排整年",s12:"12小時制",s8:"8小時制",cyc:"天循環",
+zh:{app:"我的班表",sub:"My Shift",desc:"選擇輪班制度，三步自動排整年",s12:"12小時制",s8:"8小時制",cyc:"天循環",
   today:"今天",reset:"重設",help:"說明",lang:"ID",work:"上班",off:"休假",
   q1:"今天上班還是休假？",q2w:"上什麼班？",q2o:"休完接下來什麼班？",q3w:"#s#第幾天？",q3o:"休假第幾天？",dn:"第#n#天",
   早:"早班",晚:"晚班",中:"中班",休:"休假",workD:"上班",
@@ -258,7 +263,7 @@ function rType(){
   return`<div class="page"><div class="hero fu"><img src="${IMG.icon}"><h1>${t("app")}</h1><p>${t("desc")}</p></div>
   ${Object.entries(R).map(([k,v],i)=>`<button class="rcard fu d${i+1}" data-a="pick" data-k="${k}"><div class="rcard-icon">${k==="2on2off"?"2:2":k==="4on2off"?"4:2":"5:1"}</div><div class="rcard-info"><div class="rcard-name">${RN[lang][k]}</div><div class="rcard-sub">${v.h===12?t("s12"):t("s8")} · ${v.c.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join("")}
   <div class="al-setup fu d3"><h3>${t("alSetup")}</h3><div class="al-setup-hint" style="margin-bottom:8px;font-size:11px;color:var(--green);font-weight:600">${alYRange(curALY())}</div><div class="al-setup-row"><label>${t("alTotal")}</label><input type="number" id="alTI" value="${getAL().total||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-row"><label>${t("alUsed")}</label><input type="number" id="alUI" value="${getAL().used||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-hint">${t("alSkip")}</div></div>
-  <div style="text-align:center;margin-top:14px"><button class="top-btn accent" style="margin:0 auto;padding:0 16px;height:36px;font-size:12px;border-radius:10px" data-a="lang">🌐 ${t("lang")}</button></div></div>`;
+  <div style="text-align:center;margin-top:14px"><span class="lang-tog" style="display:inline-flex;height:36px;border-color:#ddd"><button class="lt-btn${lang==='zh'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='zh'?'var(--pri-d)':'var(--tx3)'}" data-a="lzh">中文</button><button class="lt-btn${lang==='id'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='id'?'var(--pri-d)':'var(--tx3)'}" data-a="lid">ID</button></span></div></div>`;
 }
 
 function rWiz(){
@@ -292,7 +297,7 @@ function rCal(){
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent),showI=(!!DP||isIOS)&&!S.instH;
   let instH="";if(showI){instH=`<div class="install-wrap"><div class="install-card"><img class="install-icon" src="${IMG.icon}"><div class="install-info"><div class="install-title">${t("instT")}</div><div class="install-sub">${DP?t("instS"):t("instSi")}</div></div>${DP?`<button class="install-btn" data-a="inst">${t("instB")}</button>`:''}<button class="install-x" data-a="hideI">✕</button></div></div>`}
   const ml=lang==="zh"?`${y}年${m}月`:`${m}/${y}`;
-  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>My Shift</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn" data-a="today">${t("today")}</button><button class="top-btn" data-a="help">${t("help")}</button><button class="top-btn accent" data-a="lang">${t("lang")}</button><button class="top-btn" data-a="reset">${t("reset")}</button></div></div>
+  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn" data-a="today">${t("today")}</button><button class="top-btn" data-a="help">${t("help")}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="reset">${t("reset")}</button></div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
   <div class="cal fi">${cells}</div>${holH}${remH}<div class="dash fi">${chips}</div>${typeof wxHtml==='function'?wxHtml():''}${hH}${alH}
@@ -338,6 +343,8 @@ function handle(e){
     case "close":S.modal=null;break;
     case "help":S.showH=true;break;
     case "closeH":S.showH=false;break;
+    case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}break;
+    case "lid":lang="id";try{localStorage.setItem("sb_l",lang)}catch(e){}break;
     case "lang":lang=lang==="zh"?"id":"zh";try{localStorage.setItem("sb_l",lang)}catch(e){}break;
     case "tev":{const{y,m,d}=S.modal;const k=ek(y,m,d),eid=el.dataset.eid;if(!EVS[k])EVS[k]=[];const i=EVS[k].indexOf(eid);if(i>=0){EVS[k].splice(i,1);if(eid==="annualL")delete ALD[k]}else{EVS[k].push(eid);if(eid==="annualL"&&!ALD[k])ALD[k]=4}if(!EVS[k].length)delete EVS[k];sEv();sAL();break}
     case "alh":{const{y,m,d}=S.modal;const sel=document.getElementById("alSel");if(sel)ALD[ek(y,m,d)]=parseFloat(sel.value);sAL();return}
