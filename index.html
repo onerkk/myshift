@@ -219,25 +219,27 @@ const HOL={"01-01":{zh:"元旦",id:"Tahun Baru"},"01-27":{zh:"",id:"Isra Mi'raj"
 const EI=["meeting","health","class","biztrip","pay","annualL","custom"];
 const EE={meeting:"📋",health:"🏥","class":"📚",biztrip:"🚗",pay:"💰",annualL:"🌴",custom:"📝"};
 const NOW=new Date(),TY=NOW.getFullYear(),TM=NOW.getMonth()+1,TD=NOW.getDate(),TR=new Date(TY,TM-1,TD);
-let lang="zh";try{lang=localStorage.getItem("sb_l")||"zh"}catch(e){}
+let lang="zh";try{lang=localStorage.getItem("sb_l")||gCk("sb_l")||"zh"}catch(e){}
 function t(k){return (L[lang]&&L[lang][k])||L.zh[k]||k}
 function sf(s){return t(s)}
 let S={step:"wiz",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,instH:false};
-let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||{}}catch(e){}
-function sEv(){try{localStorage.setItem("sb_ev",JSON.stringify(EVS))}catch(e){}}
-let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||{}}catch(e){}
-let ALD={};try{ALD=JSON.parse(localStorage.getItem("sb_ald"))||{}}catch(e){}
+let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb_ev"))||{}}catch(e){}
+function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}}
+let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
+let ALD={};try{ALD=JSON.parse(localStorage.getItem("sb_ald"))||JSON.parse(gCk("sb_ald"))||{}}catch(e){}
 function alYear(y,m,d){return(m>12||(m===12&&d>=26))?y:y-1}
 function curALY(){return alYear(TY,TM,TD)}
 function alYRange(ay){return`${ay}/12/26 ~ ${ay+1}/12/25`}
 function getAL(){const y=curALY();return AL[y]||{total:0,used:0}}
 function setAL(total,used){const y=curALY();AL[y]={total,used};sAL()}
-function sAL(){try{localStorage.setItem("sb_al2",JSON.stringify(AL));localStorage.setItem("sb_ald",JSON.stringify(ALD))}catch(e){}}
+function sAL(){const a=JSON.stringify(AL),d=JSON.stringify(ALD);try{localStorage.setItem("sb_al2",a);localStorage.setItem("sb_ald",d)}catch(e){}try{sCk("sb_al2",a,3650);sCk("sb_ald",d,3650)}catch(e){}}
 function alUsed(){const ay=curALY();const a=AL[ay]||{};let s=a.used||0;const start=`${ay}-12-26`,end=`${ay+1}-12-25`;for(let k in ALD){if(k>=start&&k<=end)s+=ALD[k]}return s}
 function alRem(){const a=getAL();return Math.max(0,(a.total||0)-alUsed())}
 let DP=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();DP=e;render()});
-try{const c=JSON.parse(localStorage.getItem("sb_c"));if(c){S.rt=c.rt;S.pos=c.pos;S.step="cal"}}catch(e){}
-function sv(){try{localStorage.setItem("sb_c",JSON.stringify({rt:S.rt,pos:S.pos}))}catch(e){}}
+function sCk(k,v,d){const e=new Date();e.setTime(e.getTime()+d*864e5);document.cookie=k+"="+encodeURIComponent(v)+";expires="+e.toUTCString()+";path=/;SameSite=Lax"}
+function gCk(k){const m=document.cookie.match(new RegExp('(?:^|; )'+k+'=([^;]*)'));return m?decodeURIComponent(m[1]):null}
+try{const c=JSON.parse(localStorage.getItem("sb_c"))||JSON.parse(gCk("sb_c"));if(c&&c.rt&&c.pos!==null&&c.pos!==undefined){S.rt=c.rt;S.pos=c.pos;S.step="cal"}}catch(e){}
+function sv(){const d=JSON.stringify({rt:S.rt,pos:S.pos});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650)}
 function rot(){return S.rt?R[S.rt]:null}
 function cyc(){return rot()?rot().c:[]}
 function dim(y,m){return new Date(y,m,0).getDate()}
@@ -343,8 +345,8 @@ function handle(e){
     case "close":S.modal=null;break;
     case "help":S.showH=true;break;
     case "closeH":S.showH=false;break;
-    case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}break;
-    case "lid":lang="id";try{localStorage.setItem("sb_l",lang)}catch(e){}break;
+    case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);break;
+    case "lid":lang="id";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);break;
     case "lang":lang=lang==="zh"?"id":"zh";try{localStorage.setItem("sb_l",lang)}catch(e){}break;
     case "tev":{const{y,m,d}=S.modal;const k=ek(y,m,d),eid=el.dataset.eid;if(!EVS[k])EVS[k]=[];const i=EVS[k].indexOf(eid);if(i>=0){EVS[k].splice(i,1);if(eid==="annualL")delete ALD[k]}else{EVS[k].push(eid);if(eid==="annualL"&&!ALD[k])ALD[k]=4}if(!EVS[k].length)delete EVS[k];sEv();sAL();break}
     case "alh":{const{y,m,d}=S.modal;const sel=document.getElementById("alSel");if(sel)ALD[ek(y,m,d)]=parseFloat(sel.value);sAL();return}
@@ -400,6 +402,7 @@ function wxHtml(){
   const fc=d.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();
     return`<div class="wx-day${i===0?' today':''}"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div class="wx-day-icon">${WXI[f.code]||"🌡"}</div><div class="wx-day-hi">${f.hi}°</div><div class="wx-day-lo">${f.lo}°</div></div>`}).join("");
   return`<div class="wx-card fi"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"7日天氣預報":"Prakiraan 7 Hari"}</div></div><div class="wx-fc">${fc}</div></div>`}
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 if(navigator.geolocation)loadWx();
 
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{})}
