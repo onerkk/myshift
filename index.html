@@ -247,7 +247,7 @@ function fdw(y,m){return new Date(y,m-1,1).getDay()}
 function gs(y,m,d){const c=cyc();if(!c.length||S.pos===null)return null;let p=(S.pos+Math.round((new Date(y,m-1,d)-TR)/864e5))%c.length;if(p<0)p+=c.length;return c[p]}
 function ek(y,m,d){return`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function hk(m,d){return`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
-function gh(m,d){const h=HOL[hk(m,d)];if(!h)return null;const a=h[lang],b=h[lang==="zh"?"id":"zh"];if(a&&b)return a+" / "+b;return a||b||null}
+function gh(m,d){const h=HOL[hk(m,d)];if(!h)return null;return h[lang]||null}
 function en(id){return t(id)}
 function calcOT(y,m,wd,sh){const dm=dim(y,m);let wdays=0;for(let d=1;d<=dm;d++){const dw=new Date(y,m-1,d).getDay();if(dw>=1&&dw<=5)wdays++}let hwd=0;for(let d=1;d<=dm;d++){const dw=new Date(y,m-1,d).getDay();if(dw>=1&&dw<=5&&HOL[hk(m,d)])hwd++}const rH=(wdays-hwd)*8;const tH=wd*sh;return{tH,oH:sh===12?wd*4:Math.max(0,tH-rH),rH}}
 setTimeout(()=>{const sp=document.getElementById("splash");if(sp)sp.remove()},2600);
