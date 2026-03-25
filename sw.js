@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v3';
+const CACHE_NAME = 'myshift-v4';
 const urlsToCache = [
   './',
   './index.html',
@@ -28,18 +28,18 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then(response => {
-        if (response) return response;
-        return fetch(event.request).then(response => {
-          if (!response || response.status !== 200) return response;
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
-          return response;
+        if (!response || response.status !== 200) return response;
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, clone);
         });
+        return response;
       })
-      .catch(() => caches.match('./index.html'))
+      .catch(() => {
+        return caches.match(event.request)
+          .then(cached => cached || caches.match('./index.html'));
+      })
   );
 });

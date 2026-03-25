@@ -238,8 +238,10 @@ function alRem(){const a=getAL();return Math.max(0,(a.total||0)-alUsed())}
 let DP=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();DP=e;render()});
 function sCk(k,v,d){const e=new Date();e.setTime(e.getTime()+d*864e5);document.cookie=k+"="+encodeURIComponent(v)+";expires="+e.toUTCString()+";path=/;SameSite=Lax"}
 function gCk(k){const m=document.cookie.match(new RegExp('(?:^|; )'+k+'=([^;]*)'));return m?decodeURIComponent(m[1]):null}
-try{const c=JSON.parse(localStorage.getItem("sb_c"))||JSON.parse(gCk("sb_c"));if(c&&c.rt&&c.pos!==null&&c.pos!==undefined){S.rt=c.rt;S.pos=c.pos;S.step="cal"}}catch(e){}
-function sv(){const d=JSON.stringify({rt:S.rt,pos:S.pos});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650)}
+function hashSv(){try{const h=btoa(JSON.stringify({rt:S.rt,pos:S.pos}));history.replaceState(null,"","#"+h)}catch(e){}}
+function hashLd(){try{const h=location.hash.slice(1);if(!h)return null;return JSON.parse(atob(h))}catch(e){return null}}
+try{const c=JSON.parse(localStorage.getItem("sb_c"))||JSON.parse(gCk("sb_c"))||hashLd();if(c&&c.rt&&c.pos!==null&&c.pos!==undefined){S.rt=c.rt;S.pos=c.pos;S.step="cal";const d=JSON.stringify({rt:c.rt,pos:c.pos});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650);hashSv()}}catch(e){}
+function sv(){const d=JSON.stringify({rt:S.rt,pos:S.pos});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650);hashSv()}
 function rot(){return S.rt?R[S.rt]:null}
 function cyc(){return rot()?rot().c:[]}
 function dim(y,m){return new Date(y,m,0).getDate()}
@@ -340,7 +342,7 @@ function handle(e){
     case "prev":if(S.mo===1){S.yr--;S.mo=12}else S.mo--;break;
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;break;
     case "today":S.yr=TY;S.mo=TM;break;
-    case "reset":S.step="wiz";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}break;
+    case "reset":S.step="wiz";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);history.replaceState(null,"",location.pathname);break;
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
     case "help":S.showH=true;break;
