@@ -272,7 +272,7 @@ function rType(){
 
 function rWiz(){
   const c=cyc();
-  if(!S.wT)return wS(t("q1"),"1/3",`<div class="opts c2"><button class="opt-btn" data-a="wt" data-v="w"><img class="oi" src="${IMG.early}">${t("work")}</button><button class="opt-btn" data-a="wt" data-v="o"><img class="oi" src="${IMG.off}">${t("off")}</button></div>`);
+  if(!S.wT)return wS(t("q1"),"1/3",`<div class="opts c2"><button class="opt-btn" data-a="wt" data-v="w"><img class="oi" src="${IMG.early}">${t("work")}</button><button class="opt-btn" data-a="wt" data-v="o"><img class="oi" src="${IMG.off}">${t("off")}</button></div><div style="margin-top:24px;text-align:center"><button data-a="restore" style="background:none;border:1px dashed var(--pri);color:var(--pri);padding:8px 16px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">📋 ${lang==="zh"?"有備份碼？貼上恢復":"Punya kode backup? Restore"}</button></div>`);
   if(S.wT==="w"&&!S.wS){const sh=[...new Set(c.filter(x=>x!=="休"))];return wS(t("q2w"),"2/3",`<div class="opts ${sh.length===3?'c3':'c2'}">${sh.map(s=>`<button class="opt-btn" data-a="ws" data-v="${s}"><img class="oi" src="${SI[s]}">${sf(s)}</button>`).join("")}</div>`);}
   if(S.wT==="o"&&!S.wN){const sh=[...new Set(c.filter(x=>x!=="休"))];return wS(t("q2o"),"2/3",`<div class="opts ${sh.length===3?'c3':'c2'}">${sh.map(s=>`<button class="opt-btn" data-a="wn" data-v="${s}"><img class="oi" src="${SI[s]}">→${sf(s)}</button>`).join("")}</div>`);}
   if(S.wT==="w"&&S.wS&&S.wD===null){let mx=0,cr=0;for(let i=0;i<c.length*2;i++){if(c[i%c.length]===S.wS){cr++;mx=Math.max(mx,cr)}else cr=0}return wS(t("q3w").replace("#s#",sf(S.wS)),"3/3",`<div class="opts c3">${Array.from({length:mx},(_,i)=>`<button class="opt-btn" data-a="wwd" data-v="${i+1}">${t("dn").replace("#n#",i+1)}</button>`).join("")}</div>`);}
@@ -301,7 +301,7 @@ function rCal(){
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent),showI=(!!DP||isIOS)&&!S.instH;
   let instH="";if(showI){instH=`<div class="install-wrap"><div class="install-card"><img class="install-icon" src="${IMG.icon}"><div class="install-info"><div class="install-title">${t("instT")}</div><div class="install-sub">${DP?t("instS"):t("instSi")}</div></div>${DP?`<button class="install-btn" data-a="inst">${t("instB")}</button>`:''}<button class="install-x" data-a="hideI">✕</button></div></div>`}
   const ml=lang==="zh"?`${y}年${m}月`:`${m}/${y}`;
-  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn" data-a="today">${t("today")}</button><button class="top-btn" data-a="help">${t("help")}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="reset">${t("reset")}</button></div></div>
+  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn" data-a="today">${t("today")}</button><button class="top-btn" data-a="help">${t("help")}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="backup">📋</button><button class="top-btn" data-a="reset">${t("reset")}</button></div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
   <div class="cal fi">${cells}</div>${holH}${remH}<div class="dash fi">${chips}</div>${rainWarnHtml()}${typeof wxHtml==='function'?wxHtml():''}${hH}${alH}
@@ -346,6 +346,8 @@ function handle(e){
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
     case "help":S.showH=true;break;
+    case "backup":{if(S.rt&&S.pos!==null){const code=S.rt+":"+S.pos;const msg=lang==="zh"?"📋 你的備份碼（截圖或抄下）：\n\n"+code+"\n\n清除資料後，用此碼恢復班表":"📋 Kode backup:\n\n"+code+"\n\nGunakan kode ini untuk restore";prompt(msg,code)}break}
+    case "restore":{const code=prompt(lang==="zh"?"貼上備份碼：":"Masukkan kode backup:");if(code){const p=code.trim().split(":");if(p.length===2&&R[p[0]]&&!isNaN(+p[1])){S.rt=p[0];S.pos=+p[1];S.step="cal";sv();render()}else{alert(lang==="zh"?"備份碼格式錯誤":"Kode tidak valid")}}break}
     case "closeH":S.showH=false;break;
     case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);break;
     case "lid":lang="id";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);break;
