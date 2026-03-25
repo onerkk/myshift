@@ -222,7 +222,7 @@ const NOW=new Date(),TY=NOW.getFullYear(),TM=NOW.getMonth()+1,TD=NOW.getDate(),T
 let lang="zh";try{lang=localStorage.getItem("sb_l")||"zh"}catch(e){}
 function t(k){return (L[lang]&&L[lang][k])||L.zh[k]||k}
 function sf(s){return t(s)}
-let S={step:"type",rt:null,pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,instH:false};
+let S={step:"wiz",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,instH:false};
 let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||{}}catch(e){}
 function sEv(){try{localStorage.setItem("sb_ev",JSON.stringify(EVS))}catch(e){}}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||{}}catch(e){}
@@ -300,7 +300,7 @@ function rCal(){
   return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn" data-a="today">${t("today")}</button><button class="top-btn" data-a="help">${t("help")}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="reset">${t("reset")}</button></div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
-  <div class="cal fi">${cells}</div>${holH}${remH}<div class="dash fi">${chips}</div>${typeof wxHtml==='function'?wxHtml():''}${hH}${alH}
+  <div class="cal fi">${cells}</div>${holH}${remH}<div class="dash fi">${chips}</div>${rainWarnHtml()}${typeof wxHtml==='function'?wxHtml():''}${hH}${alH}
   <div style="height:${showI?'80':'12'}px"></div>${instH}`;
 }
 
@@ -329,7 +329,7 @@ function handle(e){
   const el=e.currentTarget,a=el.dataset.a;
   switch(a){
     case "pick":{const ti=document.getElementById("alTI"),ui=document.getElementById("alUI");setAL(parseFloat(ti&&ti.value)||0,parseFloat(ui&&ui.value)||0);S.rt=el.dataset.k;S.step="wiz";S.wT=S.wS=S.wN=S.wD=null;break}
-    case "wb":if(S.wD!==null)S.wD=null;else if(S.wS)S.wS=null;else if(S.wN)S.wN=null;else if(S.wT)S.wT=null;else{S.step="type";S.rt=null}break;
+    case "wb":if(S.wD!==null)S.wD=null;else if(S.wS)S.wS=null;else if(S.wN)S.wN=null;else if(S.wT)S.wT=null;break;
     case "wt":S.wT=el.dataset.v==="w"?"w":"o";S.wD=null;S.wS=null;S.wN=null;break;
     case "ws":S.wS=el.dataset.v;S.wD=null;break;
     case "wn":S.wN=el.dataset.v;S.wD=null;break;
@@ -338,7 +338,7 @@ function handle(e){
     case "prev":if(S.mo===1){S.yr--;S.mo=12}else S.mo--;break;
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;break;
     case "today":S.yr=TY;S.mo=TM;break;
-    case "reset":S.step="type";S.rt=null;S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}break;
+    case "reset":S.step="wiz";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}break;
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
     case "help":S.showH=true;break;
@@ -369,13 +369,29 @@ let wxData=null,wxErr=false;
 async function loadWx(){
   try{
     const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:8000,maximumAge:600000})});
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude.toFixed(2)}&longitude=${pos.coords.longitude.toFixed(2)}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7`;
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude.toFixed(2)}&longitude=${pos.coords.longitude.toFixed(2)}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability&timezone=auto&forecast_days=7`;
     const data=await(await fetch(url)).json();
     wxData={temp:Math.round(data.current.temperature_2m),code:data.current.weather_code,
-      days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])}))};
+      days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])})),hTime:data.hourly.time,hPrec:data.hourly.precipitation_probability};
     wxErr=false;
   }catch(e){wxErr=true;wxData=null}
   render();
+}
+
+const SHIFT_HR={"早":[6,7,8],"中":[13,14,15],"晚":[18,19,20]};
+function rainWarnHtml(){
+  if(!wxData||!wxData.hPrec||S.step!=="cal")return"";
+  const sh=gs(TY,TM,TD);if(!sh||sh==="休")return"";
+  const hrs=SHIFT_HR[sh];if(!hrs)return"";
+  const ds=`${TY}-${String(TM).padStart(2,"0")}-${String(TD).padStart(2,"0")}`;
+  let mx=0;
+  hrs.forEach(h=>{const k=ds+"T"+String(h).padStart(2,"0")+":00";const i=wxData.hTime.indexOf(k);if(i>=0&&wxData.hPrec[i]>mx)mx=wxData.hPrec[i]});
+  if(mx<40)return"";
+  const sn=lang==="zh"?{"早":"早班","中":"中班","晚":"晚班"}[sh]:{"早":"Pagi","中":"Siang","晚":"Malam"}[sh];
+  const tr=`${String(hrs[0]).padStart(2,"0")}:00-${String(hrs[hrs.length-1]+1).padStart(2,"0")}:00`;
+  const tip=lang==="zh"?`🌂 ${sn}出門注意！${tr} 降雨機率 ${mx}%，建議攜帶雨具`:`🌂 ${sn}: hujan ${mx}% (${tr}), bawa payung!`;
+  const bg=mx>=70?"var(--red-l)":"var(--amber-l)",bc=mx>=70?"var(--red)":"var(--amber)",tc=mx>=70?"var(--red)":"#b36b00";
+  return`<div class="rain-warn fi" style="margin:4px 0;padding:7px 10px;background:${bg};border-left:3px solid ${bc};border-radius:3px;font-size:10px;font-weight:600;color:${tc}">${tip}</div>`
 }
 function wxHtml(){
   if(wxErr)return`<div class="wx-card fi"><div class="wx-err">🌡️ <button data-a="wxR">${lang==="zh"?"載入天氣":"Muat Cuaca"}</button></div></div>`;
