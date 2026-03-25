@@ -314,7 +314,7 @@ function rMod(){
   let alP="";if(hasAL){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayAL?' selected':''}>${h} ${t("hr")}</option>`}alP=`<div class="al-pick"><label>🌴 ${t("alPick")} (${t("alRem")}: ${alRem()}${t("hr")})</label><select id="alSel" data-a="alh">${opts}</select></div>`}
   return`<div class="modal-bg" data-a="close"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
   <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${holL}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}
-  <button class="modal-alarm" data-a="alarm">${t("alarm")}</button><button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
+  <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
 
 function rHelp(){
   const steps=t("h");
@@ -348,7 +348,6 @@ function handle(e){
     case "lang":lang=lang==="zh"?"id":"zh";try{localStorage.setItem("sb_l",lang)}catch(e){}break;
     case "tev":{const{y,m,d}=S.modal;const k=ek(y,m,d),eid=el.dataset.eid;if(!EVS[k])EVS[k]=[];const i=EVS[k].indexOf(eid);if(i>=0){EVS[k].splice(i,1);if(eid==="annualL")delete ALD[k]}else{EVS[k].push(eid);if(eid==="annualL"&&!ALD[k])ALD[k]=4}if(!EVS[k].length)delete EVS[k];sEv();sAL();break}
     case "alh":{const{y,m,d}=S.modal;const sel=document.getElementById("alSel");if(sel)ALD[ek(y,m,d)]=parseFloat(sel.value);sAL();return}
-    case "alarm":{const{y,m,d}=S.modal,ev=EVS[ek(y,m,d)]||[],s=gs(y,m,d);const txt=ev.map(id=>en(id)).join(", ")||t("sRem");if("Notification" in window){const go=()=>{const tm=new Date(y,m-1,d,7,0,0),diff=tm-new Date();if(diff<=0){new Notification(t("sRem"),{body:`${sf(s)} — ${txt}`});alert(t("aNow"))}else{setTimeout(()=>{new Notification(t("sRem"),{body:`${sf(s)} — ${txt}`})},diff);alert(t("aSet").replace("#m#",m).replace("#d#",d))}};if(Notification.permission==="granted")go();else if(Notification.permission!=="denied")Notification.requestPermission().then(p=>{if(p==="granted")go();else alert(t("aNoPerm"))});else alert(t("aBlock"))}else alert(t("aNo"));return}
     case "inst":if(DP){DP.prompt();DP.userChoice.then(()=>{DP=null;render()})}break;
     case "hideI":S.instH=true;break;
     case "wxR":wxErr=false;wxData=null;render();loadWx();return;
