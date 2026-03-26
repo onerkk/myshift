@@ -346,8 +346,8 @@ function handle(e){
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
     case "help":S.showH=true;break;
-    case "backup":{if(S.rt&&S.pos!==null){const code=S.rt+":"+S.pos;const msg=lang==="zh"?"📋 你的備份碼（截圖或抄下）：\n\n"+code+"\n\n清除資料後，用此碼恢復班表":"📋 Kode backup:\n\n"+code+"\n\nGunakan kode ini untuk restore";prompt(msg,code)}break}
-    case "restore":{const code=prompt(lang==="zh"?"貼上備份碼：":"Masukkan kode backup:");if(code){const p=code.trim().split(":");if(p.length===2&&R[p[0]]&&!isNaN(+p[1])){S.rt=p[0];S.pos=+p[1];S.step="cal";sv();render()}else{alert(lang==="zh"?"備份碼格式錯誤":"Kode tidak valid")}}break}
+    case "backup":{if(S.rt&&S.pos!==null){const d=btoa(unescape(encodeURIComponent(JSON.stringify({rt:S.rt,pos:S.pos,ev:EVS,al:AL,ald:ALD,lang:lang}))));const msg=lang==="zh"?"📋 備份碼已產生（長按複製）：\n\n清除資料後，在 STEP 1 貼上即可恢復所有設定（含特休、標記事項）":"📋 Kode backup (tekan lama untuk copy):\n\nRestore semua data di STEP 1";prompt(msg,d)}break}
+    case "restore":{const code=prompt(lang==="zh"?"貼上備份碼：":"Masukkan kode backup:");if(code){try{const c=code.trim();let d;if(c.includes(":")){const p=c.split(":");if(R[p[0]]&&!isNaN(+p[1])){d={rt:p[0],pos:+p[1]}}}else{d=JSON.parse(decodeURIComponent(escape(atob(c))))}if(d&&d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;S.step="cal";sv();if(d.ev){EVS=d.ev;sEv()}if(d.al){AL=d.al;ALD=d.ald||{};sAL()}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)}render()}else{alert(lang==="zh"?"備份碼格式錯誤":"Kode tidak valid")}}catch(e){alert(lang==="zh"?"備份碼格式錯誤":"Kode tidak valid")}}break}
     case "closeH":S.showH=false;break;
     case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);break;
     case "lid":lang="id";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);break;
