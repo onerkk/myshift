@@ -440,6 +440,7 @@ function adminEvModalHtml(y,m,d){
 function addAdminEvBtn(date,type){setAdminEv(date,type,true)}
 function removeAdminEvBtn(date,type){setAdminEv(date,type,false)}
 function tideHtml(){
+  if(wxData&&!tideData)return`<div class="tide-card fi"><div style="font-size:11px;color:var(--tx3);text-align:center;padding:6px">🌊 ${lang==="zh"?"潮汐資料載入中...":"Memuat data pasut..."}</div></div>`;
   if(!tideData||!tideData.tides||!tideData.tides.length)return"";
   const wk=t("wk");
   const byDate={};
@@ -559,23 +560,43 @@ async function loadWx(){
       let nearest=TIDE_STATIONS[0],minD=9999;
       TIDE_STATIONS.forEach(s=>{const d=Math.sqrt(Math.pow(s.la-lat,2)+Math.pow(s.lo-lon,2));if(d<minD){minD=d;nearest=s}});
       const tUrl=`https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization=CWA-2ABF6180-86FE-4E30-80B0-3B904EC58BFE&LocationName=${encodeURIComponent(nearest.n)}&sort=dataTime`;
-      const td=await(await fetch(tUrl)).json();
-      const loc=td.records?.location?.[0];
-      if(loc){
-        const tides=[];
-        loc.validTime?.forEach(vt=>{
-          const date=vt.startTime.split(" ")[0];
-          const items=vt.weatherElement?.[0]?.time||[];
-          items.forEach(item=>{
-            const dt=item.dataTime||"";
-            const type=(item.parameter?.find(p=>p.parameterName==="潮汐")||{}).parameterValue||"";
-            const h=parseFloat((item.parameter?.find(p=>p.parameterName==="相對臺灣高程系統")||{}).parameterValue)||0;
-            tides.push({date:date,time:dt,type:type,height:h});
+      console.log("Tide URL:",tUrl);
+      const tResp=await fetch(tUrl);
+      const td=await tResp.json();
+      console.log("Tide API raw:",JSON.stringify(td).slice(0,500));
+      const tides=[];
+      try{
+        const locs=td.records?.location||td.records?.Location||td.records?.TideForecasts?.Location||[];
+        const loc=Array.isArray(locs)?locs[0]:null;
+        console.log("Tide loc keys:",loc?Object.keys(loc):"null");
+        if(loc){
+          const vts=loc.validTime||loc.ValidTime||loc.TimePeriods?.Daily||[];
+          console.log("Tide vts count:",vts.length,"first keys:",vts[0]?Object.keys(vts[0]):"null");
+          vts.forEach(vt=>{
+            const date=(vt.startTime||vt.StartTime||vt.Date||"").split(" ")[0].split("T")[0];
+            const elems=vt.weatherElement||vt.WeatherElement||[];
+            const times=elems[0]?.time||elems[0]?.Time||vt.Time||vt.time||[];
+            times.forEach(item=>{
+              const dt=item.dataTime||item.DataTime||item.DateTime||"";
+              const params=item.parameter||item.Parameter||[];
+              let type="",h=0;
+              if(Array.isArray(params)){
+                params.forEach(p=>{
+                  const pn=p.parameterName||p.ParameterName||"";
+                  const pv=p.parameterValue||p.ParameterValue||"";
+                  if(pn.includes("潮汐")||pn==="Tide")type=pv;
+                  if(pn.includes("臺灣高程")||pn.includes("TWVD"))h=parseFloat(pv)||0;
+                });
+              }
+              if(type&&dt)tides.push({date:date||dt.split(" ")[0].split("T")[0],time:dt,type:type,height:h});
+            });
           });
-        });
-        tideData={station:nearest.n,tides:tides};
-      }
-    }catch(e){tideData=null}
+        }
+      }catch(pe){console.log("Tide parse err:",pe)}
+      console.log("Tide parsed:",tides.length,"entries");
+      if(tides.length)tideData={station:nearest.n,tides:tides};
+      else tideData=null;
+    }catch(e){console.log("Tide load err:",e.message||e);tideData=null}
   }catch(e){wxErr=true;wxData=null}
   render();
 }
