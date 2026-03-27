@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v18';
+const CACHE_NAME = 'myshift-v19';
 const urlsToCache = [
   './',
   './index.html',
