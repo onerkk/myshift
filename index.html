@@ -100,6 +100,20 @@ input,select{font-family:inherit;outline:none}
 .fb-bar .fb-user{display:flex;align-items:center;gap:5px;font-weight:600;color:var(--tx)}
 .fb-bar .fb-avatar{width:20px;height:20px;border-radius:50%}
 .day.admin-ev{background:rgba(198,40,40,.12)!important;border:1px solid rgba(198,40,40,.3)!important}
+.tide-card{margin:4px 0;padding:10px;background:var(--card);border-radius:var(--r);box-shadow:var(--sh)}
+.tide-fc{display:flex;gap:4px;overflow-x:auto;padding:6px 0}
+.tide-day{min-width:70px;text-align:center;padding:6px 4px;border-radius:var(--r);border:1px solid #eee;font-size:10px}
+.tide-day.today{border-color:var(--pri);background:var(--pri-l)}
+.tide-wave{font-size:16px;font-weight:700;color:var(--pri-d)}
+.wx-detail{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}
+.wx-detail-sheet{background:var(--bg);border-radius:16px 16px 0 0;width:100%;max-width:420px;max-height:80vh;overflow-y:auto;padding:16px}
+.wx-detail-title{font-size:14px;font-weight:700;margin-bottom:10px;text-align:center}
+.wx-detail-grid{display:grid;grid-template-columns:60px 1fr 50px 50px 50px;gap:2px;font-size:10px}
+.wx-detail-grid .hdr{font-weight:700;color:var(--tx2);padding:4px 2px;border-bottom:1px solid #ddd}
+.wx-detail-grid .cell{padding:4px 2px;border-bottom:1px solid #f0f0f0}
+.admin-leave-edit{margin:8px 0;padding:8px;background:var(--card);border-radius:var(--r);border:1px dashed var(--amber)}
+.admin-leave-edit label{font-size:10px;color:var(--tx2);font-weight:600}
+.admin-leave-edit input{width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px;text-align:center;margin:0 6px}
 .leave-badge{position:absolute;top:1px;right:1px;background:var(--red);color:#fff;font-size:7px;font-weight:700;border-radius:50%;width:14px;height:14px;display:flex;align-items:center;justify-content:center;line-height:1}
 .leave-info{margin:8px 0;padding:7px 10px;background:var(--amber-l);border-left:3px solid var(--amber);border-radius:3px;font-size:11px;color:#b36b00;font-weight:600}
 .leave-list{font-size:10px;color:var(--tx2);margin-top:4px}
@@ -308,7 +322,7 @@ function render(){
   if(S.step==="type")a.innerHTML=rType();
   else if(S.step==="wiz")a.innerHTML=rWiz();
   else a.innerHTML=rCal();
-  document.getElementById("mr").innerHTML=S.modal?rMod():S.showH?rHelp():"";
+  document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():"";
   document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
 }
 
@@ -393,7 +407,21 @@ function modalLeaveHtml(y,m,d){
       html+=`<button class="modal-done" style="background:var(--amber);margin-bottom:8px" onclick="addLeave('${date}','leave')">${lang==="zh"?"📋 我要請假":"📋 Ajukan cuti"}</button>`;
     }
   }
+  if(isAdmin()){
+    html+=`<div class="admin-leave-edit"><label>👑 ${lang==="zh"?"管理員：手動設定請假人數":"Admin: Set jumlah cuti"}</label><div style="margin-top:4px;display:flex;align-items:center;gap:4px"><input type="number" id="adminLeaveN" min="0" value="${leaves.length}" placeholder="0"><button onclick="adminSetLeave('${date}')" style="background:var(--pri);color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer">${lang==="zh"?"確認":"OK"}</button></div></div>`;
+  }
   return html;
+}
+async function adminSetLeave(date){
+  if(!isAdmin())return;
+  const n=parseInt(document.getElementById("adminLeaveN").value)||0;
+  const current=getLeaves(date);
+  const adminEntries=current.filter(l=>l.uid.startsWith("admin_"));
+  for(const e of adminEntries){await fbDb.collection("leaves").doc(e.uid+"_"+date).delete()}
+  const realCount=current.filter(l=>!l.uid.startsWith("admin_")).length;
+  const need=n-realCount;
+  for(let i=0;i<need;i++){const id="admin_"+i+"_"+date;await fbDb.collection("leaves").doc(id).set({uid:"admin_"+i,name:lang==="zh"?"員工":"Staff",date:date,ym:date.slice(0,7),type:"leave",ts:firebase.firestore.FieldValue.serverTimestamp()})}
+  loadLeaves();
 }
 function adminEvModalHtml(y,m,d){
   const date=ek(y,m,d),aevs=getAdminEv(date);
@@ -411,6 +439,56 @@ function adminEvModalHtml(y,m,d){
 }
 function addAdminEvBtn(date,type){setAdminEv(date,type,true)}
 function removeAdminEvBtn(date,type){setAdminEv(date,type,false)}
+function tideHtml(){
+  if(!tideData)return"";
+  const wk=t("wk");
+  const dirName=d=>{const dirs=["N","NE","E","SE","S","SW","W","NW"];return dirs[Math.round(d/45)%8]};
+  const fc=tideData.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();
+    const wh=f.waveH!==null?f.waveH.toFixed(1):"--";
+    return`<div class="tide-day${i===0?' today':''}" onclick="showTideDetail(${i});event.stopPropagation()"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div style="font-size:14px">🌊</div><div class="tide-wave">${wh}m</div><div style="font-size:8px;color:var(--tx3)">${f.waveP?f.waveP.toFixed(0)+"s":""} ${f.waveD?dirName(f.waveD):""}</div></div>`}).join("");
+  return`<div class="tide-card fi" style="cursor:pointer"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:12px;font-weight:700">🌊 ${lang==="zh"?"7日海況預報":"Prakiraan Laut 7 Hari"}</div><div style="font-size:9px;color:var(--tx3)">▸ ${lang==="zh"?"點選看詳情":"Ketuk detail"}</div></div><div class="tide-fc">${fc}</div></div>`}
+
+let wxDetailShow=false,wxDetailDay=0,tideDetailShow=false,tideDetailDay=0;
+function showWxDetail(){wxDetailShow=true;wxDetailDay=0;render()}
+function showTideDetail(i){tideDetailShow=true;tideDetailDay=i||0;render()}
+function closeWxDetail(){wxDetailShow=false;render()}
+function closeTideDetail(){tideDetailShow=false;render()}
+
+function wxDetailHtml(){
+  if(!wxDetailShow||!wxData)return"";
+  const desc=lang==="zh"?WXZ:WXD;
+  let rows="";
+  const today=wxData.days[wxDetailDay].date;
+  for(let h=0;h<24;h++){
+    const k=today+"T"+String(h).padStart(2,"0")+":00";
+    const i=wxData.hTime.indexOf(k);if(i<0)continue;
+    const tmp=wxData.hTemp?Math.round(wxData.hTemp[i]):"--";
+    const prec=wxData.hPrec?wxData.hPrec[i]+"%":"--";
+    const wind=wxData.hWind?wxData.hWind[i].toFixed(0)+"km/h":"--";
+    const hum=wxData.hHum?wxData.hHum[i]+"%":"--";
+    const code=wxData.hCode?wxData.hCode[i]:0;
+    rows+=`<div class="cell">${String(h).padStart(2,"0")}:00</div><div class="cell">${WXI[code]||""} ${tmp}°</div><div class="cell">${prec}</div><div class="cell">${wind}</div><div class="cell">${hum}</div>`;
+  }
+  const dayTabs=wxData.days.map((d,i)=>{const dt=new Date(d.date);return`<button onclick="wxDetailDay=${i};render();event.stopPropagation()" style="padding:4px 8px;border:none;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;${i===wxDetailDay?'background:var(--pri);color:#fff':'background:#eee;color:var(--tx2)'}">${i===0?(lang==="zh"?"今天":"Hari ini"):t("wk")[dt.getDay()]}</button>`}).join("");
+  return`<div class="wx-detail" onclick="closeWxDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">${lang==="zh"?"⛅ 每小時天氣":"⛅ Cuaca Per Jam"}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div class="wx-detail-grid"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"天氣":"Cuaca"}</div><div class="hdr">${lang==="zh"?"降雨":"Hujan"}</div><div class="hdr">${lang==="zh"?"風速":"Angin"}</div><div class="hdr">${lang==="zh"?"濕度":"Humid"}</div>${rows}</div><button class="modal-done" onclick="closeWxDetail()" style="margin-top:12px">${t("done")}</button></div></div>`}
+
+function tideDetailHtml(){
+  if(!tideDetailShow||!tideData)return"";
+  const wk=t("wk");
+  const dirName=d=>{const dirs=["N","NE","E","SE","S","SW","W","NW"];return dirs[Math.round(d/45)%8]};
+  let rows="";
+  const today=tideData.days[tideDetailDay].date;
+  for(let h=0;h<24;h++){
+    const k=today+"T"+String(h).padStart(2,"0")+":00";
+    const i=tideData.hTime.indexOf(k);if(i<0)continue;
+    const wh=tideData.hWave&&tideData.hWave[i]!==null?tideData.hWave[i].toFixed(1)+"m":"--";
+    const wp=tideData.hPer&&tideData.hPer[i]!==null?tideData.hPer[i].toFixed(0)+"s":"--";
+    const wd=tideData.hDir&&tideData.hDir[i]!==null?dirName(tideData.hDir[i]):"--";
+    rows+=`<div class="cell">${String(h).padStart(2,"0")}:00</div><div class="cell" style="font-weight:700;color:var(--pri-d)">${wh}</div><div class="cell">${wp}</div><div class="cell">${wd}</div>`;
+  }
+  const dayTabs=tideData.days.map((d,i)=>{const dt=new Date(d.date);return`<button onclick="tideDetailDay=${i};render();event.stopPropagation()" style="padding:4px 8px;border:none;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;${i===tideDetailDay?'background:var(--pri);color:#fff':'background:#eee;color:var(--tx2)'}">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dt.getDay()]}</button>`}).join("");
+  return`<div class="wx-detail" onclick="closeTideDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">🌊 ${lang==="zh"?"每小時海況":"Kondisi Laut Per Jam"}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div style="display:grid;grid-template-columns:60px 1fr 60px 60px;gap:2px;font-size:10px"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"浪高":"Ombak"}</div><div class="hdr">${lang==="zh"?"週期":"Period"}</div><div class="hdr">${lang==="zh"?"方向":"Arah"}</div>${rows}</div><button class="modal-done" onclick="closeTideDetail()" style="margin-top:12px">${t("done")}</button></div></div>`}
+
 function rHelp(){
   const steps=t("h");
   return`<div class="modal-bg" data-a="closeH"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${t("helpT")}</div><div style="height:12px"></div>
@@ -462,14 +540,23 @@ try{render();}catch(e){document.getElementById("app").innerHTML="<div style='pad
 const WXI={0:"☀️",1:"🌤",2:"⛅",3:"☁️",45:"🌫",48:"🌫",51:"🌦",53:"🌧",55:"🌧",61:"🌧",63:"🌧️",65:"🌧️",71:"🌨",73:"🌨",75:"❄️",80:"🌦",81:"🌧",82:"⛈",95:"⛈"};
 const WXZ={0:"晴天",1:"大致晴",2:"局部多雲",3:"多雲",45:"霧",48:"霧",51:"小雨",53:"中雨",55:"大雨",61:"小雨",63:"中雨",65:"大雨",71:"小雪",73:"中雪",75:"大雪",80:"陣雨",81:"陣雨",82:"暴雨",95:"雷雨"};
 const WXD={0:"Cerah",1:"Cerah",2:"Berawan",3:"Mendung",45:"Kabut",48:"Kabut",51:"Gerimis",53:"Hujan",55:"Hujan Lebat",61:"Hujan",63:"Hujan",65:"Hujan Lebat",71:"Salju",80:"Hujan",81:"Hujan",82:"Badai",95:"Petir"};
+let tideData=null;
 async function loadWx(){
   try{
     const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:8000,maximumAge:600000})});
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude.toFixed(2)}&longitude=${pos.coords.longitude.toFixed(2)}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability&timezone=auto&forecast_days=7`;
+    const lat=pos.coords.latitude.toFixed(2),lon=pos.coords.longitude.toFixed(2);
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability,temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&timezone=auto&forecast_days=7`;
     const data=await(await fetch(url)).json();
-    wxData={temp:Math.round(data.current.temperature_2m),code:data.current.weather_code,
-      days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])})),hTime:data.hourly.time,hPrec:data.hourly.precipitation_probability};
+    wxData={temp:Math.round(data.current.temperature_2m),code:data.current.weather_code,lat:lat,lon:lon,
+      days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])})),
+      hTime:data.hourly.time,hPrec:data.hourly.precipitation_probability,hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m};
     wxErr=false;
+    try{
+      const tUrl=`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&daily=wave_height_max,wave_period_max,wave_direction_dominant&hourly=wave_height,wave_direction,wave_period&timezone=auto&forecast_days=7`;
+      const td=await(await fetch(tUrl)).json();
+      tideData={days:td.daily.time.map((t,i)=>({date:t,waveH:td.daily.wave_height_max[i],waveP:td.daily.wave_period_max[i],waveD:td.daily.wave_direction_dominant[i]})),
+        hTime:td.hourly.time,hWave:td.hourly.wave_height,hDir:td.hourly.wave_direction,hPer:td.hourly.wave_period};
+    }catch(e){tideData=null}
   }catch(e){wxErr=true;wxData=null}
   render();
 }
@@ -495,7 +582,7 @@ function wxHtml(){
   const d=wxData,wk=t("wk"),desc=lang==="zh"?WXZ:WXD;
   const fc=d.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();
     return`<div class="wx-day${i===0?' today':''}"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div class="wx-day-icon">${WXI[f.code]||"🌡"}</div><div class="wx-day-hi">${f.hi}°</div><div class="wx-day-lo">${f.lo}°</div></div>`}).join("");
-  return`<div class="wx-card fi"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"7日天氣預報":"Prakiraan 7 Hari"}</div></div><div class="wx-fc">${fc}</div></div>`}
+  return`<div class="wx-card fi" onclick="showWxDetail()" style="cursor:pointer"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"7日天氣預報 ▸":"Prakiraan 7 Hari ▸"}</div></div><div class="wx-fc">${fc}</div></div>${tideHtml()}`}
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 if(navigator.geolocation)loadWx();
 loadAdminEv();
