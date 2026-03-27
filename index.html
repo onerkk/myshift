@@ -440,17 +440,22 @@ function adminEvModalHtml(y,m,d){
 function addAdminEvBtn(date,type){setAdminEv(date,type,true)}
 function removeAdminEvBtn(date,type){setAdminEv(date,type,false)}
 function tideHtml(){
-  if(!tideData)return"";
+  if(!tideData||!tideData.tides||!tideData.tides.length)return"";
   const wk=t("wk");
-  const dirName=d=>{const dirs=["N","NE","E","SE","S","SW","W","NW"];return dirs[Math.round(d/45)%8]};
-  const fc=tideData.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();
-    const wh=f.waveH!==null?f.waveH.toFixed(1):"--";
-    return`<div class="tide-day${i===0?' today':''}" onclick="showTideDetail(${i});event.stopPropagation()"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div style="font-size:14px">🌊</div><div class="tide-wave">${wh}m</div><div style="font-size:8px;color:var(--tx3)">${f.waveP?f.waveP.toFixed(0)+"s":""} ${f.waveD?dirName(f.waveD):""}</div></div>`}).join("");
-  return`<div class="tide-card fi" style="cursor:pointer"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:12px;font-weight:700">🌊 ${lang==="zh"?"7日海況預報":"Prakiraan Laut 7 Hari"}</div><div style="font-size:9px;color:var(--tx3)">▸ ${lang==="zh"?"點選看詳情":"Ketuk detail"}</div></div><div class="tide-fc">${fc}</div></div>`}
+  const byDate={};
+  tideData.tides.forEach(t=>{if(!byDate[t.date])byDate[t.date]=[];byDate[t.date].push(t)});
+  const dates=Object.keys(byDate).sort().slice(0,7);
+  const fc=dates.map((date,i)=>{
+    const dt=new Date(date),dw=dt.getDay();
+    const items=byDate[date];
+    const hi=items.filter(x=>x.type==="滿潮").sort((a,b)=>b.height-a.height)[0];
+    const lo=items.filter(x=>x.type==="乾潮").sort((a,b)=>a.height-b.height)[0];
+    return`<div class="tide-day${i===0?' today':''}" onclick="showTideDetail('${date}');event.stopPropagation()"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div style="font-size:9px;color:var(--red);font-weight:600">▲${hi?hi.time.slice(11,16):""}</div><div class="tide-wave" style="font-size:12px">${hi?hi.height+"cm":""}</div><div style="font-size:9px;color:#1565c0;font-weight:600">▼${lo?lo.time.slice(11,16):""}</div><div style="font-size:10px;color:#1565c0">${lo?lo.height+"cm":""}</div></div>`}).join("");
+  return`<div class="tide-card fi" style="cursor:pointer"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:12px;font-weight:700">🌊 ${lang==="zh"?tideData.station+" 潮汐預報":"Pasang Surut "+tideData.station}</div><div style="font-size:9px;color:var(--tx3)">▸ ${lang==="zh"?"點選看詳情":"Ketuk detail"}</div></div><div class="tide-fc">${fc}</div></div>`}
 
 let wxDetailShow=false,wxDetailDay=0,tideDetailShow=false,tideDetailDay=0;
 function showWxDetail(){wxDetailShow=true;wxDetailDay=0;render()}
-function showTideDetail(i){tideDetailShow=true;tideDetailDay=i||0;render()}
+function showTideDetail(d){tideDetailShow=true;tideDetailDay=d||0;render()}
 function closeWxDetail(){wxDetailShow=false;render()}
 function closeTideDetail(){tideDetailShow=false;render()}
 
@@ -475,19 +480,17 @@ function wxDetailHtml(){
 function tideDetailHtml(){
   if(!tideDetailShow||!tideData)return"";
   const wk=t("wk");
-  const dirName=d=>{const dirs=["N","NE","E","SE","S","SW","W","NW"];return dirs[Math.round(d/45)%8]};
-  let rows="";
-  const today=tideData.days[tideDetailDay].date;
-  for(let h=0;h<24;h++){
-    const k=today+"T"+String(h).padStart(2,"0")+":00";
-    const i=tideData.hTime.indexOf(k);if(i<0)continue;
-    const wh=tideData.hWave&&tideData.hWave[i]!==null?tideData.hWave[i].toFixed(1)+"m":"--";
-    const wp=tideData.hPer&&tideData.hPer[i]!==null?tideData.hPer[i].toFixed(0)+"s":"--";
-    const wd=tideData.hDir&&tideData.hDir[i]!==null?dirName(tideData.hDir[i]):"--";
-    rows+=`<div class="cell">${String(h).padStart(2,"0")}:00</div><div class="cell" style="font-weight:700;color:var(--pri-d)">${wh}</div><div class="cell">${wp}</div><div class="cell">${wd}</div>`;
-  }
-  const dayTabs=tideData.days.map((d,i)=>{const dt=new Date(d.date);return`<button onclick="tideDetailDay=${i};render();event.stopPropagation()" style="padding:4px 8px;border:none;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;${i===tideDetailDay?'background:var(--pri);color:#fff':'background:#eee;color:var(--tx2)'}">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dt.getDay()]}</button>`}).join("");
-  return`<div class="wx-detail" onclick="closeTideDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">🌊 ${lang==="zh"?"每小時海況":"Kondisi Laut Per Jam"}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div style="display:grid;grid-template-columns:60px 1fr 60px 60px;gap:2px;font-size:10px"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"浪高":"Ombak"}</div><div class="hdr">${lang==="zh"?"週期":"Period"}</div><div class="hdr">${lang==="zh"?"方向":"Arah"}</div>${rows}</div><button class="modal-done" onclick="closeTideDetail()" style="margin-top:12px">${t("done")}</button></div></div>`}
+  const byDate={};
+  tideData.tides.forEach(t=>{if(!byDate[t.date])byDate[t.date]=[];byDate[t.date].push(t)});
+  const dates=Object.keys(byDate).sort().slice(0,7);
+  const selDate=typeof tideDetailDay==="string"?tideDetailDay:dates[0];
+  const items=(byDate[selDate]||[]).sort((a,b)=>a.time.localeCompare(b.time));
+  let rows=items.map(item=>{
+    const isHi=item.type==="滿潮";
+    return`<div class="cell" style="font-weight:600">${item.time.slice(11,16)}</div><div class="cell" style="color:${isHi?"var(--red)":"#1565c0"};font-weight:700">${isHi?"▲ 滿潮":"▼ 乾潮"}</div><div class="cell" style="font-size:14px;font-weight:700">${item.height} cm</div>`;
+  }).join("");
+  const dayTabs=dates.map((d,i)=>{const dt=new Date(d);return`<button onclick="tideDetailDay='${d}';render();event.stopPropagation()" style="padding:4px 8px;border:none;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;${d===selDate?'background:var(--pri);color:#fff':'background:#eee;color:var(--tx2)'}">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dt.getDay()]}</button>`}).join("");
+  return`<div class="wx-detail" onclick="closeTideDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">🌊 ${tideData.station} ${lang==="zh"?"潮汐詳情":"Detail Pasang Surut"}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div style="display:grid;grid-template-columns:70px 1fr 80px;gap:2px;font-size:12px"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"潮汐":"Pasut"}</div><div class="hdr">${lang==="zh"?"潮位":"Tinggi"}</div>${rows}</div><div style="margin-top:10px;font-size:9px;color:var(--tx3);text-align:center">${lang==="zh"?"資料來源：中央氣象署 · 潮位單位：相對臺灣高程系統(cm)":"Sumber: CWA Taiwan"}</div><button class="modal-done" onclick="closeTideDetail()" style="margin-top:8px">${t("done")}</button></div></div>`}
 
 function rHelp(){
   const steps=t("h");
@@ -552,10 +555,26 @@ async function loadWx(){
       hTime:data.hourly.time,hPrec:data.hourly.precipitation_probability,hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m};
     wxErr=false;
     try{
-      const tUrl=`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&daily=wave_height_max,wave_period_max,wave_direction_dominant&hourly=wave_height,wave_direction,wave_period&timezone=auto&forecast_days=7`;
+      const TIDE_STATIONS=[{n:"基隆",la:25.13,lo:121.74},{n:"淡水",la:25.17,lo:121.43},{n:"新竹",la:24.85,lo:120.92},{n:"臺中港",la:24.29,lo:120.52},{n:"布袋",la:23.37,lo:120.16},{n:"安平",la:22.97,lo:120.16},{n:"高雄",la:22.61,lo:120.29},{n:"花蓮",la:23.97,lo:121.62},{n:"臺東",la:22.75,lo:121.14},{n:"蘇澳",la:24.59,lo:121.87},{n:"馬祖",la:26.17,lo:119.95},{n:"金門",la:24.45,lo:118.38},{n:"澎湖",la:23.57,lo:119.58}];
+      let nearest=TIDE_STATIONS[0],minD=9999;
+      TIDE_STATIONS.forEach(s=>{const d=Math.sqrt(Math.pow(s.la-lat,2)+Math.pow(s.lo-lon,2));if(d<minD){minD=d;nearest=s}});
+      const tUrl=`https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization=CWA-2ABF6180-86FE-4E30-80B0-3B904EC58BFE&LocationName=${encodeURIComponent(nearest.n)}&sort=dataTime`;
       const td=await(await fetch(tUrl)).json();
-      tideData={days:td.daily.time.map((t,i)=>({date:t,waveH:td.daily.wave_height_max[i],waveP:td.daily.wave_period_max[i],waveD:td.daily.wave_direction_dominant[i]})),
-        hTime:td.hourly.time,hWave:td.hourly.wave_height,hDir:td.hourly.wave_direction,hPer:td.hourly.wave_period};
+      const loc=td.records?.location?.[0];
+      if(loc){
+        const tides=[];
+        loc.validTime?.forEach(vt=>{
+          const date=vt.startTime.split(" ")[0];
+          const items=vt.weatherElement?.[0]?.time||[];
+          items.forEach(item=>{
+            const dt=item.dataTime||"";
+            const type=(item.parameter?.find(p=>p.parameterName==="潮汐")||{}).parameterValue||"";
+            const h=parseFloat((item.parameter?.find(p=>p.parameterName==="相對臺灣高程系統")||{}).parameterValue)||0;
+            tides.push({date:date,time:dt,type:type,height:h});
+          });
+        });
+        tideData={station:nearest.n,tides:tides};
+      }
     }catch(e){tideData=null}
   }catch(e){wxErr=true;wxData=null}
   render();
