@@ -440,6 +440,7 @@ function adminEvModalHtml(y,m,d){
 function addAdminEvBtn(date,type){setAdminEv(date,type,true)}
 function removeAdminEvBtn(date,type){setAdminEv(date,type,false)}
 function tideHtml(){
+  if(tideErr)return"";
   if(wxData&&!tideData)return`<div class="tide-card fi"><div style="font-size:11px;color:var(--tx3);text-align:center;padding:6px">🌊 ${lang==="zh"?"潮汐資料載入中...":"Memuat data pasut..."}</div></div>`;
   if(!tideData||!tideData.tides||!tideData.tides.length)return"";
   const wk=t("wk");
@@ -544,7 +545,7 @@ try{render();}catch(e){document.getElementById("app").innerHTML="<div style='pad
 const WXI={0:"☀️",1:"🌤",2:"⛅",3:"☁️",45:"🌫",48:"🌫",51:"🌦",53:"🌧",55:"🌧",61:"🌧",63:"🌧️",65:"🌧️",71:"🌨",73:"🌨",75:"❄️",80:"🌦",81:"🌧",82:"⛈",95:"⛈"};
 const WXZ={0:"晴天",1:"大致晴",2:"局部多雲",3:"多雲",45:"霧",48:"霧",51:"小雨",53:"中雨",55:"大雨",61:"小雨",63:"中雨",65:"大雨",71:"小雪",73:"中雪",75:"大雪",80:"陣雨",81:"陣雨",82:"暴雨",95:"雷雨"};
 const WXD={0:"Cerah",1:"Cerah",2:"Berawan",3:"Mendung",45:"Kabut",48:"Kabut",51:"Gerimis",53:"Hujan",55:"Hujan Lebat",61:"Hujan",63:"Hujan",65:"Hujan Lebat",71:"Salju",80:"Hujan",81:"Hujan",82:"Badai",95:"Petir"};
-let tideData=null;
+let tideData=null,tideErr=false;
 async function loadWx(){
   try{
     const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:8000,maximumAge:600000})});
@@ -559,9 +560,9 @@ async function loadWx(){
       const TIDE_STATIONS=[{n:"基隆",la:25.13,lo:121.74},{n:"淡水",la:25.17,lo:121.43},{n:"新竹",la:24.85,lo:120.92},{n:"臺中港",la:24.29,lo:120.52},{n:"布袋",la:23.37,lo:120.16},{n:"安平",la:22.97,lo:120.16},{n:"高雄",la:22.61,lo:120.29},{n:"花蓮",la:23.97,lo:121.62},{n:"臺東",la:22.75,lo:121.14},{n:"蘇澳",la:24.59,lo:121.87},{n:"馬祖",la:26.17,lo:119.95},{n:"金門",la:24.45,lo:118.38},{n:"澎湖",la:23.57,lo:119.58}];
       let nearest=TIDE_STATIONS[0],minD=9999;
       TIDE_STATIONS.forEach(s=>{const d=Math.sqrt(Math.pow(s.la-lat,2)+Math.pow(s.lo-lon,2));if(d<minD){minD=d;nearest=s}});
-      const tUrl=`https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization=CWA-2ABF6180-86FE-4E30-80B0-3B904EC58BFE&LocationName=${encodeURIComponent(nearest.n)}&sort=dataTime`;
-      console.log("Tide URL:",tUrl);
-      const tResp=await fetch(tUrl);
+      const rawUrl=`https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization=CWA-2ABF6180-86FE-4E30-80B0-3B904EC58BFE&LocationName=${encodeURIComponent(nearest.n)}&sort=dataTime`;
+      let tResp;
+      try{tResp=await fetch(rawUrl)}catch(e){tResp=await fetch(`https://corsproxy.io/?url=${encodeURIComponent(rawUrl)}`)}
       const td=await tResp.json();
       console.log("Tide API raw:",JSON.stringify(td).slice(0,500));
       const tides=[];
@@ -594,9 +595,9 @@ async function loadWx(){
         }
       }catch(pe){console.log("Tide parse err:",pe)}
       console.log("Tide parsed:",tides.length,"entries");
-      if(tides.length)tideData={station:nearest.n,tides:tides};
+      if(tides.length){tideData={station:nearest.n,tides:tides};tideErr=false;}
       else tideData=null;
-    }catch(e){console.log("Tide load err:",e.message||e);tideData=null}
+    }catch(e){console.log("Tide load err:",e.message||e);tideData=null;tideErr=true}
   }catch(e){wxErr=true;wxData=null}
   render();
 }
