@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v41';
+const CACHE_NAME = 'myshift-v45';
 const urlsToCache = [
   './',
   './index.html',
@@ -6,7 +6,9 @@ const urlsToCache = [
   './styles.css',
   './manifest.json',
   './icons/icon-192x192.png',
-  './icons/icon-512x512.png'
+  './icons/icon-512x512.png',
+  './icons/icon-apple.png',
+  './images/splash-bg.jpg'
 ];
 
 self.addEventListener('install', event => {
