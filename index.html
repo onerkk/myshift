@@ -561,8 +561,13 @@ async function loadWx(){
       let nearest=TIDE_STATIONS[0],minD=9999;
       TIDE_STATIONS.forEach(s=>{const d=Math.sqrt(Math.pow(s.la-lat,2)+Math.pow(s.lo-lon,2));if(d<minD){minD=d;nearest=s}});
       const rawUrl=`https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization=CWA-2ABF6180-86FE-4E30-80B0-3B904EC58BFE&LocationName=${encodeURIComponent(nearest.n)}&sort=dataTime`;
+      const fetchT=(url,ms)=>Promise.race([fetch(url),new Promise((_,r)=>setTimeout(()=>r("timeout"),ms))]);
       let tResp;
-      try{tResp=await fetch(rawUrl)}catch(e){tResp=await fetch(`https://corsproxy.io/?url=${encodeURIComponent(rawUrl)}`)}
+      try{tResp=await fetchT(rawUrl,5000)}catch(e){
+        try{tResp=await fetchT(`https://api.allorigins.win/raw?url=${encodeURIComponent(rawUrl)}`,8000)}catch(e2){
+          throw new Error("all proxies failed")
+        }
+      }
       const td=await tResp.json();
       console.log("Tide API raw:",JSON.stringify(td).slice(0,500));
       const tides=[];
