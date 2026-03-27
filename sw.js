@@ -1,7 +1,9 @@
-const CACHE_NAME = 'myshift-v39';
+const CACHE_NAME = 'myshift-v40';
 const urlsToCache = [
   './',
   './index.html',
+  './app.js',
+  './styles.css',
   './manifest.json',
   './icons/icon-192x192.png',
   './icons/icon-512x512.png'
