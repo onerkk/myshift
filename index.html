@@ -441,7 +441,7 @@ function addAdminEvBtn(date,type){setAdminEv(date,type,true)}
 function removeAdminEvBtn(date,type){setAdminEv(date,type,false)}
 function tideHtml(){
   if(tideErr)return"";
-  if(wxData&&!tideData)return`<div class="tide-card fi"><div style="font-size:11px;color:var(--tx3);text-align:center;padding:6px">🌊 ${lang==="zh"?"海況資料載入中...":"Memuat data laut..."}</div></div>`;
+  if(wxData&&!tideData&&!tideErr)return`<div class="tide-card fi"><div style="font-size:11px;color:var(--tx3);text-align:center;padding:6px">🌊 ${lang==="zh"?"海況載入中...":"Memuat laut..."}</div></div>`;
   if(!tideData||!tideData.days)return"";
   const wk=t("wk");
   const dirN=d=>{if(d===null||d===undefined)return"";const dirs=["N","NE","E","SE","S","SW","W","NW"];return dirs[Math.round(d/45)%8]};
@@ -553,10 +553,16 @@ async function loadWx(){
       days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])})),
       hTime:data.hourly.time,hPrec:data.hourly.precipitation_probability,hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m};
     wxErr=false;
+    // Snap to nearest coast point for marine data
+    const COAST=[{la:25.16,lo:121.44},{la:25.13,lo:121.74},{la:24.85,lo:120.85},{la:24.26,lo:120.52},{la:23.57,lo:119.58},{la:23.00,lo:120.17},{la:22.61,lo:120.31},{la:22.75,lo:121.15},{la:23.97,lo:121.63},{la:24.59,lo:121.87},{la:26.17,lo:119.95},{la:24.45,lo:118.38}];
+    let cst=COAST[0],cD=9999;COAST.forEach(p=>{const d=Math.sqrt((p.la-lat)**2+(p.lo-lon)**2);if(d<cD){cD=d;cst=p}});
     try{
-      const tUrl=`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&daily=wave_height_max,wave_period_max,wave_direction_dominant&hourly=wave_height,wave_period,wave_direction&timezone=auto&forecast_days=7`;
-      const td=await(await fetch(tUrl)).json();
-      if(td.daily){tideData={type:"marine",days:td.daily.time.map((t,i)=>({date:t,waveH:td.daily.wave_height_max[i],waveP:td.daily.wave_period_max[i],waveD:td.daily.wave_direction_dominant[i]})),hTime:td.hourly.time,hWave:td.hourly.wave_height,hPer:td.hourly.wave_period,hDir:td.hourly.wave_direction};tideErr=false}
+      const tUrl=`https://marine-api.open-meteo.com/v1/marine?latitude=${cst.la}&longitude=${cst.lo}&daily=wave_height_max,wave_period_max,wave_direction_dominant&hourly=wave_height,wave_period,wave_direction&timezone=auto&forecast_days=7`;
+      const tResp=await Promise.race([fetch(tUrl),new Promise((_,r)=>setTimeout(()=>r("timeout"),8000))]);
+      const td=await tResp.json();
+      if(td.daily&&td.daily.wave_height_max&&td.daily.wave_height_max.some(v=>v!==null)){
+        tideData={type:"marine",days:td.daily.time.map((t,i)=>({date:t,waveH:td.daily.wave_height_max[i],waveP:td.daily.wave_period_max[i],waveD:td.daily.wave_direction_dominant[i]})),hTime:td.hourly.time,hWave:td.hourly.wave_height,hPer:td.hourly.wave_period,hDir:td.hourly.wave_direction};tideErr=false}
+      else{tideData=null;tideErr=true}
     }catch(e){tideData=null;tideErr=true}
   }catch(e){wxErr=true;wxData=null}
   render();
