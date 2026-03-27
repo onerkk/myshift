@@ -557,33 +557,23 @@ async function loadWx(){
       hTime:data.hourly.time,hPrec:data.hourly.precipitation_probability,hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m};
     wxErr=false;
     // Tide via Cloudflare Worker proxy → CWA API
-    const COAST=[{n:"基隆",la:25.13,lo:121.74},{n:"淡水",la:25.17,lo:121.43},{n:"新竹",la:24.85,lo:120.92},{n:"臺中港",la:24.29,lo:120.52},{n:"布袋",la:23.37,lo:120.16},{n:"安平",la:22.97,lo:120.16},{n:"高雄",la:22.61,lo:120.29},{n:"花蓮",la:23.97,lo:121.62},{n:"臺東",la:22.75,lo:121.14},{n:"蘇澳",la:24.59,lo:121.87},{n:"馬祖",la:26.17,lo:119.95},{n:"金門",la:24.45,lo:118.38},{n:"澎湖",la:23.57,lo:119.58}];
-    let cst=COAST[0],cD=9999;COAST.forEach(p=>{const d=Math.sqrt((p.la-lat)**2+(p.lo-lon)**2);if(d<cD){cD=d;cst=p}});
     try{
-      const tResp=await Promise.race([fetch(`https://cwa-tide.onerkk.workers.dev?loc=${encodeURIComponent(cst.n)}`),new Promise((_,r)=>setTimeout(()=>r("timeout"),8000))]);
+      const tResp=await Promise.race([fetch('https://cwa-tide.onerkk.workers.dev'),new Promise((_,r)=>setTimeout(()=>r("timeout"),10000))]);
       const td=await tResp.json();
-      const tides=[];
-      const locs=td.records?.location||td.records?.Location||[];
-      const loc=Array.isArray(locs)?locs[0]:null;
-      if(loc){
-        const vts=loc.validTime||[];
-        vts.forEach(vt=>{
-          const date=(vt.startTime||"").split(" ")[0];
-          const items=vt.weatherElement?.[0]?.time||[];
-          items.forEach(item=>{
-            const dt=item.dataTime||"";
-            const params=item.parameter||[];
-            let type="",h=0;
-            params.forEach(p=>{
-              if((p.parameterName||"").includes("潮汐"))type=p.parameterValue||"";
-              if((p.parameterName||"").includes("臺灣高程"))h=parseFloat(p.parameterValue)||0;
-            });
-            if(type&&dt)tides.push({date:date||dt.split(" ")[0],time:dt,type:type,height:h});
+      const forecasts=td.records?.TideForecasts||[];
+      if(forecasts.length){
+        let best=forecasts[0],bD=9999;
+        forecasts.forEach(f=>{const lo=f.Location;if(lo){const d=Math.sqrt((lo.Latitude-lat)**2+(lo.Longitude-lon)**2);if(d<bD){bD=d;best=f}}});
+        const loc=best.Location;
+        const tides=[];
+        (loc.TimePeriods?.Daily||[]).forEach(day=>{
+          (day.Time||[]).forEach(t=>{
+            tides.push({date:day.Date,time:t.DateTime||"",type:t.Tide||"",height:parseInt(t.TideHeights?.AboveTWVD)||0});
           });
         });
-      }
-      if(tides.length){tideData={station:cst.n,tides:tides};tideErr=false}
-      else{tideData=null;tideErr=true}
+        if(tides.length){tideData={station:loc.LocationName||"",tides:tides};tideErr=false}
+        else{tideData=null;tideErr=true}
+      }else{tideData=null;tideErr=true}
     }catch(e){tideData=null;tideErr=true}
   }catch(e){wxErr=true;wxData=null}
   render();
