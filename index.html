@@ -200,11 +200,10 @@ firebase.initializeApp(fbConfig);
 const fbAuth=firebase.auth(),fbDb=firebase.firestore();
 let fbUser=null;
 fbAuth.onAuthStateChanged(u=>{fbUser=u;if(u){loadLeaves();loadAdminEv();cloudLoad()}else{loadAdminEv();render()}});
+fbAuth.getRedirectResult().catch(()=>{});
 async function cloudSave(){if(!fbUser)return;try{await fbDb.collection("users").doc(fbUser.uid).set({rt:S.rt,pos:S.pos,ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){console.log("cloudSave err",e)}}
 async function cloudLoad(){if(!fbUser)return;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;S.step="cal";sv()}if(d.ev){EVS=JSON.parse(d.ev);sEv()}if(d.al){AL=JSON.parse(d.al);ALD=d.ald?JSON.parse(d.ald):{};sAL()}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)}}render()}catch(e){console.log("cloudLoad err",e);render()}}
-function fbLogin(){fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{
-  if(e.code==='auth/popup-blocked'){fbAuth.signInWithRedirect(new firebase.auth.GoogleAuthProvider())}
-})}
+function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);const isStandalone=window.matchMedia('(display-mode:standalone)').matches||navigator.standalone;if(isIOS||isStandalone){fbAuth.signInWithRedirect(p)}else{fbAuth.signInWithPopup(p).catch(e=>{if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment'){fbAuth.signInWithRedirect(p)}})}}
 function fbLogout(){fbAuth.signOut()}
 let leavesCache={};
 async function loadLeaves(){try{const y=S.yr||TY,m=S.mo||TM;const snap=await fbDb.collection("leaves").where("ym","==",y+"-"+String(m).padStart(2,"0")).get();const d={};snap.forEach(doc=>{const v=doc.data();const k=v.date;if(!d[k])d[k]=[];d[k].push({uid:v.uid,name:v.name,type:v.type})});leavesCache=d;render()}catch(e){console.log("loadLeaves err",e)}}
