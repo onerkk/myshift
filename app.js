@@ -107,6 +107,48 @@ function hk(m,d){return`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')
 function gh(m,d){const h=HOL[hk(m,d)];if(!h)return null;return h[lang]||null}
 function en(id){return t(id)}
 function calcOT(y,m,wd,sh){const dm=dim(y,m);let wdays=0;for(let d=1;d<=dm;d++){const dw=new Date(y,m-1,d).getDay();if(dw>=1&&dw<=5)wdays++}let hwd=0;for(let d=1;d<=dm;d++){const dw=new Date(y,m-1,d).getDay();if(dw>=1&&dw<=5&&HOL[hk(m,d)])hwd++}const rH=(wdays-hwd)*8;const tH=wd*sh;return{tH,oH:sh===12?wd*4:Math.max(0,tH-rH),rH}}
+function calcPayPeriod(y,m){
+  const pm=m===1?12:m-1,py=m===1?y-1:y;
+  const sd=new Date(py,pm-1,26),ed=new Date(y,m-1,25);
+  let wd=0,tH=0;
+  for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
+    const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate();
+    const s=gs(cy,cm,cd);
+    if(s&&s!=="休")wd++;
+  }
+  const r=rot();if(!r)return{sd,ed,wd,tH:0,oH:0,rH:0,sh:12};
+  const sh=r.h;tH=wd*sh;
+  let wdays=0,hwd=0;
+  for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
+    const dw=dt.getDay(),cm=dt.getMonth()+1,cd=dt.getDate();
+    if(dw>=1&&dw<=5)wdays++;
+    if(dw>=1&&dw<=5&&HOL[hk(cm,cd)])hwd++;
+  }
+  const rH=(wdays-hwd)*8;
+  const oH=sh===12?wd*4:Math.max(0,tH-rH);
+  return{sd,ed,wd,tH,oH,rH,sh};
+}
+function payCardHtml(y,m){
+  const pp=calcPayPeriod(y,m);
+  if(!pp||!rot())return"";
+  const isZh=lang==="zh";
+  const pm=m===1?12:m-1,py=m===1?y-1:y;
+  const pLabel=isZh?`${py}/${pm}/26 ~ ${y}/${m}/25`:`${pm}/26/${py} ~ ${m}/25/${y}`;
+  const pay5=isZh?`${m}/5 發薪`:`${m}/5 Gaji`;
+  const pay20=isZh?`${m}/20 績效獎金`:`${m}/20 Bonus`;
+  return`<div class="pay-card fi">
+    <div class="pay-header"><div class="pay-title">${isZh?"💳 薪資計算":"💳 Perhitungan Gaji"}</div><div class="pay-period">${pLabel}</div></div>
+    <div class="pay-grid">
+      <div class="pay-stat"><div class="pay-stat-val">${pp.wd}</div><div class="pay-stat-lbl">${isZh?"出勤日":"Hari Kerja"}</div></div>
+      <div class="pay-stat"><div class="pay-stat-val">${pp.tH}h</div><div class="pay-stat-lbl">${isZh?"總工時":"Total Jam"}</div></div>
+      <div class="pay-stat"><div class="pay-stat-val ot-val">${pp.oH}h</div><div class="pay-stat-lbl">${isZh?"加班":"Lembur"}</div></div>
+    </div>
+    <div class="pay-dates">
+      <div class="pay-date-item"><span class="pay-date-icon">💰</span><span>${pay5}</span></div>
+      <div class="pay-date-item"><span class="pay-date-icon">🏆</span><span>${pay20}</span></div>
+    </div>
+  </div>`;
+}
 setTimeout(()=>{const sp=document.getElementById("splash");if(sp)sp.remove()},2600);
 
 let _renderRAF=null;
@@ -148,8 +190,8 @@ function rCal(){
   const wk=Object.entries(st).filter(([s])=>s!=="休").reduce((a,[,v])=>a+v,0);
   const WK=t("wk");
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
-  for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||TW_OFF.has(hk(m,d)));
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${td?'<span class="td">TODAY</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
+  for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||TW_OFF.has(hk(m,d))),isPay=(d===5||d===20);
+    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${td?'<span class="td">TODAY</span>':''}${d===5?'<span class="pay-tag">💰</span>':''}${d===20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<div class="hol-strip">🎌 ${mh.join("　")}</div>`:"";
@@ -171,7 +213,7 @@ function rCal(){
   return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
-  <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${rainWarnHtml()}<div class="dash fi">${chips}</div>${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
+  <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
   <div style="height:${showI?'80':'12'}px"></div>${instH}`;
 }
 
@@ -315,6 +357,25 @@ function rHelp(){
       <div class="help-mark-item"><div class="help-mark-demo" style="border:2px solid #e68a00;border-radius:5px;width:32px;height:28px;display:flex;align-items:center;justify-content:center;position:relative"><div style="position:absolute;top:-3px;right:-3px;min-width:13px;height:13px;border-radius:3px;background:#c62828;color:#fff;font-size:7px;font-weight:800;display:flex;align-items:center;justify-content:center">1</div></div><span>${isZh?"有標記事項":"Ada catatan"}</span></div>
       <div class="help-mark-item"><div class="help-mark-demo" style="border-radius:5px;width:32px;height:28px;display:flex;align-items:center;justify-content:center;background:#f5f5f5;position:relative"><div style="position:absolute;bottom:1px;left:2px;min-width:13px;height:13px;border-radius:3px;background:#e68a00;color:#fff;font-size:7px;font-weight:800;display:flex;align-items:center;justify-content:center">2</div></div><span>${isZh?"請假人數":"Jumlah cuti"}</span></div>
       <div class="help-mark-item"><div class="help-mark-demo" style="border-radius:5px;width:32px;height:28px;display:flex;align-items:center;justify-content:center;background:#f5f5f5;position:relative"><div style="position:absolute;bottom:1px;right:2px;width:5px;height:5px;border-radius:50%;background:#2e7d32"></div></div><span>${isZh?"已排特休":"Pakai cuti"}</span></div>
+      <div class="help-mark-item"><div class="help-mark-demo" style="border:2px solid #1565c0;border-radius:5px;width:32px;height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;position:relative"><span style="font-size:9px">5</span><span style="position:absolute;bottom:0;right:1px;font-size:8px">💰</span></div><span>${isZh?"發薪日（每月5日）":"Gaji (tgl 5)"}</span></div>
+      <div class="help-mark-item"><div class="help-mark-demo" style="border:2px solid #1565c0;border-radius:5px;width:32px;height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;position:relative"><span style="font-size:9px">20</span><span style="position:absolute;bottom:0;right:1px;font-size:8px">🏆</span></div><span>${isZh?"績效獎金（每月20日）":"Bonus (tgl 20)"}</span></div>
+    </div>
+  </div>
+  <div class="help-section">
+    <div class="help-sec-title">${isZh?"💳 薪資計算說明":"💳 Perhitungan Gaji"}</div>
+    <div class="help-step" style="background:rgba(21,101,194,.05);border-left:3px solid #1565c0">
+      <div class="help-num" style="background:#1565c0">$</div>
+      <div class="help-txt">
+        <h3>${isZh?"薪資計算週期":"Periode Perhitungan"}</h3>
+        <p>${isZh?"每月薪資計算區間為上月 26 日至當月 25 日。例如 3 月薪水計算的是 2/26 ~ 3/25 的出勤與加班時數。":"Periode gaji dihitung dari tanggal 26 bulan lalu sampai tanggal 25 bulan ini."}</p>
+      </div>
+    </div>
+    <div class="help-step" style="background:rgba(21,101,194,.05);border-left:3px solid #1565c0">
+      <div class="help-num" style="background:#1565c0">💰</div>
+      <div class="help-txt">
+        <h3>${isZh?"發薪日與獎金日":"Gaji & Bonus"}</h3>
+        <p>${isZh?"每月 5 日發放薪資，每月 20 日發放績效獎金。日曆上以 💰 和 🏆 標示。":"Gaji dibayar tanggal 5, bonus tanggal 20 setiap bulan."}</p>
+      </div>
     </div>
   </div>
   <div class="help-section">
@@ -449,4 +510,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v50')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v51')caches.delete(n)})})}
