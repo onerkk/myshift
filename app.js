@@ -149,7 +149,7 @@ function rCal(){
   const WK=t("wk");
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
   for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||TW_OFF.has(hk(m,d)));
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${td?'<span class="td">TODAY</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot">📌</span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
+    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${td?'<span class="td">TODAY</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<div class="hol-strip">🎌 ${mh.join("　")}</div>`:"";
@@ -167,16 +167,17 @@ function rCal(){
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent),showI=(!!DP||isIOS)&&!S.instH;
   let instH="";if(showI){instH=`<div class="install-wrap"><div class="install-card"><img class="install-icon" src="${IMG.icon}"><div class="install-info"><div class="install-title">${t("instT")}</div><div class="install-sub">${DP?t("instS"):t("instSi")}</div></div>${DP?`<button class="install-btn" data-a="inst">${t("instB")}</button>`:''}<button class="install-x" data-a="hideI">✕</button></div></div>`}
   const ml=lang==="zh"?`${y}年${m}月`:`${m}/${y}`;
-  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn" data-a="today">${t("today")}</button><button class="top-btn" data-a="help">${t("help")}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="reset">${t("reset")}</button></div></div>
+  let todayBarH="";if(ic){const ts=gs(TY,TM,TD);if(ts){const tImg=SI[ts]||"";const tsName=sf(ts);let nextOff="";if(ts!=="休"){for(let dd=TD+1;dd<=TD+14;dd++){const nd=dd>dim(TY,TM)?dd-dim(TY,TM):dd;const nm=dd>dim(TY,TM)?TM+1:TM;const ns=gs(TY,nm,nd);if(ns==="休"){nextOff=(lang==="zh"?"→ 休 ":"→ Off ")+nm+"/"+nd;break}}}else{let streak=0;for(let dd=TD;dd<=TD+14;dd++){const nd=dd>dim(TY,TM)?dd-dim(TY,TM):dd;const nm=dd>dim(TY,TM)?TM+1:TM;if(gs(TY,nm,nd)==="休")streak++;else break}if(streak>1)nextOff=(lang==="zh"?"連休 "+streak+" 天":"Libur "+streak+" hari")}todayBarH=`<div class="today-bar fi"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-info">${nextOff?`<b>${nextOff}</b>`:""}</div></div>`}}
+  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn today-btn" data-a="today">${t("today")}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">?</button><button class="top-btn reset-btn" data-a="reset">⟲</button></div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
-  <div class="cal fi">${cells}</div>${holH}${remH}<div class="dash fi">${chips}</div>${rainWarnHtml()}${typeof wxHtml==='function'?wxHtml():''}${fbBarHtml()}${hH}${alH}
+  <div class="cal fi">${cells}</div>${todayBarH}<div class="dash fi">${chips}</div>${hH}${alH}${rainWarnHtml()}${holH}${remH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
   <div style="height:${showI?'80':'12'}px"></div>${instH}`;
 }
 
 function rMod(){
   const{y,m,d}=S.modal,s=gs(y,m,d),hol=gh(m,d),ev=EVS[ek(y,m,d)]||[],dw=new Date(y,m-1,d).getDay();
-  const WK=t("wk");const bg={"早":"var(--amber-l)","晚":"var(--sec-l)","中":"var(--amber-l)","休":"var(--green-l)"};
+  const WK=t("wk");const bg={"早":"rgba(0,77,86,.08)","晚":"var(--sec-l)","中":"rgba(158,96,0,.06)","休":"var(--green-l)"};
   let holL=hol?`<div style="padding:8px 10px;border-radius:8px;background:var(--red-l);margin-bottom:8px;font-size:11px;color:var(--red);font-weight:600">🎌 ${hol}</div>`:"";
   const evR=(EI.filter(id=>!ADMIN_EV.includes(id))).map(id=>{const a=ev.includes(id);return`<button class="ev-item${a?' on':''}" data-a="tev" data-eid="${id}"><span class="ev-emoji">${EE[id]}</span><span class="ev-name">${en(id)}</span><div class="ev-check">${a?'✓':''}</div></button>`}).join("");
   const ds=lang==="zh"?`${m}月${d}日 週${WK[dw]}`:`${WK[dw]}, ${d}/${m}/${y}`;
@@ -298,7 +299,7 @@ function rHelp(){
   const steps=t("h");
   return`<div class="modal-bg" data-a="closeH"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${t("helpT")}</div><div style="height:12px"></div>
   ${steps.map((s,i)=>{const[title,desc]=s.split("|");return`<div class="help-step"><div class="help-num">${i+1}</div><div class="help-txt"><h3>${title}</h3><p>${desc}</p></div></div>`}).join("")}
-  <button class="modal-done" data-a="closeH">${t("done")}</button></div></div>`}
+  <button class="modal-done" data-a="closeH">${t("done")}</button><button class="modal-done" data-a="reset" style="background:var(--tx3);margin-top:4px">${t("reset")}</button></div></div>`}
 
 function rW(sh,day){const c=cyc();for(let i=0;i<c.length;i++){if(c[i]!==sh)continue;let n=1;for(let j=i-1;j>=0;j--){if(c[j]===sh)n++;else break}if(n===day)return i}return 0}
 function rO(nx,day){const c=cyc();for(let i=0;i<c.length;i++){if(c[i]!=="休")continue;let j=i;while(j<c.length&&c[j]==="休")j++;if(c[j%c.length]!==nx)continue;let n=1;for(let k=i-1;k>=0;k--){if(c[k]==="休")n++;else break}if(n===day)return i}return 0}
