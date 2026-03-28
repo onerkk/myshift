@@ -8,8 +8,8 @@ fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){loadLeaves();loadA
 fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user}}).catch(()=>{});
 setTimeout(()=>{if(!fbAuthReady){fbAuthReady=true;render()}},3000);
 let _loading=false;
-async function cloudSave(){if(!fbUser||_loading)return;try{await fbDb.collection("users").doc(fbUser.uid).set({rt:S.rt,pos:S.pos,ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){console.log("cloudSave err",e)}}
-async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;S.step="cal";sv()}if(d.ev){EVS=JSON.parse(d.ev);sEv()}if(d.al){AL=JSON.parse(d.al);ALD=d.ald?JSON.parse(d.ald):{};sAL()}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)}}_loading=false;render()}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
+async function cloudSave(){if(!fbUser||_loading)return;try{await fbDb.collection("users").doc(fbUser.uid).set({rt:S.rt,pos:S.pos,ep:true,ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){console.log("cloudSave err",e)}}
+async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;if(!d.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length}};S.step="cal";sv()}if(d.ev){EVS=JSON.parse(d.ev);sEv()}if(d.al){AL=JSON.parse(d.al);ALD=d.ald?JSON.parse(d.ald):{};sAL()}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)}}_loading=false;render()}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
 let fbLoginPending=false;
 function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
 fbLoginPending=true;
@@ -76,6 +76,7 @@ const TW_OFF=new Set(["01-01","02-17","02-18","02-28","04-04","04-05","05-01","0
 const EI=["meeting","health","class","biztrip","pay","annualL","custom"];
 const EE={meeting:"📋",health:"🏥","class":"📚",biztrip:"🚗",pay:"💰",annualL:"🌴",custom:"📝"};
 const NOW=new Date(),TY=NOW.getFullYear(),TM=NOW.getMonth()+1,TD=NOW.getDate(),TR=new Date(TY,TM-1,TD);
+const EPOCH=new Date(2024,0,1);
 let lang="zh";try{lang=localStorage.getItem("sb_l")||gCk("sb_l")||"zh"}catch(e){}
 function t(k){return (L[lang]&&L[lang][k])||L.zh[k]||k}
 function sf(s){return t(s)}
@@ -95,13 +96,13 @@ function alRem(){const a=getAL();return Math.max(0,(a.total||0)-alUsed())}
 let DP=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();DP=e;render()});
 function sCk(k,v,d){const e=new Date();e.setTime(e.getTime()+d*864e5);document.cookie=k+"="+encodeURIComponent(v)+";expires="+e.toUTCString()+";path=/;SameSite=Lax"}
 function gCk(k){const m=document.cookie.match(new RegExp('(?:^|; )'+k+'=([^;]*)'));return m?decodeURIComponent(m[1]):null}
-try{const c=JSON.parse(localStorage.getItem("sb_c"))||JSON.parse(gCk("sb_c"));if(c&&c.rt&&c.pos!==null&&c.pos!==undefined){S.rt=c.rt;S.pos=c.pos;S.step="cal";const d=JSON.stringify({rt:c.rt,pos:c.pos});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650)}}catch(e){}
-function sv(){const d=JSON.stringify({rt:S.rt,pos:S.pos});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650);cloudSave()}
+try{const c=JSON.parse(localStorage.getItem("sb_c"))||JSON.parse(gCk("sb_c"));if(c&&c.rt&&c.pos!==null&&c.pos!==undefined){S.rt=c.rt;S.pos=c.pos;if(!c.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length}};S.step="cal";sv()}}catch(e){}
+function sv(){const d=JSON.stringify({rt:S.rt,pos:S.pos,ep:true});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650);cloudSave()}
 function rot(){return S.rt?R[S.rt]:null}
 function cyc(){return rot()?rot().c:[]}
 function dim(y,m){return new Date(y,m,0).getDate()}
 function fdw(y,m){return new Date(y,m-1,1).getDay()}
-function gs(y,m,d){const c=cyc();if(!c.length||S.pos===null)return null;let p=(S.pos+Math.round((new Date(y,m-1,d)-TR)/864e5))%c.length;if(p<0)p+=c.length;return c[p]}
+function gs(y,m,d){const c=cyc();if(!c.length||S.pos===null)return null;let p=(S.pos+Math.round((new Date(y,m-1,d)-EPOCH)/864e5))%c.length;if(p<0)p+=c.length;return c[p]}
 function ek(y,m,d){return`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function hk(m,d){return`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function gh(m,d){const h=HOL[hk(m,d)];if(!h)return null;return h[lang]||null}
@@ -399,8 +400,8 @@ function handle(e){
     case "wt":{const ti=document.getElementById("alTI"),ui=document.getElementById("alUI");if(ti||ui)setAL(parseFloat(ti&&ti.value)||0,parseFloat(ui&&ui.value)||0);S.wT=el.dataset.v==="w"?"w":"o";S.wD=null;S.wS=null;S.wN=null;break}
     case "ws":S.wS=el.dataset.v;S.wD=null;break;
     case "wn":S.wN=el.dataset.v;S.wD=null;break;
-    case "wwd":S.wD=+el.dataset.v;S.pos=rW(S.wS,S.wD);S.step="cal";sv();break;
-    case "wod":S.wD=+el.dataset.v;S.pos=rO(S.wN,S.wD);S.step="cal";sv();break;
+    case "wwd":{S.wD=+el.dataset.v;const ci=rW(S.wS,S.wD),c=cyc(),todOff=Math.round((TR-EPOCH)/864e5);S.pos=((ci-todOff%c.length)+c.length*1000)%c.length;S.step="cal";sv();break;}
+    case "wod":{S.wD=+el.dataset.v;const ci=rO(S.wN,S.wD),c=cyc(),todOff=Math.round((TR-EPOCH)/864e5);S.pos=((ci-todOff%c.length)+c.length*1000)%c.length;S.step="cal";sv();break;}
     case "prev":if(S.mo===1){S.yr--;S.mo=12}else S.mo--;loadLeaves();loadAdminEv();break;
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();break;
     case "today":S.yr=TY;S.mo=TM;break;
@@ -713,4 +714,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v52')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v53')caches.delete(n)})})}
