@@ -236,8 +236,8 @@ input,select{font-family:inherit;outline:none}
 .section-label{font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin:8px 0 2px;padding:0 2px}
 
 /* Pay day markers on calendar */
-.day.pay-day{border-color:#1565c0!important;border-width:2px}
-.pay-tag{position:absolute;bottom:0;right:1px;font-size:8px;line-height:1;z-index:3;pointer-events:none}
+.day.pay-day{}
+.pay-tag{position:absolute;bottom:1px;right:1px;font-size:14px;line-height:1;z-index:3;pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.15))}
 
 /* Payroll card */
 .pay-card{margin:6px 0;background:var(--card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;border-left:4px solid #1565c0}
