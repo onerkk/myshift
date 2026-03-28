@@ -1,27 +1,7 @@
-const CACHE_NAME = 'myshift-v47';
-const urlsToCache = [
-  './',
-  './index.html',
-  './app.js',
-  './styles.css',
-  './manifest.json',
-  './icons/icon-192x192.png',
-  './icons/icon-512x512.png',
-  './icons/icon-apple.png',
-  './images/splash-bg.jpg',
-  './images/icon.png',
-  './images/early.png',
-  './images/mid.png',
-  './images/night.png',
-  './images/off.png'
-];
+const CACHE_NAME = 'myshift-v48';
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', event => {
@@ -36,19 +16,23 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  url.search = '';
+  const cacheKey = url.toString();
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
         if (!response || response.status !== 200) return response;
         const clone = response.clone();
         caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, clone);
+          cache.put(cacheKey, clone);
         });
         return response;
       })
       .catch(() => {
-        return caches.match(event.request)
-          .then(cached => cached || caches.match('./index.html'));
+        return caches.match(cacheKey)
+          .then(cached => cached || caches.match(url.origin + url.pathname.replace(/[^\/]*$/, 'index.html')));
       })
   );
 });
