@@ -80,7 +80,7 @@ const EPOCH=new Date(2024,0,1);
 let lang="zh";try{lang=localStorage.getItem("sb_l")||gCk("sb_l")||"zh"}catch(e){}
 function t(k){return (L[lang]&&L[lang][k])||L.zh[k]||k}
 function sf(s){return t(s)}
-let S={step:"wiz",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,instH:false};
+let S={step:"wiz",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,instH:false};
 let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb_ev"))||{}}catch(e){}
 function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}cloudSave()}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
@@ -163,7 +163,7 @@ function _doRender(){
   if(S.step==="type")a.innerHTML=rType();
   else if(S.step==="wiz")a.innerHTML=rWiz();
   else a.innerHTML=rCal();
-  document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():"";
+  document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():"";
   document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
 }
 
@@ -210,8 +210,14 @@ function rCal(){
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent),showI=(!!DP||isIOS)&&!S.instH;
   let instH="";if(showI){instH=`<div class="install-wrap"><div class="install-card"><img class="install-icon" src="${IMG.icon}"><div class="install-info"><div class="install-title">${t("instT")}</div><div class="install-sub">${DP?t("instS"):t("instSi")}</div></div>${DP?`<button class="install-btn" data-a="inst">${t("instB")}</button>`:''}<button class="install-x" data-a="hideI">✕</button></div></div>`}
   const ml=lang==="zh"?`${y}年${m}月`:`${m}/${y}`;
-  let todayBarH="";if(ic){const ts=gs(TY,TM,TD);if(ts){const tImg=SI[ts]||"";const tsName=sf(ts);let nextOff="";if(ts!=="休"){for(let dd=1;dd<=14;dd++){const fd=new Date(TY,TM-1,TD+dd),fy=fd.getFullYear(),fm=fd.getMonth()+1,fday=fd.getDate();const ns=gs(fy,fm,fday);if(ns==="休"){nextOff=(lang==="zh"?"→ 休 ":"→ Off ")+fm+"/"+fday;break}}}else{let streak=0;for(let dd=0;dd<=14;dd++){const fd=new Date(TY,TM-1,TD+dd),fy=fd.getFullYear(),fm=fd.getMonth()+1,fday=fd.getDate();if(gs(fy,fm,fday)==="休")streak++;else break}if(streak>1)nextOff=(lang==="zh"?"連休 "+streak+" 天":"Libur "+streak+" hari")}todayBarH=`<div class="today-bar fi"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-info">${nextOff?`<b>${nextOff}</b>`:""}</div></div>`}}
-  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div></div>
+  let todayBarH="";if(ic){const ts=gs(TY,TM,TD);if(ts){const tImg=SI[ts]||"";const tsName=sf(ts);
+    let restInfo="",restDays=0;
+    if(ts!=="休"){for(let dd=1;dd<=30;dd++){const fd=new Date(TY,TM-1,TD+dd);if(gs(fd.getFullYear(),fd.getMonth()+1,fd.getDate())==="休"){restDays=dd;restInfo=(lang==="zh"?`${dd}天後休`:`${dd} hari lagi libur`);break}}}
+    else{let streak=0;for(let dd=0;dd<=14;dd++){const fd=new Date(TY,TM-1,TD+dd);if(gs(fd.getFullYear(),fd.getMonth()+1,fd.getDate())==="休")streak++;else break}if(streak>1)restInfo=(lang==="zh"?"連休 "+streak+" 天":"Libur "+streak+" hari");else restInfo=(lang==="zh"?"今天休假":"Hari ini libur")}
+    let payDay5=5-TD,payDay20=20-TD;if(payDay5<0)payDay5+=dim(TY,TM===12?1:TM+1>12?1:TM+1);if(payDay20<0)payDay20+=dim(TY,TM===12?1:TM+1>12?1:TM+1);
+    const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
+    todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
+  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">📊</button><button class="top-btn" data-a="share">📤</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
   <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
@@ -409,6 +415,9 @@ function handle(e){
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
     case "help":S.showH=true;break;
+    case "share":shareCalendar();return;
+    case "stats":S.showStats=true;break;
+    case "closeStats":S.showStats=false;break;
 
     case "closeH":S.showH=false;break;
     case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);cloudSave();break;
@@ -424,6 +433,22 @@ function handle(e){
 }
 let wxData=null,wxErr=false;
 try{render();}catch(e){document.getElementById("app").innerHTML="<div style='padding:20px;color:red;font-size:14px;word-break:break-all'><b>ERROR:</b><br>"+e.message+"</div>";}
+// ═══ SWIPE GESTURE ═══
+(function(){
+  let sx=0,sy=0,swiping=false;
+  document.addEventListener("touchstart",e=>{
+    if(S.step!=="cal"||S.modal||S.showH||wxDetailShow||tideDetailShow)return;
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;swiping=true;
+  },{passive:true});
+  document.addEventListener("touchend",e=>{
+    if(!swiping)return;swiping=false;
+    const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;
+    if(Math.abs(dx)<60||Math.abs(dy)>Math.abs(dx)*0.7)return;
+    if(dx<0){if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();render()}
+    else{if(S.mo===1){S.yr--;S.mo=12}else S.mo--;loadLeaves();loadAdminEv();render()}
+  },{passive:true});
+})();
+
 
 
 
@@ -495,6 +520,132 @@ if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 if(navigator.geolocation)loadWx();
 loadAdminEv();
 
+
+// ═══ SHARE CALENDAR ═══
+async function shareCalendar(){
+  const isZh=lang==="zh";
+  const y=S.yr,m=S.mo,dm=dim(y,m),fd=fdw(y,m);
+  const r=rot(),c=cyc();
+  const W=390,cellW=W/7,cellH=44,pad=16;
+  const headerH=50,wkH=28;
+  const rows=Math.ceil((fd+dm)/7);
+  const calH=rows*cellH;
+  const footerH=60;
+  const H=headerH+wkH+calH+footerH+pad*2;
+  
+  const cv=document.createElement("canvas");cv.width=W*2;cv.height=H*2;
+  const cx=cv.getContext("2d");cx.scale(2,2);
+  
+  // BG
+  cx.fillStyle="#f0f2f5";cx.fillRect(0,0,W,H);
+  
+  // Header
+  cx.fillStyle="#00897b";cx.fillRect(0,0,W,headerH);
+  cx.fillStyle="#fff";cx.font="bold 18px 'Noto Sans TC',sans-serif";
+  const ml=isZh?`${y}年${m}月`:`${m}/${y}`;
+  cx.textAlign="center";cx.fillText(ml,W/2,32);
+  cx.font="11px 'Noto Sans TC',sans-serif";cx.fillStyle="rgba(255,255,255,.6)";
+  const rn=RN[lang][S.rt];cx.fillText(rn,W/2,46);
+  
+  // Weekday row
+  const wy=headerH;
+  cx.fillStyle="#00695c";cx.fillRect(0,wy,W,wkH);
+  const WK=t("wk");
+  cx.font="bold 10px 'Noto Sans TC',sans-serif";cx.textAlign="center";
+  WK.forEach((w,i)=>{cx.fillStyle=(i===0||i===6)?"#ffab91":"rgba(255,255,255,.8)";cx.fillText(w,i*cellW+cellW/2,wy+18)});
+  
+  // Calendar cells
+  const calY=headerH+wkH;
+  const shiftBg={"早":"#d0eff5","晚":"#ddd0ec","中":"#ffeecf","休":"#f5f5f5"};
+  const shiftTx={"早":"#004d56","晚":"#311b6b","中":"#7a4700","休":"#b0b0b0"};
+  
+  for(let d=1;d<=dm;d++){
+    const col=(fd+d-1)%7,row=Math.floor((fd+d-1)/7);
+    const x=col*cellW,yy=calY+row*cellH;
+    const s=gs(y,m,d);
+    const ic=y===TY&&m===TM&&d===TD;
+    
+    cx.fillStyle=shiftBg[s]||"#fff";
+    cx.fillRect(x+1,yy+1,cellW-2,cellH-2);
+    
+    if(ic){cx.strokeStyle="#ff6d00";cx.lineWidth=2;cx.strokeRect(x+1,yy+1,cellW-2,cellH-2)}
+    
+    cx.fillStyle=shiftTx[s]||"#333";cx.font="bold 14px 'Noto Sans TC',sans-serif";
+    cx.textAlign="center";cx.fillText(String(d),x+cellW/2,yy+20);
+    cx.font="bold 11px 'Noto Sans TC',sans-serif";
+    cx.fillText(sf(s),x+cellW/2,yy+36);
+  }
+  
+  // Footer
+  const fy=calY+calH+8;
+  cx.fillStyle="#fff";cx.fillRect(pad,fy,W-pad*2,footerH-16);
+  cx.fillStyle="#1a1a1a";cx.font="bold 11px 'Noto Sans TC',sans-serif";cx.textAlign="left";
+  cx.fillText(isZh?"我的班表 · 華新麗華":"My Shift · Walsin Lihwa",pad+8,fy+22);
+  cx.fillStyle="#999";cx.font="10px 'Noto Sans TC',sans-serif";
+  const now=new Date();cx.fillText(isZh?`產生於 ${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()}`:`Generated ${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()}`,pad+8,fy+38);
+  
+  cv.toBlob(async blob=>{
+    if(!blob)return;
+    const file=new File([blob],`shift-${y}-${m}.png`,{type:"image/png"});
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      try{await navigator.share({title:isZh?"我的班表":"My Shift",files:[file]})}catch(e){}
+    }else{
+      const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;a.click();URL.revokeObjectURL(a.href);
+    }
+  },"image/png");
+}
+
+// ═══ ANNUAL STATS ═══
+function rStats(){
+  const isZh=lang==="zh";
+  const y=S.yr;
+  // Calculate full year stats
+  let monthData=[];
+  for(let mo=1;mo<=12;mo++){
+    const dm=dim(y,mo);
+    let e=0,n=0,m=0,o=0,wd=0;
+    for(let d=1;d<=dm;d++){
+      const s=gs(y,mo,d);
+      if(s==="早"){e++;wd++}else if(s==="晚"){n++;wd++}else if(s==="中"){m++;wd++}else if(s==="休")o++;
+    }
+    const r=rot();const sh=r?r.h:12;
+    const tH=wd*sh,oH=sh===12?wd*4:0;
+    monthData.push({mo,e,n,m,o,wd,tH,oH});
+  }
+  const totals=monthData.reduce((a,md)=>({wd:a.wd+md.wd,tH:a.tH+md.tH,oH:a.oH+md.oH,e:a.e+md.e,n:a.n+md.n,m:a.m+md.m,o:a.o+md.o}),{wd:0,tH:0,oH:0,e:0,n:0,m:0,o:0});
+  
+  // Monthly chart bars (max tH for scale)
+  const maxH=Math.max(...monthData.map(d=>d.tH),1);
+  const barChart=monthData.map((md,i)=>{
+    const pct=Math.round(md.tH/maxH*100);
+    const isCur=(i+1===TM&&y===TY);
+    return`<div class="stat-bar-col${isCur?' cur':''}"><div class="stat-bar" style="height:${pct}%"><span>${md.tH}</span></div><div class="stat-bar-lbl">${i+1}${isZh?"月":""}</div></div>`}).join("");
+  
+  // Annual leave
+  const al=getAL();const alU=alUsed();const alR=alRem();
+  const alPct=al.total>0?Math.round(alU/al.total*100):0;
+  
+  const yearNav=`<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0"><button onclick="S.yr=${y-1};render()" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">◀</button><span style="font-size:16px;font-weight:900">${y}${isZh?" 年度統計":" Annual"}</span><button onclick="S.yr=${y+1};render()" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">▶</button></div>`;
+  
+  return`<div class="modal-bg" data-a="closeStats"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div>
+  ${yearNav}
+  <div class="stat-summary">
+    <div class="stat-sum-item"><div class="stat-sum-val">${totals.wd}</div><div class="stat-sum-lbl">${isZh?"出勤日":"Hari Kerja"}</div></div>
+    <div class="stat-sum-item"><div class="stat-sum-val">${totals.tH}h</div><div class="stat-sum-lbl">${isZh?"總工時":"Total Jam"}</div></div>
+    <div class="stat-sum-item"><div class="stat-sum-val ot-c">${totals.oH}h</div><div class="stat-sum-lbl">${isZh?"加班":"Lembur"}</div></div>
+  </div>
+  <div class="stat-shifts">
+    <div class="stat-shift-item" style="color:#004d56"><span class="stat-shift-dot" style="background:#d0eff5;border:1px solid #9dd8e6"></span>${isZh?"早班":"Pagi"} <b>${totals.e}</b></div>
+    <div class="stat-shift-item" style="color:#311b6b"><span class="stat-shift-dot" style="background:#ddd0ec;border:1px solid #c0a9dc"></span>${isZh?"晚班":"Malam"} <b>${totals.n}</b></div>
+    ${totals.m?`<div class="stat-shift-item" style="color:#7a4700"><span class="stat-shift-dot" style="background:#ffeecf;border:1px solid #ffd88a"></span>${isZh?"中班":"Siang"} <b>${totals.m}</b></div>`:""}
+    <div class="stat-shift-item" style="color:#999"><span class="stat-shift-dot" style="background:#f5f5f5;border:1px solid #e8e8e8"></span>${isZh?"休假":"Libur"} <b>${totals.o}</b></div>
+  </div>
+  <div style="margin:14px 0 6px;font-size:13px;font-weight:800">${isZh?"📊 每月工時":"📊 Monthly Hours"}</div>
+  <div class="stat-chart">${barChart}</div>
+  ${al.total>0?`<div style="margin:14px 0 6px;font-size:13px;font-weight:800">🌴 ${isZh?"特休使用率":"Penggunaan Cuti"}</div>
+  <div class="stat-al-bar"><div class="stat-al-fill" style="width:${alPct}%"></div></div>
+  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--tx2);margin-top:4px"><span>${isZh?"已用":"Terpakai"} ${alU}h</span><span>${isZh?"剩餘":"Sisa"} ${alR}h / ${al.total}h</span></div>`:""}
+  <button class="modal-done" data-a="closeStats" style="margin-top:14px">${t("done")}</button></div></div>`}
 
 // ═══ WEATHER EFFECTS ENGINE ═══
 const WxFx = (function(){
@@ -714,4 +865,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v56')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v57')caches.delete(n)})})}
