@@ -80,7 +80,7 @@ const EPOCH=new Date(2024,0,1);
 let lang="zh";try{lang=localStorage.getItem("sb_l")||gCk("sb_l")||"zh"}catch(e){}
 function t(k){return (L[lang]&&L[lang][k])||L.zh[k]||k}
 function sf(s){return t(s)}
-let S={step:"wiz",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,instH:false};
+let S={step:"wiz",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false};
 let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb_ev"))||{}}catch(e){}
 function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}cloudSave()}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
@@ -217,7 +217,7 @@ function rCal(){
     let payDay5=5-TD,payDay20=20-TD;if(payDay5<0)payDay5+=dim(TY,TM===12?1:TM+1>12?1:TM+1);if(payDay20<0)payDay20+=dim(TY,TM===12?1:TM+1>12?1:TM+1);
     const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
     todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
-  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">📊</button><button class="top-btn" data-a="share">📤</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div></div>
+  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
   <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
@@ -416,7 +416,7 @@ function handle(e){
     case "close":S.modal=null;break;
     case "help":S.showH=true;break;
     case "share":shareCalendar();return;
-    case "stats":S.showStats=true;break;
+    case "stats":S.showStats=true;S.statsYr=TY;break;
     case "closeStats":S.showStats=false;break;
 
     case "closeH":S.showH=false;break;
@@ -598,8 +598,8 @@ async function shareCalendar(){
 // ═══ ANNUAL STATS ═══
 function rStats(){
   const isZh=lang==="zh";
-  const y=S.yr;
-  // Calculate full year stats
+  const y=S.statsYr;
+  // Calculate full year stats (calendar year Jan-Dec)
   let monthData=[];
   for(let mo=1;mo<=12;mo++){
     const dm=dim(y,mo);
@@ -614,18 +614,24 @@ function rStats(){
   }
   const totals=monthData.reduce((a,md)=>({wd:a.wd+md.wd,tH:a.tH+md.tH,oH:a.oH+md.oH,e:a.e+md.e,n:a.n+md.n,m:a.m+md.m,o:a.o+md.o}),{wd:0,tH:0,oH:0,e:0,n:0,m:0,o:0});
   
-  // Monthly chart bars (max tH for scale)
   const maxH=Math.max(...monthData.map(d=>d.tH),1);
   const barChart=monthData.map((md,i)=>{
     const pct=Math.round(md.tH/maxH*100);
     const isCur=(i+1===TM&&y===TY);
     return`<div class="stat-bar-col${isCur?' cur':''}"><div class="stat-bar" style="height:${pct}%"><span>${md.tH}</span></div><div class="stat-bar-lbl">${i+1}${isZh?"月":""}</div></div>`}).join("");
   
-  // Annual leave
-  const al=getAL();const alU=alUsed();const alR=alRem();
-  const alPct=al.total>0?Math.round(alU/al.total*100):0;
+  // Annual leave — use AL year (y-1)/12/26 ~ y/12/25
+  const aly=y-1;
+  const alData=AL[aly]||{total:0,used:0};
+  let alUsedCalc=alData.used||0;
+  const alStart=`${aly}-12-26`,alEnd=`${aly+1}-12-25`;
+  for(let k in ALD){if(k>=alStart&&k<=alEnd)alUsedCalc+=ALD[k]}
+  const alTotal=alData.total||0;
+  const alRemCalc=Math.max(0,alTotal-alUsedCalc);
+  const alPct=alTotal>0?Math.round(alUsedCalc/alTotal*100):0;
+  const alRange=`${aly}/12/26 ~ ${aly+1}/12/25`;
   
-  const yearNav=`<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0"><button onclick="S.yr=${y-1};render()" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">◀</button><span style="font-size:16px;font-weight:900">${y}${isZh?" 年度統計":" Annual"}</span><button onclick="S.yr=${y+1};render()" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">▶</button></div>`;
+  const yearNav=`<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0"><button onclick="S.statsYr=${y-1};render()" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">◀</button><span style="font-size:16px;font-weight:900">${y}${isZh?" 年度統計":" Annual"}</span><button onclick="S.statsYr=${y+1};render()" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">▶</button></div>`;
   
   return`<div class="modal-bg" data-a="closeStats"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div>
   ${yearNav}
@@ -642,9 +648,9 @@ function rStats(){
   </div>
   <div style="margin:14px 0 6px;font-size:13px;font-weight:800">${isZh?"📊 每月工時":"📊 Monthly Hours"}</div>
   <div class="stat-chart">${barChart}</div>
-  ${al.total>0?`<div style="margin:14px 0 6px;font-size:13px;font-weight:800">🌴 ${isZh?"特休使用率":"Penggunaan Cuti"}</div>
+  ${alTotal>0?`<div style="margin:14px 0 6px;font-size:13px;font-weight:800">🌴 ${isZh?"特休使用率":"Penggunaan Cuti"} <span style="font-size:10px;font-weight:600;color:var(--tx3)">${alRange}</span></div>
   <div class="stat-al-bar"><div class="stat-al-fill" style="width:${alPct}%"></div></div>
-  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--tx2);margin-top:4px"><span>${isZh?"已用":"Terpakai"} ${alU}h</span><span>${isZh?"剩餘":"Sisa"} ${alR}h / ${al.total}h</span></div>`:""}
+  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--tx2);margin-top:4px"><span>${isZh?"已用":"Terpakai"} ${alUsedCalc}h</span><span>${isZh?"剩餘":"Sisa"} ${alRemCalc}h / ${alTotal}h</span></div>`:""}
   <button class="modal-done" data-a="closeStats" style="margin-top:14px">${t("done")}</button></div></div>`}
 
 // ═══ WEATHER EFFECTS ENGINE ═══
@@ -865,4 +871,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v57')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v58')caches.delete(n)})})}
