@@ -497,7 +497,11 @@ async function loadWx(){
     }catch(e){tideData=null;tideErr=true}
   }catch(e){wxErr=true;wxData=null}
   render();
-  if(wxData)WxFx.update(wxData.code,wxData.temp);else WxFx.update(null,0);
+  if(wxData){
+    let curPrec=0;
+    if(wxData.hPrec&&wxData.hTime){const n=new Date();const nh=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0")+"T"+String(n.getHours()).padStart(2,"0");const hi=wxData.hTime.findIndex(t=>t.startsWith(nh));if(hi>=0)curPrec=wxData.hPrec[hi]||0}
+    WxFx.update(wxData.code,wxData.temp,curPrec);
+  }else WxFx.update(null,0,0);
 }
 
 const SHIFT_HR={"早":[6,7,8],"中":[13,14,15],"晚":[18,19,20]};
@@ -838,21 +842,23 @@ const WxFx = (function(){
     });
   }
   
-  function update(code,temp){
+  function update(code,temp,prec){
     init();
     if(code===null||code===undefined){setMode("none");return}
     // Storm / Typhoon
     if(code===95||code===96||code===99){setMode("storm");return}
     // Heavy rain
-    if(code===65||code===82||code===55){setMode("heavy");return}
+    if([55,65,67,82].includes(code)){setMode("heavy");return}
     // Rain
-    if([51,53,61,63,80,81].includes(code)){setMode("rain");return}
-    // Snow
-    if([71,73,75].includes(code)){setMode("snow");return}
+    if([51,53,56,61,63,66,80,81].includes(code)){setMode("rain");return}
+    // Snow / sleet
+    if([71,73,75,77,85,86].includes(code)){setMode("snow");return}
     // Fog
     if(code===45||code===48){setMode("fog");return}
-    // Heat
-    if((code===0||code===1)&&temp>=33){setMode("heat");return}
+    // Precip probability fallback — API says cloudy/clear but actually raining
+    if(prec>=40&&code<=3){setMode("rain");return}
+    // Heat shimmer
+    if((code===0||code===1)&&temp>=32){setMode("heat");return}
     // Clear / cloudy — no effect
     setMode("none");
   }
