@@ -255,14 +255,14 @@ input,select{font-family:inherit;outline:none}
 .pay-date-icon{font-size:14px}
 
 /* Weather atmosphere tints — very subtle, professional */
-body.wx-heat{background:linear-gradient(180deg,rgba(255,160,40,.04) 0%,var(--bg) 35%)}
+body.wx-heat{background:linear-gradient(180deg,rgba(255,160,40,.08) 0%,var(--bg) 40%)}
 body.wx-heat .top{background:linear-gradient(135deg,#2e7d32 0%,#558b2f 100%)}
-body.wx-rain{background:linear-gradient(180deg,rgba(120,144,180,.06) 0%,var(--bg) 40%)}
+body.wx-rain{background:linear-gradient(180deg,rgba(100,120,160,.12) 0%,var(--bg) 50%)}
 body.wx-rain .top{background:linear-gradient(135deg,#37474f 0%,#455a64 100%)}
-body.wx-storm{background:linear-gradient(180deg,rgba(80,90,110,.08) 0%,var(--bg) 40%)}
-body.wx-storm .top{background:linear-gradient(135deg,#263238 0%,#37474f 100%)}
-body.wx-fog{background:linear-gradient(180deg,rgba(180,190,200,.06) 0%,var(--bg) 50%)}
-body.wx-snow{background:linear-gradient(180deg,rgba(200,210,230,.06) 0%,var(--bg) 40%)}
+body.wx-storm{background:linear-gradient(180deg,rgba(50,60,80,.18) 0%,var(--bg) 50%)}
+body.wx-storm .top{background:linear-gradient(135deg,#1a237e 0%,#263238 100%)}
+body.wx-fog{background:linear-gradient(180deg,rgba(180,190,200,.1) 0%,var(--bg) 60%)}
+body.wx-snow{background:linear-gradient(180deg,rgba(200,215,240,.1) 0%,var(--bg) 45%)}
 body.wx-snow .top{background:linear-gradient(135deg,#1565c0 0%,#42a5f5 100%)}
 #wxfx{mix-blend-mode:screen}
 body.wx-rain #wxfx,body.wx-heavy #wxfx,body.wx-storm #wxfx{mix-blend-mode:normal}
