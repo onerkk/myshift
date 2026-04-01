@@ -79,7 +79,6 @@ const HOL_YEAR={
   2026:{"02-15":{zh:"小年夜",id:"Malam Tahun Baru Imlek"},"02-16":{zh:"除夕",id:"Malam Imlek"},"02-17":{zh:"春節",id:"Imlek"},"02-18":{zh:"春節",id:"Imlek"},"02-19":{zh:"春節",id:"Imlek"},"02-20":{zh:"小年夜(補假)",id:"Libur Pengganti"},"02-27":{zh:"和平紀念日(補假)",id:"Libur Pengganti"},"04-03":{zh:"兒童節(補假)",id:"Libur Pengganti"},"04-06":{zh:"清明節(補假)",id:"Libur Pengganti"},"05-31":{zh:"端午節",id:"Peh Cun"},"06-01":{zh:"端午節(補假)",id:"Libur Pengganti"},"10-09":{zh:"國慶日(補假)",id:"Libur Pengganti"},"10-26":{zh:"光復節(補假)",id:"Libur Pengganti"}}
 };
 function getHOL(y,m,d){const k=hk(m,d);return HOL_YEAR[y]&&HOL_YEAR[y][k]||HOL_BASE[k]||HOL_ID[k]||null}
-const HOL=new Proxy({},{get:(_,k)=>HOL_BASE[k]||HOL_ID[k]||null});
 
 // Year-specific Taiwan weekday holidays (for isOff & payday calculation)
 const TW_OFF_Y={
@@ -87,8 +86,7 @@ const TW_OFF_Y={
 };
 const TW_OFF_DEFAULT=new Set(["01-01","02-28","04-04","04-05","05-01","09-25","09-28","10-10","10-25","12-25"]);
 function isTWOff(y,m,d){const s=TW_OFF_Y[y]||TW_OFF_DEFAULT;return s.has(hk(m,d))}
-const TW_OFF=TW_OFF_Y[TY]||TW_OFF_DEFAULT;
-function getPayDay(y,m,base){let d=new Date(y,m-1,base);for(let i=0;i<10;i++){const dw=d.getDay();if(dw!==0&&dw!==6&&!TW_OFF.has(hk(d.getMonth()+1,d.getDate())))break;d.setDate(d.getDate()-1)}return d.getDate()}
+function getPayDay(y,m,base){let d=new Date(y,m-1,base);for(let i=0;i<10;i++){const dw=d.getDay();if(dw!==0&&dw!==6&&!isTWOff(d.getFullYear(),d.getMonth()+1,d.getDate()))break;d.setDate(d.getDate()-1)}return d.getDate()}
 const EI=["meeting","health","class","biztrip","pay","annualL","custom"];
 const EE={meeting:"📋",health:"🏥","class":"📚",biztrip:"🚗",pay:"💰",annualL:"🌴",custom:"📝"};
 const NOW=new Date(),TY=NOW.getFullYear(),TM=NOW.getMonth()+1,TD=NOW.getDate(),TR=new Date(TY,TM-1,TD);
@@ -1478,4 +1476,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v69')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v70')caches.delete(n)})})}
