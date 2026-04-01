@@ -114,20 +114,20 @@ input,select{font-family:inherit;outline:none}
 .admin-leave-edit label{font-size:10px;color:var(--tx2);font-weight:600}
 .admin-leave-edit input{width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px;text-align:center;margin:0 6px}
 .leave-badge{position:absolute;bottom:1px;left:1px;background:var(--amber);color:#fff;font-size:7px;font-weight:700;border-radius:3px;min-width:13px;height:13px;display:flex;align-items:center;justify-content:center;line-height:1;padding:0 2px}
-.leave-info{margin:8px 0;padding:7px 10px;background:var(--amber-l);border-left:3px solid var(--amber);border-radius:3px;font-size:11px;color:#b36b00;font-weight:600}
+.leave-info{margin:8px 0;padding:7px 10px;background:var(--amber-l);border-left:3px solid var(--amber);border-radius:3px;font-size:13px;color:#b36b00;font-weight:600}
 .leave-list{font-size:10px;color:var(--tx2);margin-top:4px}
 .leave-list span{display:inline-block;background:var(--red-l);color:var(--red);padding:2px 6px;border-radius:3px;margin:2px 2px;font-weight:600}
-.hol-strip{margin:4px 0 0;padding:8px 12px;background:var(--red-l);border-left:3px solid var(--red);border-radius:var(--r);font-size:11px;color:var(--red);font-weight:600}
+.hol-strip{margin:4px 0 0;padding:8px 12px;background:var(--red-l);border-left:3px solid var(--red);border-radius:var(--r);font-size:13px;color:var(--red);font-weight:600}
 
 /* Reminders */
 .rem-sec{margin:4px 0 0}
-.rem-title{font-size:10px;font-weight:700;color:var(--amber);margin-bottom:3px}
+.rem-title{font-size:12px;font-weight:700;color:var(--amber);margin-bottom:3px}
 .rem-list{display:flex;flex-direction:column;gap:2px}
-.rem-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:4px;background:var(--card);border-left:3px solid var(--amber);box-shadow:var(--sh)}
-.rem-date{min-width:30px;height:30px;border-radius:5px;background:var(--amber-l);display:flex;flex-direction:column;align-items:center;justify-content:center}
-.rem-date .d{font-size:13px;font-weight:800;color:var(--amber);line-height:1}
-.rem-date .w{font-size:7px;color:var(--tx3)}
-.rem-info{flex:1}.rem-name{font-size:10px;font-weight:700}.rem-shift{font-size:8px;color:var(--tx3)}
+.rem-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:4px;background:var(--card);border-left:3px solid var(--amber);box-shadow:var(--sh)}
+.rem-date{min-width:36px;height:36px;border-radius:5px;background:var(--amber-l);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.rem-date .d{font-size:15px;font-weight:800;color:var(--amber);line-height:1}
+.rem-date .w{font-size:9px;color:var(--tx3)}
+.rem-info{flex:1}.rem-name{font-size:13px;font-weight:700}.rem-shift{font-size:10px;color:var(--tx3)}
 
 /* Stats dashboard */
 .dash{margin:6px 0 0;display:grid;grid-template-columns:repeat(4,1fr);background:var(--card);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
