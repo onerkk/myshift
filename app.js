@@ -707,7 +707,7 @@ const WxFx = (function(){
     particles=[];splashes=[];debris=[];
     heatPhase=0;lightningTimer=0;lightningAlpha=0;
     if(typeof WxSfx!=='undefined') WxSfx.setMode(m);
-    document.body.classList.remove("wx-heat","wx-rain","wx-storm","wx-fog","wx-snow","wx-wind","wx-typhoon");
+    document.body.classList.remove("wx-heat","wx-rain","wx-storm","wx-fog","wx-snow","wx-wind","wx-typhoon","wx-cold");
     if(mode==="none") return;
     if(mode==="heat") document.body.classList.add("wx-heat");
     if(mode==="rain"||mode==="heavy") document.body.classList.add("wx-rain");
@@ -716,6 +716,7 @@ const WxFx = (function(){
     if(mode==="snow") document.body.classList.add("wx-snow");
     if(mode==="wind") document.body.classList.add("wx-wind");
     if(mode==="typhoon") document.body.classList.add("wx-typhoon");
+    if(mode==="cold") document.body.classList.add("wx-cold");
     seedParticles();
   }
   
@@ -740,6 +741,9 @@ const WxFx = (function(){
       for(let i=0;i<50;i++) particles.push(mkWindStreak());
       for(let i=0;i<15;i++) debris.push(mkDebris());
       lightningTimer=40+Math.random()*80;
+    } else if(mode==="cold"){
+      for(let i=0;i<50;i++) particles.push(mkFrost());
+      for(let i=0;i<8;i++) particles.push(mkBreath());
     }
   }
   
@@ -779,6 +783,27 @@ const WxFx = (function(){
       r:2+Math.random()*3, alpha:0.3+Math.random()*0.4,
       shape:shapes[Math.floor(Math.random()*shapes.length)],
       rot:Math.random()*Math.PI*2, rotSpeed:0.05+Math.random()*0.1};
+  }
+
+  function mkFrost(){
+    // Frost crystals that grow on screen edges
+    const side=Math.floor(Math.random()*4); // 0=top,1=right,2=bottom,3=left
+    let x,y;
+    if(side===0){x=Math.random()*_w;y=Math.random()*60}
+    else if(side===1){x=_w-Math.random()*60;y=Math.random()*_h}
+    else if(side===2){x=Math.random()*_w;y=_h-Math.random()*60}
+    else{x=Math.random()*60;y=Math.random()*_h}
+    return{type:"frost",x,y,r:3+Math.random()*8,alpha:0,maxAlpha:0.15+Math.random()*0.2,
+      growSpeed:0.001+Math.random()*0.002,rot:Math.random()*Math.PI*2,
+      branches:3+Math.floor(Math.random()*4)};
+  }
+
+  function mkBreath(){
+    // Breath-like mist puffs rising slowly
+    return{type:"breath",x:_w*0.2+Math.random()*_w*0.6, y:_h*0.5+Math.random()*_h*0.4,
+      r:15+Math.random()*25, alpha:0, maxAlpha:0.04+Math.random()*0.03,
+      speed:-0.15-Math.random()*0.2, drift:Math.random()*0.4-0.2,
+      phase:0, growing:true};
   }
   
   function addSplash(x){
@@ -1115,6 +1140,84 @@ const WxFx = (function(){
     ctx.fillRect(0,_h*0.7,_w,_h*0.3);
   }
   
+  function drawCold(){
+    // Icy blue overlay at edges
+    const edgeG=ctx.createRadialGradient(_w/2,_h/2,_h*0.3,_w/2,_h/2,_h*0.8);
+    edgeG.addColorStop(0,"rgba(180,210,240,0)");
+    edgeG.addColorStop(1,"rgba(160,195,230,0.08)");
+    ctx.fillStyle=edgeG;
+    ctx.fillRect(0,0,_w,_h);
+
+    // Draw frost crystals
+    particles.forEach(p=>{
+      if(p.type==="frost"){
+        if(p.alpha<p.maxAlpha) p.alpha+=p.growSpeed;
+        ctx.save();
+        ctx.translate(p.x,p.y);
+        ctx.rotate(p.rot);
+        ctx.strokeStyle=`rgba(200,225,255,${p.alpha})`;
+        ctx.lineWidth=1;
+        for(let b=0;b<p.branches;b++){
+          const angle=(Math.PI*2/p.branches)*b;
+          const len=p.r;
+          const ex=Math.cos(angle)*len, ey=Math.sin(angle)*len;
+          ctx.beginPath();
+          ctx.moveTo(0,0);
+          ctx.lineTo(ex,ey);
+          ctx.stroke();
+          // Sub-branches
+          const mid=0.6;
+          const mx=Math.cos(angle)*len*mid, my=Math.sin(angle)*len*mid;
+          ctx.beginPath();
+          ctx.moveTo(mx,my);
+          ctx.lineTo(mx+Math.cos(angle+0.5)*len*0.3,my+Math.sin(angle+0.5)*len*0.3);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(mx,my);
+          ctx.lineTo(mx+Math.cos(angle-0.5)*len*0.3,my+Math.sin(angle-0.5)*len*0.3);
+          ctx.stroke();
+        }
+        // Center sparkle
+        ctx.fillStyle=`rgba(220,240,255,${p.alpha*0.8})`;
+        ctx.beginPath();
+        ctx.arc(0,0,1.5,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+      if(p.type==="breath"){
+        p.y+=p.speed;
+        p.x+=p.drift;
+        p.r+=0.03;
+        if(p.growing){
+          p.alpha+=0.0008;
+          if(p.alpha>=p.maxAlpha){p.growing=false}
+        }else{
+          p.alpha-=0.0005;
+        }
+        if(p.alpha<=0){
+          // Reset breath puff
+          p.x=_w*0.2+Math.random()*_w*0.6;
+          p.y=_h*0.5+Math.random()*_h*0.4;
+          p.r=15+Math.random()*25;
+          p.alpha=0;p.growing=true;
+          p.drift=Math.random()*0.4-0.2;
+        }
+        const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
+        g.addColorStop(0,`rgba(210,225,245,${p.alpha})`);
+        g.addColorStop(1,"rgba(210,225,245,0)");
+        ctx.fillStyle=g;
+        ctx.fillRect(p.x-p.r,p.y-p.r,p.r*2,p.r*2);
+      }
+    });
+
+    // Bottom frost gradient
+    const bfG=ctx.createLinearGradient(0,_h*0.85,0,_h);
+    bfG.addColorStop(0,"rgba(200,220,245,0)");
+    bfG.addColorStop(1,"rgba(200,220,245,0.06)");
+    ctx.fillStyle=bfG;
+    ctx.fillRect(0,_h*0.85,_w,_h*0.15);
+  }
+
   // ═══ MAIN LOOP ═══
   function loop(){
     raf=requestAnimationFrame(loop);
@@ -1132,6 +1235,7 @@ const WxFx = (function(){
     else if(mode==="fog") drawFog();
     else if(mode==="wind") drawWind();
     else if(mode==="typhoon") drawTyphoon();
+    else if(mode==="cold") drawCold();
   }
   
   function update(code,temp,prec,wind){
@@ -1155,6 +1259,8 @@ const WxFx = (function(){
     if(prec>=40&&code<=3){setMode("rain");return}
     // Heat shimmer
     if((code===0||code===1)&&temp>=32){setMode("heat");return}
+    // Cold wave (clear/cloudy but very cold)
+    if(code<=3&&temp<=10){setMode("cold");return}
     // No weather effect, but ambient still runs
     setMode("none");
   }
@@ -1296,6 +1402,12 @@ const WxSfx = (function(){
         if(rainGain)rainGain.gain.value=0.02;
         if(rainFilter){rainFilter.frequency.value=3000;rainFilter.Q.value=1.5}
         break;
+      case "cold":
+        // Soft eerie wind whistle
+        startWind(false);
+        if(windGain)windGain.gain.value=0.04;
+        if(windFilter){windFilter.frequency.value=180;windFilter.Q.value=0.3}
+        break;
     }
   }
   
@@ -1351,4 +1463,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v66')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v67')caches.delete(n)})})}

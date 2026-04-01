@@ -268,6 +268,8 @@ body.wx-wind{background:linear-gradient(180deg,rgba(140,160,180,.08) 0%,var(--bg
 body.wx-wind .top{background:linear-gradient(135deg,#37474f 0%,#546e7a 100%)}
 body.wx-typhoon{background:linear-gradient(180deg,rgba(30,30,50,.22) 0%,var(--bg) 55%)}
 body.wx-typhoon .top{background:linear-gradient(135deg,#1a237e 0%,#311b92 100%)}
+body.wx-cold{background:linear-gradient(180deg,rgba(180,210,240,.12) 0%,var(--bg) 50%)}
+body.wx-cold .top{background:linear-gradient(135deg,#37474f 0%,#78909c 100%)}
 #wxfx{mix-blend-mode:normal}
 .sfx-btn{position:fixed;bottom:16px;right:16px;z-index:20;width:40px;height:40px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;transition:transform .15s,background .2s}
 .sfx-btn:active{transform:scale(0.9);background:rgba(0,0,0,0.7)}
