@@ -1281,6 +1281,7 @@ const WxSfx = (function(){
     if(m===mode) return;
     mode=m;
     stopAll();
+    if(!muted&&!_initialized) initAudio();
     if(!_initialized||!actx) return;
     if(actx.state==="suspended") actx.resume();
     switch(mode){
@@ -1304,6 +1305,8 @@ const WxSfx = (function(){
     try{localStorage.setItem("sb_sfx",muted?"off":"on")}catch(e){}
     if(masterGain) masterGain.gain.value=muted?0:1;
     if(!muted&&actx&&actx.state==="suspended") actx.resume();
+    // Restart current weather sounds when unmuting
+    if(!muted&&mode!=="none"){const cur=mode;mode="none";setMode(cur)}
     render();
   }
   
@@ -1313,7 +1316,21 @@ const WxSfx = (function(){
   }
   
   function isMuted(){return muted}
-  
+
+  // Auto-start audio on first user gesture if previously enabled
+  if(!muted){
+    const _autoStart=()=>{
+      document.removeEventListener("touchstart",_autoStart);
+      document.removeEventListener("click",_autoStart);
+      if(!_initialized&&initAudio()){
+        if(actx&&actx.state==="suspended")actx.resume();
+        if(mode!=="none"){const cur=mode;mode="none";setMode(cur)}
+      }
+    };
+    document.addEventListener("touchstart",_autoStart,{once:true,passive:true});
+    document.addEventListener("click",_autoStart,{once:true});
+  }
+
   return{setMode,toggle,triggerThunder,isMuted,initAudio};
 })();
 
@@ -1334,4 +1351,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v58')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v66')caches.delete(n)})})}
