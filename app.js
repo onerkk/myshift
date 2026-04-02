@@ -93,6 +93,30 @@ const NOW=new Date(),TY=NOW.getFullYear(),TM=NOW.getMonth()+1,TD=NOW.getDate(),T
 const EPOCH=new Date(2024,0,1);
 function getSeason(){const m=new Date().getMonth()+1;if(m>=3&&m<=5)return'spring';if(m>=6&&m<=8)return'summer';if(m>=9&&m<=11)return'autumn';return'winter'}
 
+const TIME_CLASSES=['time-dawn','time-morning','time-midday','time-afternoon','time-sunset','time-evening','time-night'];
+const SEASON_CLASSES=['season-spring','season-summer','season-autumn','season-winter'];
+function updateTimeTheme(){
+  const h=new Date().getHours(),m=new Date().getMinutes(),t=h+m/60;
+  let cls='time-midday';
+  if(t>=21||t<5) cls='time-night';
+  else if(t>=5&&t<7) cls='time-dawn';
+  else if(t>=7&&t<10) cls='time-morning';
+  else if(t>=10&&t<15) cls='time-midday';
+  else if(t>=15&&t<17) cls='time-afternoon';
+  else if(t>=17&&t<19) cls='time-sunset';
+  else if(t>=19&&t<21) cls='time-evening';
+  if(!document.body.classList.contains(cls)){
+    TIME_CLASSES.forEach(c=>document.body.classList.remove(c));
+    document.body.classList.add(cls);
+  }
+  const scls='season-'+getSeason();
+  if(!document.body.classList.contains(scls)){
+    SEASON_CLASSES.forEach(c=>document.body.classList.remove(c));
+    document.body.classList.add(scls);
+  }
+}
+setInterval(updateTimeTheme,60000);
+
 let lang="zh";try{lang=localStorage.getItem("sb_l")||gCk("sb_l")||"zh"}catch(e){}
 function t(k){return (L[lang]&&L[lang][k])||L.zh[k]||k}
 function sf(s){return t(s)}
@@ -459,7 +483,7 @@ function handle(e){
   render();
 }
 let wxData=null,wxErr=false;
-try{render();}catch(e){document.getElementById("app").innerHTML="<div style='padding:20px;color:red;font-size:14px;word-break:break-all'><b>ERROR:</b><br>"+e.message+"</div>";}
+try{render();updateTimeTheme();}catch(e){document.getElementById("app").innerHTML="<div style='padding:20px;color:red;font-size:14px;word-break:break-all'><b>ERROR:</b><br>"+e.message+"</div>";}
 // ═══ SWIPE GESTURE ═══
 (function(){
   let sx=0,sy=0,swiping=false;
@@ -1892,4 +1916,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v73')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v74')caches.delete(n)})})}
