@@ -1431,7 +1431,6 @@ const WxFx = (function(){
   // ── Seeding ──
   function seedSeason(s,ts){
     seasonParts=[];curSeason=s;curTimeSlot=ts;
-    const bad=isBadWeather();
     // Clouds for overcast
     if(showClouds()) for(let i=0;i<4+Math.floor(Math.random()*3);i++) seasonParts.push(mkCloud());
     if(isHarsh()) return; // Storm/typhoon: no seasonal visuals at all
@@ -2049,4 +2048,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v77')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v78')caches.delete(n)})})}
