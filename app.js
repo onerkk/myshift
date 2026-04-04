@@ -1756,53 +1756,52 @@ const WxSfx = (function(){
     function env(g,pts){pts.forEach(([v,t,m])=>{if(m==='set')g.gain.setValueAtTime(v,t);else if(m==='lin')g.gain.linearRampToValueAtTime(v,t);else g.gain.exponentialRampToValueAtTime(Math.max(v,0.0001),t)})}
 
     if(type===0){
-      // ── Close strike: loud crack + heavy body ──
-      const c=noiseSrc(.2),cf=bp(3000+Math.random()*2000,1.5),cg=actx.createGain();
-      env(cg,[[ .6+Math.random()*.2,t0,'set'],[.001,t0+.08,'exp']]);
+      // ── Close strike: loud crack + thick body ──
+      const c=noiseSrc(.2),cf=bp(4000+Math.random()*2000,1.5),cg=actx.createGain();
+      env(cg,[[.7,t0,'set'],[.001,t0+.07,'exp']]);
       c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0);c.stop(t0+.2);
-      const b=noiseSrc(2),bf=bp(1500+Math.random()*800),bg=actx.createGain();
-      env(bg,[[.001,t0,'set'],[.35,t0+.03,'lin'],[.001,t0+1.2+Math.random()*.5,'exp']]);
+      const b=noiseSrc(2),bf=bp(2000+Math.random()*1500,.4),bg=actx.createGain();
+      env(bg,[[.001,t0,'set'],[.4,t0+.03,'lin'],[.15,t0+.3,'exp'],[.001,t0+1.2+Math.random()*.5,'exp']]);
       b.connect(bf);bf.connect(bg);bg.connect(masterGain);b.start(t0);b.stop(t0+2);
     }
     else if(type===1){
-      // ── Distant rumble: no crack, just low rolling ──
-      const r=noiseSrc(4),rf=bp(800+Math.random()*600,.4),rg=actx.createGain();
-      env(rg,[[.001,t0,'set'],[.08+Math.random()*.04,t0+.3,'lin'],[.04,t0+1.5,'exp'],[.001,t0+3+Math.random(),'exp']]);
+      // ── Distant rumble: muffled rolling ──
+      const r=noiseSrc(4),rf=bp(1800+Math.random()*800,.3),rg=actx.createGain();
+      env(rg,[[.001,t0,'set'],[.12,t0+.4,'lin'],[.08,t0+1.5,'lin'],[.001,t0+3+Math.random(),'exp']]);
       r.connect(rf);rf.connect(rg);rg.connect(masterGain);r.start(t0);r.stop(t0+4);
     }
     else if(type===2){
-      // ── Multi-crack: 2-3 rapid cracks then rumble ──
+      // ── Multi-crack: 2-3 rapid cracks then rolling ──
       const n=2+Math.floor(Math.random()*2);
       for(let i=0;i<n;i++){
         const d=i*(.06+Math.random()*.08);
-        const c=noiseSrc(.15),cf=bp(2500+Math.random()*2500,1.2),cg=actx.createGain();
-        env(cg,[[.4+Math.random()*.2,t0+d,'set'],[.001,t0+d+.05+Math.random()*.03,'exp']]);
-        c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0+d);c.stop(t0+d+.15);
+        const c=noiseSrc(.12),cf=bp(3500+Math.random()*2500,1.3),cg=actx.createGain();
+        env(cg,[[.5+Math.random()*.2,t0+d,'set'],[.001,t0+d+.04+Math.random()*.02,'exp']]);
+        c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0+d);c.stop(t0+d+.12);
       }
-      const b=noiseSrc(2.5),bf=bp(1000+Math.random()*1000),bg=actx.createGain();
-      env(bg,[[.001,t0+.1,'set'],[.25,t0+.2,'lin'],[.001,t0+2+Math.random(),'exp']]);
+      const b=noiseSrc(2.5),bf=bp(1800+Math.random()*1200,.4),bg=actx.createGain();
+      env(bg,[[.001,t0+.1,'set'],[.3,t0+.18,'lin'],[.1,t0+.6,'exp'],[.001,t0+2+Math.random(),'exp']]);
       b.connect(bf);bf.connect(bg);bg.connect(masterGain);b.start(t0+.1);b.stop(t0+3);
     }
     else if(type===3){
       // ── Long rolling: builds slowly, long tail ──
-      const r=noiseSrc(5),rf=bp(900+Math.random()*800,.4),rg=actx.createGain();
-      env(rg,[[.001,t0,'set'],[.05,t0+.5,'lin'],[.12+Math.random()*.06,t0+1.2,'lin'],[.001,t0+4+Math.random(),'exp']]);
+      const r=noiseSrc(5),rf=bp(1600+Math.random()*1000,.3),rg=actx.createGain();
+      env(rg,[[.001,t0,'set'],[.06,t0+.5,'lin'],[.18,t0+1.2,'lin'],[.08,t0+2.5,'exp'],[.001,t0+4+Math.random(),'exp']]);
       r.connect(rf);rf.connect(rg);rg.connect(masterGain);r.start(t0);r.stop(t0+5);
-      // Late crack surprise
       if(Math.random()>.5){
         const d=1+Math.random()*.8;
-        const c=noiseSrc(.1),cf=bp(3000+Math.random()*1500,1),cg=actx.createGain();
-        env(cg,[[.3,t0+d,'set'],[.001,t0+d+.06,'exp']]);
-        c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0+d);c.stop(t0+d+.15);
+        const c=noiseSrc(.1),cf=bp(4000+Math.random()*2000,1.2),cg=actx.createGain();
+        env(cg,[[.4,t0+d,'set'],[.001,t0+d+.05,'exp']]);
+        c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0+d);c.stop(t0+d+.12);
       }
     }
     else{
-      // ── Sharp single: one crack, minimal tail ──
-      const c=noiseSrc(.15),cf=bp(3500+Math.random()*2000,1.8),cg=actx.createGain();
-      env(cg,[[.55+Math.random()*.2,t0,'set'],[.001,t0+.04+Math.random()*.02,'exp']]);
-      c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0);c.stop(t0+.15);
-      const b=noiseSrc(1),bf=bp(1200+Math.random()*600),bg=actx.createGain();
-      env(bg,[[.001,t0+.02,'set'],[.1,t0+.06,'lin'],[.001,t0+.5+Math.random()*.3,'exp']]);
+      // ── Sharp single: one crack, short tail ──
+      const c=noiseSrc(.12),cf=bp(4500+Math.random()*2000,1.8),cg=actx.createGain();
+      env(cg,[[.6,t0,'set'],[.001,t0+.035,'exp']]);
+      c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0);c.stop(t0+.12);
+      const b=noiseSrc(1),bf=bp(2000+Math.random()*1000,.5),bg=actx.createGain();
+      env(bg,[[.001,t0+.02,'set'],[.2,t0+.05,'lin'],[.001,t0+.4+Math.random()*.3,'exp']]);
       b.connect(bf);bf.connect(bg);bg.connect(masterGain);b.start(t0);b.stop(t0+1);
     }
   }
@@ -2089,4 +2088,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v81')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v82')caches.delete(n)})})}
