@@ -1751,7 +1751,7 @@ const WxSfx = (function(){
     const t0=actx.currentTime;
     const type=Math.floor(Math.random()*5);
 
-    // 啪 crack — high freq noise burst
+    // 啪 crack
     function crack(t){
       const s=actx.createBufferSource();s.buffer=mkNoise(.1);
       const f=actx.createBiquadFilter();f.type="bandpass";f.frequency.value=5000+Math.random()*2000;f.Q.value=1;
@@ -1762,79 +1762,62 @@ const WxSfx = (function(){
       s.start(t);s.stop(t+.1);
     }
 
-    // 轟隆 — sawtooth oscillators at low freq; phone plays the harmonics
-    // 150Hz sawtooth → harmonics at 300,450,600,750,900,1050,1200,1500,1800,2100Hz
-    // Brain hears these as a LOW growling tone
-    function growl(t,dur,pattern){
-      // 2-3 detuned sawtooth oscillators for thick sound
-      const baseF=100+Math.random()*80; // 100-180Hz fundamental
-      const oscs=[];
-      const detunes=[0, 7+Math.random()*5, -5-Math.random()*4]; // slight detune
+    // 轟隆 — EXACT same filter as heavy rain (bandpass 1500Hz, Q=0.5)
+    // but 3-4x louder, with hand-shaped gain envelope
+    function rumbleBody(t,dur,pattern){
+      const s=actx.createBufferSource();s.buffer=mkNoise(dur+.2);
+      const f=actx.createBiquadFilter();
+      f.type="bandpass";
+      f.frequency.value=1500;  // same as heavy rain
+      f.Q.value=0.5;           // same as heavy rain
       const g=actx.createGain();
       g.gain.setValueAtTime(.001,t);
       for(const [dt,v] of pattern) g.gain.linearRampToValueAtTime(v,t+dt);
       g.gain.linearRampToValueAtTime(.001,t+dur);
-      // Lowpass to tame harsh highs, keep the meaty harmonics
-      const lp=actx.createBiquadFilter();
-      lp.type="lowpass";lp.frequency.value=2500+Math.random()*500;lp.Q.value=.3;
-      g.connect(lp);lp.connect(masterGain);
-      for(let i=0;i<3;i++){
-        const o=actx.createOscillator();
-        o.type="sawtooth";
-        o.frequency.setValueAtTime(baseF+detunes[i],t);
-        // Pitch drops over time for falling thunder feel
-        o.frequency.linearRampToValueAtTime(baseF*(.6+Math.random()*.2),t+dur);
-        o.connect(g);
-        o.start(t);o.stop(t+dur+.05);
-        oscs.push(o);
-      }
-      // Add noise layer for texture
-      const ns=actx.createBufferSource();ns.buffer=mkNoise(dur+.1);
-      const nf=actx.createBiquadFilter();nf.type="bandpass";nf.frequency.value=1500+Math.random()*500;nf.Q.value=.4;
-      const ng=actx.createGain();ng.gain.value=.6; // mix noise quieter than oscillators
-      ns.connect(nf);nf.connect(ng);ng.connect(g);
-      ns.start(t);ns.stop(t+dur+.05);
+      s.connect(f);f.connect(g);g.connect(masterGain);
+      s.start(t);s.stop(t+dur+.05);
     }
 
+    // Rain = 0.18 gain. Thunder body = 0.5~0.7 (3-4x louder)
     if(type===0){
-      // Close strike: crack → heavy boom → rolling fade
+      // Close: crack → loud boom → rolling
       crack(t0);
-      growl(t0+.03, 2.5+Math.random(), [
-        [.03,.55],[.15,.5],[.3,.4],[.5,.35],
-        [.7,.25],[.85,.3],[1,.22],[1.2,.28],
-        [1.4,.15],[1.6,.2],[1.9,.08],[2.2,.03]
+      rumbleBody(t0+.03, 2.5+Math.random(), [
+        [.03,.7],[.2,.6],[.4,.5],[.6,.45],
+        [.8,.35],[1,.4],[1.2,.3],[1.4,.35],
+        [1.6,.22],[1.8,.28],[2,.12],[2.2,.05]
       ]);
     }
     else if(type===1){
-      // Distant rumble: no crack, slow build
-      growl(t0, 3.5+Math.random(), [
-        [.4,.1],[.8,.18],[1.2,.25],[1.5,.22],
-        [1.8,.28],[2.1,.2],[2.4,.15],[2.7,.1],[3,.05]
+      // Distant: slow rolling
+      rumbleBody(t0, 3.5+Math.random(), [
+        [.4,.15],[.8,.25],[1.2,.35],[1.5,.3],
+        [1.8,.38],[2.1,.28],[2.4,.32],[2.7,.2],[3,.1],[3.3,.04]
       ]);
     }
     else if(type===2){
-      // Multi-crack then rolling
+      // Multi-crack → rolling
       const n=2+Math.floor(Math.random()*2);
       for(let i=0;i<n;i++) crack(t0+i*(.1+Math.random()*.08));
-      growl(t0+n*.12, 2.2+Math.random(), [
-        [.04,.5],[.2,.42],[.4,.32],[.7,.28],
-        [.9,.22],[1.1,.26],[1.3,.15],[1.6,.08],[1.9,.03]
+      rumbleBody(t0+n*.12, 2.2+Math.random(), [
+        [.04,.65],[.2,.55],[.5,.42],[.7,.38],
+        [.9,.3],[1.1,.35],[1.3,.22],[1.6,.15],[1.9,.05]
       ]);
     }
     else if(type===3){
-      // Long rolling, optional late crack
-      growl(t0, 4+Math.random(), [
-        [.3,.08],[.6,.15],[.9,.22],[1.1,.28],[1.4,.32],
-        [1.7,.25],[2,.3],[2.3,.2],[2.6,.25],
-        [2.9,.15],[3.2,.1],[3.6,.04]
+      // Long rolling, late crack
+      rumbleBody(t0, 4+Math.random(), [
+        [.3,.12],[.6,.2],[.9,.3],[1.1,.38],[1.4,.42],
+        [1.7,.35],[2,.4],[2.3,.3],[2.6,.35],
+        [2.9,.22],[3.2,.15],[3.6,.06]
       ]);
       if(Math.random()>.4) crack(t0+1.2+Math.random()*.8);
     }
     else{
-      // Sharp single: crack + short growl
+      // Sharp single: crack + short body
       crack(t0);
-      growl(t0+.03, .7+Math.random()*.2, [
-        [.03,.45],[.15,.35],[.3,.18],[.5,.05]
+      rumbleBody(t0+.03, .7+Math.random()*.2, [
+        [.03,.55],[.15,.42],[.3,.25],[.5,.08]
       ]);
     }
   }
@@ -2121,4 +2104,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v87')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v88')caches.delete(n)})})}
