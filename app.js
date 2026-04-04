@@ -689,6 +689,7 @@ function rStats(){
 const WxFx = (function(){
   let canvas, ctx, raf, particles=[], splashes=[], debris=[], stars=[];
   let mode="none", _w=0, _h=0;
+  let wxCode=0, wxTemp=0, wxWind=0;
   let lightningTimer=0, lightningAlpha=0;
   let heatPhase=0;
   let ambientHour=-1;
@@ -1318,6 +1319,7 @@ const WxFx = (function(){
   
   function update(code,temp,prec,wind){
     init();
+    wxCode=code||0;wxTemp=temp||0;wxWind=wind||0;
     if(code===null||code===undefined){setMode("none");return}
     // Typhoon: storm codes + extreme wind
     if((code===95||code===96||code===99)&&wind>=50){setMode("typhoon");return}
@@ -1344,233 +1346,312 @@ const WxFx = (function(){
   }
   
 
-  // ═══ SEASONAL EFFECTS ═══
-  let seasonParts=[],curSeason="",seasonTimer=0,burstTimer=0;
+  // ═══ SEASONAL EFFECTS (weather-aware) ═══
+  let seasonParts=[],curSeason="",curTimeSlot="",seasonTimer=0,burstTimer=0;
 
-  function mkPetal(){
-    const colors=[[255,182,210],[255,210,230],[255,160,190],[248,200,220],[255,235,245]];
-    const c=colors[Math.floor(Math.random()*colors.length)];
-    return{type:"petal",x:Math.random()*_w*1.3-_w*0.15,y:-10-Math.random()*_h*0.3,
-      r:3+Math.random()*5,speed:0.4+Math.random()*1,drift:0.3+Math.random()*0.8,
-      wobble:Math.random()*Math.PI*2,ws:0.015+Math.random()*0.025,
-      rot:Math.random()*Math.PI*2,rs:0.01+Math.random()*0.03,
-      alpha:0.25+Math.random()*0.35,c}
+  function getTimeSlot(){
+    const h=new Date().getHours();
+    if(h>=6&&h<10) return 'morning';
+    if(h>=10&&h<16) return 'day';
+    if(h>=16&&h<19) return 'dusk';
+    return 'night';
+  }
+  // Harsh: suppress ALL seasonal (storm, typhoon, heavy rain, snow)
+  function isHarsh(){return mode==='storm'||mode==='typhoon'||mode==='heavy'||mode==='snow'}
+  // Moderate: suppress flying creatures but keep falling particles (rain, fog, strong wind)
+  function isModerate(){return mode==='rain'||mode==='fog'||mode==='wind'}
+  // Any bad: no creatures
+  function noCreatures(){return isHarsh()||isModerate()}
+  // Should show clouds
+  function showClouds(){return mode==='rain'||mode==='heavy'||mode==='storm'||mode==='fog'||mode==='typhoon'||mode==='wind'||wxCode>=3}
+
+  // ── Particle makers ──
+  function mkBlossom(){
+    const pinks=[[255,183,197],[255,210,225],[248,187,208],[255,160,185],[252,228,236]];
+    const c=pinks[Math.floor(Math.random()*pinks.length)];
+    return{type:"blossom",x:Math.random()*_w*1.3-_w*.15,y:-10-Math.random()*_h*.3,
+      r:3+Math.random()*5,speed:.3+Math.random()*.8,drift:.2+Math.random()*.6,
+      wobble:Math.random()*Math.PI*2,ws:.01+Math.random()*.02,
+      rot:Math.random()*Math.PI*2,rs:.008+Math.random()*.025,
+      alpha:.2+Math.random()*.35,c,petals:4+Math.floor(Math.random()*2)}
+  }
+  function mkFlower(){
+    const cols=[[255,200,220],[255,180,200],[240,230,140],[200,220,255],[255,220,180]];
+    const c=cols[Math.floor(Math.random()*cols.length)];
+    return{type:"flower",x:Math.random()*_w,y:_h-10-Math.random()*40,
+      r:4+Math.random()*4,alpha:0,maxA:.18+Math.random()*.12,growing:true,
+      life:250+Math.random()*350,c,petals:5+Math.floor(Math.random()*2)}
   }
   function mkButterfly(){
-    const colors=[[255,200,50],[200,100,255],[100,200,255],[255,150,100]];
-    const c=colors[Math.floor(Math.random()*colors.length)];
-    return{type:"bfly",x:Math.random()*_w,y:_h*0.2+Math.random()*_h*0.5,
-      speed:0.8+Math.random()*1.2,angle:Math.random()*Math.PI*2,
-      turn:0.02+Math.random()*0.03,wingPhase:Math.random()*Math.PI*2,
-      wingSpeed:0.12+Math.random()*0.08,r:4+Math.random()*3,alpha:0.3+Math.random()*0.3,c}
+    const cols=[[255,200,50],[180,120,255],[100,200,255],[255,130,80],[200,255,130]];
+    const c=cols[Math.floor(Math.random()*cols.length)];
+    return{type:"bfly",x:Math.random()*_w,y:_h*.15+Math.random()*_h*.5,
+      speed:.6+Math.random()*1,angle:Math.random()*Math.PI*2,
+      turn:.02+Math.random()*.02,wingPhase:Math.random()*Math.PI*2,
+      wingSpeed:.1+Math.random()*.08,r:4+Math.random()*3,alpha:.3+Math.random()*.25,c}
   }
   function mkFirefly(){
-    return{type:"ffly",x:Math.random()*_w,y:_h*0.2+Math.random()*_h*0.7,
-      speed:0.2+Math.random()*0.4,angle:Math.random()*Math.PI*2,
-      turn:0.01+Math.random()*0.03,pulse:Math.random()*Math.PI*2,
-      ps:0.02+Math.random()*0.04,r:2+Math.random()*2.5,maxA:0.4+Math.random()*0.5}
+    return{type:"ffly",x:Math.random()*_w,y:_h*.15+Math.random()*_h*.7,
+      speed:.15+Math.random()*.35,angle:Math.random()*Math.PI*2,
+      turn:.008+Math.random()*.025,pulse:Math.random()*Math.PI*2,
+      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,maxA:.35+Math.random()*.5}
   }
-  function mkFallingLeaf(){
-    const colors=[[200,75,25],[220,135,25],[180,55,15],[240,175,45],[160,95,15],[190,50,10]];
-    const c=colors[Math.floor(Math.random()*colors.length)];
-    return{type:"fleaf",x:Math.random()*_w*1.3-_w*0.15,y:-15-Math.random()*_h*0.3,
-      size:6+Math.random()*8,speed:0.6+Math.random()*1.2,drift:0.8+Math.random()*1.5,
-      wobble:Math.random()*Math.PI*2,ws:0.012+Math.random()*0.018,
-      rot:Math.random()*Math.PI*2,rs:0.015+Math.random()*0.04,
-      alpha:0.35+Math.random()*0.4,c}
+  function mkLeaf(){
+    const cols=[[200,75,25],[220,135,25],[180,55,15],[240,175,45],[160,95,15],[190,50,10]];
+    const c=cols[Math.floor(Math.random()*cols.length)];
+    return{type:"leaf",x:Math.random()*_w*1.3-_w*.15,y:-15-Math.random()*_h*.3,
+      size:5+Math.random()*7,speed:.5+Math.random()*1,drift:.6+Math.random()*1.2,
+      wobble:Math.random()*Math.PI*2,ws:.01+Math.random()*.015,
+      rot:Math.random()*Math.PI*2,rs:.012+Math.random()*.035,
+      alpha:.3+Math.random()*.35,c}
   }
   function mkFrostSpark(){
     return{type:"fspark",x:Math.random()*_w,y:Math.random()*_h,
       r:1+Math.random()*1.5,pulse:Math.random()*Math.PI*2,
-      ps:0.008+Math.random()*0.015,maxA:0.15+Math.random()*0.25}
+      ps:.006+Math.random()*.012,maxA:.12+Math.random()*.2}
   }
   function mkMist(){
-    return{type:"mist",x:Math.random()*_w*1.5-_w*0.25,y:_h*0.6+Math.random()*_h*0.35,
+    return{type:"mist",x:Math.random()*_w*1.5-_w*.25,y:_h*.55+Math.random()*_h*.4,
       w:200+Math.random()*300,h:40+Math.random()*60,
-      speed:0.1+Math.random()*0.2,alpha:0.02+Math.random()*0.02,
-      dir:Math.random()>0.5?1:-1}
+      speed:.08+Math.random()*.15,alpha:.015+Math.random()*.015,
+      dir:Math.random()>.5?1:-1}
+  }
+  function mkCloud(){
+    return{type:"cloud",x:-200-Math.random()*200,y:Math.random()*_h*.2,
+      w:150+Math.random()*200,h:40+Math.random()*50,
+      speed:.15+Math.random()*.25,alpha:.06+Math.random()*.06}
+  }
+  function mkDragonfly(){
+    return{type:"dfly",x:Math.random()*_w,y:_h*.1+Math.random()*_h*.3,
+      speed:1.5+Math.random()*2,angle:Math.random()*Math.PI*2,
+      turn:.03+Math.random()*.03,wingPhase:Math.random()*Math.PI*2,
+      alpha:.25+Math.random()*.2,r:5+Math.random()*3}
   }
 
-  function seedSeason(s){
-    seasonParts=[];curSeason=s;
-    const hr=new Date().getHours(),isNight=(hr>=19||hr<6);
+  // ── Seeding ──
+  function seedSeason(s,ts){
+    seasonParts=[];curSeason=s;curTimeSlot=ts;
+    const bad=isBadWeather();
+    // Clouds for overcast
+    if(showClouds()) for(let i=0;i<4+Math.floor(Math.random()*3);i++) seasonParts.push(mkCloud());
+    if(isHarsh()) return; // Storm/typhoon: no seasonal visuals at all
+    const noc=noCreatures(); // Rain/fog/wind: no flying creatures
+
     if(s==='spring'){
-      const n=15+Math.floor(Math.random()*10);
-      for(let i=0;i<n;i++) seasonParts.push(mkPetal());
-      if(Math.random()>0.4) seasonParts.push(mkButterfly());
+      // Blossoms always
+      for(let i=0;i<12+Math.floor(Math.random()*8);i++) seasonParts.push(mkBlossom());
+      // Flowers at bottom
+      for(let i=0;i<5+Math.floor(Math.random()*4);i++) seasonParts.push(mkFlower());
+      if(!noc&&(ts==='morning'||ts==='day'||ts==='dusk')){
+        if(Math.random()>.3) seasonParts.push(mkButterfly());
+        if(Math.random()>.6) seasonParts.push(mkButterfly());
+      }
+      if(!noc&&ts==='night'){
+        for(let i=0;i<4+Math.floor(Math.random()*4);i++) seasonParts.push(mkFirefly());
+      }
     } else if(s==='summer'){
-      if(isNight){for(let i=0;i<12+Math.floor(Math.random()*8);i++) seasonParts.push(mkFirefly())}
+      if(!noc&&(ts==='day'||ts==='morning')){
+        if(Math.random()>.4) seasonParts.push(mkDragonfly());
+        if(Math.random()>.7) seasonParts.push(mkDragonfly());
+      } else if(!noc&&(ts==='night'||ts==='dusk')){
+        for(let i=0;i<8+Math.floor(Math.random()*8);i++) seasonParts.push(mkFirefly());
+      }
     } else if(s==='autumn'){
-      const n=10+Math.floor(Math.random()*8);
-      for(let i=0;i<n;i++) seasonParts.push(mkFallingLeaf());
-      for(let i=0;i<3;i++) seasonParts.push(mkMist());
+      for(let i=0;i<8+Math.floor(Math.random()*6);i++) seasonParts.push(mkLeaf());
+      for(let i=0;i<2+Math.floor(Math.random()*2);i++) seasonParts.push(mkMist());
     } else if(s==='winter'){
-      for(let i=0;i<25+Math.floor(Math.random()*15);i++) seasonParts.push(mkFrostSpark());
-      for(let i=0;i<4;i++) seasonParts.push(mkMist());
+      for(let i=0;i<20+Math.floor(Math.random()*15);i++) seasonParts.push(mkFrostSpark());
+      for(let i=0;i<3+Math.floor(Math.random()*2);i++) seasonParts.push(mkMist());
     }
   }
 
+  // ── Drawing ──
   function drawSeason(){
-    const s=getSeason();
+    const s=getSeason(),ts=getTimeSlot();
     seasonTimer++;
-    // Re-seed every ~30s or on season change, to keep variation
-    if(s!==curSeason||seasonTimer>1800){seedSeason(s);seasonTimer=0}
-    const hr=new Date().getHours(),isNight=(hr>=19||hr<6);
+    // Re-seed on change or every ~25s
+    if(s!==curSeason||ts!==curTimeSlot||seasonTimer>1500){seedSeason(s,ts);seasonTimer=0}
 
-    // Occasional bursts for variation
+    // Random bursts
     burstTimer--;
-    if(burstTimer<=0){
-      burstTimer=300+Math.floor(Math.random()*600);
+    if(burstTimer<=0&&!isHarsh()){
+      burstTimer=250+Math.floor(Math.random()*500);
       if(s==='spring'){
-        const n=5+Math.floor(Math.random()*8);
-        for(let i=0;i<n;i++) seasonParts.push(mkPetal());
-        if(Math.random()>0.6) seasonParts.push(mkButterfly());
-      } else if(s==='summer'&&isNight){
-        for(let i=0;i<3+Math.floor(Math.random()*5);i++) seasonParts.push(mkFirefly());
+        for(let i=0;i<3+Math.floor(Math.random()*5);i++) seasonParts.push(mkBlossom());
+        if(!noCreatures()&&(ts==='day'||ts==='morning')&&Math.random()>.6) seasonParts.push(mkButterfly());
+        if(Math.random()>.5) seasonParts.push(mkFlower());
+      } else if(s==='summer'&&!noCreatures()&&(ts==='night'||ts==='dusk')){
+        for(let i=0;i<2+Math.floor(Math.random()*4);i++) seasonParts.push(mkFirefly());
       } else if(s==='autumn'){
-        const n=3+Math.floor(Math.random()*6);
-        for(let i=0;i<n;i++) seasonParts.push(mkFallingLeaf());
+        for(let i=0;i<2+Math.floor(Math.random()*5);i++) seasonParts.push(mkLeaf());
+      }
+    }
+    // Cloud bursts for weather
+    if(showClouds()&&burstTimer%200===0&&seasonParts.filter(p=>p.type==='cloud').length<8){
+      seasonParts.push(mkCloud());
+    }
+
+    // Season tints (only when calm)
+    if(!isHarsh()){
+      if(s==='autumn'){
+        const g=ctx.createLinearGradient(0,0,0,_h*.4);
+        g.addColorStop(0,"rgba(180,100,30,0.025)");g.addColorStop(1,"rgba(180,100,30,0)");
+        ctx.fillStyle=g;ctx.fillRect(0,0,_w,_h*.4);
+      }
+      if(s==='winter'){
+        const g=ctx.createRadialGradient(_w/2,_h/2,_h*.3,_w/2,_h/2,_h*.75);
+        g.addColorStop(0,"rgba(180,210,240,0)");g.addColorStop(1,"rgba(180,210,240,0.035)");
+        ctx.fillStyle=g;ctx.fillRect(0,0,_w,_h);
       }
     }
 
-    // Summer day: add heat haze tint
-    if(s==='summer'&&!isNight){
-      const g=ctx.createLinearGradient(0,_h*0.7,0,_h);
-      g.addColorStop(0,"rgba(255,200,50,0)");
-      g.addColorStop(1,"rgba(255,200,50,0.03)");
-      ctx.fillStyle=g;
-      ctx.fillRect(0,_h*0.7,_w,_h*0.3);
-    }
-    // Summer night: add fireflies if missing
-    if(s==='summer'&&isNight&&!seasonParts.some(p=>p.type==='ffly')){
-      for(let i=0;i<8;i++) seasonParts.push(mkFirefly());
-    }
-    // Summer day: remove fireflies
-    if(s==='summer'&&!isNight) seasonParts=seasonParts.filter(p=>p.type!=='ffly');
-
-    // Autumn color wash
-    if(s==='autumn'){
-      const g=ctx.createLinearGradient(0,0,0,_h*0.4);
-      g.addColorStop(0,"rgba(180,100,30,0.03)");
-      g.addColorStop(1,"rgba(180,100,30,0)");
-      ctx.fillStyle=g;
-      ctx.fillRect(0,0,_w,_h*0.4);
-    }
-    // Winter cold edge tint
-    if(s==='winter'){
-      const g=ctx.createRadialGradient(_w/2,_h/2,_h*0.3,_w/2,_h/2,_h*0.75);
-      g.addColorStop(0,"rgba(180,210,240,0)");
-      g.addColorStop(1,"rgba(180,210,240,0.04)");
-      ctx.fillStyle=g;
-      ctx.fillRect(0,0,_w,_h);
-    }
-
-    // Draw & update particles
+    // Draw particles
     for(let i=seasonParts.length-1;i>=0;i--){
       const p=seasonParts[i];
-      if(p.type==='petal'){
-        p.y+=p.speed;p.x+=p.drift;
-        p.wobble+=p.ws;p.rot+=p.rs;
-        p.x+=Math.sin(p.wobble)*0.8;
+
+      if(p.type==='cloud'){
+        p.x+=p.speed;
+        if(p.x>_w+p.w){p.x=-p.w-Math.random()*100;p.y=Math.random()*_h*.2}
+        // Draw cloud as overlapping circles
+        ctx.fillStyle=`rgba(160,170,185,${p.alpha})`;
+        const cx=p.x+p.w/2,cy=p.y+p.h/2;
+        for(let j=0;j<5;j++){
+          const ox=(j-2)*p.w*.18,oy=Math.sin(j*1.2)*p.h*.2;
+          const rr=p.w*.15+Math.sin(j*2)*p.w*.05;
+          ctx.beginPath();ctx.arc(cx+ox,cy+oy,rr,0,Math.PI*2);ctx.fill();
+        }
+      }
+      else if(p.type==='blossom'){
+        p.y+=p.speed;p.x+=p.drift;p.wobble+=p.ws;p.rot+=p.rs;
+        p.x+=Math.sin(p.wobble)*.7;
         if(p.y>_h+20){seasonParts.splice(i,1);continue}
         ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-        ctx.beginPath();
-        ctx.ellipse(0,0,p.r,p.r*0.6,0,0,Math.PI*2);
-        ctx.fillStyle=`rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.alpha})`;
-        ctx.fill();ctx.restore();
-      } else if(p.type==='bfly'){
-        p.angle+=p.turn*(Math.sin(p.wingPhase*0.3)>0?1:-1);
-        p.x+=Math.cos(p.angle)*p.speed;
-        p.y+=Math.sin(p.angle)*p.speed*0.6;
+        // Draw petal shape
+        for(let j=0;j<p.petals;j++){
+          const a=(Math.PI*2/p.petals)*j;
+          ctx.beginPath();
+          ctx.ellipse(Math.cos(a)*p.r*.4,Math.sin(a)*p.r*.4,p.r,p.r*.5,a,0,Math.PI*2);
+          ctx.fillStyle=`rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.alpha})`;
+          ctx.fill();
+        }
+        // Center
+        ctx.beginPath();ctx.arc(0,0,p.r*.25,0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,230,180,${p.alpha})`;ctx.fill();
+        ctx.restore();
+      }
+      else if(p.type==='flower'){
+        p.life--;
+        if(p.growing){p.alpha+=.003;if(p.alpha>=p.maxA)p.growing=false}
+        else if(p.life<60){p.alpha-=.003}
+        if(p.life<=0||p.alpha<=0){seasonParts.splice(i,1);continue}
+        ctx.save();ctx.translate(p.x,p.y);
+        for(let j=0;j<p.petals;j++){
+          const a=(Math.PI*2/p.petals)*j-Math.PI/2;
+          ctx.beginPath();
+          ctx.ellipse(Math.cos(a)*p.r*.5,Math.sin(a)*p.r*.5,p.r*.7,p.r*.35,a,0,Math.PI*2);
+          ctx.fillStyle=`rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.alpha})`;
+          ctx.fill();
+        }
+        ctx.beginPath();ctx.arc(0,0,p.r*.2,0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,220,80,${p.alpha})`;ctx.fill();
+        // Stem
+        ctx.strokeStyle=`rgba(80,160,60,${p.alpha*.5})`;ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(0,p.r*.5);ctx.lineTo(0,p.r*2);ctx.stroke();
+        ctx.restore();
+      }
+      else if(p.type==='bfly'){
+        p.angle+=p.turn*(Math.sin(p.wingPhase*.3)>0?1:-1);
+        p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.6;
         p.wingPhase+=p.wingSpeed;
         const wing=Math.abs(Math.sin(p.wingPhase));
         if(p.x<-30||p.x>_w+30||p.y<-30||p.y>_h+30){
-          p.x=Math.random()*_w;p.y=_h*0.2+Math.random()*_h*0.5;p.angle=Math.random()*Math.PI*2;
+          p.x=Math.random()*_w;p.y=_h*.15+Math.random()*_h*.5;p.angle=Math.random()*Math.PI*2;
         }
         ctx.save();ctx.translate(p.x,p.y);
         ctx.fillStyle=`rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.alpha*wing})`;
-        // Left wing
-        ctx.beginPath();
-        ctx.ellipse(-p.r*0.5,0,p.r*wing,p.r*0.7,-.3,0,Math.PI*2);
-        ctx.fill();
-        // Right wing
-        ctx.beginPath();
-        ctx.ellipse(p.r*0.5,0,p.r*wing,p.r*0.7,.3,0,Math.PI*2);
-        ctx.fill();
-        // Body
+        ctx.beginPath();ctx.ellipse(-p.r*.5,0,p.r*wing,p.r*.7,-.3,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(p.r*.5,0,p.r*wing,p.r*.7,.3,0,Math.PI*2);ctx.fill();
         ctx.fillStyle=`rgba(60,40,30,${p.alpha})`;
-        ctx.beginPath();ctx.ellipse(0,0,1.5,p.r*0.4,0,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(0,0,1.5,p.r*.4,0,0,Math.PI*2);ctx.fill();
         ctx.restore();
-      } else if(p.type==='ffly'){
-        p.angle+=p.turn*(Math.sin(p.pulse*0.5)>0?1:-1);
-        p.x+=Math.cos(p.angle)*p.speed;
-        p.y+=Math.sin(p.angle)*p.speed*0.7;
+      }
+      else if(p.type==='dfly'){
+        p.angle+=p.turn*(Math.random()>.5?1:-1);
+        p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.4;
+        p.wingPhase=(p.wingPhase||0)+.2;
+        if(p.x<-30||p.x>_w+30||p.y<-20||p.y>_h*.5){
+          p.x=Math.random()*_w;p.y=_h*.1+Math.random()*_h*.3;p.angle=Math.random()*Math.PI*2;
+        }
+        const wf=Math.abs(Math.sin(p.wingPhase));
+        ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);
+        // Body
+        ctx.fillStyle=`rgba(40,80,120,${p.alpha})`;
+        ctx.beginPath();ctx.ellipse(0,0,p.r*1.2,1.5,0,0,Math.PI*2);ctx.fill();
+        // Wings
+        ctx.fillStyle=`rgba(180,220,255,${p.alpha*.4*wf})`;
+        ctx.beginPath();ctx.ellipse(-2,-3,p.r*.8*wf,p.r*.3,-.4,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(-2,3,p.r*.8*wf,p.r*.3,.4,0,Math.PI*2);ctx.fill();
+        ctx.restore();
+      }
+      else if(p.type==='ffly'){
+        p.angle+=p.turn*(Math.sin(p.pulse*.5)>0?1:-1);
+        p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.7;
         p.pulse+=p.ps;
-        const a=Math.max(0,(Math.sin(p.pulse)*0.5+0.5))*p.maxA;
+        const a=Math.max(0,(Math.sin(p.pulse)*.5+.5))*p.maxA;
         if(p.x<-20)p.x=_w+10;if(p.x>_w+20)p.x=-10;
-        if(p.y<_h*0.1)p.y=_h*0.9;if(p.y>_h*0.95)p.y=_h*0.2;
-        const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
-        g.addColorStop(0,`rgba(200,255,100,${a})`);
-        g.addColorStop(0.5,`rgba(150,230,50,${a*0.3})`);
-        g.addColorStop(1,"rgba(150,230,50,0)");
-        ctx.fillStyle=g;
-        ctx.fillRect(p.x-p.r*3,p.y-p.r*3,p.r*6,p.r*6);
-        ctx.beginPath();
-        ctx.fillStyle=`rgba(220,255,150,${a*1.2})`;
-        ctx.arc(p.x,p.y,p.r*0.5,0,Math.PI*2);ctx.fill();
-      } else if(p.type==='fleaf'){
-        p.y+=p.speed;p.x+=p.drift;
-        p.wobble+=p.ws;p.rot+=p.rs;
-        p.x+=Math.sin(p.wobble)*1.2;
-        p.speed+=Math.sin(p.wobble*2)*0.02;
+        if(p.y<_h*.1)p.y=_h*.9;if(p.y>_h*.95)p.y=_h*.2;
+        if(a>.01){
+          const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
+          g.addColorStop(0,`rgba(200,255,100,${a})`);
+          g.addColorStop(.5,`rgba(150,230,50,${a*.3})`);
+          g.addColorStop(1,"rgba(150,230,50,0)");
+          ctx.fillStyle=g;ctx.fillRect(p.x-p.r*3,p.y-p.r*3,p.r*6,p.r*6);
+          ctx.beginPath();ctx.fillStyle=`rgba(220,255,150,${a*1.2})`;
+          ctx.arc(p.x,p.y,p.r*.5,0,Math.PI*2);ctx.fill();
+        }
+      }
+      else if(p.type==='leaf'){
+        p.y+=p.speed;p.x+=p.drift;p.wobble+=p.ws;p.rot+=p.rs;
+        p.x+=Math.sin(p.wobble)*1.1;p.speed+=Math.sin(p.wobble*2)*.015;
         if(p.y>_h+25){seasonParts.splice(i,1);continue}
-        ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-        // Maple-ish leaf shape
-        ctx.beginPath();
         const sz=p.size;
-        ctx.moveTo(0,-sz);
-        ctx.quadraticCurveTo(sz*0.5,-sz*0.3,sz*0.8,-sz*0.6);
-        ctx.quadraticCurveTo(sz*0.4,0,sz*0.6,sz*0.4);
-        ctx.quadraticCurveTo(sz*0.2,sz*0.3,0,sz*0.8);
-        ctx.quadraticCurveTo(-sz*0.2,sz*0.3,-sz*0.6,sz*0.4);
-        ctx.quadraticCurveTo(-sz*0.4,0,-sz*0.8,-sz*0.6);
-        ctx.quadraticCurveTo(-sz*0.5,-sz*0.3,0,-sz);
-        ctx.fillStyle=`rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.alpha})`;
-        ctx.fill();
-        // Leaf vein
-        ctx.strokeStyle=`rgba(${Math.max(0,p.c[0]-40)},${Math.max(0,p.c[1]-30)},${p.c[2]},${p.alpha*0.5})`;
-        ctx.lineWidth=0.5;
-        ctx.beginPath();ctx.moveTo(0,-sz*0.8);ctx.lineTo(0,sz*0.6);ctx.stroke();
+        ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
+        ctx.beginPath();ctx.moveTo(0,-sz);
+        ctx.quadraticCurveTo(sz*.5,-sz*.3,sz*.8,-sz*.6);
+        ctx.quadraticCurveTo(sz*.4,0,sz*.6,sz*.4);
+        ctx.quadraticCurveTo(sz*.2,sz*.3,0,sz*.8);
+        ctx.quadraticCurveTo(-sz*.2,sz*.3,-sz*.6,sz*.4);
+        ctx.quadraticCurveTo(-sz*.4,0,-sz*.8,-sz*.6);
+        ctx.quadraticCurveTo(-sz*.5,-sz*.3,0,-sz);
+        ctx.fillStyle=`rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.alpha})`;ctx.fill();
+        ctx.strokeStyle=`rgba(${Math.max(0,p.c[0]-40)},${Math.max(0,p.c[1]-30)},${p.c[2]},${p.alpha*.4})`;
+        ctx.lineWidth=.5;ctx.beginPath();ctx.moveTo(0,-sz*.7);ctx.lineTo(0,sz*.5);ctx.stroke();
         ctx.restore();
-      } else if(p.type==='fspark'){
+      }
+      else if(p.type==='fspark'){
         p.pulse+=p.ps;
         const a=Math.max(0,Math.sin(p.pulse))*p.maxA;
-        if(a>0.01){
-          ctx.beginPath();
-          ctx.fillStyle=`rgba(210,230,255,${a})`;
-          ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-          ctx.fill();
-          // Cross sparkle
-          ctx.strokeStyle=`rgba(220,240,255,${a*0.5})`;
-          ctx.lineWidth=0.5;
+        if(a>.01){
+          ctx.beginPath();ctx.fillStyle=`rgba(210,230,255,${a})`;
+          ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+          ctx.strokeStyle=`rgba(220,240,255,${a*.4})`;ctx.lineWidth=.5;
           ctx.beginPath();ctx.moveTo(p.x-p.r*2,p.y);ctx.lineTo(p.x+p.r*2,p.y);ctx.stroke();
           ctx.beginPath();ctx.moveTo(p.x,p.y-p.r*2);ctx.lineTo(p.x,p.y+p.r*2);ctx.stroke();
         }
-      } else if(p.type==='mist'){
+      }
+      else if(p.type==='mist'){
         p.x+=p.speed*p.dir;
         if(p.x>_w+p.w)p.x=-p.w;if(p.x<-p.w)p.x=_w;
         const g=ctx.createRadialGradient(p.x+p.w/2,p.y,0,p.x+p.w/2,p.y,p.w/2);
-        g.addColorStop(0,`rgba(200,210,225,${p.alpha})`);
-        g.addColorStop(1,"rgba(200,210,225,0)");
-        ctx.fillStyle=g;
-        ctx.fillRect(p.x,p.y-p.h,p.w,p.h*2);
+        g.addColorStop(0,`rgba(200,210,225,${p.alpha})`);g.addColorStop(1,"rgba(200,210,225,0)");
+        ctx.fillStyle=g;ctx.fillRect(p.x,p.y-p.h,p.w,p.h*2);
       }
     }
-    // Cap particle count
-    if(seasonParts.length>120) seasonParts.splice(0,seasonParts.length-120);
+    if(seasonParts.length>130) seasonParts.splice(0,seasonParts.length-130);
   }
 
-  return{update};
+  function getMode(){return mode}
+  return{update,getMode};
 })();
 
 // ═══ WEATHER SOUND ENGINE ═══
@@ -1707,6 +1788,12 @@ const WxSfx = (function(){
         if(rainGain)rainGain.gain.value=0.02;
         if(rainFilter){rainFilter.frequency.value=3000;rainFilter.Q.value=1.5}
         break;
+      case "fog":
+        // Very quiet wind for fog
+        startWind(false);
+        if(windGain)windGain.gain.value=.02;
+        if(windFilter){windFilter.frequency.value=120;windFilter.Q.value=.15}
+        break;
       case "cold":
         // Soft eerie wind whistle
         startWind(false);
@@ -1730,7 +1817,8 @@ const WxSfx = (function(){
   }
   
   function triggerThunder(){
-    if(!_initialized) return;
+    if(!_initialized){if(!initAudio())return}
+    if(actx&&actx.state==='suspended')actx.resume();
     thunder();
   }
   
@@ -1752,123 +1840,194 @@ const WxSfx = (function(){
   }
 
 
-  // ═══ SEASONAL SOUNDS ═══
-  let seasonSnd="",cicadaNode2=null,cicadaGain2=null,cicadaFilter2=null,cicadaLfo2=null,cicadaLfoG2=null;
-  let seasonInterval=null;
+  // ═══ SEASONAL SOUNDS (weather-aware) ═══
+  let seasonSnd="",seasonInterval=null;
+  let cicadaNode2=null,cicadaGain2=null,cicadaFilter2=null,cicadaLfo2=null,cicadaLfoG2=null;
+  let frogInterval=null;
 
   function stopSeasonSnd(){
     if(cicadaNode2){try{cicadaNode2.stop()}catch(e){}cicadaNode2=null}
     if(cicadaLfo2){try{cicadaLfo2.stop()}catch(e){}cicadaLfo2=null}
     cicadaGain2=null;cicadaFilter2=null;cicadaLfoG2=null;
-    if(seasonInterval){clearInterval(seasonInterval);seasonInterval=null}
+    if(seasonInterval){clearTimeout(seasonInterval);seasonInterval=null}
+    if(frogInterval){clearTimeout(frogInterval);frogInterval=null}
     seasonSnd="";
   }
 
-  function chirpBird(){
+  // Bird sounds with variety
+  function chirpBird(species){
     if(!actx||muted)return;
-    // 2-3 rapid chirps with pitch variation
-    const baseF=2000+Math.random()*2500;
-    const n=2+Math.floor(Math.random()*3);
-    for(let j=0;j<n;j++){
-      const osc=actx.createOscillator();
-      osc.type="sine";
-      const g=actx.createGain();
-      const t0=actx.currentTime+j*0.08+Math.random()*0.03;
-      g.gain.setValueAtTime(0,t0);
-      g.gain.linearRampToValueAtTime(0.04+Math.random()*0.02,t0+0.015);
-      g.gain.exponentialRampToValueAtTime(0.001,t0+0.08+Math.random()*0.06);
-      osc.frequency.setValueAtTime(baseF+Math.random()*500,t0);
-      osc.frequency.linearRampToValueAtTime(baseF+800+Math.random()*600,t0+0.03);
-      osc.frequency.linearRampToValueAtTime(baseF-200+Math.random()*300,t0+0.07);
-      osc.connect(g);g.connect(masterGain);
-      osc.start(t0);osc.stop(t0+0.15);
+    const sp=species||Math.floor(Math.random()*4);
+    if(sp===0){
+      // Sparrow: rapid short chirps
+      const f=3000+Math.random()*1500,n=2+Math.floor(Math.random()*3);
+      for(let j=0;j<n;j++){
+        const osc=actx.createOscillator();osc.type="sine";
+        const g=actx.createGain();const t0=actx.currentTime+j*.07;
+        g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.03,t0+.01);
+        g.gain.exponentialRampToValueAtTime(.001,t0+.06);
+        osc.frequency.setValueAtTime(f+Math.random()*400,t0);
+        osc.frequency.linearRampToValueAtTime(f+600,t0+.02);
+        osc.frequency.linearRampToValueAtTime(f-100,t0+.05);
+        osc.connect(g);g.connect(masterGain);osc.start(t0);osc.stop(t0+.1);
+      }
+    } else if(sp===1){
+      // Warbler: descending melodic trill
+      const f=4000+Math.random()*1000;
+      for(let j=0;j<4+Math.floor(Math.random()*3);j++){
+        const osc=actx.createOscillator();osc.type="sine";
+        const g=actx.createGain();const t0=actx.currentTime+j*.1;
+        g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.025,t0+.015);
+        g.gain.exponentialRampToValueAtTime(.001,t0+.08);
+        osc.frequency.setValueAtTime(f-j*200,t0);
+        osc.frequency.linearRampToValueAtTime(f-j*200-300,t0+.06);
+        osc.connect(g);g.connect(masterGain);osc.start(t0);osc.stop(t0+.12);
+      }
+    } else if(sp===2){
+      // Cuckoo: two notes
+      for(let j=0;j<2;j++){
+        const osc=actx.createOscillator();osc.type="sine";
+        const g=actx.createGain();const t0=actx.currentTime+j*.35;
+        g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.04,t0+.02);
+        g.gain.exponentialRampToValueAtTime(.001,t0+.25);
+        osc.frequency.setValueAtTime(j===0?1200:900,t0);
+        osc.connect(g);g.connect(masterGain);osc.start(t0);osc.stop(t0+.3);
+      }
+    } else {
+      // Robin: melodic rising
+      const f=2500+Math.random()*800;
+      for(let j=0;j<3;j++){
+        const osc=actx.createOscillator();osc.type="sine";
+        const g=actx.createGain();const t0=actx.currentTime+j*.12;
+        g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.03,t0+.015);
+        g.gain.exponentialRampToValueAtTime(.001,t0+.1);
+        osc.frequency.setValueAtTime(f+j*300,t0);
+        osc.frequency.linearRampToValueAtTime(f+j*300+200,t0+.05);
+        osc.connect(g);g.connect(masterGain);osc.start(t0);osc.stop(t0+.15);
+      }
     }
+  }
+
+  function chirpCricket(){
+    if(!actx||muted)return;
+    const f=4200+Math.random()*800,n=2+Math.floor(Math.random()*4);
+    for(let j=0;j<n;j++){
+      const osc=actx.createOscillator();osc.type="sine";osc.frequency.value=f+Math.random()*200;
+      const g=actx.createGain();const t0=actx.currentTime+j*.06;
+      g.gain.setValueAtTime(.02+Math.random()*.01,t0);g.gain.setValueAtTime(0,t0+.025);
+      osc.connect(g);g.connect(masterGain);osc.start(t0);osc.stop(t0+.04);
+    }
+  }
+
+  function croakFrog(){
+    if(!actx||muted)return;
+    const f=300+Math.random()*200;
+    const osc=actx.createOscillator();osc.type="sawtooth";
+    const g=actx.createGain();const flt=actx.createBiquadFilter();
+    flt.type="lowpass";flt.frequency.value=800;
+    g.gain.setValueAtTime(0,actx.currentTime);
+    g.gain.linearRampToValueAtTime(.03,actx.currentTime+.05);
+    g.gain.setValueAtTime(.025,actx.currentTime+.15);
+    g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.4);
+    osc.frequency.setValueAtTime(f,actx.currentTime);
+    osc.frequency.linearRampToValueAtTime(f*.7,actx.currentTime+.3);
+    osc.connect(flt);flt.connect(g);g.connect(masterGain);
+    osc.start();osc.stop(actx.currentTime+.5);
   }
 
   function startCicada(){
     if(!actx)return;
     const buf=mkNoise(2);
-    cicadaNode2=actx.createBufferSource();
-    cicadaNode2.buffer=buf;cicadaNode2.loop=true;
-    cicadaFilter2=actx.createBiquadFilter();
-    cicadaFilter2.type="bandpass";
-    cicadaFilter2.frequency.value=3500+Math.random()*1500;
-    cicadaFilter2.Q.value=4+Math.random()*3;
-    cicadaGain2=actx.createGain();
-    cicadaGain2.gain.value=0.04;
-    cicadaLfo2=actx.createOscillator();
-    cicadaLfo2.frequency.value=6+Math.random()*6;
-    cicadaLfoG2=actx.createGain();
-    cicadaLfoG2.gain.value=0.025;
-    cicadaLfo2.connect(cicadaLfoG2);
-    cicadaLfoG2.connect(cicadaGain2.gain);
-    cicadaLfo2.start();
-    cicadaNode2.connect(cicadaFilter2);
-    cicadaFilter2.connect(cicadaGain2);
-    cicadaGain2.connect(masterGain);
+    cicadaNode2=actx.createBufferSource();cicadaNode2.buffer=buf;cicadaNode2.loop=true;
+    cicadaFilter2=actx.createBiquadFilter();cicadaFilter2.type="bandpass";
+    cicadaFilter2.frequency.value=3500+Math.random()*1500;cicadaFilter2.Q.value=4+Math.random()*3;
+    cicadaGain2=actx.createGain();cicadaGain2.gain.value=.04;
+    cicadaLfo2=actx.createOscillator();cicadaLfo2.frequency.value=5+Math.random()*7;
+    cicadaLfoG2=actx.createGain();cicadaLfoG2.gain.value=.025;
+    cicadaLfo2.connect(cicadaLfoG2);cicadaLfoG2.connect(cicadaGain2.gain);cicadaLfo2.start();
+    cicadaNode2.connect(cicadaFilter2);cicadaFilter2.connect(cicadaGain2);cicadaGain2.connect(masterGain);
     cicadaNode2.start();
   }
 
-  function chirpCricket(){
-    if(!actx||muted)return;
-    const f=4200+Math.random()*800;
-    const n=3+Math.floor(Math.random()*3);
-    for(let j=0;j<n;j++){
-      const osc=actx.createOscillator();
-      osc.type="sine";osc.frequency.value=f+Math.random()*200;
-      const g=actx.createGain();
-      const t0=actx.currentTime+j*0.07;
-      g.gain.setValueAtTime(0.025+Math.random()*0.01,t0);
-      g.gain.setValueAtTime(0,t0+0.03);
-      osc.connect(g);g.connect(masterGain);
-      osc.start(t0);osc.stop(t0+0.05);
-    }
-  }
+  function hasWeatherWind(){return mode==='wind'||mode==='storm'||mode==='typhoon'||mode==='cold'}
+  function hasWeatherRain(){return mode==='rain'||mode==='heavy'||mode==='storm'||mode==='typhoon'||mode==='snow'}
+  function wxSuppressSound(){return mode==='rain'||mode==='heavy'||mode==='storm'||mode==='typhoon'||mode==='snow'||mode==='fog'}
 
   function setSeasonSnd(s){
-    if(s===seasonSnd)return;
+    const suppress=wxSuppressSound();
+    const key=s+'_'+(suppress?'wx':'')+mode+'_'+getTimeSlot();
+    if(key===seasonSnd)return;
     stopSeasonSnd();
     if(muted||!_initialized||!actx)return;
-    seasonSnd=s;
+    seasonSnd=key;
+    if(suppress) return; // Weather sounds dominate
+
+    const ts=getTimeSlot();
     if(s==='spring'){
-      // Random bird chirps every 3-8s
-      const doChirp=()=>{chirpBird();seasonInterval=setTimeout(doChirp,3000+Math.random()*5000)};
-      seasonInterval=setTimeout(doChirp,1000+Math.random()*2000);
+      if(ts==='morning'||ts==='day'){
+        // Random birds every 4-10s, varying species
+        const loop=()=>{chirpBird();seasonInterval=setTimeout(loop,4000+Math.random()*6000)};
+        seasonInterval=setTimeout(loop,1500+Math.random()*2000);
+      } else if(ts==='dusk'){
+        // Sparse birds + early crickets
+        const loop=()=>{if(Math.random()>.5)chirpBird(2);else chirpCricket();seasonInterval=setTimeout(loop,5000+Math.random()*8000)};
+        seasonInterval=setTimeout(loop,2000);
+      } else {
+        // Night: frogs + crickets
+        const cLoop=()=>{chirpCricket();seasonInterval=setTimeout(cLoop,2000+Math.random()*5000)};
+        seasonInterval=setTimeout(cLoop,1000);
+        const fLoop=()=>{croakFrog();frogInterval=setTimeout(fLoop,3000+Math.random()*8000)};
+        frogInterval=setTimeout(fLoop,2000+Math.random()*3000);
+      }
     } else if(s==='summer'){
-      const hr=new Date().getHours();
-      if(hr>=10&&hr<19){
-        // Daytime cicadas
+      if(ts==='morning'||ts==='day'){
         startCicada();
-      } else if(hr>=19||hr<5){
-        // Night crickets + occasional cicada swell
-        const doCricket=()=>{chirpCricket();seasonInterval=setTimeout(doCricket,1500+Math.random()*4000)};
-        seasonInterval=setTimeout(doCricket,500+Math.random()*1500);
+        // Occasional bird too
+        const loop=()=>{if(Math.random()>.6)chirpBird(Math.floor(Math.random()*4));seasonInterval=setTimeout(loop,8000+Math.random()*12000)};
+        seasonInterval=setTimeout(loop,5000);
+      } else if(ts==='dusk'){
+        // Cicadas fading, crickets starting
+        startCicada();if(cicadaGain2)cicadaGain2.gain.value=.02;
+        const loop=()=>{chirpCricket();seasonInterval=setTimeout(loop,2500+Math.random()*4000)};
+        seasonInterval=setTimeout(loop,1500);
+      } else {
+        // Night: crickets + frogs, no cicadas
+        const cLoop=()=>{chirpCricket();seasonInterval=setTimeout(cLoop,1500+Math.random()*3500)};
+        seasonInterval=setTimeout(cLoop,800);
+        const fLoop=()=>{croakFrog();frogInterval=setTimeout(fLoop,4000+Math.random()*8000)};
+        frogInterval=setTimeout(fLoop,2000);
       }
     } else if(s==='autumn'){
-      // Crickets (slower, sparser) + soft wind
-      const doCricket=()=>{chirpCricket();seasonInterval=setTimeout(doCricket,2500+Math.random()*6000)};
-      seasonInterval=setTimeout(doCricket,1000+Math.random()*3000);
-      startWind(false);if(windGain)windGain.gain.value=0.025;
+      // Soft wind only if weather isn't already providing wind
+      if(!hasWeatherWind()){startWind(false);if(windGain)windGain.gain.value=.02}
+      if(ts==='day'||ts==='morning'){
+        // Very sparse birds
+        const loop=()=>{if(Math.random()>.4)chirpBird(3);seasonInterval=setTimeout(loop,10000+Math.random()*15000)};
+        seasonInterval=setTimeout(loop,5000);
+      } else {
+        // Night: slow crickets
+        const loop=()=>{chirpCricket();seasonInterval=setTimeout(loop,3000+Math.random()*7000)};
+        seasonInterval=setTimeout(loop,2000);
+      }
     } else if(s==='winter'){
-      // Quiet cold wind
-      startWind(false);if(windGain)windGain.gain.value=0.03;
-      if(windFilter){windFilter.frequency.value=150;windFilter.Q.value=0.2}
+      if(!hasWeatherWind()){startWind(false);if(windGain)windGain.gain.value=.03;
+      if(windFilter){windFilter.frequency.value=150;windFilter.Q.value=.2}}
     }
   }
 
-  // Check season periodically and update sounds
+  function getTimeSlot(){
+    const h=new Date().getHours();
+    if(h>=6&&h<10) return 'morning';
+    if(h>=10&&h<16) return 'day';
+    if(h>=16&&h<19) return 'dusk';
+    return 'night';
+  }
+
+  // Periodic check for time/weather changes (every 15s for responsiveness)
   setInterval(()=>{
     if(!_initialized||muted)return;
-    const s=getSeason();
-    if(s!==seasonSnd) setSeasonSnd(s);
-    // Summer: switch between cicada(day) and cricket(night)
-    if(s==='summer'){
-      const hr=new Date().getHours();
-      const isDay=(hr>=10&&hr<19);
-      if(isDay&&!cicadaNode2){stopSeasonSnd();setSeasonSnd(s)}
-      if(!isDay&&cicadaNode2){stopSeasonSnd();setSeasonSnd(s)}
-    }
-  },60000);
+    setSeasonSnd(getSeason());
+  },15000);
 
   return{setMode,toggle,triggerThunder,isMuted,initAudio,setSeasonSnd,stopSeasonSnd};
 })();
@@ -1890,4 +2049,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v75')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v77')caches.delete(n)})})}
