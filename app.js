@@ -1465,11 +1465,17 @@ const WxFx = (function(){
   }
 
   // ── Drawing ──
+  let lastMode="none";
   function drawSeason(){
     const s=getSeason(),ts=getTimeSlot();
     seasonTimer++;
-    // Re-seed on change or every ~25s
-    if(s!==curSeason||ts!==curTimeSlot||seasonTimer>1500){seedSeason(s,ts);seasonTimer=0}
+    // Force re-seed immediately when weather mode changes
+    const modeChanged=(mode!==lastMode);lastMode=mode;
+    if(s!==curSeason||ts!==curTimeSlot||modeChanged||seasonTimer>1500){seedSeason(s,ts);seasonTimer=0}
+    // Purge creatures immediately during bad weather (in case any survived)
+    if(noCreatures()){
+      seasonParts=seasonParts.filter(p=>p.type!=='bfly'&&p.type!=='dfly'&&p.type!=='ffly');
+    }
 
     // Random bursts
     burstTimer--;
@@ -1742,28 +1748,42 @@ const WxSfx = (function(){
   
   function thunder(){
     if(!actx||muted) return;
-    const osc=actx.createOscillator();
-    osc.type="sawtooth";
-    osc.frequency.value=40+Math.random()*30;
-    const g=actx.createGain();
-    g.gain.setValueAtTime(0.25+Math.random()*0.15,actx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+1.5+Math.random());
-    const f=actx.createBiquadFilter();
-    f.type="lowpass";
-    f.frequency.value=150;
-    osc.connect(f);f.connect(g);g.connect(masterGain);
-    osc.start();
-    osc.stop(actx.currentTime+2);
-    // Rumble layer
-    const n=actx.createBufferSource();
-    n.buffer=mkNoise(2);
-    const nf=actx.createBiquadFilter();
-    nf.type="lowpass";nf.frequency.value=100;
-    const ng=actx.createGain();
-    ng.gain.setValueAtTime(0.12,actx.currentTime);
-    ng.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+2.5);
-    n.connect(nf);nf.connect(ng);ng.connect(masterGain);
-    n.start();n.stop(actx.currentTime+3);
+    const t0=actx.currentTime;
+    // Layer 1: Initial crack (sharp, high-mid freq, audible on phone)
+    const crack=actx.createBufferSource();
+    crack.buffer=mkNoise(0.5);
+    const cf=actx.createBiquadFilter();
+    cf.type="bandpass";cf.frequency.value=800+Math.random()*600;cf.Q.value=0.8;
+    const cg=actx.createGain();
+    cg.gain.setValueAtTime(0.35+Math.random()*0.15,t0);
+    cg.gain.exponentialRampToValueAtTime(0.01,t0+0.15);
+    cg.gain.exponentialRampToValueAtTime(0.001,t0+0.5);
+    crack.connect(cf);cf.connect(cg);cg.connect(masterGain);
+    crack.start(t0);crack.stop(t0+0.5);
+    // Layer 2: Mid rumble (the body of the thunder)
+    const rum=actx.createBufferSource();
+    rum.buffer=mkNoise(3);
+    const rf=actx.createBiquadFilter();
+    rf.type="bandpass";rf.frequency.value=250+Math.random()*200;rf.Q.value=0.5;
+    const rg=actx.createGain();
+    rg.gain.setValueAtTime(0.001,t0);
+    rg.gain.linearRampToValueAtTime(0.2+Math.random()*0.1,t0+0.08);
+    rg.gain.exponentialRampToValueAtTime(0.05,t0+0.8);
+    rg.gain.exponentialRampToValueAtTime(0.001,t0+2+Math.random());
+    rum.connect(rf);rf.connect(rg);rg.connect(masterGain);
+    rum.start(t0);rum.stop(t0+3);
+    // Layer 3: Distant echo rumble (delayed)
+    const delay=0.3+Math.random()*0.5;
+    const echo=actx.createBufferSource();
+    echo.buffer=mkNoise(2);
+    const ef=actx.createBiquadFilter();
+    ef.type="lowpass";ef.frequency.value=500+Math.random()*300;
+    const eg=actx.createGain();
+    eg.gain.setValueAtTime(0.001,t0+delay);
+    eg.gain.linearRampToValueAtTime(0.08+Math.random()*0.05,t0+delay+0.1);
+    eg.gain.exponentialRampToValueAtTime(0.001,t0+delay+2);
+    echo.connect(ef);ef.connect(eg);eg.connect(masterGain);
+    echo.start(t0+delay);echo.stop(t0+delay+2.5);
   }
   
   function stopAll(){stopRain();stopWind()}
@@ -2048,4 +2068,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v78')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v79')caches.delete(n)})})}
