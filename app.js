@@ -1749,41 +1749,62 @@ const WxSfx = (function(){
   function thunder(){
     if(!actx||muted) return;
     const t0=actx.currentTime;
-    // Layer 1: Initial crack (sharp, high-mid freq, audible on phone)
-    const crack=actx.createBufferSource();
-    crack.buffer=mkNoise(0.5);
-    const cf=actx.createBiquadFilter();
-    cf.type="bandpass";cf.frequency.value=800+Math.random()*600;cf.Q.value=0.8;
-    const cg=actx.createGain();
-    cg.gain.setValueAtTime(0.35+Math.random()*0.15,t0);
-    cg.gain.exponentialRampToValueAtTime(0.01,t0+0.15);
-    cg.gain.exponentialRampToValueAtTime(0.001,t0+0.5);
-    crack.connect(cf);cf.connect(cg);cg.connect(masterGain);
-    crack.start(t0);crack.stop(t0+0.5);
-    // Layer 2: Mid rumble (the body of the thunder)
-    const rum=actx.createBufferSource();
-    rum.buffer=mkNoise(3);
-    const rf=actx.createBiquadFilter();
-    rf.type="bandpass";rf.frequency.value=250+Math.random()*200;rf.Q.value=0.5;
-    const rg=actx.createGain();
-    rg.gain.setValueAtTime(0.001,t0);
-    rg.gain.linearRampToValueAtTime(0.2+Math.random()*0.1,t0+0.08);
-    rg.gain.exponentialRampToValueAtTime(0.05,t0+0.8);
-    rg.gain.exponentialRampToValueAtTime(0.001,t0+2+Math.random());
-    rum.connect(rf);rf.connect(rg);rg.connect(masterGain);
-    rum.start(t0);rum.stop(t0+3);
-    // Layer 3: Distant echo rumble (delayed)
-    const delay=0.3+Math.random()*0.5;
-    const echo=actx.createBufferSource();
-    echo.buffer=mkNoise(2);
-    const ef=actx.createBiquadFilter();
-    ef.type="lowpass";ef.frequency.value=500+Math.random()*300;
-    const eg=actx.createGain();
-    eg.gain.setValueAtTime(0.001,t0+delay);
-    eg.gain.linearRampToValueAtTime(0.08+Math.random()*0.05,t0+delay+0.1);
-    eg.gain.exponentialRampToValueAtTime(0.001,t0+delay+2);
-    echo.connect(ef);ef.connect(eg);eg.connect(masterGain);
-    echo.start(t0+delay);echo.stop(t0+delay+2.5);
+    const type=Math.floor(Math.random()*5);
+
+    function noiseSrc(dur){const s=actx.createBufferSource();s.buffer=mkNoise(dur);return s}
+    function bp(freq,q){const f=actx.createBiquadFilter();f.type="bandpass";f.frequency.value=freq;f.Q.value=q||0.6;return f}
+    function env(g,pts){pts.forEach(([v,t,m])=>{if(m==='set')g.gain.setValueAtTime(v,t);else if(m==='lin')g.gain.linearRampToValueAtTime(v,t);else g.gain.exponentialRampToValueAtTime(Math.max(v,0.0001),t)})}
+
+    if(type===0){
+      // ── Close strike: loud crack + heavy body ──
+      const c=noiseSrc(.2),cf=bp(3000+Math.random()*2000,1.5),cg=actx.createGain();
+      env(cg,[[ .6+Math.random()*.2,t0,'set'],[.001,t0+.08,'exp']]);
+      c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0);c.stop(t0+.2);
+      const b=noiseSrc(2),bf=bp(1500+Math.random()*800),bg=actx.createGain();
+      env(bg,[[.001,t0,'set'],[.35,t0+.03,'lin'],[.001,t0+1.2+Math.random()*.5,'exp']]);
+      b.connect(bf);bf.connect(bg);bg.connect(masterGain);b.start(t0);b.stop(t0+2);
+    }
+    else if(type===1){
+      // ── Distant rumble: no crack, just low rolling ──
+      const r=noiseSrc(4),rf=bp(800+Math.random()*600,.4),rg=actx.createGain();
+      env(rg,[[.001,t0,'set'],[.08+Math.random()*.04,t0+.3,'lin'],[.04,t0+1.5,'exp'],[.001,t0+3+Math.random(),'exp']]);
+      r.connect(rf);rf.connect(rg);rg.connect(masterGain);r.start(t0);r.stop(t0+4);
+    }
+    else if(type===2){
+      // ── Multi-crack: 2-3 rapid cracks then rumble ──
+      const n=2+Math.floor(Math.random()*2);
+      for(let i=0;i<n;i++){
+        const d=i*(.06+Math.random()*.08);
+        const c=noiseSrc(.15),cf=bp(2500+Math.random()*2500,1.2),cg=actx.createGain();
+        env(cg,[[.4+Math.random()*.2,t0+d,'set'],[.001,t0+d+.05+Math.random()*.03,'exp']]);
+        c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0+d);c.stop(t0+d+.15);
+      }
+      const b=noiseSrc(2.5),bf=bp(1000+Math.random()*1000),bg=actx.createGain();
+      env(bg,[[.001,t0+.1,'set'],[.25,t0+.2,'lin'],[.001,t0+2+Math.random(),'exp']]);
+      b.connect(bf);bf.connect(bg);bg.connect(masterGain);b.start(t0+.1);b.stop(t0+3);
+    }
+    else if(type===3){
+      // ── Long rolling: builds slowly, long tail ──
+      const r=noiseSrc(5),rf=bp(900+Math.random()*800,.4),rg=actx.createGain();
+      env(rg,[[.001,t0,'set'],[.05,t0+.5,'lin'],[.12+Math.random()*.06,t0+1.2,'lin'],[.001,t0+4+Math.random(),'exp']]);
+      r.connect(rf);rf.connect(rg);rg.connect(masterGain);r.start(t0);r.stop(t0+5);
+      // Late crack surprise
+      if(Math.random()>.5){
+        const d=1+Math.random()*.8;
+        const c=noiseSrc(.1),cf=bp(3000+Math.random()*1500,1),cg=actx.createGain();
+        env(cg,[[.3,t0+d,'set'],[.001,t0+d+.06,'exp']]);
+        c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0+d);c.stop(t0+d+.15);
+      }
+    }
+    else{
+      // ── Sharp single: one crack, minimal tail ──
+      const c=noiseSrc(.15),cf=bp(3500+Math.random()*2000,1.8),cg=actx.createGain();
+      env(cg,[[.55+Math.random()*.2,t0,'set'],[.001,t0+.04+Math.random()*.02,'exp']]);
+      c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0);c.stop(t0+.15);
+      const b=noiseSrc(1),bf=bp(1200+Math.random()*600),bg=actx.createGain();
+      env(bg,[[.001,t0+.02,'set'],[.1,t0+.06,'lin'],[.001,t0+.5+Math.random()*.3,'exp']]);
+      b.connect(bf);bf.connect(bg);bg.connect(masterGain);b.start(t0);b.stop(t0+1);
+    }
   }
   
   function stopAll(){stopRain();stopWind()}
@@ -2068,4 +2089,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v79')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v81')caches.delete(n)})})}
