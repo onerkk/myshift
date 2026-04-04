@@ -1751,70 +1751,81 @@ const WxSfx = (function(){
     const t0=actx.currentTime;
     const type=Math.floor(Math.random()*5);
 
-    function ns(d){const s=actx.createBufferSource();s.buffer=mkNoise(d);return s}
-    function bpf(f,q){const x=actx.createBiquadFilter();x.type="bandpass";x.frequency.value=f;x.Q.value=q||.8;return x}
-
-    // Helper: create rumble with tremolo LFO (simulates 隆隆隆 on phone speakers)
-    function mkRumble(freq,vol,lfoHz,lfoDep,start,dur){
-      const n=ns(dur),f=bpf(freq,.4),g=actx.createGain();
-      g.gain.value=0;
-      // Tremolo LFO
-      const lfo=actx.createOscillator();lfo.type="sine";lfo.frequency.value=lfoHz;
-      const lg=actx.createGain();lg.gain.value=lfoDep;
-      lfo.connect(lg);lg.connect(g.gain);lfo.start(start);lfo.stop(start+dur);
-      // Envelope
-      g.gain.setValueAtTime(.001,start);
-      g.gain.linearRampToValueAtTime(vol,start+.15);
-      g.gain.setValueAtTime(vol,start+dur*.4);
-      g.gain.exponentialRampToValueAtTime(.001,start+dur);
-      n.connect(f);f.connect(g);g.connect(masterGain);
-      n.start(start);n.stop(start+dur);
-    }
-    // Helper: sharp crack
-    function mkCrack(freq,vol,start){
-      const n=ns(.15),f=bpf(freq,1.5),g=actx.createGain();
+    // Shared: create a short noise burst at given freq/vol/time/duration
+    function burst(freq,vol,start,dur){
+      const s=actx.createBufferSource();s.buffer=mkNoise(dur+.05);
+      const f=actx.createBiquadFilter();f.type="bandpass";f.frequency.value=freq;f.Q.value=.6;
+      const g=actx.createGain();
       g.gain.setValueAtTime(vol,start);
-      g.gain.exponentialRampToValueAtTime(.001,start+.04+Math.random()*.03);
-      n.connect(f);f.connect(g);g.connect(masterGain);
-      n.start(start);n.stop(start+.15);
-    }
-    // Helper: boom (轟)
-    function mkBoom(freq,vol,start,dur){
-      const n=ns(dur),f=bpf(freq,.5),g=actx.createGain();
-      g.gain.setValueAtTime(.001,start);
-      g.gain.linearRampToValueAtTime(vol,start+.02);
-      g.gain.exponentialRampToValueAtTime(vol*.3,start+dur*.3);
+      g.gain.setValueAtTime(vol,start+dur*.7);
       g.gain.exponentialRampToValueAtTime(.001,start+dur);
-      n.connect(f);f.connect(g);g.connect(masterGain);
-      n.start(start);n.stop(start+dur);
+      s.connect(f);f.connect(g);g.connect(masterGain);
+      s.start(start);s.stop(start+dur+.01);
+    }
+
+    // Element A: 啪 crack — short, NOT too loud so it doesn't mask the rest
+    function crack(t){
+      burst(5500+Math.random()*2000, .3+Math.random()*.1, t, .04+Math.random()*.02);
+    }
+
+    // Element B: 轟 body — SAME freq range as crack (proven audible), LOUD, LONG sustain
+    function boom(t,dur){
+      const freq=3800+Math.random()*1500;
+      const s=actx.createBufferSource();s.buffer=mkNoise(dur+.1);
+      const f=actx.createBiquadFilter();f.type="bandpass";f.frequency.value=freq;f.Q.value=.4;
+      const g=actx.createGain();
+      g.gain.setValueAtTime(.001,t);
+      g.gain.linearRampToValueAtTime(.5,t+.03);         // fast attack to 0.5
+      g.gain.setValueAtTime(.45,t+dur*.3);               // sustain loud
+      g.gain.linearRampToValueAtTime(.2,t+dur*.6);       // slow taper
+      g.gain.exponentialRampToValueAtTime(.001,t+dur);   // fade out
+      s.connect(f);f.connect(g);g.connect(masterGain);
+      s.start(t);s.stop(t+dur+.01);
+    }
+
+    // Element C: 隆隆隆 discrete pulse train — each pulse individually audible
+    function rumble(t,count,decay){
+      const baseFreq=3500+Math.random()*1500;
+      const gap=.06+Math.random()*.04; // 60-100ms between pulses
+      const pDur=.04+Math.random()*.03; // each pulse 40-70ms
+      for(let i=0;i<count;i++){
+        const vol=(.3+Math.random()*.1)*(1-i*decay);
+        if(vol<.03) break;
+        const pt=t+i*(gap+pDur);
+        burst(baseFreq+Math.random()*600-.300, vol, pt, pDur);
+      }
     }
 
     if(type===0){
-      // ── Close strike: CRACK + BOOM + rumble ──
-      mkCrack(5000+Math.random()*2000,.8,t0);
-      mkBoom(3000+Math.random()*1000,.5,t0,.8);
-      mkRumble(2800+Math.random()*800,.35,5+Math.random()*3,.2,t0+.2,2+Math.random());
+      // Close strike: crack → loud boom → rumble tail
+      crack(t0);
+      boom(t0+.03, .6+Math.random()*.3);
+      rumble(t0+.5+Math.random()*.2, 8+Math.floor(Math.random()*5), .06);
     }
     else if(type===1){
-      // ── Distant: just rolling rumble, no crack ──
-      mkRumble(2500+Math.random()*1000,.25,3+Math.random()*2,.15,t0,3+Math.random()*1.5);
+      // Distant: no crack, just long rumble
+      rumble(t0, 12+Math.floor(Math.random()*6), .04);
     }
     else if(type===2){
-      // ── Multi-crack: rapid cracks then rumble ──
+      // Multi-crack: 2-3 cracks → boom → rumble
       const n=2+Math.floor(Math.random()*2);
-      for(let i=0;i<n;i++) mkCrack(4000+Math.random()*2500,.6,t0+i*(.07+Math.random()*.06));
-      mkBoom(3200+Math.random()*800,.4,t0+.05,1);
-      mkRumble(2600+Math.random()*1000,.3,4+Math.random()*4,.18,t0+.3,2.5+Math.random());
+      for(let i=0;i<n;i++) crack(t0+i*(.08+Math.random()*.06));
+      boom(t0+n*.1, .5+Math.random()*.3);
+      rumble(t0+.4+Math.random()*.2, 6+Math.floor(Math.random()*5), .05);
     }
     else if(type===3){
-      // ── Long rolling: slow build, long rumble, maybe late crack ──
-      mkRumble(2500+Math.random()*800,.3,3+Math.random()*2,.2,t0,4+Math.random());
-      if(Math.random()>.4) mkCrack(5000+Math.random()*1500,.5,t0+1+Math.random());
+      // Long rolling: rumble builds, optional late crack
+      rumble(t0, 15+Math.floor(Math.random()*8), .03);
+      if(Math.random()>.4){
+        const d=.8+Math.random()*.6;
+        crack(t0+d);
+        boom(t0+d+.03, .4+Math.random()*.2);
+      }
     }
     else{
-      // ── Sharp single: one loud crack, tiny tail ──
-      mkCrack(5500+Math.random()*2000,.85,t0);
-      mkBoom(3500+Math.random()*1000,.3,t0,.4);
+      // Sharp single: one crack + short boom, no rumble
+      crack(t0);
+      boom(t0+.03, .3+Math.random()*.15);
     }
   }
   
@@ -2100,4 +2111,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v83')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v84')caches.delete(n)})})}
