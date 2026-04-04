@@ -1751,81 +1751,78 @@ const WxSfx = (function(){
     const t0=actx.currentTime;
     const type=Math.floor(Math.random()*5);
 
-    // Shared: create a short noise burst at given freq/vol/time/duration
-    function burst(freq,vol,start,dur){
-      const s=actx.createBufferSource();s.buffer=mkNoise(dur+.05);
-      const f=actx.createBiquadFilter();f.type="bandpass";f.frequency.value=freq;f.Q.value=.6;
-      const g=actx.createGain();
-      g.gain.setValueAtTime(vol,start);
-      g.gain.setValueAtTime(vol,start+dur*.7);
-      g.gain.exponentialRampToValueAtTime(.001,start+dur);
-      s.connect(f);f.connect(g);g.connect(masterGain);
-      s.start(start);s.stop(start+dur+.01);
-    }
-
-    // Element A: 啪 crack — short, NOT too loud so it doesn't mask the rest
+    // 啪 crack — high freq, short (this works on phone)
     function crack(t){
-      burst(5500+Math.random()*2000, .3+Math.random()*.1, t, .04+Math.random()*.02);
+      const s=actx.createBufferSource();s.buffer=mkNoise(.1);
+      const f=actx.createBiquadFilter();f.type="bandpass";f.frequency.value=5000+Math.random()*2000;f.Q.value=1;
+      const g=actx.createGain();
+      g.gain.setValueAtTime(.35,t);
+      g.gain.exponentialRampToValueAtTime(.001,t+.05);
+      s.connect(f);f.connect(g);g.connect(masterGain);
+      s.start(t);s.stop(t+.1);
     }
 
-    // Element B: 轟 body — SAME freq range as crack (proven audible), LOUD, LONG sustain
-    function boom(t,dur){
-      const freq=3800+Math.random()*1500;
-      const s=actx.createBufferSource();s.buffer=mkNoise(dur+.1);
-      const f=actx.createBiquadFilter();f.type="bandpass";f.frequency.value=freq;f.Q.value=.4;
+    // 轟隆隆 — ONE continuous noise source, gain hand-sculpted
+    // Uses same freq range as rain (proven to work on this phone)
+    function rumbleBoom(t,dur,pattern){
+      // pattern: array of [timeOffset, gainValue] pairs
+      const s=actx.createBufferSource();s.buffer=mkNoise(dur+.2);
+      const f=actx.createBiquadFilter();
+      f.type="bandpass";f.frequency.value=1800+Math.random()*800;f.Q.value=.5;
       const g=actx.createGain();
       g.gain.setValueAtTime(.001,t);
-      g.gain.linearRampToValueAtTime(.5,t+.03);         // fast attack to 0.5
-      g.gain.setValueAtTime(.45,t+dur*.3);               // sustain loud
-      g.gain.linearRampToValueAtTime(.2,t+dur*.6);       // slow taper
-      g.gain.exponentialRampToValueAtTime(.001,t+dur);   // fade out
-      s.connect(f);f.connect(g);g.connect(masterGain);
-      s.start(t);s.stop(t+dur+.01);
-    }
-
-    // Element C: 隆隆隆 discrete pulse train — each pulse individually audible
-    function rumble(t,count,decay){
-      const baseFreq=3500+Math.random()*1500;
-      const gap=.06+Math.random()*.04; // 60-100ms between pulses
-      const pDur=.04+Math.random()*.03; // each pulse 40-70ms
-      for(let i=0;i<count;i++){
-        const vol=(.3+Math.random()*.1)*(1-i*decay);
-        if(vol<.03) break;
-        const pt=t+i*(gap+pDur);
-        burst(baseFreq+Math.random()*600-.300, vol, pt, pDur);
+      for(const [dt,v] of pattern){
+        g.gain.linearRampToValueAtTime(v,t+dt);
       }
+      g.gain.linearRampToValueAtTime(.001,t+dur);
+      s.connect(f);f.connect(g);g.connect(masterGain);
+      s.start(t);s.stop(t+dur+.05);
     }
 
     if(type===0){
-      // Close strike: crack → loud boom → rumble tail
+      // Close: crack → big boom sustain → rolling fade
       crack(t0);
-      boom(t0+.03, .6+Math.random()*.3);
-      rumble(t0+.5+Math.random()*.2, 8+Math.floor(Math.random()*5), .06);
+      rumbleBoom(t0+.03, 2.5+Math.random(), [
+        [.03,.5],[.15,.45],[.3,.35],[.5,.3],
+        [.7,.25],[.8,.3],[.95,.2],[1.1,.25],
+        [1.3,.15],[1.5,.2],[1.7,.1],[2,.05]
+      ]);
     }
     else if(type===1){
-      // Distant: no crack, just long rumble
-      rumble(t0, 12+Math.floor(Math.random()*6), .04);
+      // Distant: no crack, slow rolling build
+      rumbleBoom(t0, 3.5+Math.random(), [
+        [.3,.1],[.6,.15],[.9,.2],[1.1,.25],
+        [1.4,.2],[1.6,.25],[1.9,.15],[2.2,.2],
+        [2.5,.12],[2.8,.08],[3,.04]
+      ]);
     }
     else if(type===2){
-      // Multi-crack: 2-3 cracks → boom → rumble
+      // Multi-crack → boom → rolling
       const n=2+Math.floor(Math.random()*2);
-      for(let i=0;i<n;i++) crack(t0+i*(.08+Math.random()*.06));
-      boom(t0+n*.1, .5+Math.random()*.3);
-      rumble(t0+.4+Math.random()*.2, 6+Math.floor(Math.random()*5), .05);
+      for(let i=0;i<n;i++) crack(t0+i*(.1+Math.random()*.08));
+      rumbleBoom(t0+n*.12, 2+Math.random(), [
+        [.03,.45],[.2,.4],[.4,.3],[.6,.35],
+        [.8,.25],[1,.3],[1.2,.2],[1.5,.12],[1.8,.05]
+      ]);
     }
     else if(type===3){
-      // Long rolling: rumble builds, optional late crack
-      rumble(t0, 15+Math.floor(Math.random()*8), .03);
+      // Long rolling, late crack
+      rumbleBoom(t0, 4+Math.random(), [
+        [.2,.08],[.5,.15],[.8,.2],[1,.25],[1.2,.3],
+        [1.5,.25],[1.7,.3],[2,.2],[2.3,.25],
+        [2.6,.15],[2.9,.2],[3.2,.1],[3.5,.05]
+      ]);
       if(Math.random()>.4){
-        const d=.8+Math.random()*.6;
+        const d=1.2+Math.random()*.8;
         crack(t0+d);
-        boom(t0+d+.03, .4+Math.random()*.2);
       }
     }
     else{
-      // Sharp single: one crack + short boom, no rumble
+      // Sharp single: crack + short boom
       crack(t0);
-      boom(t0+.03, .3+Math.random()*.15);
+      rumbleBoom(t0+.03, .6+Math.random()*.2, [
+        [.03,.4],[.15,.3],[.3,.15],[.45,.05]
+      ]);
     }
   }
   
@@ -2111,4 +2108,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v84')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v86')caches.delete(n)})})}
