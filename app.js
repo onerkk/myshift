@@ -1751,58 +1751,70 @@ const WxSfx = (function(){
     const t0=actx.currentTime;
     const type=Math.floor(Math.random()*5);
 
-    function noiseSrc(dur){const s=actx.createBufferSource();s.buffer=mkNoise(dur);return s}
-    function bp(freq,q){const f=actx.createBiquadFilter();f.type="bandpass";f.frequency.value=freq;f.Q.value=q||0.6;return f}
-    function env(g,pts){pts.forEach(([v,t,m])=>{if(m==='set')g.gain.setValueAtTime(v,t);else if(m==='lin')g.gain.linearRampToValueAtTime(v,t);else g.gain.exponentialRampToValueAtTime(Math.max(v,0.0001),t)})}
+    function ns(d){const s=actx.createBufferSource();s.buffer=mkNoise(d);return s}
+    function bpf(f,q){const x=actx.createBiquadFilter();x.type="bandpass";x.frequency.value=f;x.Q.value=q||.8;return x}
+
+    // Helper: create rumble with tremolo LFO (simulates 隆隆隆 on phone speakers)
+    function mkRumble(freq,vol,lfoHz,lfoDep,start,dur){
+      const n=ns(dur),f=bpf(freq,.4),g=actx.createGain();
+      g.gain.value=0;
+      // Tremolo LFO
+      const lfo=actx.createOscillator();lfo.type="sine";lfo.frequency.value=lfoHz;
+      const lg=actx.createGain();lg.gain.value=lfoDep;
+      lfo.connect(lg);lg.connect(g.gain);lfo.start(start);lfo.stop(start+dur);
+      // Envelope
+      g.gain.setValueAtTime(.001,start);
+      g.gain.linearRampToValueAtTime(vol,start+.15);
+      g.gain.setValueAtTime(vol,start+dur*.4);
+      g.gain.exponentialRampToValueAtTime(.001,start+dur);
+      n.connect(f);f.connect(g);g.connect(masterGain);
+      n.start(start);n.stop(start+dur);
+    }
+    // Helper: sharp crack
+    function mkCrack(freq,vol,start){
+      const n=ns(.15),f=bpf(freq,1.5),g=actx.createGain();
+      g.gain.setValueAtTime(vol,start);
+      g.gain.exponentialRampToValueAtTime(.001,start+.04+Math.random()*.03);
+      n.connect(f);f.connect(g);g.connect(masterGain);
+      n.start(start);n.stop(start+.15);
+    }
+    // Helper: boom (轟)
+    function mkBoom(freq,vol,start,dur){
+      const n=ns(dur),f=bpf(freq,.5),g=actx.createGain();
+      g.gain.setValueAtTime(.001,start);
+      g.gain.linearRampToValueAtTime(vol,start+.02);
+      g.gain.exponentialRampToValueAtTime(vol*.3,start+dur*.3);
+      g.gain.exponentialRampToValueAtTime(.001,start+dur);
+      n.connect(f);f.connect(g);g.connect(masterGain);
+      n.start(start);n.stop(start+dur);
+    }
 
     if(type===0){
-      // ── Close strike: loud crack + thick body ──
-      const c=noiseSrc(.2),cf=bp(4000+Math.random()*2000,1.5),cg=actx.createGain();
-      env(cg,[[.7,t0,'set'],[.001,t0+.07,'exp']]);
-      c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0);c.stop(t0+.2);
-      const b=noiseSrc(2),bf=bp(2000+Math.random()*1500,.4),bg=actx.createGain();
-      env(bg,[[.001,t0,'set'],[.4,t0+.03,'lin'],[.15,t0+.3,'exp'],[.001,t0+1.2+Math.random()*.5,'exp']]);
-      b.connect(bf);bf.connect(bg);bg.connect(masterGain);b.start(t0);b.stop(t0+2);
+      // ── Close strike: CRACK + BOOM + rumble ──
+      mkCrack(5000+Math.random()*2000,.8,t0);
+      mkBoom(3000+Math.random()*1000,.5,t0,.8);
+      mkRumble(2800+Math.random()*800,.35,5+Math.random()*3,.2,t0+.2,2+Math.random());
     }
     else if(type===1){
-      // ── Distant rumble: muffled rolling ──
-      const r=noiseSrc(4),rf=bp(1800+Math.random()*800,.3),rg=actx.createGain();
-      env(rg,[[.001,t0,'set'],[.12,t0+.4,'lin'],[.08,t0+1.5,'lin'],[.001,t0+3+Math.random(),'exp']]);
-      r.connect(rf);rf.connect(rg);rg.connect(masterGain);r.start(t0);r.stop(t0+4);
+      // ── Distant: just rolling rumble, no crack ──
+      mkRumble(2500+Math.random()*1000,.25,3+Math.random()*2,.15,t0,3+Math.random()*1.5);
     }
     else if(type===2){
-      // ── Multi-crack: 2-3 rapid cracks then rolling ──
+      // ── Multi-crack: rapid cracks then rumble ──
       const n=2+Math.floor(Math.random()*2);
-      for(let i=0;i<n;i++){
-        const d=i*(.06+Math.random()*.08);
-        const c=noiseSrc(.12),cf=bp(3500+Math.random()*2500,1.3),cg=actx.createGain();
-        env(cg,[[.5+Math.random()*.2,t0+d,'set'],[.001,t0+d+.04+Math.random()*.02,'exp']]);
-        c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0+d);c.stop(t0+d+.12);
-      }
-      const b=noiseSrc(2.5),bf=bp(1800+Math.random()*1200,.4),bg=actx.createGain();
-      env(bg,[[.001,t0+.1,'set'],[.3,t0+.18,'lin'],[.1,t0+.6,'exp'],[.001,t0+2+Math.random(),'exp']]);
-      b.connect(bf);bf.connect(bg);bg.connect(masterGain);b.start(t0+.1);b.stop(t0+3);
+      for(let i=0;i<n;i++) mkCrack(4000+Math.random()*2500,.6,t0+i*(.07+Math.random()*.06));
+      mkBoom(3200+Math.random()*800,.4,t0+.05,1);
+      mkRumble(2600+Math.random()*1000,.3,4+Math.random()*4,.18,t0+.3,2.5+Math.random());
     }
     else if(type===3){
-      // ── Long rolling: builds slowly, long tail ──
-      const r=noiseSrc(5),rf=bp(1600+Math.random()*1000,.3),rg=actx.createGain();
-      env(rg,[[.001,t0,'set'],[.06,t0+.5,'lin'],[.18,t0+1.2,'lin'],[.08,t0+2.5,'exp'],[.001,t0+4+Math.random(),'exp']]);
-      r.connect(rf);rf.connect(rg);rg.connect(masterGain);r.start(t0);r.stop(t0+5);
-      if(Math.random()>.5){
-        const d=1+Math.random()*.8;
-        const c=noiseSrc(.1),cf=bp(4000+Math.random()*2000,1.2),cg=actx.createGain();
-        env(cg,[[.4,t0+d,'set'],[.001,t0+d+.05,'exp']]);
-        c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0+d);c.stop(t0+d+.12);
-      }
+      // ── Long rolling: slow build, long rumble, maybe late crack ──
+      mkRumble(2500+Math.random()*800,.3,3+Math.random()*2,.2,t0,4+Math.random());
+      if(Math.random()>.4) mkCrack(5000+Math.random()*1500,.5,t0+1+Math.random());
     }
     else{
-      // ── Sharp single: one crack, short tail ──
-      const c=noiseSrc(.12),cf=bp(4500+Math.random()*2000,1.8),cg=actx.createGain();
-      env(cg,[[.6,t0,'set'],[.001,t0+.035,'exp']]);
-      c.connect(cf);cf.connect(cg);cg.connect(masterGain);c.start(t0);c.stop(t0+.12);
-      const b=noiseSrc(1),bf=bp(2000+Math.random()*1000,.5),bg=actx.createGain();
-      env(bg,[[.001,t0+.02,'set'],[.2,t0+.05,'lin'],[.001,t0+.4+Math.random()*.3,'exp']]);
-      b.connect(bf);bf.connect(bg);bg.connect(masterGain);b.start(t0);b.stop(t0+1);
+      // ── Sharp single: one loud crack, tiny tail ──
+      mkCrack(5500+Math.random()*2000,.85,t0);
+      mkBoom(3500+Math.random()*1000,.3,t0,.4);
     }
   }
   
@@ -2088,4 +2100,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v82')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v83')caches.delete(n)})})}
