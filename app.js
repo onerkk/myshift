@@ -4,12 +4,11 @@ const fbAuth=firebase.auth(),fbDb=firebase.firestore();
 fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 let fbUser=null;
 let fbAuthReady=false;
-let _authSettled=false;
 let _initDone=false;
 function _doAuthInit(){if(_initDone)return;_initDone=true;loadLeaves();loadAdminEv();cloudLoad()}
-fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){_authSettled=true;render();_doAuthInit()}else if(_authSettled){render()}});
-fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user;_authSettled=true;fbAuthReady=true;render();_doAuthInit()}}).catch(()=>{});
-setTimeout(()=>{_authSettled=true;if(!fbUser){fbAuthReady=true;render()}},3500);
+fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){_doAuthInit()}else{loadAdminEv()}render()});
+fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user;fbAuthReady=true;render();_doAuthInit()}}).catch(()=>{});
+setTimeout(()=>{if(!fbAuthReady){fbAuthReady=true;render()}},3000);
 let _loading=false;
 async function cloudSave(){if(!fbUser||_loading)return;try{const payload={rt:S.rt,pos:S.pos,ep:true,ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};if(JSON.stringify(NOTES)==='{}'){delete payload.notes}await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true})}catch(e){console.log("cloudSave err",e)}}
 async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();let needEpSave=false;if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;if(!d.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length};needEpSave=true};S.step="cal";const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true});try{localStorage.setItem("sb_c",dd)}catch(e){}sCk("sb_c",dd,3650)}if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}if(d.al){try{AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{}}catch(e){}}if(d.notes){try{const raw=d.notes;const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});if(Object.keys(_n).length){NOTES=_n;sNotes()}}catch(e){}}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)};_loading=false;if(needEpSave)cloudSave();sEv();sAL();render();setTimeout(render,1000)}else{_loading=false;render()}}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
@@ -18,7 +17,7 @@ function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
   fbLoginPending=true;
   fbAuth.signInWithPopup(p).then(r=>{
     fbLoginPending=false;
-    if(r&&r.user){fbUser=r.user;fbAuthReady=true;_authSettled=true;_initDone=false;render();_doAuthInit()}
+    if(r&&r.user){fbUser=r.user;fbAuthReady=true;_initDone=false;render();_doAuthInit()}
   }).catch(e=>{
     fbLoginPending=false;
     // Only redirect if popup was actually blocked (not cancelled/closed)
@@ -187,27 +186,6 @@ function render(){
 function _doRender(){
   _renderRAF=null;
   const a=document.getElementById("app");
-  // ── Require Google login ──
-  if(fbAuthReady&&!fbUser){
-    a.innerHTML=`<div class="page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:30px">
-      <img src="${typeof IMG!=='undefined'&&IMG.icon?IMG.icon:'./icons/icon-192.png'}" style="width:80px;height:80px;border-radius:20px;margin-bottom:16px">
-      <h1 style="font-size:22px;font-weight:800;margin-bottom:6px">${lang==="zh"?"我的班表":"My Shift"}</h1>
-      <p style="font-size:13px;color:var(--tx3);margin-bottom:30px">${lang==="zh"?"登入 Google 帳號以同步並保護你的資料":"Login with Google to sync & protect your data"}</p>
-      <button onclick="fbLogin()" style="background:#fff;border:1px solid #ddd;padding:14px 28px;border-radius:12px;font-size:14px;font-weight:700;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.1)">
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:22px;height:22px">
-        ${lang==="zh"?"Google 登入":"Login with Google"}
-      </button>
-      <div style="margin-top:20px;text-align:center">
-        <span class="lang-tog" style="display:inline-flex;height:32px;border-color:#ddd">
-          <button class="lt-btn${lang==='zh'?' lt-on':''}" style="font-size:11px;padding:0 12px;color:${lang==='zh'?'var(--pri-d)':'var(--tx3)'}" data-a="lzh">中文</button>
-          <button class="lt-btn${lang==='id'?' lt-on':''}" style="font-size:11px;padding:0 12px;color:${lang==='id'?'var(--pri-d)':'var(--tx3)'}" data-a="lid">ID</button>
-        </span>
-      </div>
-    </div>`;
-    document.getElementById("mr").innerHTML="";
-    document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
-    return;
-  }
   if(!fbAuthReady){
     a.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--tx3);font-size:13px">⏳ ${lang==="zh"?"載入中...":"Loading..."}</div>`;
     return;
@@ -297,7 +275,13 @@ function rMod(){
 
 function fbBarHtml(){
   if(!firebase||!fbAuth)return"";
-  if(!fbUser)return`<div class="fb-bar fi"><span style="color:var(--tx3)">${lang==="zh"?"登入可同步請假資料":"Login untuk sync cuti"}</span><button onclick="fbLogin()">${lang==="zh"?"Google 登入":"Login Google"}</button></div>`;
+  if(!fbUser)return`<div class="fb-bar fi" style="background:linear-gradient(135deg,#fff3e0,#fbe9e7);border:1.5px solid #ff8f00;border-radius:10px;padding:12px 14px;margin:0 0 6px">
+    <div style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:6px">⚠️ ${lang==="zh"?"尚未登入 — 清除快取將遺失所有資料":"Belum login — data hilang jika cache dihapus"}</div>
+    <button onclick="fbLogin()" style="width:100%;background:#fff;border:1px solid #ddd;padding:10px;border-radius:8px;font-size:13px;font-weight:700;color:var(--tx);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:18px;height:18px">
+      ${lang==="zh"?"Google 登入保護資料":"Login Google untuk lindungi data"}
+    </button>
+  </div>`;
   const pic=fbUser.photoURL?`<img class="fb-avatar" src="${fbUser.photoURL}" referrerpolicy="no-referrer">`:"";
   const name=fbUser.displayName||fbUser.email||"";
   return`<div class="fb-bar fi"><div class="fb-user">${pic}<span>${name}</span></div><button onclick="fbLogout()" style="background:var(--tx3)">${lang==="zh"?"登出":"Logout"}</button></div>`;
@@ -2136,4 +2120,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v98')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v99')caches.delete(n)})})}
