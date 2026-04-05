@@ -5,24 +5,32 @@ fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 let fbUser=null;
 let fbAuthReady=false;
 let _authSettled=false;
-fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){_authSettled=true;render();loadLeaves();loadAdminEv();cloudLoad()}else if(_authSettled){render()}});
-fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user;_authSettled=true;fbAuthReady=true;render()}}).catch(()=>{});
-// Show login screen only after splash finishes (2.6s) + extra buffer
+let _initDone=false;
+function _doAuthInit(){if(_initDone)return;_initDone=true;loadLeaves();loadAdminEv();cloudLoad()}
+fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){_authSettled=true;render();_doAuthInit()}else if(_authSettled){render()}});
+fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user;_authSettled=true;fbAuthReady=true;render();_doAuthInit()}}).catch(()=>{});
 setTimeout(()=>{_authSettled=true;if(!fbUser){fbAuthReady=true;render()}},3500);
 let _loading=false;
 async function cloudSave(){if(!fbUser||_loading)return;try{const payload={rt:S.rt,pos:S.pos,ep:true,ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};if(JSON.stringify(NOTES)==='{}'){delete payload.notes}await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true})}catch(e){console.log("cloudSave err",e)}}
 async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();let needEpSave=false;if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;if(!d.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length};needEpSave=true};S.step="cal";const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true});try{localStorage.setItem("sb_c",dd)}catch(e){}sCk("sb_c",dd,3650)}if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}if(d.al){try{AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{}}catch(e){}}if(d.notes){try{const raw=d.notes;const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});if(Object.keys(_n).length){NOTES=_n;sNotes()}}catch(e){}}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)};_loading=false;if(needEpSave)cloudSave();sEv();sAL();render();setTimeout(render,1000)}else{_loading=false;render()}}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
 let fbLoginPending=false;
 function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
-fbLoginPending=true;
-fbAuth.signInWithPopup(p).then(()=>{fbLoginPending=false}).catch(e=>{
-  fbLoginPending=false;
-  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
-  const isStandalone=window.matchMedia('(display-mode:standalone)').matches||navigator.standalone;
-  if(isIOS&&isStandalone){alert(lang==="zh"?"📱 iOS 桌面版請先用 Safari 開啟 onerkk.github.io 登入 Google，登入後再回到此 App 即可自動同步":"📱 iOS: Buka onerkk.github.io di Safari, login Google, lalu kembali ke App")}
-  else{fbAuth.signInWithRedirect(p)}
-})}
-function fbLogout(){fbAuth.signOut()}
+  fbLoginPending=true;
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(isMobile){
+    // Mobile: always redirect (popup causes double-login issues)
+    fbAuth.signInWithRedirect(p);
+  } else {
+    fbAuth.signInWithPopup(p).then(r=>{
+      fbLoginPending=false;
+      if(r&&r.user){fbUser=r.user;fbAuthReady=true;_authSettled=true;_initDone=false;render();_doAuthInit()}
+    }).catch(e=>{
+      fbLoginPending=false;
+      if(e.code==='auth/popup-blocked'){fbAuth.signInWithRedirect(p)}
+    });
+  }
+}
+function fbLogout(){_initDone=false;fbAuth.signOut()}
 let leavesCache={};
 async function loadLeaves(){try{const y=S.yr||TY,m=S.mo||TM;const snap=await fbDb.collection("leaves").where("ym","==",y+"-"+String(m).padStart(2,"0")).get();const d={};snap.forEach(doc=>{const v=doc.data();const k=v.date;if(!d[k])d[k]=[];d[k].push({uid:v.uid,name:v.name,type:v.type})});leavesCache=d;render()}catch(e){console.log("loadLeaves err",e)}}
 async function addLeave(date,type){if(!fbUser)return;const id=fbUser.uid+"_"+date;await fbDb.collection("leaves").doc(id).set({uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),type:type,ts:firebase.firestore.FieldValue.serverTimestamp()});loadLeaves()}
@@ -2131,4 +2139,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v96')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v97')caches.delete(n)})})}
