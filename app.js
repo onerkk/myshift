@@ -16,19 +16,16 @@ async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await f
 let fbLoginPending=false;
 function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
   fbLoginPending=true;
-  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if(isMobile){
-    // Mobile: always redirect (popup causes double-login issues)
-    fbAuth.signInWithRedirect(p);
-  } else {
-    fbAuth.signInWithPopup(p).then(r=>{
-      fbLoginPending=false;
-      if(r&&r.user){fbUser=r.user;fbAuthReady=true;_authSettled=true;_initDone=false;render();_doAuthInit()}
-    }).catch(e=>{
-      fbLoginPending=false;
-      if(e.code==='auth/popup-blocked'){fbAuth.signInWithRedirect(p)}
-    });
-  }
+  fbAuth.signInWithPopup(p).then(r=>{
+    fbLoginPending=false;
+    if(r&&r.user){fbUser=r.user;fbAuthReady=true;_authSettled=true;_initDone=false;render();_doAuthInit()}
+  }).catch(e=>{
+    fbLoginPending=false;
+    // Only redirect if popup was actually blocked (not cancelled/closed)
+    if(e.code==='auth/popup-blocked'){
+      fbAuth.signInWithRedirect(p);
+    }
+  });
 }
 function fbLogout(){_initDone=false;fbAuth.signOut()}
 let leavesCache={};
@@ -2139,4 +2136,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v97')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v98')caches.delete(n)})})}
