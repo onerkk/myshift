@@ -180,6 +180,31 @@ function render(){
 function _doRender(){
   _renderRAF=null;
   const a=document.getElementById("app");
+  // ── Require Google login ──
+  if(fbAuthReady&&!fbUser){
+    a.innerHTML=`<div class="page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:30px">
+      <img src="${typeof IMG!=='undefined'&&IMG.icon?IMG.icon:'./icons/icon-192.png'}" style="width:80px;height:80px;border-radius:20px;margin-bottom:16px">
+      <h1 style="font-size:22px;font-weight:800;margin-bottom:6px">${lang==="zh"?"我的班表":"My Shift"}</h1>
+      <p style="font-size:13px;color:var(--tx3);margin-bottom:30px">${lang==="zh"?"登入 Google 帳號以同步並保護你的資料":"Login with Google to sync & protect your data"}</p>
+      <button onclick="fbLogin()" style="background:#fff;border:1px solid #ddd;padding:14px 28px;border-radius:12px;font-size:14px;font-weight:700;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.1)">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:22px;height:22px">
+        ${lang==="zh"?"Google 登入":"Login with Google"}
+      </button>
+      <div style="margin-top:20px;text-align:center">
+        <span class="lang-tog" style="display:inline-flex;height:32px;border-color:#ddd">
+          <button class="lt-btn${lang==='zh'?' lt-on':''}" style="font-size:11px;padding:0 12px;color:${lang==='zh'?'var(--pri-d)':'var(--tx3)'}" data-a="lzh">中文</button>
+          <button class="lt-btn${lang==='id'?' lt-on':''}" style="font-size:11px;padding:0 12px;color:${lang==='id'?'var(--pri-d)':'var(--tx3)'}" data-a="lid">ID</button>
+        </span>
+      </div>
+    </div>`;
+    document.getElementById("mr").innerHTML="";
+    document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
+    return;
+  }
+  if(!fbAuthReady){
+    a.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--tx3);font-size:13px">⏳ ${lang==="zh"?"載入中...":"Loading..."}</div>`;
+    return;
+  }
   if(S.step==="type")a.innerHTML=rType();
   else if(S.step==="wiz")a.innerHTML=rWiz();
   else a.innerHTML=rCal();
@@ -2104,4 +2129,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v91')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v92')caches.delete(n)})})}
