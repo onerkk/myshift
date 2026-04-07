@@ -14,13 +14,12 @@ async function cloudSave(){if(!fbUser||_loading)return;try{const payload={rt:S.r
 async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();let needEpSave=false;if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;if(!d.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length};needEpSave=true};S.step="cal";const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true});try{localStorage.setItem("sb_c",dd)}catch(e){}sCk("sb_c",dd,3650)}if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}if(d.al){try{AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{}}catch(e){}}if(d.notes){try{const raw=d.notes;const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});if(Object.keys(_n).length){NOTES=_n;sNotes()}}catch(e){}}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)};_loading=false;if(needEpSave)cloudSave();sEv();sAL();render();setTimeout(render,1000)}else{_loading=false;render()}}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
 let fbLoginPending=false;
 function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
-  fbLoginPending=true;
+  fbLoginPending=true;render();
   fbAuth.signInWithPopup(p).then(r=>{
     fbLoginPending=false;
     if(r&&r.user){fbUser=r.user;fbAuthReady=true;_initDone=false;render();_doAuthInit()}
   }).catch(e=>{
-    fbLoginPending=false;
-    // Only redirect if popup was actually blocked (not cancelled/closed)
+    fbLoginPending=false;render();
     if(e.code==='auth/popup-blocked'){
       fbAuth.signInWithRedirect(p);
     }
@@ -28,7 +27,7 @@ function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
 }
 function fbLogout(){_initDone=false;fbAuth.signOut()}
 let leavesCache={};
-async function loadLeaves(){try{const y=S.yr||TY,m=S.mo||TM;const snap=await fbDb.collection("leaves").where("ym","==",y+"-"+String(m).padStart(2,"0")).get();const d={};snap.forEach(doc=>{const v=doc.data();const k=v.date;if(!d[k])d[k]=[];d[k].push({uid:v.uid,name:v.name,type:v.type})});leavesCache=d;render()}catch(e){console.log("loadLeaves err",e)}}
+async function loadLeaves(){try{const y=S.yr||TY,m=S.mo||TM;const snap=await fbDb.collection("leaves").where("ym","==",y+"-"+String(m).padStart(2,"0")).get();const d={};snap.forEach(doc=>{const v=doc.data();const k=v.date;if(!d[k])d[k]=[];d[k].push({uid:v.uid,name:v.name,type:v.type,ts:v.ts})});leavesCache=d;render()}catch(e){console.log("loadLeaves err",e)}}
 async function addLeave(date,type){if(!fbUser)return;const id=fbUser.uid+"_"+date;await fbDb.collection("leaves").doc(id).set({uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),type:type,ts:firebase.firestore.FieldValue.serverTimestamp()});loadLeaves()}
 async function removeLeave(date){if(!fbUser)return;const id=fbUser.uid+"_"+date;await fbDb.collection("leaves").doc(id).delete();loadLeaves()}
 function getLeaves(date){return leavesCache[date]||[]}
@@ -277,9 +276,9 @@ function fbBarHtml(){
   if(!firebase||!fbAuth)return"";
   if(!fbUser)return`<div class="fb-bar fi" style="background:linear-gradient(135deg,#fff3e0,#fbe9e7);border:1.5px solid #ff8f00;border-radius:10px;padding:12px 14px;margin:0 0 6px">
     <div style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:6px">⚠️ ${lang==="zh"?"尚未登入 — 清除快取將遺失所有資料":"Belum login — data hilang jika cache dihapus"}</div>
-    <button onclick="fbLogin()" style="width:100%;background:#fff;border:1px solid #ddd;padding:10px;border-radius:8px;font-size:13px;font-weight:700;color:var(--tx);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+    <button onclick="fbLogin()" id="loginBtn" style="width:100%;background:#fff;border:1px solid #ddd;padding:10px;border-radius:8px;font-size:13px;font-weight:700;color:var(--tx);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:18px;height:18px">
-      ${lang==="zh"?"Google 登入保護資料":"Login Google untuk lindungi data"}
+      ${fbLoginPending?(lang==="zh"?"⏳ 登入中...":"⏳ Logging in..."):(lang==="zh"?"Google 登入保護資料":"Login Google untuk lindungi data")}
     </button>
   </div>`;
   const pic=fbUser.photoURL?`<img class="fb-avatar" src="${fbUser.photoURL}" referrerpolicy="no-referrer">`:"";
@@ -290,7 +289,15 @@ function modalLeaveHtml(y,m,d){
   const date=ek(y,m,d),leaves=getLeaves(date),ml=myLeave(date);
   let html="";
   if(leaves.length){
-    html+=`<div class="leave-info">${lang==="zh"?"📋 今日 "+leaves.length+" 人請假":"📋 "+leaves.length+" orang cuti"}${isAdmin()?`<div class="leave-list">${leaves.map(l=>`<span>${l.name}</span>`).join("")}</div>`:""}</div>`;
+    if(isAdmin()){
+      html+=`<div class="leave-info">${lang==="zh"?"📋 今日 "+leaves.length+" 人請假":"📋 "+leaves.length+" orang cuti"}<div class="leave-list">${leaves.filter(l=>!l.uid.startsWith("admin_")).map(l=>{
+        let timeStr="";
+        if(l.ts&&l.ts.toDate){const dt=l.ts.toDate();timeStr=` (${String(dt.getMonth()+1)}/${dt.getDate()} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")})`}
+        return`<span title="${timeStr}">${l.name}${timeStr}</span>`
+      }).join("")}</div></div>`;
+    }else{
+      html+=`<div class="leave-info">${lang==="zh"?"📋 今日 "+leaves.length+" 人請假":"📋 "+leaves.length+" orang cuti"}</div>`;
+    }
   }
   if(fbUser){
     if(ml){
@@ -504,12 +511,21 @@ const WXI={0:"☀️",1:"🌤",2:"⛅",3:"☁️",45:"🌫",48:"🌫",51:"🌦",
 const WXZ={0:"晴天",1:"大致晴",2:"局部多雲",3:"多雲",45:"霧",48:"霧",51:"小雨",53:"中雨",55:"大雨",61:"小雨",63:"中雨",65:"大雨",71:"小雪",73:"中雪",75:"大雪",80:"陣雨",81:"陣雨",82:"暴雨",95:"雷雨"};
 const WXD={0:"Cerah",1:"Cerah",2:"Berawan",3:"Mendung",45:"Kabut",48:"Kabut",51:"Gerimis",53:"Hujan",55:"Hujan Lebat",61:"Hujan",63:"Hujan",65:"Hujan Lebat",71:"Salju",80:"Hujan",81:"Hujan",82:"Badai",95:"Petir"};
 let tideData=null,tideErr=false;
-async function loadWx(){
+async function loadWx(retries){
+  retries=retries||0;
   try{
-    const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:8000,maximumAge:600000})});
-    const lat=pos.coords.latitude.toFixed(2),lon=pos.coords.longitude.toFixed(2);
+    let lat,lon;
+    // Try cached position first for speed
+    const cached=sessionStorage.getItem('_wxPos');
+    if(cached){const c=JSON.parse(cached);lat=c.lat;lon=c.lon}
+    else{
+      const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:10000,maximumAge:1800000})});
+      lat=pos.coords.latitude.toFixed(2);lon=pos.coords.longitude.toFixed(2);
+      try{sessionStorage.setItem('_wxPos',JSON.stringify({lat,lon}))}catch(e){}
+    }
     const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability,temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&timezone=auto&forecast_days=7`;
-    const data=await(await fetch(url)).json();
+    const resp=await Promise.race([fetch(url),new Promise((_,r)=>setTimeout(()=>r('timeout'),12000))]);
+    const data=await resp.json();
     wxData={temp:Math.round(data.current.temperature_2m),code:data.current.weather_code,lat:lat,lon:lon,
       days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])})),
       hTime:data.hourly.time,hPrec:data.hourly.precipitation_probability,hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m};
@@ -533,7 +549,10 @@ async function loadWx(){
         else{tideData=null;tideErr=true}
       }else{tideData=null;tideErr=true}
     }catch(e){tideData=null;tideErr=true}
-  }catch(e){wxErr=true;wxData=null}
+  }catch(e){
+    if(retries<2){setTimeout(()=>loadWx(retries+1),3000);return}
+    wxErr=true;wxData=null
+  }
   render();
   if(wxData){
     let curPrec=0,curWind=0;
@@ -2120,4 +2139,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v99')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v101')caches.delete(n)})})}
