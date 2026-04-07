@@ -122,21 +122,29 @@ const SUPER_ADMIN=["onerkk@gmail.com"];
 let user=null,tab="overview",cfg={units:[],leaveTypes:[],admins:[]},allLeaves=[],allUsers=[];
 
 // ═══ AUTH ═══
+let _authReady=false;
 auth.onAuthStateChanged(async u=>{
-  user=u;
+  user=u;_authReady=true;
   if(u&&SUPER_ADMIN.includes(u.email)){
     await loadAll();
   }
   render();
 });
-auth.getRedirectResult().catch(()=>{});
+auth.getRedirectResult().then(r=>{
+  if(r&&r.user){user=r.user;_authReady=true;render()}
+}).catch(()=>{_authReady=true;render()});
+setTimeout(()=>{if(!_authReady){_authReady=true;render()}},4000);
 
 function login(){
-  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{
-    if(e.code==='auth/popup-blocked'){
-      auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
-    }
-  });
+  const p=new firebase.auth.GoogleAuthProvider();
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(isMobile){
+    auth.signInWithRedirect(p);
+  } else {
+    auth.signInWithPopup(p).catch(e=>{
+      auth.signInWithRedirect(p);
+    });
+  }
 }
 function logout(){auth.signOut()}
 
@@ -281,6 +289,7 @@ function render(){
 }
 
 function renderLogin(){
+  if(!_authReady)return`<div class="login-screen"><div class="spinner"></div><span style="color:var(--tx2)">載入中...</span></div>`;
   return`<div class="login-screen">
     <img src="./icons/icon-192.png" onerror="this.style.display='none'">
     <h1>🔐 管理後台</h1>
