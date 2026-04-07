@@ -389,7 +389,7 @@ function resizeCycle(len){
 function addRotation(){
   const n=document.getElementById("rotName"),h=document.getElementById("rotHours");
   if(!n||!n.value.trim()){toast("請輸入名稱");return}
-  const id=n.value.trim().replace(/[^a-zA-Z0-9]/g,"_").substring(0,20)||("rot_"+Date.now());
+  const id=n.value.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,"_").substring(0,20)||("rot_"+Date.now());
   if(!cfg.rotations)cfg.rotations=[];
   cfg.rotations.push({id,name:n.value.trim(),nameId:n.value.trim(),hours:parseInt(h?h.value:12),cycle:[...editingCycle]});
   saveConfig().then(()=>{editingCycle=["早","早","早","早","休","休","晚","晚","晚","晚","休","休"];render()});
@@ -404,7 +404,8 @@ function renderUsers(){
   return`<div class="card"><h3>👤 使用者白名單 (${allUsers.length})</h3>
     ${allUsers.length?allUsers.map(u=>{
       const locked=u.lockedUnit?true:false;
-      const rt=u.rt?({"2on2off":"做2休2","4on2off":"做4休2","5on_mixed":"做5休1+2"}[u.rt]||u.rt):"未設定";
+      const rotMatch=cfg.rotations.find(r=>r.id===u.rt||r.name===u.rt||r.nameId===u.rt);
+      const rt=u.rt?(rotMatch?rotMatch.name:({"2on2off":"做2休2","4on2off":"做4休2","5on_mixed":"做5休1+2"}[u.rt]||u.rt)):"未設定";
       const uName=u.displayName||u.email||u._uid.substring(0,10)+"...";
       return`<div class="card-row" style="flex-wrap:wrap">
         <div class="info" style="min-width:60%"><div class="top">${uName}</div><div class="bot">${rt} · ${u.unit||"未選擇單位"}${locked?' 🔒':''}</div></div>
