@@ -73,14 +73,13 @@ id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis seta
   h:["Pengaturan Awal|Jawab 3 pertanyaan (kerja/libur → shift → hari ke-berapa), jadwal setahun otomatis dibuat.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, ketuk 'Hari ini' untuk kembali. Ketuk tanggal untuk menandai.","Tandai Acara|Kelas, Dinas, Gajian, Cuti, Catatan sendiri. Admin bisa set Rapat & Kesehatan untuk semua user.","Kelola Cuti|Atur total jam dan jam terpakai di halaman STEP 1 (per 0.5 jam). Sisa cuti dihitung otomatis.","Lembur|12 jam: 4 jam lembur/hari. 8 jam: kelebihan dari jam wajib. Hari libur nasional otomatis dikurangi.","Cuaca & Peringatan Hujan|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Ketuk untuk detail per jam (suhu, hujan, angin, kelembaban). Peringatan bawa payung jika hujan ≥40%.","Pasang Surut|Otomatis deteksi lokasi, tampilkan pasang surut 7 hari dari stasiun pantai terdekat. Ketuk untuk detail harian. Sumber: CWA Taiwan.","Sinkronisasi Cloud|Login Google, semua pengaturan otomatis tersimpan di cloud. Setelah hapus data, login lagi untuk restore.","Sinkronisasi Cuti|Setelah login, bisa tandai cuti. Semua user bisa lihat jumlah cuti per hari. Admin bisa lihat nama dan atur jumlah.","Hari Libur|Hari libur Taiwan & Indonesia ditampilkan, terjemahan otomatis sesuai bahasa.","Install ke Layar|Tombol install di bawah. Ganti bahasa 中/ID di kanan atas. iOS: buka di Safari lalu Share → Add to Home Screen."],
   wk:["Min","Sen","Sel","Rab","Kam","Jum","Sab"]}
 };
-let RN={zh:{"2on2off":"做2休2","4on2off":"做4休2","5on_mixed":"做5休1＋做5休2"},id:{"2on2off":"2K 2L","4on2off":"4K 2L","5on_mixed":"5K1L+5K2L"}};
-let R={"2on2off":{h:12,c:["早","早","休","休","晚","晚","休","休"]},"4on2off":{h:12,c:["早","早","早","早","休","休","晚","晚","晚","晚","休","休"]},"5on_mixed":{h:8,c:["早","早","早","早","早","休","早","早","早","早","早","休","休","中","中","中","中","中","休","中","中","中","中","中","休","休","晚","晚","晚","晚","晚","休","晚","晚","晚","晚","晚","休","休"]}};
+let RN={zh:{},id:{}};
+let R={};
 function rebuildR(){
   if(!APP_CFG.rotations||!APP_CFG.rotations.length)return;
-  // Keep existing defaults, add/override from config
+  R={};RN={zh:{},id:{}};
   APP_CFG.rotations.forEach(rot=>{
     R[rot.id]={h:rot.hours,c:rot.cycle};
-    if(!RN.zh)RN.zh={};if(!RN.id)RN.id={};
     RN.zh[rot.id]=rot.name;
     RN.id[rot.id]=rot.nameId||rot.name;
   });
@@ -257,18 +256,24 @@ function rType(){
       <option value="">${lang==="zh"?"-- 請選擇 --":"-- Pilih --"}</option>${unitOpts}
     </select>
   </div>
-  ${Object.entries(R).map(([k,v],i)=>`<button class="rcard fu d${(i%3)+1}" data-a="pick" data-k="${k}"><div class="rcard-icon">${v.c.filter(x=>x!=="休").length>9?"":v.c.filter(x=>x!=="休").length}${v.c.filter(x=>x!=="休").length>9?k.substring(0,3):":"+v.c.filter(x=>x==="休").length}</div><div class="rcard-info"><div class="rcard-name">${RN[lang]&&RN[lang][k]||k}</div><div class="rcard-sub">${v.h}h · ${v.c.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join("")}
+  ${Object.keys(R).length?Object.entries(R).map(([k,v],i)=>`<button class="rcard fu d${(i%3)+1}" data-a="pick" data-k="${k}"><div class="rcard-icon">${v.c.filter(x=>x!=="休").length>9?"":v.c.filter(x=>x!=="休").length}${v.c.filter(x=>x!=="休").length>9?k.substring(0,3):":"+v.c.filter(x=>x==="休").length}</div><div class="rcard-info"><div class="rcard-name">${RN[lang]&&RN[lang][k]||k}</div><div class="rcard-sub">${v.h}h · ${v.c.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join(""):`<div style="padding:20px;text-align:center;color:var(--tx3);font-size:13px">${lang==="zh"?"⚠️ 尚未設定輪班規則，請管理員到後台設定":"⚠️ Belum ada aturan shift"}</div>`}
   <div class="al-setup fu d3"><h3>${t("alSetup")}</h3><div class="al-setup-hint" style="margin-bottom:8px;font-size:11px;color:var(--green);font-weight:600">${alYRange(curALY())}</div><div class="al-setup-row"><label>${t("alTotal")}</label><input type="number" id="alTI" value="${getAL().total||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-row"><label>${t("alUsed")}</label><input type="number" id="alUI" value="${getAL().used||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-hint">${t("alSkip")}</div></div>
   <div style="text-align:center;margin-top:14px"><span class="lang-tog" style="display:inline-flex;height:36px;border-color:#ddd"><button class="lt-btn${lang==='zh'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='zh'?'var(--pri-d)':'var(--tx3)'}" data-a="lzh">中文</button><button class="lt-btn${lang==='id'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='id'?'var(--pri-d)':'var(--tx3)'}" data-a="lid">ID</button></span></div></div>`;
 }
 
 function rWiz(){
   const c=cyc();
-  if(!S.wT){let loginBtn="";if(!fbAuthReady){loginBtn=`<div style="margin-top:18px;text-align:center;color:var(--tx3);font-size:11px">${lang==="zh"?"⏳ 檢查登入狀態...":"⏳ Checking login..."}</div>`}else if(!fbUser){loginBtn=`<div style="margin-top:18px;text-align:center"><button onclick="fbLogin()" style="background:#fff;border:1px solid #ddd;padding:10px 20px;border-radius:8px;font-size:12px;font-weight:600;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,.1)"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:18px;height:18px">${lang==="zh"?"Google 登入恢復設定":"Login Google untuk restore"}</button></div>`}return wS(t("q1"),"1/3",`<div class="opts c2"><button class="opt-btn" data-a="wt" data-v="w"><img class="oi" src="${IMG.early}">${t("work")}</button><button class="opt-btn" data-a="wt" data-v="o"><img class="oi" src="${IMG.off}">${t("off")}</button></div>${loginBtn}<div class="al-setup fu d3" style="margin-top:14px"><h3>${t("alSetup")}</h3><div class="al-setup-hint" style="margin-bottom:8px;font-size:11px;color:var(--green);font-weight:600">${alYRange(curALY())}</div><div class="al-setup-row"><label>${t("alTotal")}</label><input type="number" id="alTI" value="${getAL().total||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-row"><label>${t("alUsed")}</label><input type="number" id="alUI" value="${getAL().used||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-hint">${t("alSkip")}</div></div>`);}
-  if(S.wT==="w"&&!S.wS){const sh=[...new Set(c.filter(x=>x!=="休"))];return wS(t("q2w"),"2/3",`<div class="opts ${sh.length===3?'c3':'c2'}">${sh.map(s=>`<button class="opt-btn" data-a="ws" data-v="${s}"><img class="oi" src="${SI[s]}">${sf(s)}</button>`).join("")}</div>`);}
-  if(S.wT==="o"&&!S.wN){const sh=[...new Set(c.filter(x=>x!=="休"))];return wS(t("q2o"),"2/3",`<div class="opts ${sh.length===3?'c3':'c2'}">${sh.map(s=>`<button class="opt-btn" data-a="wn" data-v="${s}"><img class="oi" src="${SI[s]}">→${sf(s)}</button>`).join("")}</div>`);}
-  if(S.wT==="w"&&S.wS&&S.wD===null){let mx=0,cr=0;for(let i=0;i<c.length*2;i++){if(c[i%c.length]===S.wS){cr++;mx=Math.max(mx,cr)}else cr=0}return wS(t("q3w").replace("#s#",sf(S.wS)),"3/3",`<div class="opts c3">${Array.from({length:mx},(_,i)=>`<button class="opt-btn" data-a="wwd" data-v="${i+1}">${t("dn").replace("#n#",i+1)}</button>`).join("")}</div>`);}
-  if(S.wT==="o"&&S.wN&&S.wD===null){let mx=0;for(let i=0;i<c.length;i++){if(c[i]!=="休")continue;let j=i;while(j<c.length&&c[j]==="休")j++;if(c[j%c.length]===S.wN)mx=Math.max(mx,j-i)}return wS(t("q3o"),"3/3",`<div class="opts ${mx<=4?'c2':'c3'}">${Array.from({length:mx},(_,i)=>`<button class="opt-btn" data-a="wod" data-v="${i+1}">${t("dn").replace("#n#",i+1)}</button>`).join("")}</div>`);}
+  // Merged step: show ALL shift types (early/mid/night/off) on one page
+  if(!S.wT||(!S.wS&&S.wT==="w")||(!S.wN&&S.wT==="o")){
+    const allSh=[...new Set(c)];
+    const shiftBtns=allSh.filter(x=>x!=="休").map(s=>`<button class="opt-btn" data-a="wizShift" data-v="${s}"><img class="oi" src="${SI[s]}">${sf(s)}</button>`).join("");
+    const offBtn=`<button class="opt-btn" data-a="wizOff"><img class="oi" src="${IMG.off}">${t("off")}</button>`;
+    let loginBtn="";if(!fbAuthReady){loginBtn=`<div style="margin-top:12px;text-align:center;color:var(--tx3);font-size:11px">${lang==="zh"?"⏳ 檢查登入狀態...":"⏳ Checking login..."}</div>`}else if(!fbUser){loginBtn=`<div style="margin-top:12px;text-align:center"><button onclick="fbLogin()" style="background:#fff;border:1px solid #ddd;padding:10px 20px;border-radius:8px;font-size:12px;font-weight:600;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,.1)"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:18px;height:18px">${lang==="zh"?"Google 登入恢復設定":"Login Google untuk restore"}</button></div>`}
+    return wS(lang==="zh"?"今天上什麼班？":"Shift hari ini?","1/2",`<div class="opts ${allSh.length>=4?'c2':'c2'}">${shiftBtns}${offBtn}</div>${loginBtn}`);
+  }
+  if(S.wT==="o"&&!S.wN){const sh=[...new Set(c.filter(x=>x!=="休"))];return wS(lang==="zh"?"休假後接什麼班？":"Shift setelah libur?","1/2",`<div class="opts ${sh.length===3?'c3':'c2'}">${sh.map(s=>`<button class="opt-btn" data-a="wn" data-v="${s}"><img class="oi" src="${SI[s]}">→${sf(s)}</button>`).join("")}</div>`);}
+  if(S.wT==="w"&&S.wS&&S.wD===null){let mx=0,cr=0;for(let i=0;i<c.length*2;i++){if(c[i%c.length]===S.wS){cr++;mx=Math.max(mx,cr)}else cr=0}return wS(t("q3w").replace("#s#",sf(S.wS)),"2/2",`<div class="opts c3">${Array.from({length:mx},(_,i)=>`<button class="opt-btn" data-a="wwd" data-v="${i+1}">${t("dn").replace("#n#",i+1)}</button>`).join("")}</div>`);}
+  if(S.wT==="o"&&S.wN&&S.wD===null){let mx=0;for(let i=0;i<c.length;i++){if(c[i]!=="休")continue;let j=i;while(j<c.length&&c[j]==="休")j++;if(c[j%c.length]===S.wN)mx=Math.max(mx,j-i)}return wS(t("q3o"),"2/2",`<div class="opts ${mx<=4?'c2':'c3'}">${Array.from({length:mx},(_,i)=>`<button class="opt-btn" data-a="wod" data-v="${i+1}">${t("dn").replace("#n#",i+1)}</button>`).join("")}</div>`);}
   return"";
 }
 function wS(q,step,ct){return`<div class="page"><div class="wiz-top fu"><button class="wiz-back" data-a="wb">←</button><div class="wiz-info"><div class="wiz-step">STEP ${step}</div><div class="wiz-q">${q}</div></div><div class="wiz-badge">${RN[lang][S.rt]}</div></div><div class="fu d1">${ct}</div></div>`}
@@ -2294,4 +2299,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v112')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v113')caches.delete(n)})})}
