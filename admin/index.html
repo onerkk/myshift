@@ -214,7 +214,7 @@ async function unlockUser(uid){
 }
 async function setUserRt(uid,rt){
   if(!rt){toast("請選擇輪班規則");return}
-  try{await db.collection("users").doc(uid).set({rt:rt,lockedRt:rt},{merge:true});toast("已鎖定輪班");await loadUsers();render()}catch(e){toast("設定失敗")}
+  try{await db.collection("users").doc(uid).set({rt:rt,lockedRt:rt,pos:0,ep:true,step:"cal"},{merge:true});toast("已鎖定輪班");await loadUsers();render()}catch(e){toast("設定失敗")}
 }
 async function unlockUserRt(uid){
   try{await db.collection("users").doc(uid).set({lockedRt:""},{merge:true});toast("已解鎖輪班");await loadUsers();render()}catch(e){toast("解鎖失敗")}
@@ -413,27 +413,31 @@ function renderUsers(){
   return`<div class="card"><h3>👤 使用者白名單 (${allUsers.length})</h3>
     ${allUsers.length?allUsers.map(u=>{
       const locked=u.lockedUnit?true:false;
+      const lockedRt=u.lockedRt?true:false;
       const rotMatch=cfg.rotations.find(r=>r.id===u.rt||r.name===u.rt||r.nameId===u.rt);
       const rt=u.rt?(rotMatch?rotMatch.name:({"2on2off":"做2休2","4on2off":"做4休2","5on_mixed":"做5休1+2"}[u.rt]||u.rt)):"未設定";
       const uName=u.displayName||u.email||u._uid.substring(0,10)+"...";
-      const lockedRt=u.lockedRt?true:false;
       return`<div class="card-row" style="flex-wrap:wrap">
-        <div class="info" style="min-width:60%"><div class="top">${uName}</div><div class="bot">${rt} · ${u.unit||"未選擇單位"}${locked?' 🔒':''}${lockedRt?' 🔄':''}</div></div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;width:100%">
-          <select id="uUnit_${u._uid}" class="input" style="flex:1;padding:6px;font-size:11px">
-            <option value="">-- 選擇單位 --</option>
-            ${cfg.units.map(un=>`<option value="${un}"${u.unit===un||u.lockedUnit===un?' selected':''}>${un}</option>`).join('')}
-          </select>
-          <button onclick="setUserUnit('${u._uid}',document.getElementById('uUnit_${u._uid}').value)" style="background:var(--pri);color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔒鎖定</button>
-          ${locked?`<button onclick="unlockUser('${u._uid}')" style="background:var(--amber);color:#000;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔓解鎖</button>`:''}
-        </div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;width:100%">
-          <select id="uRt_${u._uid}" class="input" style="flex:1;padding:6px;font-size:11px">
-            <option value="">-- 選擇輪班 --</option>
-            ${(cfg.rotations||[]).map(r=>`<option value="${r.id}"${u.rt===r.id||u.lockedRt===r.id?' selected':''}>${r.name}</option>`).join('')}
-          </select>
-          <button onclick="setUserRt('${u._uid}',document.getElementById('uRt_${u._uid}').value)" style="background:var(--teal);color:#000;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔒輪班</button>
-          ${lockedRt?`<button onclick="unlockUserRt('${u._uid}')" style="background:var(--amber);color:#000;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔓解鎖</button>`:''}
+        <div class="info" style="min-width:60%"><div class="top">${uName}</div><div class="bot">${rt} · ${u.unit||"未選擇單位"}</div></div>
+        <div style="width:100%;margin-top:6px">
+          <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">
+            <span style="font-size:10px;color:var(--tx2);width:32px">單位</span>
+            <select id="uUnit_${u._uid}" class="input" style="flex:1;padding:6px;font-size:11px">
+              <option value="">-- 選擇 --</option>
+              ${cfg.units.map(un=>`<option value="${un}"${u.unit===un||u.lockedUnit===un?' selected':''}>${un}</option>`).join('')}
+            </select>
+            <button onclick="setUserUnit('${u._uid}',document.getElementById('uUnit_${u._uid}').value)" style="background:var(--pri);color:#fff;border:none;padding:6px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔒</button>
+            ${locked?`<button onclick="unlockUser('${u._uid}')" style="background:var(--amber);color:#000;border:none;padding:6px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔓</button>`:''}
+          </div>
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;color:var(--tx2);width:32px">輪班</span>
+            <select id="uRt_${u._uid}" class="input" style="flex:1;padding:6px;font-size:11px">
+              <option value="">-- 選擇 --</option>
+              ${(cfg.rotations||[]).map(r=>`<option value="${r.id}"${u.rt===r.id||u.lockedRt===r.id?' selected':''}>${r.name}</option>`).join('')}
+            </select>
+            <button onclick="setUserRt('${u._uid}',document.getElementById('uRt_${u._uid}').value)" style="background:var(--teal);color:#000;border:none;padding:6px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔒</button>
+            ${lockedRt?`<button onclick="unlockUserRt('${u._uid}')" style="background:var(--amber);color:#000;border:none;padding:6px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔓</button>`:''}
+          </div>
         </div>
       </div>`}).join(""):`<div class="empty">尚無使用者</div>`}
     <button class="add-btn" onclick="loadUsers().then(()=>render())">🔄 重新載入</button>
