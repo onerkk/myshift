@@ -128,7 +128,7 @@ auth.onAuthStateChanged(async u=>{
   user=u;
   if(!u&&!_redirectDone)return;
   _authReady=true;
-  if(u&&SUPER_ADMIN.includes(u.email)){await loadAll()}
+  if(u&&SUPER_ADMIN.includes(u.email)){try{await db.collection("users").doc(u.uid).set({displayName:u.displayName||"",email:u.email||"",photoURL:u.photoURL||""},{merge:true})}catch(e){}await loadAll()}
   render();
 });
 setTimeout(()=>{_redirectDone=true;_authReady=true;render()},4000);
