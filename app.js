@@ -73,8 +73,8 @@ id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis seta
   h:["Pengaturan Awal|Jawab 3 pertanyaan (kerja/libur → shift → hari ke-berapa), jadwal setahun otomatis dibuat.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, ketuk 'Hari ini' untuk kembali. Ketuk tanggal untuk menandai.","Tandai Acara|Kelas, Dinas, Gajian, Cuti, Catatan sendiri. Admin bisa set Rapat & Kesehatan untuk semua user.","Kelola Cuti|Atur total jam dan jam terpakai di halaman STEP 1 (per 0.5 jam). Sisa cuti dihitung otomatis.","Lembur|12 jam: 4 jam lembur/hari. 8 jam: kelebihan dari jam wajib. Hari libur nasional otomatis dikurangi.","Cuaca & Peringatan Hujan|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Ketuk untuk detail per jam (suhu, hujan, angin, kelembaban). Peringatan bawa payung jika hujan ≥40%.","Pasang Surut|Otomatis deteksi lokasi, tampilkan pasang surut 7 hari dari stasiun pantai terdekat. Ketuk untuk detail harian. Sumber: CWA Taiwan.","Sinkronisasi Cloud|Login Google, semua pengaturan otomatis tersimpan di cloud. Setelah hapus data, login lagi untuk restore.","Sinkronisasi Cuti|Setelah login, bisa tandai cuti. Semua user bisa lihat jumlah cuti per hari. Admin bisa lihat nama dan atur jumlah.","Hari Libur|Hari libur Taiwan & Indonesia ditampilkan, terjemahan otomatis sesuai bahasa.","Install ke Layar|Tombol install di bawah. Ganti bahasa 中/ID di kanan atas. iOS: buka di Safari lalu Share → Add to Home Screen."],
   wk:["Min","Sen","Sel","Rab","Kam","Jum","Sab"]}
 };
-let RN={zh:{},id:{}};
-let R={};
+let RN={zh:{"4on2off":"做4休2","2on2off":"做2休2"},id:{"4on2off":"4K 2L","2on2off":"2K 2L"}};
+let R={"4on2off":{h:12,c:["早","早","早","早","休","休","晚","晚","晚","晚","休","休"]},"2on2off":{h:12,c:["早","早","休","休","晚","晚","休","休"]}};
 function rebuildR(){
   if(!APP_CFG.rotations||!APP_CFG.rotations.length)return;
   R={};RN={zh:{},id:{}};
@@ -2299,4 +2299,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v113')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v114')caches.delete(n)})})}
