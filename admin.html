@@ -151,6 +151,7 @@ async function loadConfig(){
       const d=doc.data();
       cfg.units=d.units||[];
       cfg.leaveTypes=d.leaveTypes||[];
+      cfg.rotations=d.rotations||[];
       cfg.admins=d.admins||[];
     }
   }catch(e){console.log("loadConfig err",e)}
@@ -158,7 +159,7 @@ async function loadConfig(){
 
 async function saveConfig(){
   try{
-    await db.collection("config").doc("app").set({
+    await db.collection("config").doc("app").set({rotations:cfg.rotations||[],
       units:cfg.units,
       leaveTypes:cfg.leaveTypes,
       admins:cfg.admins,
@@ -184,7 +185,19 @@ async function loadUsers(){
     const snap=await db.collection("users").get();
     allUsers=[];
     snap.forEach(doc=>{const d=doc.data();d._uid=doc.id;allUsers.push(d)});
+    allUsers.sort((a,b)=>(a.unit||"").localeCompare(b.unit||""));
   }catch(e){console.log("loadUsers err",e)}
+}
+
+async function setUserUnit(uid,unit){
+  try{await db.collection("users").doc(uid).set({unit:unit,lockedUnit:unit},{merge:true});toast("已鎖定單位");await loadUsers();render()}catch(e){toast("設定失敗")}
+}
+async function unlockUser(uid){
+  try{await db.collection("users").doc(uid).set({lockedUnit:""},{merge:true});toast("已解鎖");await loadUsers();render()}catch(e){toast("解鎖失敗")}
+}
+async function removeUser(uid){
+  if(!confirm("確定刪除此使用者資料？"))return;
+  try{await db.collection("users").doc(uid).delete();toast("已刪除");await loadUsers();render()}catch(e){toast("刪除失敗")}
 }
 
 async function delLeave(id){
@@ -264,8 +277,8 @@ function renderLogin(){
 }
 
 function renderApp(){
-  const tabs=["overview","units","leaveTypes","admins","leaves"];
-  const tabNames=["總覽","單位管理","假別管理","管理員","請假記錄"];
+  const tabs=["overview","users","rotations","units","leaveTypes","admins","leaves"];
+  const tabNames=["總覽","使用者","輪班規則","單位管理","假別管理","管理員","請假記錄"];
   const pic=user.photoURL?`<img src="${user.photoURL}" referrerpolicy="no-referrer">`:"";
 
   return`<div class="app">
@@ -276,6 +289,8 @@ function renderApp(){
     <div class="tabs">${tabs.map((t,i)=>`<div class="tab${tab===t?' active':''}" data-tab="${t}">${tabNames[i]}</div>`).join("")}</div>
     <div class="content">
       <div class="section${tab==='overview'?' active':''}">${renderOverview()}</div>
+      <div class="section${tab==='users'?' active':''}">${renderUsers()}</div>
+      <div class="section${tab==='rotations'?' active':''}">${renderRotations()}</div>
       <div class="section${tab==='units'?' active':''}">${renderUnits()}</div>
       <div class="section${tab==='leaveTypes'?' active':''}">${renderLeaveTypes()}</div>
       <div class="section${tab==='admins'?' active':''}">${renderAdmins()}</div>
@@ -290,6 +305,8 @@ function renderOverview(){
   const unitCounts={};
   realLeaves.forEach(l=>{const u=l.unit||"未設定";unitCounts[u]=(unitCounts[u]||0)+1});
   const totalHours=realLeaves.reduce((s,l)=>s+(l.hours||0),0);
+  const userUnits={};
+  allUsers.forEach(u=>{const un=u.unit||"未設定";userUnits[un]=(userUnits[un]||0)+1});
 
   return`<div class="grid">
     <div class="stat-card"><div class="val">${cfg.units.length}</div><div class="lbl">🏭 單位數</div></div>
@@ -299,13 +316,90 @@ function renderOverview(){
     <div class="stat-card"><div class="val pink">${realLeaves.length}</div><div class="lbl">📋 本月請假</div></div>
     <div class="stat-card"><div class="val teal">${totalHours}h</div><div class="lbl">⏱ 請假時數</div></div>
   </div>
-  <div class="card"><h3>📊 各單位請假統計</h3>
+  <div class="card"><h3>👥 各單位人數</h3>
+    ${Object.entries(userUnits).map(([u,c])=>`<div class="card-row"><span class="name">${u}</span><span class="tag" style="background:var(--blue);color:#fff">${c} 人</span></div>`).join("")}
+  </div>
+  <div class="card"><h3>📊 各單位本月請假</h3>
     ${Object.entries(unitCounts).length?Object.entries(unitCounts).map(([u,c])=>`<div class="card-row"><span class="name">${u}</span><span class="tag" style="background:var(--pri);color:#fff">${c} 筆</span></div>`).join(""):`<div class="empty">本月尚無請假記錄</div>`}
   </div>
-  <div class="card"><h3>👤 使用者列表</h3>
-    ${allUsers.length?allUsers.map(u=>`<div class="card-row"><span class="name">${u.rt?'✅':'⏳'} ${u._uid.substring(0,8)}...</span><span class="sub">${u.unit||"未設定"} · ${u.rt||"未設定"}</span></div>`).join(""):`<div class="empty">尚無使用者</div>`}
-  </div>
   <button class="add-btn" onclick="loadAll().then(()=>render())">🔄 重新載入</button>`;
+}
+
+let editingCycle=["早","早","早","早","休","休","晚","晚","晚","晚","休","休"];
+const SHIFT_TYPES=["早","中","晚","休"];
+const SHIFT_COLORS={"早":"#ff9800","中":"#9c27b0","晚":"#2196f3","休":"#4caf50"};
+
+function renderRotations(){
+  const rots=cfg.rotations||[];
+  return`<div class="card"><h3>🔄 輪班規則 (${rots.length})</h3>
+    ${rots.map((rot,i)=>{
+      const cycleVis=rot.cycle.map(s=>`<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:4px;font-size:10px;font-weight:700;color:#fff;background:${SHIFT_COLORS[s]||'#999'};margin:1px">${s}</span>`).join('');
+      return`<div class="card-row" style="flex-wrap:wrap">
+        <div class="info"><div class="top">${rot.name} <span style="color:var(--tx2);font-size:11px">(${rot.nameId||''})</span></div><div class="bot">${rot.hours}h/班 · ${rot.cycle.length}天循環</div></div>
+        <button class="del-btn" onclick="delRotation(${i})">刪除</button>
+        <div style="width:100%;margin-top:6px;overflow-x:auto;white-space:nowrap">${cycleVis}</div>
+      </div>`}).join('')}
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bg4)">
+      <label class="form-label">新增輪班規則</label>
+      <div class="form-row"><input id="rotName" class="input" placeholder="中文名稱（如：做4休2）"><input id="rotNameId" class="input" placeholder="印尼文名稱"></div>
+      <div class="form-row">
+        <select id="rotHours" class="input"><option value="12">12小時制</option><option value="8">8小時制</option></select>
+        <select id="rotLen" class="input" onchange="resizeCycle(+this.value)">
+          ${[4,6,8,10,12,14,16,18,20,24,28,30,36,39,42].map(n=>`<option value="${n}"${n===12?' selected':''}>${n}天</option>`).join('')}
+        </select>
+      </div>
+      <label class="form-label" style="margin-top:8px">點擊切換班別（早→中→晚→休）</label>
+      <div id="cycleEditor" style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0">
+        ${editingCycle.map((s,i)=>`<button onclick="toggleCycleDay(${i})" style="width:36px;height:36px;border:none;border-radius:6px;font-size:13px;font-weight:700;color:#fff;background:${SHIFT_COLORS[s]||'#999'};cursor:pointer">${s}</button>`).join('')}
+      </div>
+      <button class="add-btn" onclick="addRotation()">＋ 新增輪班規則</button>
+    </div>
+  </div>`;
+}
+
+function toggleCycleDay(i){
+  const cur=editingCycle[i];
+  const idx=SHIFT_TYPES.indexOf(cur);
+  editingCycle[i]=SHIFT_TYPES[(idx+1)%SHIFT_TYPES.length];
+  render();
+}
+function resizeCycle(len){
+  while(editingCycle.length<len)editingCycle.push("休");
+  editingCycle.length=len;
+  render();
+}
+function addRotation(){
+  const n=document.getElementById("rotName"),ni=document.getElementById("rotNameId"),h=document.getElementById("rotHours");
+  if(!n||!n.value.trim()){toast("請輸入名稱");return}
+  const id=n.value.trim().replace(/[^a-zA-Z0-9]/g,"_").substring(0,20)||("rot_"+Date.now());
+  if(!cfg.rotations)cfg.rotations=[];
+  cfg.rotations.push({id,name:n.value.trim(),nameId:ni?ni.value.trim()||n.value.trim():n.value.trim(),hours:parseInt(h?h.value:12),cycle:[...editingCycle]});
+  saveConfig().then(()=>{editingCycle=["早","早","早","早","休","休","晚","晚","晚","晚","休","休"];render()});
+}
+function delRotation(i){
+  if(!confirm("確定刪除「"+(cfg.rotations[i]?.name||"")+"」？"))return;
+  cfg.rotations.splice(i,1);
+  saveConfig().then(()=>render());
+}
+
+function renderUsers(){
+  return`<div class="card"><h3>👤 使用者白名單 (${allUsers.length})</h3>
+    ${allUsers.length?allUsers.map(u=>{
+      const locked=u.lockedUnit?true:false;
+      const rt=u.rt?({"2on2off":"做2休2","4on2off":"做4休2","5on_mixed":"做5休1+2"}[u.rt]||u.rt):"未設定";
+      return`<div class="card-row" style="flex-wrap:wrap">
+        <div class="info" style="min-width:60%"><div class="top">${u._uid.substring(0,10)}...</div><div class="bot">${rt} · ${u.unit||"未選擇單位"}${locked?' 🔒':''}</div></div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;width:100%">
+          <select id="uUnit_${u._uid}" class="input" style="flex:1;padding:6px;font-size:11px">
+            <option value="">-- 選擇單位 --</option>
+            ${cfg.units.map(un=>\`<option value="\${un}"\${u.unit===un||u.lockedUnit===un?' selected':''}>\${un}</option>\`).join('')}
+          </select>
+          <button onclick="setUserUnit('${u._uid}',document.getElementById('uUnit_${u._uid}').value)" style="background:var(--pri);color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔒鎖定</button>
+          ${locked?`<button onclick="unlockUser('${u._uid}')" style="background:var(--amber);color:#000;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔓解鎖</button>`:''}
+        </div>
+      </div>`}).join(""):`<div class="empty">尚無使用者</div>`}
+    <button class="add-btn" onclick="loadUsers().then(()=>render())">🔄 重新載入</button>
+  </div>`;
 }
 
 function renderUnits(){
@@ -382,6 +476,11 @@ let deferredPrompt;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;
   const bar=document.getElementById("installBar");if(bar)bar.style.display="flex";
 });
+
+// ═══ PWA SERVICE WORKER ═══
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
 
 // ═══ INIT ═══
 render();

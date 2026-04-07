@@ -10,8 +10,8 @@ fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){_doAuthInit()}else
 fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user;fbAuthReady=true;render();_doAuthInit()}}).catch(()=>{});
 setTimeout(()=>{if(!fbAuthReady){fbAuthReady=true;render()}},3000);
 let _loading=false;
-async function cloudSave(){if(!fbUser||_loading)return;try{const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};if(JSON.stringify(NOTES)==='{}'){delete payload.notes}await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true})}catch(e){console.log("cloudSave err",e)}}
-async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();let needEpSave=false;if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;if(!d.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length};needEpSave=true};S.step="cal";const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true});try{localStorage.setItem("sb_c",dd)}catch(e){}sCk("sb_c",dd,3650)}if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}if(d.al){try{AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{}}catch(e){}}if(d.notes){try{const raw=d.notes;const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});if(Object.keys(_n).length){NOTES=_n;sNotes()}}catch(e){}}if(d.unit){S.unit=d.unit}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)};_loading=false;if(needEpSave)cloudSave();sEv();sAL();render();setTimeout(render,1000)}else{_loading=false;render()}}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
+async function cloudSave(){if(!fbUser||_loading)return;try{const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",displayName:fbUser.displayName||"",email:fbUser.email||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};if(JSON.stringify(NOTES)==='{}'){delete payload.notes}await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true})}catch(e){console.log("cloudSave err",e)}}
+async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();let needEpSave=false;if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;if(!d.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length};needEpSave=true};S.step="cal";const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true});try{localStorage.setItem("sb_c",dd)}catch(e){}sCk("sb_c",dd,3650)}if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}if(d.al){try{AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{}}catch(e){}}if(d.notes){try{const raw=d.notes;const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});if(Object.keys(_n).length){NOTES=_n;sNotes()}}catch(e){}}if(d.lockedUnit){S.unit=d.lockedUnit;S.lockedUnit=d.lockedUnit}else if(d.unit){S.unit=d.unit}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)};_loading=false;if(needEpSave)cloudSave();sEv();sAL();render();setTimeout(render,1000)}else{_loading=false;render()}}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
 let fbLoginPending=false;
 function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
   fbLoginPending=true;render();
@@ -73,8 +73,17 @@ id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis seta
   h:["Pengaturan Awal|Jawab 3 pertanyaan (kerja/libur → shift → hari ke-berapa), jadwal setahun otomatis dibuat.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, ketuk 'Hari ini' untuk kembali. Ketuk tanggal untuk menandai.","Tandai Acara|Kelas, Dinas, Gajian, Cuti, Catatan sendiri. Admin bisa set Rapat & Kesehatan untuk semua user.","Kelola Cuti|Atur total jam dan jam terpakai di halaman STEP 1 (per 0.5 jam). Sisa cuti dihitung otomatis.","Lembur|12 jam: 4 jam lembur/hari. 8 jam: kelebihan dari jam wajib. Hari libur nasional otomatis dikurangi.","Cuaca & Peringatan Hujan|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Ketuk untuk detail per jam (suhu, hujan, angin, kelembaban). Peringatan bawa payung jika hujan ≥40%.","Pasang Surut|Otomatis deteksi lokasi, tampilkan pasang surut 7 hari dari stasiun pantai terdekat. Ketuk untuk detail harian. Sumber: CWA Taiwan.","Sinkronisasi Cloud|Login Google, semua pengaturan otomatis tersimpan di cloud. Setelah hapus data, login lagi untuk restore.","Sinkronisasi Cuti|Setelah login, bisa tandai cuti. Semua user bisa lihat jumlah cuti per hari. Admin bisa lihat nama dan atur jumlah.","Hari Libur|Hari libur Taiwan & Indonesia ditampilkan, terjemahan otomatis sesuai bahasa.","Install ke Layar|Tombol install di bawah. Ganti bahasa 中/ID di kanan atas. iOS: buka di Safari lalu Share → Add to Home Screen."],
   wk:["Min","Sen","Sel","Rab","Kam","Jum","Sab"]}
 };
-const RN={zh:{"2on2off":"做2休2","4on2off":"做4休2","5on_mixed":"做5休1＋做5休2"},id:{"2on2off":"2K 2L","4on2off":"4K 2L","5on_mixed":"5K1L+5K2L"}};
-const R={"2on2off":{h:12,c:["早","早","休","休","晚","晚","休","休"]},"4on2off":{h:12,c:["早","早","早","早","休","休","晚","晚","晚","晚","休","休"]},"5on_mixed":{h:8,c:["早","早","早","早","早","休","早","早","早","早","早","休","休","中","中","中","中","中","休","中","中","中","中","中","休","休","晚","晚","晚","晚","晚","休","晚","晚","晚","晚","晚","休","休"]}};
+let RN={zh:{"2on2off":"做2休2","4on2off":"做4休2","5on_mixed":"做5休1＋做5休2"},id:{"2on2off":"2K 2L","4on2off":"4K 2L","5on_mixed":"5K1L+5K2L"}};
+let R={"2on2off":{h:12,c:["早","早","休","休","晚","晚","休","休"]},"4on2off":{h:12,c:["早","早","早","早","休","休","晚","晚","晚","晚","休","休"]},"5on_mixed":{h:8,c:["早","早","早","早","早","休","早","早","早","早","早","休","休","中","中","中","中","中","休","中","中","中","中","中","休","休","晚","晚","晚","晚","晚","休","晚","晚","晚","晚","晚","休","休"]}};
+function rebuildR(){
+  if(!APP_CFG.rotations||!APP_CFG.rotations.length)return;
+  R={};RN={zh:{},id:{}};
+  APP_CFG.rotations.forEach(rot=>{
+    R[rot.id]={h:rot.hours,c:rot.cycle};
+    RN.zh[rot.id]=rot.name;
+    RN.id[rot.id]=rot.nameId||rot.name;
+  });
+}
 // Fixed holidays (same date every year) - display only
 const HOL_BASE={"01-01":{zh:"元旦",id:"Tahun Baru"},"02-28":{zh:"和平紀念日",id:"Hari Perdamaian TW"},"04-04":{zh:"兒童節",id:"Hari Anak TW"},"04-05":{zh:"清明節",id:"Qingming"},"05-01":{zh:"勞動節",id:"Hari Buruh"},"09-25":{zh:"中秋節",id:"Festival Kue Bulan"},"09-28":{zh:"教師節",id:"Hari Guru"},"10-10":{zh:"國慶日",id:"Hari Nasional TW"},"10-25":{zh:"光復節",id:"Hari Retrosesi"},"12-25":{zh:"行憲紀念日",id:"Hari Konstitusi TW"}};
 // Indonesian holidays (display only, not in TW_OFF)
@@ -105,6 +114,11 @@ function sf(s){return t(s)}
 // ═══ ADMIN CONFIG (loaded from Firestore) ═══
 let APP_CFG={admins:[],
   units:["冷抽二股A板","冷抽二股B板","冷抽二股C板","冷抽一股A板","冷抽一股B板","冷抽一股C板","熱處理A板","熱處理B板","品管","其他"],
+  rotations:[
+    {id:"4on2off",name:"做4休2",nameId:"4K 2L",hours:12,cycle:["早","早","早","早","休","休","晚","晚","晚","晚","休","休"]},
+    {id:"2on2off",name:"做2休2",nameId:"2K 2L",hours:12,cycle:["早","早","休","休","晚","晚","休","休"]},
+    {id:"5on_mixed",name:"做5休1＋做5休2",nameId:"5K1L+5K2L",hours:8,cycle:["早","早","早","早","早","休","早","早","早","早","早","休","休","中","中","中","中","中","休","中","中","中","中","中","休","休","晚","晚","晚","晚","晚","休","晚","晚","晚","晚","晚","休","休"]}
+  ],
   leaveTypes:[
     {id:"annual",name:"特休",nameId:"Cuti Tahunan",step:0.5,color:"#4caf50"},
     {id:"sick",name:"病假",nameId:"Sakit",step:1,color:"#f44336"},
@@ -126,14 +140,16 @@ async function loadAppConfig(){
       if(d.units&&d.units.length)APP_CFG.units=d.units;
       if(d.leaveTypes&&d.leaveTypes.length)APP_CFG.leaveTypes=d.leaveTypes;
       if(d.admins)APP_CFG.admins=d.admins;
+      if(d.rotations&&d.rotations.length)APP_CFG.rotations=d.rotations;
+      rebuildR();
     }
   }catch(e){console.log("loadCfg err",e)}
 }
 async function saveAppConfig(){
   if(!isAdmin())return;
-  try{await fbDb.collection("config").doc("app").set({units:APP_CFG.units,leaveTypes:APP_CFG.leaveTypes,admins:APP_CFG.admins||[],ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){console.log("saveCfg err",e)}
+  try{await fbDb.collection("config").doc("app").set({units:APP_CFG.units,leaveTypes:APP_CFG.leaveTypes,admins:APP_CFG.admins||[],rotations:APP_CFG.rotations||[],ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){console.log("saveCfg err",e)}
 }
-let S={step:"wiz",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false,unit:""};
+let S={step:"wiz",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false,unit:"",lockedUnit:""};
 let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb_ev"))||{}}catch(e){}
 function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}cloudSave()}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
@@ -236,11 +252,11 @@ function rType(){
   const unitOpts=getUnits().map(u=>`<option value="${u}"${S.unit===u?' selected':''}>${u}</option>`).join('');
   return`<div class="page"><div class="hero fu"><img src="${IMG.icon}"><h1>${t("app")}</h1><p>${t("desc")}</p></div>
   <div class="al-setup fu d1" style="margin-bottom:10px"><h3>🏭 ${lang==="zh"?"選擇單位":"Pilih Unit"}</h3>
-    <select id="unitSel" onchange="S.unit=this.value;sv();if(fbUser)loadLeaves()" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff">
+    <select id="unitSel" onchange="if(S.lockedUnit){this.value=S.lockedUnit;alert(lang==='zh'?'單位已被管理員鎖定':'Unit dikunci');return}S.unit=this.value;sv();if(fbUser)loadLeaves()" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff">
       <option value="">${lang==="zh"?"-- 請選擇 --":"-- Pilih --"}</option>${unitOpts}
     </select>
   </div>
-  ${Object.entries(R).map(([k,v],i)=>`<button class="rcard fu d${i+1}" data-a="pick" data-k="${k}"><div class="rcard-icon">${k==="2on2off"?"2:2":k==="4on2off"?"4:2":"5:1"}</div><div class="rcard-info"><div class="rcard-name">${RN[lang][k]}</div><div class="rcard-sub">${v.h===12?t("s12"):t("s8")} · ${v.c.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join("")}
+  ${APP_CFG.rotations.map((rot,i)=>`<button class="rcard fu d${(i%3)+1}" data-a="pick" data-k="${rot.id}"><div class="rcard-icon">${rot.cycle.filter(x=>x!=="休").length}:${rot.cycle.filter(x=>x==="休").length>2?Math.round(rot.cycle.filter(x=>x==="休").length/Math.max(1,rot.cycle.filter(x=>x!=="休").filter((x,j,a)=>j===0||a[j-1]==="休").length)):rot.cycle.filter(x=>x==="休").length}</div><div class="rcard-info"><div class="rcard-name">${lang==="zh"?rot.name:rot.nameId||rot.name}</div><div class="rcard-sub">${rot.hours}h · ${rot.cycle.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join("")}
   <div class="al-setup fu d3"><h3>${t("alSetup")}</h3><div class="al-setup-hint" style="margin-bottom:8px;font-size:11px;color:var(--green);font-weight:600">${alYRange(curALY())}</div><div class="al-setup-row"><label>${t("alTotal")}</label><input type="number" id="alTI" value="${getAL().total||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-row"><label>${t("alUsed")}</label><input type="number" id="alUI" value="${getAL().used||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-hint">${t("alSkip")}</div></div>
   <div style="text-align:center;margin-top:14px"><span class="lang-tog" style="display:inline-flex;height:36px;border-color:#ddd"><button class="lt-btn${lang==='zh'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='zh'?'var(--pri-d)':'var(--tx3)'}" data-a="lzh">中文</button><button class="lt-btn${lang==='id'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='id'?'var(--pri-d)':'var(--tx3)'}" data-a="lid">ID</button></span></div></div>`;
 }
@@ -586,7 +602,7 @@ function handle(e){
     case "prev":if(S.mo===1){S.yr--;S.mo=12}else S.mo--;loadLeaves();loadAdminEv();break;
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();break;
     case "today":S.yr=TY;S.mo=TM;break;
-    case "chUnit":{const sel=document.getElementById("unitChg");if(sel){S.unit=sel.value;sv();loadLeaves();render()}}break;
+    case "chUnit":{if(S.lockedUnit){alert(lang==="zh"?"單位已被管理員鎖定，無法更改":"Unit dikunci oleh admin");break}const sel=document.getElementById("unitChg");if(sel){S.unit=sel.value;sv();loadLeaves();render()}}break;
     case "reset":S.step="wiz";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){fbDb.collection("users").doc(fbUser.uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}).catch(()=>{})}break;
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
@@ -2277,4 +2293,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v108')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v110')caches.delete(n)})})}
