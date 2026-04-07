@@ -6,7 +6,10 @@ let fbUser=null;
 let fbAuthReady=false;
 let _initDone=false;
 function _doAuthInit(){if(_initDone)return;_initDone=true;loadAppConfig().then(()=>{loadLeaves();loadAdminEv();cloudLoad()})}
-fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){_doAuthInit()}else{loadAdminEv()}render()});
+fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){
+  // Immediately save display name for admin panel
+  try{fbDb.collection("users").doc(u.uid).set({displayName:u.displayName||"",email:u.email||"",photoURL:u.photoURL||"",lastLogin:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){}
+  _doAuthInit()}else{loadAdminEv()}render()});
 fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user;fbAuthReady=true;render();_doAuthInit()}}).catch(()=>{});
 setTimeout(()=>{if(!fbAuthReady){fbAuthReady=true;render()}},3000);
 let _loading=false;
@@ -2303,4 +2306,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v118')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v119')caches.delete(n)})})}
