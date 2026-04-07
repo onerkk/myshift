@@ -464,9 +464,10 @@ function renderLeaves(){
       const ltName=lt?lt.name:(l.leaveType||"請假");
       let ts="";
       if(l.ts&&l.ts.toDate){const d=l.ts.toDate();ts=`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
+      const hrsStr=l.hours?(' '+l.hours+'h'):'';
       return`<div class="leave-row">
         <div class="dot" style="background:${color}"></div>
-        <div class="info"><div class="top">${l.name} — ${ltName} ${l.hours||0}h</div><div class="bot">${l.date} · ${l.unit||"未設定"} · 申請：${ts}</div></div>
+        <div class="info"><div class="top">${l.name} — ${ltName}${hrsStr}</div><div class="bot">${l.date} · ${l.unit||"未設定"} · 申請：${ts}</div></div>
         <button class="del-btn" onclick="delLeave('${l._id}')">刪除</button>
       </div>`
     }).join(""):`<div class="empty">本月尚無請假記錄</div>`}
