@@ -5,13 +5,13 @@ fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 let fbUser=null;
 let fbAuthReady=false;
 let _initDone=false;
-function _doAuthInit(){if(_initDone)return;_initDone=true;loadLeaves();loadAdminEv();cloudLoad()}
+function _doAuthInit(){if(_initDone)return;_initDone=true;loadAppConfig().then(()=>{loadLeaves();loadAdminEv();cloudLoad()})}
 fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){_doAuthInit()}else{loadAdminEv()}render()});
 fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user;fbAuthReady=true;render();_doAuthInit()}}).catch(()=>{});
 setTimeout(()=>{if(!fbAuthReady){fbAuthReady=true;render()}},3000);
 let _loading=false;
-async function cloudSave(){if(!fbUser||_loading)return;try{const payload={rt:S.rt,pos:S.pos,ep:true,ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};if(JSON.stringify(NOTES)==='{}'){delete payload.notes}await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true})}catch(e){console.log("cloudSave err",e)}}
-async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();let needEpSave=false;if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;if(!d.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length};needEpSave=true};S.step="cal";const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true});try{localStorage.setItem("sb_c",dd)}catch(e){}sCk("sb_c",dd,3650)}if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}if(d.al){try{AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{}}catch(e){}}if(d.notes){try{const raw=d.notes;const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});if(Object.keys(_n).length){NOTES=_n;sNotes()}}catch(e){}}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)};_loading=false;if(needEpSave)cloudSave();sEv();sAL();render();setTimeout(render,1000)}else{_loading=false;render()}}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
+async function cloudSave(){if(!fbUser||_loading)return;try{const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};if(JSON.stringify(NOTES)==='{}'){delete payload.notes}await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true})}catch(e){console.log("cloudSave err",e)}}
+async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();let needEpSave=false;if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;if(!d.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length};needEpSave=true};S.step="cal";const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true});try{localStorage.setItem("sb_c",dd)}catch(e){}sCk("sb_c",dd,3650)}if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}if(d.al){try{AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{}}catch(e){}}if(d.notes){try{const raw=d.notes;const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});if(Object.keys(_n).length){NOTES=_n;sNotes()}}catch(e){}}if(d.unit){S.unit=d.unit}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)};_loading=false;if(needEpSave)cloudSave();sEv();sAL();render();setTimeout(render,1000)}else{_loading=false;render()}}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
 let fbLoginPending=false;
 function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
   fbLoginPending=true;render();
@@ -27,15 +27,15 @@ function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
 }
 function fbLogout(){_initDone=false;fbAuth.signOut()}
 let leavesCache={};
-async function loadLeaves(){try{const y=S.yr||TY,m=S.mo||TM;const snap=await fbDb.collection("leaves").where("ym","==",y+"-"+String(m).padStart(2,"0")).get();const d={};snap.forEach(doc=>{const v=doc.data();const k=v.date;if(!d[k])d[k]=[];d[k].push({uid:v.uid,name:v.name,type:v.type,ts:v.ts})});leavesCache=d;render()}catch(e){console.log("loadLeaves err",e)}}
-async function addLeave(date,type){if(!fbUser)return;const id=fbUser.uid+"_"+date;await fbDb.collection("leaves").doc(id).set({uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),type:type,ts:firebase.firestore.FieldValue.serverTimestamp()});loadLeaves()}
-async function removeLeave(date){if(!fbUser)return;const id=fbUser.uid+"_"+date;await fbDb.collection("leaves").doc(id).delete();loadLeaves()}
+async function loadLeaves(){try{const y=S.yr||TY,m=S.mo||TM;const snap=await fbDb.collection("leaves").where("ym","==",y+"-"+String(m).padStart(2,"0")).get();const d={};snap.forEach(doc=>{const v=doc.data();if(S.unit&&S.unit!=="__all"&&v.unit&&v.unit!==S.unit)return;const k=v.date;if(!d[k])d[k]=[];d[k].push({uid:v.uid,name:v.name,type:v.type,leaveType:v.leaveType||"",hours:v.hours||0,ts:v.ts,unit:v.unit||""})});leavesCache=d;render()}catch(e){console.log("loadLeaves err",e)}}
+async function addLeave(date,leaveTypeId,hours){if(!fbUser)return;const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).set({uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),type:"leave",leaveType:leaveTypeId,hours:hours||0,unit:S.unit||"",ts:firebase.firestore.FieldValue.serverTimestamp()});loadLeaves()}
+async function removeLeave(date,leaveTypeId){if(!fbUser)return;if(leaveTypeId){const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).delete()}else{const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).where("date","==",date).get();const batch=fbDb.batch();snap.forEach(d=>batch.delete(d.ref));await batch.commit()}loadLeaves()}
 function getLeaves(date){return leavesCache[date]||[]}
-function myLeave(date){return getLeaves(date).find(l=>l.uid===(fbUser&&fbUser.uid))}
+function myLeave(date){return getLeaves(date).filter(l=>l.uid===(fbUser&&fbUser.uid))}
 
 const ADMIN_EMAILS=["onerkk@gmail.com","asus0814999@gmail.com"];
 const ADMIN_EV=["meeting","health"];
-function isAdmin(){return fbUser&&ADMIN_EMAILS.includes(fbUser.email)}
+function isAdmin(){if(!fbUser)return false;if(ADMIN_EMAILS.includes(fbUser.email))return true;return APP_CFG.admins&&APP_CFG.admins.some(a=>a.email===fbUser.email)}
 let adminEvCache={};
 async function loadAdminEv(){try{const y=S.yr||TY,m=S.mo||TM;const snap=await fbDb.collection("adminEvents").where("ym","==",y+"-"+String(m).padStart(2,"0")).get();const d={};snap.forEach(doc=>{const v=doc.data();const k=v.date;if(!d[k])d[k]=[];d[k].push(v.type)});adminEvCache=d;render()}catch(e){console.log("loadAdminEv err",e)}}
 async function setAdminEv(date,type,add){if(!isAdmin())return;const id=type+"_"+date;if(add){await fbDb.collection("adminEvents").doc(id).set({date:date,ym:date.slice(0,7),type:type,ts:firebase.firestore.FieldValue.serverTimestamp()})}else{await fbDb.collection("adminEvents").doc(id).delete()}loadAdminEv()}
@@ -102,7 +102,38 @@ function getSeason(){const m=new Date().getMonth()+1;if(m>=3&&m<=5)return'spring
 let lang="zh";try{lang=localStorage.getItem("sb_l")||gCk("sb_l")||"zh"}catch(e){}
 function t(k){return (L[lang]&&L[lang][k])||L.zh[k]||k}
 function sf(s){return t(s)}
-let S={step:"wiz",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false};
+// ═══ ADMIN CONFIG (loaded from Firestore) ═══
+let APP_CFG={admins:[],
+  units:["冷抽二股A板","冷抽二股B板","冷抽二股C板","冷抽一股A板","冷抽一股B板","冷抽一股C板","熱處理A板","熱處理B板","品管","其他"],
+  leaveTypes:[
+    {id:"annual",name:"特休",nameId:"Cuti Tahunan",step:0.5,color:"#4caf50"},
+    {id:"sick",name:"病假",nameId:"Sakit",step:1,color:"#f44336"},
+    {id:"personal",name:"事假",nameId:"Izin Pribadi",step:1,color:"#ff9800"},
+    {id:"funeral",name:"喪假",nameId:"Duka Cita",step:1,color:"#616161"},
+    {id:"marriage",name:"婚假",nameId:"Nikah",step:1,color:"#e91e63"},
+    {id:"maternity",name:"產假",nameId:"Melahirkan",step:1,color:"#9c27b0"},
+    {id:"official",name:"公假",nameId:"Dinas",step:1,color:"#2196f3"},
+    {id:"comp",name:"補休",nameId:"Kompensasi",step:0.5,color:"#009688"}
+  ]
+};
+const UNITS_DEFAULT=APP_CFG.units.slice();
+function getUnits(){return APP_CFG.units}
+function getLeaveTypes(){return APP_CFG.leaveTypes}
+function getLT(id){return APP_CFG.leaveTypes.find(t=>t.id===id)}
+async function loadAppConfig(){
+  try{const doc=await fbDb.collection("config").doc("app").get();
+    if(doc.exists){const d=doc.data();
+      if(d.units&&d.units.length)APP_CFG.units=d.units;
+      if(d.leaveTypes&&d.leaveTypes.length)APP_CFG.leaveTypes=d.leaveTypes;
+      if(d.admins)APP_CFG.admins=d.admins;
+    }
+  }catch(e){console.log("loadCfg err",e)}
+}
+async function saveAppConfig(){
+  if(!isAdmin())return;
+  try{await fbDb.collection("config").doc("app").set({units:APP_CFG.units,leaveTypes:APP_CFG.leaveTypes,admins:APP_CFG.admins||[],ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){console.log("saveCfg err",e)}
+}
+let S={step:"wiz",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false,unit:""};
 let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb_ev"))||{}}catch(e){}
 function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}cloudSave()}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
@@ -120,8 +151,8 @@ function alRem(){const a=getAL();return Math.max(0,(a.total||0)-alUsed())}
 let DP=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();DP=e;render()});
 function sCk(k,v,d){const e=new Date();e.setTime(e.getTime()+d*864e5);document.cookie=k+"="+encodeURIComponent(v)+";expires="+e.toUTCString()+";path=/;SameSite=Lax"}
 function gCk(k){const m=document.cookie.match(new RegExp('(?:^|; )'+k+'=([^;]*)'));return m?decodeURIComponent(m[1]):null}
-try{const c=JSON.parse(localStorage.getItem("sb_c"))||JSON.parse(gCk("sb_c"));if(c&&c.rt&&c.pos!==null&&c.pos!==undefined){S.rt=c.rt;S.pos=c.pos;if(!c.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length}};S.step="cal";sv()}}catch(e){}
-function sv(){const d=JSON.stringify({rt:S.rt,pos:S.pos,ep:true});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650);cloudSave()}
+try{const c=JSON.parse(localStorage.getItem("sb_c"))||JSON.parse(gCk("sb_c"));if(c&&c.rt&&c.pos!==null&&c.pos!==undefined){S.rt=c.rt;S.pos=c.pos;if(c.unit)S.unit=c.unit;if(!c.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length}};S.step="cal";sv()}}catch(e){}
+function sv(){const d=JSON.stringify({rt:S.rt,pos:S.pos,ep:true,unit:S.unit||""});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650);cloudSave()}
 function rot(){return S.rt?R[S.rt]:null}
 function cyc(){return rot()?rot().c:[]}
 function dim(y,m){return new Date(y,m,0).getDate()}
@@ -135,13 +166,16 @@ function calcOT(y,m,wd,sh){const dm=dim(y,m);let wdays=0;for(let d=1;d<=dm;d++){
 function calcPayPeriod(y,m){
   const pm=m===1?12:m-1,py=m===1?y-1:y;
   const sd=new Date(py,pm-1,26),ed=new Date(y,m-1,25);
-  let wd=0,tH=0;
+  let wd=0,tH=0,leaveH=0;
   for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
     const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate();
     const s=gs(cy,cm,cd);
     if(s&&s!=="休")wd++;
+    // Sum my leave hours in this period
+    const dayLeaves=getLeaves(ek(cy,cm,cd));
+    dayLeaves.forEach(l=>{if(l.uid===(fbUser&&fbUser.uid))leaveH+=l.hours||0});
   }
-  const r=rot();if(!r)return{sd,ed,wd,tH:0,oH:0,rH:0,sh:12};
+  const r=rot();if(!r)return{sd,ed,wd,tH:0,oH:0,rH:0,sh:12,leaveH:0};
   const sh=r.h;tH=wd*sh;
   let wdays=0,hwd=0;
   for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
@@ -150,8 +184,9 @@ function calcPayPeriod(y,m){
     if(dw>=1&&dw<=5&&isTWOff(dt.getFullYear(),cm,cd))hwd++;
   }
   const rH=(wdays-hwd)*8;
-  const oH=sh===12?wd*4:Math.max(0,tH-rH);
-  return{sd,ed,wd,tH,oH,rH,sh};
+  const rawOH=sh===12?wd*4:Math.max(0,tH-rH);
+  const oH=Math.max(0,rawOH-leaveH);
+  return{sd,ed,wd,tH,oH,rH,sh,leaveH};
 }
 function payCardHtml(y,m){
   const pp=calcPayPeriod(y,m);
@@ -167,7 +202,7 @@ function payCardHtml(y,m){
     <div class="pay-grid">
       <div class="pay-stat"><div class="pay-stat-val">${pp.wd}</div><div class="pay-stat-lbl">${isZh?"出勤日":"Hari Kerja"}</div></div>
       <div class="pay-stat"><div class="pay-stat-val">${pp.tH}h</div><div class="pay-stat-lbl">${isZh?"總工時":"Total Jam"}</div></div>
-      <div class="pay-stat"><div class="pay-stat-val ot-val">${pp.oH}h</div><div class="pay-stat-lbl">${isZh?"加班":"Lembur"}</div></div>
+      <div class="pay-stat"><div class="pay-stat-val ot-val">${pp.oH}h</div><div class="pay-stat-lbl">${isZh?"加班":"Lembur"}${pp.leaveH?`<br><span style="color:var(--red);font-size:8px">-${pp.leaveH}h ${isZh?"請假":"cuti"}</span>`:""}</div></div>
     </div>
     <div class="pay-dates">
       <div class="pay-date-item"><span class="pay-date-icon">💰</span><span>${pay5}</span></div>
@@ -192,12 +227,18 @@ function _doRender(){
   if(S.step==="type")a.innerHTML=rType();
   else if(S.step==="wiz")a.innerHTML=rWiz();
   else a.innerHTML=rCal();
-  document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():"";
+  document.getElementById("mr").innerHTML=showAdmin?adminPanelHtml():wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():"";
   document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
 }
 
 function rType(){
+  const unitOpts=getUnits().map(u=>`<option value="${u}"${S.unit===u?' selected':''}>${u}</option>`).join('');
   return`<div class="page"><div class="hero fu"><img src="${IMG.icon}"><h1>${t("app")}</h1><p>${t("desc")}</p></div>
+  <div class="al-setup fu d1" style="margin-bottom:10px"><h3>🏭 ${lang==="zh"?"選擇單位":"Pilih Unit"}</h3>
+    <select id="unitSel" onchange="S.unit=this.value;sv();if(fbUser)loadLeaves()" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff">
+      <option value="">${lang==="zh"?"-- 請選擇 --":"-- Pilih --"}</option>${unitOpts}
+    </select>
+  </div>
   ${Object.entries(R).map(([k,v],i)=>`<button class="rcard fu d${i+1}" data-a="pick" data-k="${k}"><div class="rcard-icon">${k==="2on2off"?"2:2":k==="4on2off"?"4:2":"5:1"}</div><div class="rcard-info"><div class="rcard-name">${RN[lang][k]}</div><div class="rcard-sub">${v.h===12?t("s12"):t("s8")} · ${v.c.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join("")}
   <div class="al-setup fu d3"><h3>${t("alSetup")}</h3><div class="al-setup-hint" style="margin-bottom:8px;font-size:11px;color:var(--green);font-weight:600">${alYRange(curALY())}</div><div class="al-setup-row"><label>${t("alTotal")}</label><input type="number" id="alTI" value="${getAL().total||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-row"><label>${t("alUsed")}</label><input type="number" id="alUI" value="${getAL().used||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-hint">${t("alSkip")}</div></div>
   <div style="text-align:center;margin-top:14px"><span class="lang-tog" style="display:inline-flex;height:36px;border-color:#ddd"><button class="lt-btn${lang==='zh'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='zh'?'var(--pri-d)':'var(--tx3)'}" data-a="lzh">中文</button><button class="lt-btn${lang==='id'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='id'?'var(--pri-d)':'var(--tx3)'}" data-a="lid">ID</button></span></div></div>`;
@@ -250,7 +291,7 @@ function rCal(){
     if(payDay20<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay20=getPayDay(ny,nm,20)+dim(TY,TM)-TD}
     const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
     todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
-  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}</span></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div></div>
+  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}${S.unit&&S.unit!=="__all"?` · ${S.unit}`:S.unit==="__all"?` · ${lang==="zh"?"全部單位":"All Units"}`:""}</span></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
   <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
@@ -283,28 +324,45 @@ function fbBarHtml(){
   </div>`;
   const pic=fbUser.photoURL?`<img class="fb-avatar" src="${fbUser.photoURL}" referrerpolicy="no-referrer">`:"";
   const name=fbUser.displayName||fbUser.email||"";
-  return`<div class="fb-bar fi"><div class="fb-user">${pic}<span>${name}</span></div><button onclick="fbLogout()" style="background:var(--tx3)">${lang==="zh"?"登出":"Logout"}</button></div>`;
+  return`<div class="fb-bar fi"><div class="fb-user">${pic}<span>${name}</span></div><button onclick="fbLogout()" style="background:var(--tx3)">${lang==="zh"?"登出":"Logout"}</button></div>${S.unit?"":`<div style="margin:4px 0;padding:8px 10px;background:#fff3e0;border-radius:8px;border:1px solid #ffcc80;font-size:11px;color:#e65100;font-weight:600">⚠️ ${lang==="zh"?"請先選擇單位（重設後可設定）":"Pilih unit terlebih dahulu (reset untuk setting)"}</div>`}`;
 }
 function modalLeaveHtml(y,m,d){
-  const date=ek(y,m,d),leaves=getLeaves(date),ml=myLeave(date);
+  const date=ek(y,m,d),leaves=getLeaves(date),myLeaves=leaves.filter(l=>l.uid===(fbUser&&fbUser.uid));
   let html="";
   if(leaves.length){
-    if(isAdmin()){
-      html+=`<div class="leave-info">${lang==="zh"?"📋 今日 "+leaves.length+" 人請假":"📋 "+leaves.length+" orang cuti"}<div class="leave-list">${leaves.filter(l=>!l.uid.startsWith("admin_")).map(l=>{
-        let timeStr="";
-        if(l.ts&&l.ts.toDate){const dt=l.ts.toDate();timeStr=` (${String(dt.getMonth()+1)}/${dt.getDate()} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")})`}
-        return`<span title="${timeStr}">${l.name}${timeStr}</span>`
+    const realLeaves=leaves.filter(l=>!l.uid.startsWith("admin_"));
+    if(isAdmin()&&realLeaves.length){
+      html+=`<div class="leave-info">${lang==="zh"?"📋 今日 "+realLeaves.length+" 人請假":"📋 "+realLeaves.length+" orang cuti"}<div class="leave-list">${realLeaves.map(l=>{
+        let timeStr="";const lt=getLT(l.leaveType);const ltName=lt?(lang==="zh"?lt.name:lt.nameId):l.leaveType;
+        if(l.ts&&l.ts.toDate){const dt=l.ts.toDate();timeStr=` ${String(dt.getMonth()+1)}/${dt.getDate()} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`}
+        return`<span style="border-left:3px solid ${lt?lt.color:'#999'};padding-left:4px">${l.name} ${ltName} ${l.hours}h${l.unit&&l.unit!==S.unit?' ['+l.unit+']':''}${timeStr?'<br><small style="color:var(--tx3)">'+timeStr+'</small>':''}</span>`
       }).join("")}</div></div>`;
-    }else{
+    }else if(leaves.length){
       html+=`<div class="leave-info">${lang==="zh"?"📋 今日 "+leaves.length+" 人請假":"📋 "+leaves.length+" orang cuti"}</div>`;
     }
   }
+  // Show my existing leaves for this day
+  if(fbUser&&myLeaves.length){
+    html+=`<div style="margin:6px 0"><div style="font-size:11px;font-weight:700;margin-bottom:4px">${lang==="zh"?"我的請假":"Cuti saya"}</div>`;
+    myLeaves.forEach(l=>{
+      const lt=getLT(l.leaveType);const ltName=lt?(lang==="zh"?lt.name:lt.nameId):l.leaveType;
+      html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--card);border-radius:6px;margin-bottom:3px;border-left:3px solid ${lt?lt.color:'#999'}"><span style="font-size:12px;font-weight:600">${ltName} ${l.hours}h</span><button onclick="removeLeave('${date}','${l.leaveType}')" style="background:var(--red);color:#fff;border:none;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer">${lang==="zh"?"取消":"Batal"}</button></div>`;
+    });
+    html+=`</div>`;
+  }
+  // Add new leave
   if(fbUser){
-    if(ml){
-      html+=`<button class="modal-done" style="background:var(--red);margin-bottom:8px" onclick="removeLeave('${date}')">${lang==="zh"?"取消我的請假":"Batalkan cuti"}</button>`;
-    }else{
-      html+=`<button class="modal-done" style="background:var(--amber);margin-bottom:8px" onclick="addLeave('${date}','leave')">${lang==="zh"?"📋 我要請假":"📋 Ajukan cuti"}</button>`;
-    }
+    html+=`<div style="margin:8px 0;padding:10px;background:var(--pri-l);border-radius:8px;border:1.5px dashed var(--pri)">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px">${lang==="zh"?"➕ 新增請假":"➕ Tambah Cuti"}</div>
+      <select id="leaveTypeSel" onchange="updateLeaveHours()" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:6px">
+        ${getLeaveTypes().map(lt=>`<option value="${lt.id}" data-step="${lt.step}">${lang==="zh"?lt.name:lt.nameId}</option>`).join('')}
+      </select>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:11px;white-space:nowrap">${lang==="zh"?"時數":"Jam"}:</label>
+        <select id="leaveHoursSel" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px"></select>
+        <button onclick="submitLeave('${date}')" style="padding:8px 16px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">${lang==="zh"?"確認":"OK"}</button>
+      </div>
+    </div>`;
   }
   if(isAdmin()){
     html+=`<div class="admin-leave-edit"><label>👑 ${lang==="zh"?"管理員：手動設定請假人數":"Admin: Set jumlah cuti"}</label><div style="margin-top:4px;display:flex;align-items:center;gap:4px"><input type="number" id="adminLeaveN" min="0" value="${leaves.length}" placeholder="0"><button onclick="adminSetLeave('${date}')" style="background:var(--pri);color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer">${lang==="zh"?"確認":"OK"}</button></div></div>`;
@@ -320,7 +378,7 @@ async function adminSetLeave(date){
   const realCount=current.filter(l=>!l.uid.startsWith("admin_")).length;
   const need=n-realCount;
   if(need<0){alert(lang==="zh"?"已有 "+realCount+" 人實際請假，無法設低於此數":realCount+" orang sudah cuti, tidak bisa kurang");loadLeaves();return;}
-  for(let i=0;i<need;i++){const id="admin_"+i+"_"+date;await fbDb.collection("leaves").doc(id).set({uid:"admin_"+i,name:lang==="zh"?"員工":"Staff",date:date,ym:date.slice(0,7),type:"leave",ts:firebase.firestore.FieldValue.serverTimestamp()})}
+  for(let i=0;i<need;i++){const id="admin_"+i+"_"+date;await fbDb.collection("leaves").doc(id).set({uid:"admin_"+i,name:lang==="zh"?"員工":"Staff",date:date,ym:date.slice(0,7),type:"leave",leaveType:"admin",hours:0,unit:S.unit||"",ts:firebase.firestore.FieldValue.serverTimestamp()})}
   loadLeaves();
 }
 function adminEvModalHtml(y,m,d){
@@ -441,12 +499,85 @@ function rHelp(){
   return`<div class="modal-bg" data-a="closeH"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="help-header"><div class="help-header-icon"><img src="${IMG.icon}" style="width:40px;height:40px;border-radius:10px"></div><div><div class="modal-title" style="text-align:left;font-size:18px">${isZh?"我的班表 使用說明":"My Shift Panduan"}</div><div style="font-size:11px;color:var(--tx3);margin-top:2px">${isZh?"華新麗華 輪班管理系統":"Sistem Manajemen Shift"}</div></div></div><div style="height:16px"></div>
   ${colorLegend}${stepsHtml}</div>
   <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee">
+    <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:700;color:var(--tx)">🏭 ${isZh?"切換單位":"Ganti Unit"}</label><div style="display:flex;gap:6px;margin-top:6px"><select id="unitChg" style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;font-weight:600"><option value="">${isZh?"-- 無 --":"-- None --"}</option>${isAdmin()?`<option value="__all"${S.unit==="__all"?" selected":""}>${isZh?"全部單位":"Semua Unit"}</option>`:""}
+${getUnits().map(u=>`<option value="${u}"${S.unit===u?' selected':''}>${u}</option>`).join('')}</select><button data-a="chUnit" style="padding:8px 14px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">${isZh?"確認":"OK"}</button></div></div>
     <button class="modal-done" data-a="closeH">${t("done")}</button>
+    ${isAdmin()?`<button class="modal-done" onclick="showAdmin=true;S.showH=false;render()" style="background:#1565c0;margin-top:6px">${isZh?"⚙️ 管理員後台":"⚙️ Admin Panel"}</button>`:""}
     <button class="modal-done" data-a="reset" style="background:var(--red);margin-top:6px">${isZh?"⚠️ 重新設定班表":"⚠️ Reset Jadwal"}</button>
   </div></div></div>`}
 
 function rW(sh,day){const c=cyc();for(let i=0;i<c.length;i++){if(c[i]!==sh)continue;let n=1;for(let j=i-1;j>=0;j--){if(c[j]===sh)n++;else break}if(n===day)return i}return 0}
 function rO(nx,day){const c=cyc();for(let i=0;i<c.length;i++){if(c[i]!=="休")continue;let j=i;while(j<c.length&&c[j]==="休")j++;if(c[j%c.length]!==nx)continue;let n=1;for(let k=i-1;k>=0;k--){if(c[k]==="休")n++;else break}if(n===day)return i}return 0}
+
+// ═══ LEAVE HELPERS ═══
+function updateLeaveHours(){
+  const sel=document.getElementById("leaveTypeSel");
+  const hSel=document.getElementById("leaveHoursSel");
+  if(!sel||!hSel)return;
+  const lt=getLT(sel.value);
+  const step=lt?lt.step:1;
+  const max=12;
+  let opts="";
+  for(let h=step;h<=max;h+=step){opts+=`<option value="${h}"${h===(step===0.5?4:8)?' selected':''}>${h}h</option>`}
+  hSel.innerHTML=opts;
+}
+function submitLeave(date){
+  const tSel=document.getElementById("leaveTypeSel");
+  const hSel=document.getElementById("leaveHoursSel");
+  if(!tSel||!hSel)return;
+  addLeave(date,tSel.value,parseFloat(hSel.value));
+}
+// Auto-init hours dropdown after modal renders
+const _origRender=render;
+// Will call updateLeaveHours after modal opens via MutationObserver
+setTimeout(()=>{
+  const obs=new MutationObserver(()=>{if(document.getElementById("leaveTypeSel"))updateLeaveHours()});
+  const mr=document.getElementById("mr");
+  if(mr)obs.observe(mr,{childList:true,subtree:true});
+},1000);
+
+// ═══ ADMIN PANEL ═══
+let showAdmin=false;
+function adminPanelHtml(){
+  if(!isAdmin()||!showAdmin)return"";
+  const isZh=lang==="zh";
+  let unitsHtml=APP_CFG.units.map((u,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:var(--card);border-radius:6px"><span style="flex:1;font-size:12px">${u}</span><button onclick="adminDelUnit(${i})" style="background:var(--red);color:#fff;border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">✕</button></div>`).join("");
+  let ltHtml=APP_CFG.leaveTypes.map((lt,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:var(--card);border-radius:6px;border-left:3px solid ${lt.color}"><span style="flex:1;font-size:12px">${isZh?lt.name:lt.nameId} (${lt.step}h)</span><button onclick="adminDelLT(${i})" style="background:var(--red);color:#fff;border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">✕</button></div>`).join("");
+  return`<div class="modal-bg" onclick="showAdmin=false;render()"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div>
+    <div class="modal-title">⚙️ ${isZh?"管理員後台":"Admin Panel"}</div>
+    <div style="margin:12px 0"><h3 style="font-size:13px;margin-bottom:6px">🏭 ${isZh?"單位管理":"Unit Management"}</h3>${unitsHtml}
+      <div style="display:flex;gap:4px;margin-top:6px"><input id="newUnit" placeholder="${isZh?"新增單位名稱":"Nama unit baru"}" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px"><button onclick="adminAddUnit()" style="background:var(--pri);color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">+</button></div>
+    </div>
+    <div style="margin:12px 0;padding-top:12px;border-top:1px solid #eee"><h3 style="font-size:13px;margin-bottom:6px">📋 ${isZh?"假別管理":"Leave Type Management"}</h3>${ltHtml}
+      <div style="margin-top:8px;padding:8px;background:#f8f8f8;border-radius:8px">
+        <div style="display:flex;gap:4px;margin-bottom:4px"><input id="newLTName" placeholder="${isZh?"假別名稱(中)":"Nama cuti"}" style="flex:1;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:11px"><input id="newLTNameId" placeholder="${isZh?"印尼文名":"Nama ID"}" style="flex:1;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:11px"></div>
+        <div style="display:flex;gap:4px;align-items:center"><label style="font-size:10px;white-space:nowrap">${isZh?"計算單位":"Step"}:</label><select id="newLTStep" style="padding:5px;border:1px solid #ddd;border-radius:4px;font-size:11px"><option value="0.5">0.5h</option><option value="1" selected>1h</option></select><label style="font-size:10px;white-space:nowrap">${isZh?"顏色":"Color"}:</label><input id="newLTColor" type="color" value="#607d8b" style="width:30px;height:26px;border:none;cursor:pointer"><button onclick="adminAddLT()" style="background:var(--pri);color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer">+</button></div>
+      </div>
+    </div>
+    <button onclick="showAdmin=false;render()" class="modal-done" style="margin-top:10px">${isZh?"完成":"Done"}</button>
+  </div></div>`;
+}
+function adminAddUnit(){const el=document.getElementById("newUnit");if(!el||!el.value.trim())return;APP_CFG.units.push(el.value.trim());saveAppConfig();render()}
+function adminDelUnit(i){APP_CFG.units.splice(i,1);saveAppConfig();render()}
+function adminAddLT(){
+  const n=document.getElementById("newLTName"),ni=document.getElementById("newLTNameId"),s=document.getElementById("newLTStep"),c=document.getElementById("newLTColor");
+  if(!n||!n.value.trim())return;
+  const id=n.value.trim().toLowerCase().replace(/[^a-z0-9]/g,"_")||("lt_"+Date.now());
+  APP_CFG.leaveTypes.push({id:id,name:n.value.trim(),nameId:ni?ni.value.trim()||n.value.trim():n.value.trim(),step:parseFloat(s?s.value:1),color:c?c.value:"#607d8b"});
+  saveAppConfig();render();
+}
+function adminDelLT(i){APP_CFG.leaveTypes.splice(i,1);saveAppConfig();render()}
+
+// ═══ OT DEDUCTION: subtract leave hours ═══
+function getMonthLeaveHours(y,m){
+  let total=0;
+  const dm=new Date(y,m,0).getDate();
+  for(let d=1;d<=dm;d++){
+    const leaves=getLeaves(ek(y,m,d));
+    leaves.forEach(l=>{if(l.uid===(fbUser&&fbUser.uid))total+=l.hours||0});
+  }
+  return total;
+}
 
 function handle(e){
   const el=e.currentTarget,a=el.dataset.a;
@@ -461,6 +592,7 @@ function handle(e){
     case "prev":if(S.mo===1){S.yr--;S.mo=12}else S.mo--;loadLeaves();loadAdminEv();break;
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();break;
     case "today":S.yr=TY;S.mo=TM;break;
+    case "chUnit":{const sel=document.getElementById("unitChg");if(sel){S.unit=sel.value;sv();loadLeaves();render()}}break;
     case "reset":S.step="wiz";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){fbDb.collection("users").doc(fbUser.uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}).catch(()=>{})}break;
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
@@ -488,7 +620,7 @@ try{render();}catch(e){document.getElementById("app").innerHTML="<div style='pad
 (function(){
   let sx=0,sy=0,swiping=false;
   document.addEventListener("touchstart",e=>{
-    if(S.step!=="cal"||S.modal||S.showH||wxDetailShow||tideDetailShow)return;
+    if(S.step!=="cal"||S.modal||S.showH||showAdmin||wxDetailShow||tideDetailShow)return;
     sx=e.touches[0].clientX;sy=e.touches[0].clientY;swiping=true;
   },{passive:true});
   document.addEventListener("touchend",e=>{
@@ -2151,4 +2283,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v104')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v107')caches.delete(n)})})}
