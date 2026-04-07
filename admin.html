@@ -122,18 +122,19 @@ const SUPER_ADMIN=["onerkk@gmail.com"];
 let user=null,tab="overview",cfg={units:[],leaveTypes:[],admins:[]},allLeaves=[],allUsers=[];
 
 // ═══ AUTH ═══
-let _authReady=false;
+let _authReady=false,_redirectDone=false;
+auth.getRedirectResult().then(r=>{
+  _redirectDone=true;
+  if(r&&r.user){user=r.user;_authReady=true;if(SUPER_ADMIN.includes(r.user.email))loadAll().then(()=>render());else render()}
+}).catch(()=>{_redirectDone=true});
 auth.onAuthStateChanged(async u=>{
-  user=u;_authReady=true;
-  if(u&&SUPER_ADMIN.includes(u.email)){
-    await loadAll();
-  }
+  user=u;
+  if(!_redirectDone&&!u)return; // Don't show login yet, redirect might be pending
+  _authReady=true;
+  if(u&&SUPER_ADMIN.includes(u.email)){await loadAll()}
   render();
 });
-auth.getRedirectResult().then(r=>{
-  if(r&&r.user){user=r.user;_authReady=true;render()}
-}).catch(()=>{_authReady=true;render()});
-setTimeout(()=>{if(!_authReady){_authReady=true;render()}},4000);
+setTimeout(()=>{_redirectDone=true;_authReady=true;render()},5000);
 
 function login(){
   const p=new firebase.auth.GoogleAuthProvider();
