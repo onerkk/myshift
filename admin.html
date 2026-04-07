@@ -129,10 +129,13 @@ auth.onAuthStateChanged(async u=>{
   }
   render();
 });
+auth.getRedirectResult().catch(()=>{});
 
 function login(){
   auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{
-    auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+    if(e.code==='auth/popup-blocked'){
+      auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+    }
   });
 }
 function logout(){auth.signOut()}
@@ -220,10 +223,10 @@ function delUnit(i){
 
 // ═══ LEAVE TYPE MANAGEMENT ═══
 function addLT(){
-  const n=document.getElementById("ltName"),ni=document.getElementById("ltNameId"),s=document.getElementById("ltStep"),c=document.getElementById("ltColor");
+  const n=document.getElementById("ltName"),s=document.getElementById("ltStep"),c=document.getElementById("ltColor");
   if(!n||!n.value.trim())return;
   const id=n.value.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,"").substring(0,20)||("lt_"+Date.now());
-  cfg.leaveTypes.push({id,name:n.value.trim(),nameId:ni?ni.value.trim()||n.value.trim():n.value.trim(),step:parseFloat(s?s.value:1),color:c?c.value:"#607d8b"});
+  cfg.leaveTypes.push({id,name:n.value.trim(),nameId:n.value.trim(),step:parseFloat(s?s.value:1),color:c?c.value:"#607d8b"});
   saveConfig().then(()=>{render()});
 }
 function delLT(i){
@@ -335,20 +338,20 @@ function renderRotations(){
     ${rots.map((rot,i)=>{
       const cycleVis=rot.cycle.map(s=>`<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:4px;font-size:10px;font-weight:700;color:#fff;background:${SHIFT_COLORS[s]||'#999'};margin:1px">${s}</span>`).join('');
       return`<div class="card-row" style="flex-wrap:wrap">
-        <div class="info"><div class="top">${rot.name} <span style="color:var(--tx2);font-size:11px">(${rot.nameId||''})</span></div><div class="bot">${rot.hours}h/班 · ${rot.cycle.length}天循環</div></div>
+        <div class="info"><div class="top">${rot.name} </div><div class="bot">${rot.hours}h/班 · ${rot.cycle.length}天循環</div></div>
         <button class="del-btn" onclick="delRotation(${i})">刪除</button>
         <div style="width:100%;margin-top:6px;overflow-x:auto;white-space:nowrap">${cycleVis}</div>
       </div>`}).join('')}
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bg4)">
       <label class="form-label">新增輪班規則</label>
-      <div class="form-row"><input id="rotName" class="input" placeholder="中文名稱（如：做4休2）"><input id="rotNameId" class="input" placeholder="印尼文名稱"></div>
+      <div class="form-row"><input id="rotName" class="input" placeholder="中文名稱（如：做4休2）"></div>
       <div class="form-row">
-        <select id="rotHours" class="input"><option value="12">12小時制</option><option value="8">8小時制</option></select>
+        <select id="rotHours" class="input"><option value="12">12小時/班</option><option value="8">8小時/班</option></select>
         <select id="rotLen" class="input" onchange="resizeCycle(+this.value)">
           ${[4,6,8,10,12,14,16,18,20,24,28,30,36,39,42].map(n=>`<option value="${n}"${n===12?' selected':''}>${n}天</option>`).join('')}
         </select>
       </div>
-      <label class="form-label" style="margin-top:8px">點擊切換班別（早→中→晚→休）</label>
+      <label class="form-label" style="margin-top:8px">點擊每格切換班別（🟠早 🟣中 🔵晚 🟢休）</label>
       <div id="cycleEditor" style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0">
         ${editingCycle.map((s,i)=>`<button onclick="toggleCycleDay(${i})" style="width:36px;height:36px;border:none;border-radius:6px;font-size:13px;font-weight:700;color:#fff;background:${SHIFT_COLORS[s]||'#999'};cursor:pointer">${s}</button>`).join('')}
       </div>
@@ -369,11 +372,11 @@ function resizeCycle(len){
   render();
 }
 function addRotation(){
-  const n=document.getElementById("rotName"),ni=document.getElementById("rotNameId"),h=document.getElementById("rotHours");
+  const n=document.getElementById("rotName"),h=document.getElementById("rotHours");
   if(!n||!n.value.trim()){toast("請輸入名稱");return}
   const id=n.value.trim().replace(/[^a-zA-Z0-9]/g,"_").substring(0,20)||("rot_"+Date.now());
   if(!cfg.rotations)cfg.rotations=[];
-  cfg.rotations.push({id,name:n.value.trim(),nameId:ni?ni.value.trim()||n.value.trim():n.value.trim(),hours:parseInt(h?h.value:12),cycle:[...editingCycle]});
+  cfg.rotations.push({id,name:n.value.trim(),nameId:n.value.trim(),hours:parseInt(h?h.value:12),cycle:[...editingCycle]});
   saveConfig().then(()=>{editingCycle=["早","早","早","早","休","休","晚","晚","晚","晚","休","休"];render()});
 }
 function delRotation(i){
@@ -416,12 +419,12 @@ function renderLeaveTypes(){
   return`<div class="card"><h3>📋 假別列表 (${cfg.leaveTypes.length})</h3>
     ${cfg.leaveTypes.map((lt,i)=>`<div class="card-row">
       <div class="dot" style="background:${lt.color}"></div>
-      <div class="info"><div class="top">${lt.name}</div><div class="bot">${lt.nameId} · 每次 ${lt.step}h</div></div>
+      <div class="info"><div class="top">${lt.name}</div><div class="bot">每次 ${lt.step}h</div></div>
       <button class="del-btn" onclick="delLT(${i})">刪除</button>
     </div>`).join("")}
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bg4)">
       <label class="form-label">新增假別</label>
-      <div class="form-row"><input id="ltName" class="input" placeholder="中文名稱"><input id="ltNameId" class="input" placeholder="印尼文名稱"></div>
+      <div class="form-row"><input id="ltName" class="input" placeholder="中文名稱"></div>
       <div class="form-row">
         <select id="ltStep" class="input"><option value="0.5">0.5h 計算</option><option value="1" selected>1h 計算</option></select>
         <input id="ltColor" type="color" value="#607d8b" style="width:50px;height:40px;border:none;border-radius:8px;cursor:pointer">
@@ -442,7 +445,7 @@ function renderAdmins(){
     </div>`).join(""):`<div class="empty">尚無單位管理員</div>`}
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bg4)">
       <label class="form-label">新增管理員</label>
-      <div class="form-row"><input id="adminName" class="input" placeholder="姓名"><input id="adminEmail" class="input" placeholder="Google Email"></div>
+      <div class="form-row"><input id="adminName" class="input" placeholder="姓名"><input id="adminEmail" class="input" placeholder="Google Email 帳號"></div>
       <select id="adminUnit" class="input" style="margin-bottom:8px">
         <option value="">全部單位</option>
         ${cfg.units.map(u=>`<option value="${u}">${u}</option>`).join("")}
