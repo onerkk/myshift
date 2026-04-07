@@ -392,7 +392,7 @@ function renderUsers(){
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;width:100%">
           <select id="uUnit_${u._uid}" class="input" style="flex:1;padding:6px;font-size:11px">
             <option value="">-- 選擇單位 --</option>
-            ${cfg.units.map(un=>\`<option value="\${un}"\${u.unit===un||u.lockedUnit===un?' selected':''}>\${un}</option>\`).join('')}
+            ${cfg.units.map(un=>`<option value="${un}"${u.unit===un||u.lockedUnit===un?' selected':''}>${un}</option>`).join('')}
           </select>
           <button onclick="setUserUnit('${u._uid}',document.getElementById('uUnit_${u._uid}').value)" style="background:var(--pri);color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔒鎖定</button>
           ${locked?`<button onclick="unlockUser('${u._uid}')" style="background:var(--amber);color:#000;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔓解鎖</button>`:''}
