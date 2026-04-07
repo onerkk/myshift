@@ -513,31 +513,39 @@ const WXD={0:"Cerah",1:"Cerah",2:"Berawan",3:"Mendung",45:"Kabut",48:"Kabut",51:
 let tideData=null,tideErr=false;
 async function loadWx(retries){
   retries=retries||0;
+  // ── Cache-first: show cached data immediately ──
+  if(retries===0&&!wxData){
+    try{
+      const c=JSON.parse(localStorage.getItem('_wxCache'));
+      if(c&&c.d){wxData=c.d;wxData._cached=true;wxErr=false;render();
+        // Update weather effects from cache
+        let cp=0,cw=0;
+        if(wxData.hTime){const n=new Date();const nh=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0")+"T"+String(n.getHours()).padStart(2,"0");const hi=wxData.hTime.findIndex(t=>t.startsWith(nh));if(hi>=0){cp=wxData.hPrec?wxData.hPrec[hi]||0:0;cw=wxData.hWind?wxData.hWind[hi]||0:0}}
+        WxFx.update(wxData.code,wxData.temp,cp,cw);
+      }
+    }catch(e){}
+  }
+  // ── Then try fresh data from API ──
   try{
     let lat,lon;
-    // Try localStorage cached position first
     try{const c=JSON.parse(localStorage.getItem('_wxPos'));if(c&&c.lat&&c.lon){lat=c.lat;lon=c.lon}}catch(e){}
     if(!lat){
       try{
         const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:8000,maximumAge:3600000})});
         lat=pos.coords.latitude.toFixed(2);lon=pos.coords.longitude.toFixed(2);
         try{localStorage.setItem('_wxPos',JSON.stringify({lat,lon}))}catch(e){}
-      }catch(e){
-        // Geolocation failed — use fallback (台南鹽水)
-        lat="23.32";lon="120.27";
-      }
+      }catch(e){lat="23.32";lon="120.27"}
     }
     const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability,temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&timezone=auto&forecast_days=7`;
     const resp=await Promise.race([fetch(url),new Promise((_,r)=>setTimeout(()=>r('timeout'),10000))]);
-    if(!resp.ok)throw new Error('API error');
+    if(!resp.ok)throw new Error('API '+resp.status);
     const data=await resp.json();
     wxData={temp:Math.round(data.current.temperature_2m),code:data.current.weather_code,lat:lat,lon:lon,
       days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])})),
       hTime:data.hourly.time,hPrec:data.hourly.precipitation_probability,hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m};
-    wxErr=false;
-    // Cache successful weather data
+    wxErr=false;delete wxData._cached;
     try{localStorage.setItem('_wxCache',JSON.stringify({ts:Date.now(),d:wxData}))}catch(e){}
-    // Tide via Cloudflare Worker proxy → CWA API
+    // Tide
     try{
       const tResp=await Promise.race([fetch('https://cwa-tide.onerkk.workers.dev'),new Promise((_,r)=>setTimeout(()=>r("timeout"),10000))]);
       const td=await tResp.json();
@@ -545,25 +553,16 @@ async function loadWx(retries){
       if(forecasts.length){
         let best=forecasts[0],bD=9999;
         forecasts.forEach(f=>{const lo=f.Location;if(lo){const d=Math.sqrt((lo.Latitude-lat)**2+(lo.Longitude-lon)**2);if(d<bD){bD=d;best=f}}});
-        const loc=best.Location;
-        const tides=[];
-        (loc.TimePeriods?.Daily||[]).forEach(day=>{
-          (day.Time||[]).forEach(t=>{
-            tides.push({date:day.Date,time:t.DateTime||"",type:t.Tide||"",height:parseInt(t.TideHeights?.AboveTWVD)||0});
-          });
-        });
+        const loc=best.Location;const tides=[];
+        (loc.TimePeriods?.Daily||[]).forEach(day=>{(day.Time||[]).forEach(t=>{tides.push({date:day.Date,time:t.DateTime||"",type:t.Tide||"",height:parseInt(t.TideHeights?.AboveTWVD)||0})})});
         if(tides.length){tideData={station:loc.LocationName||"",tides:tides};tideErr=false}
         else{tideData=null;tideErr=true}
       }else{tideData=null;tideErr=true}
     }catch(e){tideData=null;tideErr=true}
   }catch(e){
-    if(retries<2){setTimeout(()=>loadWx(retries+1),3000);return}
-    // Try restore from cache (valid for 3 hours)
-    try{
-      const c=JSON.parse(localStorage.getItem('_wxCache'));
-      if(c&&c.d&&(Date.now()-c.ts<10800000)){wxData=c.d;wxErr=false;wxData._cached=true}
-      else{wxErr=true;wxData=null}
-    }catch(e2){wxErr=true;wxData=null}
+    if(retries<2){setTimeout(()=>loadWx(retries+1),5000);return}
+    // If no cached data at all, show error
+    if(!wxData){wxErr=true}
   }
   render();
   if(wxData){
@@ -594,7 +593,7 @@ function wxHtml(){
   const d=wxData,wk=t("wk"),desc=lang==="zh"?WXZ:WXD;
   const fc=d.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();
     return`<div class="wx-day${i===0?' today':''}"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div class="wx-day-icon">${WXI[f.code]||"🌡"}</div><div class="wx-day-hi">${f.hi}°</div><div class="wx-day-lo">${f.lo}°</div></div>`}).join("");
-  return`<div class="wx-card fi" onclick="showWxDetail()" style="cursor:pointer"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"7日天氣預報 ▸":"Prakiraan 7 Hari ▸"}</div></div><div class="wx-fc">${fc}</div></div>${tideHtml()}`}
+  return`<div class="wx-card fi" onclick="showWxDetail()" style="cursor:pointer"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"7日天氣預報 ▸":"Prakiraan 7 Hari ▸"}</div></div><div class="wx-fc">${fc}</div></div>${tideHtml()}`}
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 loadWx();
 setInterval(()=>{loadWx()},1800000);
@@ -2152,4 +2151,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v103')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v104')caches.delete(n)})})}
