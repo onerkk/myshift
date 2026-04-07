@@ -478,7 +478,7 @@ function handle(e){
     case "alh":{const{y,m,d}=S.modal;const sel=document.getElementById("alSel");if(sel)ALD[ek(y,m,d)]=parseFloat(sel.value);sAL();return}
     case "inst":if(DP){DP.prompt();DP.userChoice.then(()=>{DP=null;render()})}break;
     case "hideI":S.instH=true;break;
-    case "wxR":wxErr=false;wxData=null;render();loadWx();return;
+    case "wxR":wxErr=false;wxData=null;try{localStorage.removeItem('_wxPos')}catch(e){}render();loadWx();return;
   }
   render();
 }
@@ -515,21 +515,28 @@ async function loadWx(retries){
   retries=retries||0;
   try{
     let lat,lon;
-    // Try cached position first for speed
-    const cached=sessionStorage.getItem('_wxPos');
-    if(cached){const c=JSON.parse(cached);lat=c.lat;lon=c.lon}
-    else{
-      const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:10000,maximumAge:1800000})});
-      lat=pos.coords.latitude.toFixed(2);lon=pos.coords.longitude.toFixed(2);
-      try{sessionStorage.setItem('_wxPos',JSON.stringify({lat,lon}))}catch(e){}
+    // Try localStorage cached position first
+    try{const c=JSON.parse(localStorage.getItem('_wxPos'));if(c&&c.lat&&c.lon){lat=c.lat;lon=c.lon}}catch(e){}
+    if(!lat){
+      try{
+        const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:8000,maximumAge:3600000})});
+        lat=pos.coords.latitude.toFixed(2);lon=pos.coords.longitude.toFixed(2);
+        try{localStorage.setItem('_wxPos',JSON.stringify({lat,lon}))}catch(e){}
+      }catch(e){
+        // Geolocation failed — use fallback (台南鹽水)
+        lat="23.32";lon="120.27";
+      }
     }
     const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability,temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&timezone=auto&forecast_days=7`;
-    const resp=await Promise.race([fetch(url),new Promise((_,r)=>setTimeout(()=>r('timeout'),12000))]);
+    const resp=await Promise.race([fetch(url),new Promise((_,r)=>setTimeout(()=>r('timeout'),10000))]);
+    if(!resp.ok)throw new Error('API error');
     const data=await resp.json();
     wxData={temp:Math.round(data.current.temperature_2m),code:data.current.weather_code,lat:lat,lon:lon,
       days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])})),
       hTime:data.hourly.time,hPrec:data.hourly.precipitation_probability,hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m};
     wxErr=false;
+    // Cache successful weather data
+    try{localStorage.setItem('_wxCache',JSON.stringify({ts:Date.now(),d:wxData}))}catch(e){}
     // Tide via Cloudflare Worker proxy → CWA API
     try{
       const tResp=await Promise.race([fetch('https://cwa-tide.onerkk.workers.dev'),new Promise((_,r)=>setTimeout(()=>r("timeout"),10000))]);
@@ -551,7 +558,12 @@ async function loadWx(retries){
     }catch(e){tideData=null;tideErr=true}
   }catch(e){
     if(retries<2){setTimeout(()=>loadWx(retries+1),3000);return}
-    wxErr=true;wxData=null
+    // Try restore from cache (valid for 3 hours)
+    try{
+      const c=JSON.parse(localStorage.getItem('_wxCache'));
+      if(c&&c.d&&(Date.now()-c.ts<10800000)){wxData=c.d;wxErr=false;wxData._cached=true}
+      else{wxErr=true;wxData=null}
+    }catch(e2){wxErr=true;wxData=null}
   }
   render();
   if(wxData){
@@ -577,14 +589,15 @@ function rainWarnHtml(){
   return`<div class="rain-warn fi" style="margin:4px 0;padding:7px 10px;background:${bg};border-left:3px solid ${bc};border-radius:3px;font-size:10px;font-weight:600;color:${tc}">${tip}</div>`
 }
 function wxHtml(){
-  if(wxErr)return`<div class="wx-card fi"><div class="wx-err">🌡️ <button data-a="wxR">${lang==="zh"?"載入天氣":"Muat Cuaca"}</button></div></div>`;
+  if(wxErr)return`<div class="wx-card fi"><div class="wx-err" style="text-align:center;padding:12px">🌡️ ${lang==="zh"?"天氣載入失敗":"Gagal muat cuaca"}<br><button data-a="wxR" style="margin-top:8px;padding:6px 16px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">${lang==="zh"?"重新載入":"Muat Ulang"}</button></div></div>`;
   if(!wxData)return`<div class="wx-card fi"><div class="wx-loading">🌡️ ${lang==="zh"?"載入天氣中...":"Memuat cuaca..."}</div></div>`;
   const d=wxData,wk=t("wk"),desc=lang==="zh"?WXZ:WXD;
   const fc=d.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();
     return`<div class="wx-day${i===0?' today':''}"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div class="wx-day-icon">${WXI[f.code]||"🌡"}</div><div class="wx-day-hi">${f.hi}°</div><div class="wx-day-lo">${f.lo}°</div></div>`}).join("");
   return`<div class="wx-card fi" onclick="showWxDetail()" style="cursor:pointer"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"7日天氣預報 ▸":"Prakiraan 7 Hari ▸"}</div></div><div class="wx-fc">${fc}</div></div>${tideHtml()}`}
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
-if(navigator.geolocation)loadWx();else WxFx.update(null,0,0,0);
+loadWx();
+setInterval(()=>{loadWx()},1800000);
 loadAdminEv();
 
 
@@ -2139,4 +2152,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v101')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v103')caches.delete(n)})})}
