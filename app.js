@@ -244,7 +244,7 @@ function _doRender(){
   if(S.step==="type")a.innerHTML=rType();
   else if(S.step==="wiz")a.innerHTML=rWiz();
   else a.innerHTML=rCal();
-  document.getElementById("mr").innerHTML=showAdmin?adminPanelHtml():wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():"";
+  document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():"";
   document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
   if(document.getElementById("leaveTypeSel"))try{updateLeaveHours()}catch(e){}
 }
@@ -520,7 +520,7 @@ function rHelp(){
     <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:700;color:var(--tx)">🏭 ${isZh?"切換單位":"Ganti Unit"}</label><div style="display:flex;gap:6px;margin-top:6px"><select id="unitChg" style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;font-weight:600"><option value="">${isZh?"-- 無 --":"-- None --"}</option>${isAdmin()?`<option value="__all"${S.unit==="__all"?" selected":""}>${isZh?"全部單位":"Semua Unit"}</option>`:""}
 ${getUnits().map(u=>`<option value="${u}"${S.unit===u?' selected':''}>${u}</option>`).join('')}</select><button data-a="chUnit" style="padding:8px 14px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">${isZh?"確認":"OK"}</button></div></div>
     <button class="modal-done" data-a="closeH">${t("done")}</button>
-    ${isAdmin()?`<button class="modal-done" onclick="showAdmin=true;S.showH=false;render()" style="background:#1565c0;margin-top:6px">${isZh?"⚙️ 管理員後台":"⚙️ Admin Panel"}</button>`:""}
+    
     <button class="modal-done" data-a="reset" style="background:var(--red);margin-top:6px">${isZh?"⚠️ 重新設定班表":"⚠️ Reset Jadwal"}</button>
   </div></div></div>`}
 
@@ -604,7 +604,7 @@ function handle(e){
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();break;
     case "today":S.yr=TY;S.mo=TM;break;
     case "chUnit":{if(S.lockedUnit){alert(lang==="zh"?"單位已被管理員鎖定，無法更改":"Unit dikunci oleh admin");break}const sel=document.getElementById("unitChg");if(sel){S.unit=sel.value;sv();loadLeaves();render()}}break;
-    case "reset":S.step="wiz";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){fbDb.collection("users").doc(fbUser.uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}).catch(()=>{})}break;
+    case "reset":S.step="type";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){fbDb.collection("users").doc(fbUser.uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}).catch(()=>{})}break;
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
     case "help":S.showH=true;break;
@@ -631,7 +631,7 @@ try{render();}catch(e){document.getElementById("app").innerHTML="<div style='pad
 (function(){
   let sx=0,sy=0,swiping=false;
   document.addEventListener("touchstart",e=>{
-    if(S.step!=="cal"||S.modal||S.showH||showAdmin||wxDetailShow||tideDetailShow)return;
+    if(S.step!=="cal"||S.modal||S.showH||wxDetailShow||tideDetailShow)return;
     sx=e.touches[0].clientX;sy=e.touches[0].clientY;swiping=true;
   },{passive:true});
   document.addEventListener("touchend",e=>{
@@ -2294,4 +2294,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v111')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v112')caches.delete(n)})})}
