@@ -1,4 +1,536 @@
-<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="theme-color" content="#00897b"><link rel="manifest" href="./manifest.json"><link rel="apple-touch-icon" href="./icons/icon-apple.png"><title>My Shift</title><link rel="stylesheet" href="./styles.css?v=124"><script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-</head><body><div id="splash"><img src="./images/splash-bg.jpg"><h1>我的班表</h1><p>My Shift</p></div><div id="app"></div><div id="mr"></div><script src="./app.js?v=124"></script></body></html>
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f0f1a">
+<title>我的班表 管理後台</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f0f1a;--bg2:#1a1a2e;--bg3:#252540;--bg4:#2f2f50;
+  --tx:#e8e8f0;--tx2:#9999b8;--tx3:#666680;
+  --pri:#7c5cfc;--pri-l:#9b80ff;--pri-d:#5a3fd9;
+  --green:#34d399;--red:#f87171;--amber:#fbbf24;--blue:#60a5fa;--pink:#f472b6;--teal:#2dd4bf;
+  --r:14px;--sh:0 4px 20px rgba(0,0,0,.4);
+  --grad:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+}
+html,body{height:100%;font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--tx);-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+.app{min-height:100vh;display:flex;flex-direction:column}
+
+/* Header */
+.header{background:var(--grad);padding:20px 16px 16px;position:sticky;top:0;z-index:100}
+.header h1{font-size:18px;font-weight:900;display:flex;align-items:center;gap:8px}
+.header h1 img{width:28px;height:28px;border-radius:8px}
+.header .badge{background:rgba(255,255,255,.2);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-left:auto}
+.header .user{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:rgba(255,255,255,.8)}
+.header .user img{width:24px;height:24px;border-radius:50%}
+.header .user button{margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer}
+
+/* Tabs */
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--bg3);position:sticky;top:76px;z-index:99;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:12px 16px;font-size:13px;font-weight:600;color:var(--tx3);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s}
+.tab.active{color:var(--pri-l);border-bottom-color:var(--pri)}
+
+/* Content */
+.content{flex:1;padding:16px}
+.section{display:none}
+.section.active{display:block}
+
+/* Cards */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--r);padding:16px 12px;text-align:center}
+.stat-card .val{font-size:28px;font-weight:900;color:var(--pri-l)}
+.stat-card .val.green{color:var(--green)}
+.stat-card .val.amber{color:var(--amber)}
+.stat-card .val.blue{color:var(--blue)}
+.stat-card .val.pink{color:var(--pink)}
+.stat-card .val.teal{color:var(--teal)}
+.stat-card .lbl{font-size:11px;color:var(--tx2);margin-top:4px}
+
+.card{background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.card h3{font-size:14px;font-weight:700;margin-bottom:10px}
+.card-row{display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg3);border-radius:8px;margin-bottom:6px}
+.card-row .name{flex:1;font-size:13px;font-weight:600}
+.card-row .sub{font-size:11px;color:var(--tx2)}
+.card-row .tag{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700}
+.del-btn{background:var(--red);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer}
+.add-btn{background:var(--pri);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-top:8px}
+.add-btn:active{opacity:.8}
+
+/* Form inputs */
+.input{width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--bg4);border-radius:8px;color:var(--tx);font-size:13px;font-family:inherit}
+.input:focus{outline:none;border-color:var(--pri)}
+.input::placeholder{color:var(--tx3)}
+select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239999b8' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.form-row{display:flex;gap:8px;margin-bottom:8px}
+.form-row .input{flex:1}
+.form-label{font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px;display:block}
+
+/* Leave records */
+.leave-row{display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:6px}
+.leave-row .dot{width:4px;height:32px;border-radius:2px}
+.leave-row .info{flex:1}
+.leave-row .info .top{font-size:13px;font-weight:600}
+.leave-row .info .bot{font-size:10px;color:var(--tx2);margin-top:2px}
+
+/* Login screen */
+.login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:30px}
+.login-screen img{width:80px;height:80px;border-radius:20px;margin-bottom:16px}
+.login-screen h1{font-size:22px;font-weight:900;margin-bottom:6px}
+.login-screen p{font-size:13px;color:var(--tx2);margin-bottom:30px}
+.login-btn{background:#fff;border:none;padding:14px 28px;border-radius:12px;font-size:14px;font-weight:700;color:#333;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:var(--sh)}
+.login-btn img{width:22px;height:22px}
+
+/* Loading */
+.loading{display:flex;align-items:center;justify-content:center;min-height:200px;color:var(--tx3)}
+.spinner{width:32px;height:32px;border:3px solid var(--bg3);border-top-color:var(--pri);border-radius:50%;animation:spin .8s linear infinite;margin-right:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Empty state */
+.empty{text-align:center;padding:40px 20px;color:var(--tx3);font-size:13px}
+
+/* Toast */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;z-index:999;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+
+/* PWA install */
+.install-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bg3);padding:12px 16px;display:none;align-items:center;gap:10px;z-index:200}
+.install-bar button{background:var(--pri);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-left:auto}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({apiKey:"AIzaSyBKgqmsDIZgqf8nxWTDdTqVS01H0TIOCj4",authDomain:"myshift-a67f1.firebaseapp.com",projectId:"myshift-a67f1"});
+const auth=firebase.auth(),db=firebase.firestore();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+// ═══ STATE ═══
+const SUPER_ADMIN=["onerkk@gmail.com"];
+let user=null,tab="overview",cfg={units:[],leaveTypes:[],admins:[]},allLeaves=[],allUsers=[];
+
+// ═══ AUTH ═══
+let _authReady=false,_redirectDone=false;
+auth.getRedirectResult().then(r=>{_redirectDone=true;if(r&&r.user){}}).catch(()=>{_redirectDone=true});
+auth.onAuthStateChanged(async u=>{
+  user=u;
+  if(!u&&!_redirectDone)return;
+  _authReady=true;
+  if(u&&SUPER_ADMIN.includes(u.email)){await loadAll()}
+  render();
+});
+setTimeout(()=>{_redirectDone=true;_authReady=true;render()},4000);
+
+function login(){
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{
+    if(e.code==='auth/popup-closed-by-user'||e.code==='auth/popup-blocked'||e.code==='auth/cancelled-popup-request'){
+      auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+    }
+  });
+}
+function logout(){auth.signOut()}
+
+// ═══ DATA ═══
+async function loadAll(){
+  await loadConfig();
+  await loadLeaves();
+  await loadUsers();
+}
+
+async function loadConfig(){
+  try{
+    const doc=await db.collection("config").doc("app").get();
+    if(doc.exists){
+      const d=doc.data();
+      cfg.units=d.units||[];
+      cfg.leaveTypes=d.leaveTypes||[];
+      cfg.rotations=d.rotations||[];
+      cfg.admins=d.admins||[];
+    }
+  }catch(e){console.log("loadConfig err",e)}
+}
+
+async function saveConfig(){
+  try{
+    await db.collection("config").doc("app").set({rotations:cfg.rotations||[],
+      units:cfg.units,
+      leaveTypes:cfg.leaveTypes,
+      admins:cfg.admins,
+      ts:firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true});
+    toast("已儲存");
+  }catch(e){console.log("saveConfig err",e);toast("儲存失敗")}
+}
+
+async function loadLeaves(){
+  try{
+    const now=new Date();
+    const ym=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+    const snap=await db.collection("leaves").where("ym","==",ym).get();
+    allLeaves=[];
+    snap.forEach(doc=>{const d=doc.data();d._id=doc.id;allLeaves.push(d)});
+    allLeaves.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  }catch(e){console.log("loadLeaves err",e)}
+}
+
+async function loadUsers(){
+  try{
+    const snap=await db.collection("users").get();
+    allUsers=[];
+    snap.forEach(doc=>{const d=doc.data();d._uid=doc.id;allUsers.push(d)});
+    // Build name map from leaves (leaves have uid+name)
+    const nameMap={};
+    allLeaves.forEach(l=>{if(l.uid&&l.name&&!l.uid.startsWith("admin_"))nameMap[l.uid]=l.name});
+    // Also try from all months (broader search)
+    try{
+      const lSnap=await db.collection("leaves").limit(200).get();
+      lSnap.forEach(doc=>{const d=doc.data();if(d.uid&&d.name&&!d.uid.startsWith("admin_"))nameMap[d.uid]=d.name});
+    }catch(e){}
+    // Merge names into users
+    allUsers.forEach(u=>{
+      if(!u.displayName&&nameMap[u._uid])u.displayName=nameMap[u._uid];
+    });
+    allUsers.sort((a,b)=>(a.unit||"").localeCompare(b.unit||""));
+  }catch(e){console.log("loadUsers err",e)}
+}
+
+async function setUserUnit(uid,unit){
+  try{await db.collection("users").doc(uid).set({unit:unit,lockedUnit:unit},{merge:true});toast("已鎖定單位");await loadUsers();render()}catch(e){toast("設定失敗")}
+}
+async function unlockUser(uid){
+  try{await db.collection("users").doc(uid).set({lockedUnit:""},{merge:true});toast("已解鎖");await loadUsers();render()}catch(e){toast("解鎖失敗")}
+}
+async function setUserRt(uid,rt){
+  if(!rt){toast("請選擇輪班規則");return}
+  try{await db.collection("users").doc(uid).set({rt:rt,lockedRt:rt},{merge:true});toast("已鎖定輪班");await loadUsers();render()}catch(e){toast("設定失敗")}
+}
+async function unlockUserRt(uid){
+  try{await db.collection("users").doc(uid).set({lockedRt:""},{merge:true});toast("已解鎖輪班");await loadUsers();render()}catch(e){toast("解鎖失敗")}
+}
+async function removeUser(uid){
+  if(!confirm("確定刪除此使用者資料？"))return;
+  try{await db.collection("users").doc(uid).delete();toast("已刪除");await loadUsers();render()}catch(e){toast("刪除失敗")}
+}
+
+async function delLeave(id){
+  if(!confirm("確定刪除此筆請假？"))return;
+  try{await db.collection("leaves").doc(id).delete();await loadLeaves();render();toast("已刪除")}catch(e){toast("刪除失敗")}
+}
+
+// ═══ UNIT MANAGEMENT ═══
+function addUnit(){
+  const el=document.getElementById("newUnit");
+  if(!el||!el.value.trim())return;
+  cfg.units.push(el.value.trim());
+  saveConfig().then(()=>{render()});
+}
+function delUnit(i){
+  if(!confirm("確定刪除「"+cfg.units[i]+"」？"))return;
+  cfg.units.splice(i,1);
+  saveConfig().then(()=>{render()});
+}
+
+// ═══ LEAVE TYPE MANAGEMENT ═══
+function addLT(){
+  const n=document.getElementById("ltName"),s=document.getElementById("ltStep"),c=document.getElementById("ltColor");
+  if(!n||!n.value.trim())return;
+  const id=n.value.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,"").substring(0,20)||("lt_"+Date.now());
+  cfg.leaveTypes.push({id,name:n.value.trim(),nameId:n.value.trim(),step:parseFloat(s?s.value:1),color:c?c.value:"#607d8b"});
+  saveConfig().then(()=>{render()});
+}
+function delLT(i){
+  if(!confirm("確定刪除「"+cfg.leaveTypes[i].name+"」？"))return;
+  cfg.leaveTypes.splice(i,1);
+  saveConfig().then(()=>{render()});
+}
+
+// ═══ ADMIN MANAGEMENT ═══
+function addAdmin(){
+  const email=document.getElementById("adminEmail"),unit=document.getElementById("adminUnit"),name=document.getElementById("adminName");
+  if(!email||!email.value.trim())return;
+  cfg.admins.push({email:email.value.trim(),unit:unit?unit.value:"",name:name?name.value.trim():""});
+  saveConfig().then(()=>{render()});
+}
+function delAdmin(i){
+  if(!confirm("確定移除管理員「"+(cfg.admins[i].name||cfg.admins[i].email)+"」？"))return;
+  cfg.admins.splice(i,1);
+  saveConfig().then(()=>{render()});
+}
+
+// ═══ TOAST ═══
+function toast(msg){
+  const t=document.getElementById("toast");
+  if(!t)return;
+  t.textContent=msg;t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),2000);
+}
+
+// ═══ RENDER ═══
+function render(){
+  const root=document.getElementById("root");
+  if(!user||!SUPER_ADMIN.includes(user.email)){
+    root.innerHTML=renderLogin();return;
+  }
+  root.innerHTML=renderApp();
+  if(deferredPrompt){const bar=document.getElementById("installBar");if(bar)bar.style.display="flex"}
+  document.querySelectorAll(".tab").forEach(t=>{
+    t.onclick=()=>{tab=t.dataset.tab;render()};
+  });
+}
+
+function renderLogin(){
+  if(!_authReady)return`<div class="login-screen"><div class="spinner"></div><span style="color:var(--tx2)">載入中...</span></div>`;
+  return`<div class="login-screen">
+    <img src="./icon-192.png" onerror="this.style.display='none'">
+    <h1>🔐 管理後台</h1>
+    <p>僅限超級管理員登入</p>
+    <button class="login-btn" onclick="login()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg">Google 登入
+    </button>
+  </div>`;
+}
+
+function renderApp(){
+  const tabs=["overview","users","rotations","units","leaveTypes","admins","leaves"];
+  const tabNames=["總覽","使用者","輪班規則","單位管理","假別管理","管理員","請假記錄"];
+  const pic=user.photoURL?`<img src="${user.photoURL}" referrerpolicy="no-referrer">`:"";
+
+  return`<div class="app">
+    <div class="header">
+      <h1><img src="./icon-192.png" onerror="this.style.display='none'">我的班表 管理後台<span class="badge">ADMIN</span></h1>
+      <div class="user">${pic}<span>${user.displayName||user.email}</span><button onclick="logout()">登出</button></div>
+    </div>
+    <div class="tabs">${tabs.map((t,i)=>`<div class="tab${tab===t?' active':''}" data-tab="${t}">${tabNames[i]}</div>`).join("")}</div>
+    <div class="content">
+      <div class="section${tab==='overview'?' active':''}">${renderOverview()}</div>
+      <div class="section${tab==='users'?' active':''}">${renderUsers()}</div>
+      <div class="section${tab==='rotations'?' active':''}">${renderRotations()}</div>
+      <div class="section${tab==='units'?' active':''}">${renderUnits()}</div>
+      <div class="section${tab==='leaveTypes'?' active':''}">${renderLeaveTypes()}</div>
+      <div class="section${tab==='admins'?' active':''}">${renderAdmins()}</div>
+      <div class="section${tab==='leaves'?' active':''}">${renderLeaves()}</div>
+    </div>
+    <div id="toast" class="toast"></div>
+    <div id="installBar" class="install-bar"><span>📲 安裝管理後台到桌面</span><button onclick="installPWA()">安裝</button></div>
+  </div>`;
+}
+
+function renderOverview(){
+  const realLeaves=allLeaves.filter(l=>!l.uid.startsWith("admin_"));
+  const unitCounts={};
+  realLeaves.forEach(l=>{const u=l.unit||"未設定";unitCounts[u]=(unitCounts[u]||0)+1});
+  const totalHours=realLeaves.reduce((s,l)=>s+(l.hours||0),0);
+  const userUnits={};
+  allUsers.forEach(u=>{const un=u.unit||"未設定";userUnits[un]=(userUnits[un]||0)+1});
+
+  return`<div class="grid">
+    <div class="stat-card"><div class="val">${cfg.units.length}</div><div class="lbl">🏭 單位數</div></div>
+    <div class="stat-card"><div class="val green">${cfg.leaveTypes.length}</div><div class="lbl">📋 假別數</div></div>
+    <div class="stat-card"><div class="val amber">${cfg.admins.length}</div><div class="lbl">👑 管理員</div></div>
+    <div class="stat-card"><div class="val blue">${allUsers.length}</div><div class="lbl">👤 使用者</div></div>
+    <div class="stat-card"><div class="val pink">${realLeaves.length}</div><div class="lbl">📋 本月請假</div></div>
+    <div class="stat-card"><div class="val teal">${totalHours}h</div><div class="lbl">⏱ 請假時數</div></div>
+  </div>
+  <div class="card"><h3>👥 各單位人數</h3>
+    ${Object.entries(userUnits).map(([u,c])=>`<div class="card-row"><span class="name">${u}</span><span class="tag" style="background:var(--blue);color:#fff">${c} 人</span></div>`).join("")}
+  </div>
+  <div class="card"><h3>📊 各單位本月請假</h3>
+    ${Object.entries(unitCounts).length?Object.entries(unitCounts).map(([u,c])=>`<div class="card-row"><span class="name">${u}</span><span class="tag" style="background:var(--pri);color:#fff">${c} 筆</span></div>`).join(""):`<div class="empty">本月尚無請假記錄</div>`}
+  </div>
+  <button class="add-btn" onclick="loadAll().then(()=>render())">🔄 重新載入</button>`;
+}
+
+let editingCycle=["早","早","早","早","休","休","晚","晚","晚","晚","休","休"];
+const SHIFT_TYPES=["早","中","晚","休"];
+const SHIFT_COLORS={"早":"#ff9800","中":"#9c27b0","晚":"#2196f3","休":"#4caf50"};
+
+function renderRotations(){
+  const rots=cfg.rotations||[];
+  return`<div class="card"><h3>🔄 輪班規則 (${rots.length})</h3>
+    ${rots.map((rot,i)=>{
+      const cycleVis=rot.cycle.map(s=>`<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:4px;font-size:10px;font-weight:700;color:#fff;background:${SHIFT_COLORS[s]||'#999'};margin:1px">${s}</span>`).join('');
+      return`<div class="card-row" style="flex-wrap:wrap">
+        <div class="info"><div class="top">${rot.name} </div><div class="bot">${rot.hours}h/班 · ${rot.cycle.length}天循環</div></div>
+        <button class="del-btn" onclick="delRotation(${i})">刪除</button>
+        <div style="width:100%;margin-top:6px;overflow-x:auto;white-space:nowrap">${cycleVis}</div>
+      </div>`}).join('')}
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bg4)">
+      <label class="form-label">新增輪班規則</label>
+      <div class="form-row"><input id="rotName" class="input" placeholder="中文名稱（如：做4休2）"></div>
+      <div class="form-row">
+        <select id="rotHours" class="input"><option value="12">12小時/班</option><option value="8">8小時/班</option></select>
+        <select id="rotLen" class="input" onchange="resizeCycle(+this.value)">
+          ${[4,6,8,10,12,14,16,18,20,24,28,30,36,39,42].map(n=>`<option value="${n}"${n===12?' selected':''}>${n}天</option>`).join('')}
+        </select>
+      </div>
+      <label class="form-label" style="margin-top:8px">點擊每格切換班別（🟠早 🟣中 🔵晚 🟢休）</label>
+      <div id="cycleEditor" style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0">
+        ${editingCycle.map((s,i)=>`<button onclick="toggleCycleDay(${i})" style="width:36px;height:36px;border:none;border-radius:6px;font-size:13px;font-weight:700;color:#fff;background:${SHIFT_COLORS[s]||'#999'};cursor:pointer">${s}</button>`).join('')}
+      </div>
+      <button class="add-btn" onclick="addRotation()">＋ 新增輪班規則</button>
+    </div>
+  </div>`;
+}
+
+function toggleCycleDay(i){
+  const cur=editingCycle[i];
+  const idx=SHIFT_TYPES.indexOf(cur);
+  editingCycle[i]=SHIFT_TYPES[(idx+1)%SHIFT_TYPES.length];
+  render();
+}
+function resizeCycle(len){
+  while(editingCycle.length<len)editingCycle.push("休");
+  editingCycle.length=len;
+  render();
+}
+function addRotation(){
+  const n=document.getElementById("rotName"),h=document.getElementById("rotHours");
+  if(!n||!n.value.trim()){toast("請輸入名稱");return}
+  const id=n.value.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,"_").substring(0,20)||("rot_"+Date.now());
+  if(!cfg.rotations)cfg.rotations=[];
+  cfg.rotations.push({id,name:n.value.trim(),nameId:n.value.trim(),hours:parseInt(h?h.value:12),cycle:[...editingCycle]});
+  saveConfig().then(()=>{editingCycle=["早","早","早","早","休","休","晚","晚","晚","晚","休","休"];render()});
+}
+function delRotation(i){
+  if(!confirm("確定刪除「"+(cfg.rotations[i]?.name||"")+"」？"))return;
+  cfg.rotations.splice(i,1);
+  saveConfig().then(()=>render());
+}
+
+function renderUsers(){
+  return`<div class="card"><h3>👤 使用者白名單 (${allUsers.length})</h3>
+    ${allUsers.length?allUsers.map(u=>{
+      const locked=u.lockedUnit?true:false;
+      const rotMatch=cfg.rotations.find(r=>r.id===u.rt||r.name===u.rt||r.nameId===u.rt);
+      const rt=u.rt?(rotMatch?rotMatch.name:({"2on2off":"做2休2","4on2off":"做4休2","5on_mixed":"做5休1+2"}[u.rt]||u.rt)):"未設定";
+      const uName=u.displayName||u.email||u._uid.substring(0,10)+"...";
+      const lockedRt=u.lockedRt?true:false;
+      return`<div class="card-row" style="flex-wrap:wrap">
+        <div class="info" style="min-width:60%"><div class="top">${uName}</div><div class="bot">${rt} · ${u.unit||"未選擇單位"}${locked?' 🔒':''}${lockedRt?' 🔄':''}</div></div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;width:100%">
+          <select id="uUnit_${u._uid}" class="input" style="flex:1;padding:6px;font-size:11px">
+            <option value="">-- 選擇單位 --</option>
+            ${cfg.units.map(un=>`<option value="${un}"${u.unit===un||u.lockedUnit===un?' selected':''}>${un}</option>`).join('')}
+          </select>
+          <button onclick="setUserUnit('${u._uid}',document.getElementById('uUnit_${u._uid}').value)" style="background:var(--pri);color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔒鎖定</button>
+          ${locked?`<button onclick="unlockUser('${u._uid}')" style="background:var(--amber);color:#000;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔓解鎖</button>`:''}
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;width:100%">
+          <select id="uRt_${u._uid}" class="input" style="flex:1;padding:6px;font-size:11px">
+            <option value="">-- 選擇輪班 --</option>
+            ${(cfg.rotations||[]).map(r=>`<option value="${r.id}"${u.rt===r.id||u.lockedRt===r.id?' selected':''}>${r.name}</option>`).join('')}
+          </select>
+          <button onclick="setUserRt('${u._uid}',document.getElementById('uRt_${u._uid}').value)" style="background:var(--teal);color:#000;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔒輪班</button>
+          ${lockedRt?`<button onclick="unlockUserRt('${u._uid}')" style="background:var(--amber);color:#000;border:none;padding:6px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔓解鎖</button>`:''}
+        </div>
+      </div>`}).join(""):`<div class="empty">尚無使用者</div>`}
+    <button class="add-btn" onclick="loadUsers().then(()=>render())">🔄 重新載入</button>
+  </div>`;
+}
+
+function renderUnits(){
+  return`<div class="card"><h3>🏭 單位列表 (${cfg.units.length})</h3>
+    ${cfg.units.map((u,i)=>`<div class="card-row"><span class="name">${u}</span><button class="del-btn" onclick="delUnit(${i})">刪除</button></div>`).join("")}
+    <div style="margin-top:12px">
+      <label class="form-label">新增單位</label>
+      <div class="form-row"><input id="newUnit" class="input" placeholder="輸入單位名稱"><button class="del-btn" style="background:var(--pri);padding:10px 16px" onclick="addUnit()">＋新增</button></div>
+    </div>
+  </div>`;
+}
+
+function renderLeaveTypes(){
+  return`<div class="card"><h3>📋 假別列表 (${cfg.leaveTypes.length})</h3>
+    ${cfg.leaveTypes.map((lt,i)=>`<div class="card-row">
+      <div class="dot" style="background:${lt.color}"></div>
+      <div class="info"><div class="top">${lt.name}</div><div class="bot">每次 ${lt.step}h</div></div>
+      <button class="del-btn" onclick="delLT(${i})">刪除</button>
+    </div>`).join("")}
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bg4)">
+      <label class="form-label">新增假別</label>
+      <div class="form-row"><input id="ltName" class="input" placeholder="中文名稱"></div>
+      <div class="form-row">
+        <select id="ltStep" class="input"><option value="0.5">0.5h 計算</option><option value="1" selected>1h 計算</option></select>
+        <input id="ltColor" type="color" value="#607d8b" style="width:50px;height:40px;border:none;border-radius:8px;cursor:pointer">
+      </div>
+      <button class="add-btn" onclick="addLT()">＋ 新增假別</button>
+    </div>
+  </div>`;
+}
+
+function renderAdmins(){
+  return`<div class="card"><h3>👑 超級管理員</h3>
+    ${SUPER_ADMIN.map(e=>`<div class="card-row"><span class="name">🔐 ${e}</span><span class="tag" style="background:var(--amber);color:#000">SUPER</span></div>`).join("")}
+  </div>
+  <div class="card"><h3>📋 單位管理員 (${cfg.admins.length})</h3>
+    ${cfg.admins.length?cfg.admins.map((a,i)=>`<div class="card-row">
+      <div class="info"><div class="top">${a.name||a.email}</div><div class="bot">${a.email} · ${a.unit||"全部單位"}</div></div>
+      <button class="del-btn" onclick="delAdmin(${i})">移除</button>
+    </div>`).join(""):`<div class="empty">尚無單位管理員</div>`}
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bg4)">
+      <label class="form-label">新增管理員</label>
+      <div class="form-row"><input id="adminName" class="input" placeholder="姓名"><input id="adminEmail" class="input" placeholder="Google Email 帳號"></div>
+      <select id="adminUnit" class="input" style="margin-bottom:8px">
+        <option value="">全部單位</option>
+        ${cfg.units.map(u=>`<option value="${u}">${u}</option>`).join("")}
+      </select>
+      <button class="add-btn" onclick="addAdmin()">＋ 新增管理員</button>
+    </div>
+  </div>`;
+}
+
+function renderLeaves(){
+  const realLeaves=allLeaves.filter(l=>!l.uid.startsWith("admin_"));
+  return`<div class="card"><h3>📋 本月請假記錄 (${realLeaves.length})</h3>
+    ${realLeaves.length?realLeaves.map(l=>{
+      const lt=cfg.leaveTypes.find(t=>t.id===l.leaveType);
+      const color=lt?lt.color:"#999";
+      const ltName=lt?lt.name:(l.leaveType||"請假");
+      let ts="";
+      if(l.ts&&l.ts.toDate){const d=l.ts.toDate();ts=`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
+      const hrsStr=l.hours?(' '+l.hours+'h'):'';
+      return`<div class="leave-row">
+        <div class="dot" style="background:${color}"></div>
+        <div class="info"><div class="top">${l.name} — ${ltName}${hrsStr}</div><div class="bot">${l.date} · ${l.unit||"未設定"} · 申請：${ts}</div></div>
+        <button class="del-btn" onclick="delLeave('${l._id}')">刪除</button>
+      </div>`
+    }).join(""):`<div class="empty">本月尚無請假記錄</div>`}
+    <button class="add-btn" onclick="loadLeaves().then(()=>render())">🔄 重新載入</button>
+  </div>`;
+}
+
+// ═══ PWA INSTALL ═══
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;
+  const bar=document.getElementById("installBar");if(bar)bar.style.display="flex";
+});
+function installPWA(){
+  if(!deferredPrompt)return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(r=>{
+    if(r.outcome==='accepted'){const bar=document.getElementById("installBar");if(bar)bar.style.display="none"}
+    deferredPrompt=null;
+  });
+}
+
+// ═══ PWA SERVICE WORKER ═══
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+// ═══ INIT ═══
+render();
+</script>
+</body>
+</html>
