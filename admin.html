@@ -122,18 +122,22 @@ const SUPER_ADMIN=["onerkk@gmail.com"];
 let user=null,tab="overview",cfg={units:[],leaveTypes:[],admins:[]},allLeaves=[],allUsers=[];
 
 // ═══ AUTH ═══
-let _authReady=false;
+let _authReady=false,_redirectDone=false;
+auth.getRedirectResult().then(r=>{_redirectDone=true;if(r&&r.user){}}).catch(()=>{_redirectDone=true});
 auth.onAuthStateChanged(async u=>{
-  user=u;_authReady=true;
+  user=u;
+  if(!u&&!_redirectDone)return;
+  _authReady=true;
   if(u&&SUPER_ADMIN.includes(u.email)){await loadAll()}
   render();
 });
-setTimeout(()=>{if(!_authReady){_authReady=true;render()}},3000);
+setTimeout(()=>{_redirectDone=true;_authReady=true;render()},4000);
 
 function login(){
   auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{
-    console.log("login err",e.code);
-    alert("登入失敗："+e.message);
+    if(e.code==='auth/popup-closed-by-user'||e.code==='auth/popup-blocked'||e.code==='auth/cancelled-popup-request'){
+      auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+    }
   });
 }
 function logout(){auth.signOut()}
