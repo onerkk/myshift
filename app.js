@@ -77,9 +77,10 @@ let RN={zh:{"2on2off":"做2休2","4on2off":"做4休2","5on_mixed":"做5休1＋�
 let R={"2on2off":{h:12,c:["早","早","休","休","晚","晚","休","休"]},"4on2off":{h:12,c:["早","早","早","早","休","休","晚","晚","晚","晚","休","休"]},"5on_mixed":{h:8,c:["早","早","早","早","早","休","早","早","早","早","早","休","休","中","中","中","中","中","休","中","中","中","中","中","休","休","晚","晚","晚","晚","晚","休","晚","晚","晚","晚","晚","休","休"]}};
 function rebuildR(){
   if(!APP_CFG.rotations||!APP_CFG.rotations.length)return;
-  R={};RN={zh:{},id:{}};
+  // Keep existing defaults, add/override from config
   APP_CFG.rotations.forEach(rot=>{
     R[rot.id]={h:rot.hours,c:rot.cycle};
+    if(!RN.zh)RN.zh={};if(!RN.id)RN.id={};
     RN.zh[rot.id]=rot.name;
     RN.id[rot.id]=rot.nameId||rot.name;
   });
@@ -256,7 +257,7 @@ function rType(){
       <option value="">${lang==="zh"?"-- 請選擇 --":"-- Pilih --"}</option>${unitOpts}
     </select>
   </div>
-  ${APP_CFG.rotations.map((rot,i)=>`<button class="rcard fu d${(i%3)+1}" data-a="pick" data-k="${rot.id}"><div class="rcard-icon">${rot.cycle.filter(x=>x!=="休").length}:${rot.cycle.filter(x=>x==="休").length>2?Math.round(rot.cycle.filter(x=>x==="休").length/Math.max(1,rot.cycle.filter(x=>x!=="休").filter((x,j,a)=>j===0||a[j-1]==="休").length)):rot.cycle.filter(x=>x==="休").length}</div><div class="rcard-info"><div class="rcard-name">${lang==="zh"?rot.name:rot.nameId||rot.name}</div><div class="rcard-sub">${rot.hours}h · ${rot.cycle.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join("")}
+  ${Object.entries(R).map(([k,v],i)=>`<button class="rcard fu d${(i%3)+1}" data-a="pick" data-k="${k}"><div class="rcard-icon">${v.c.filter(x=>x!=="休").length>9?"":v.c.filter(x=>x!=="休").length}${v.c.filter(x=>x!=="休").length>9?k.substring(0,3):":"+v.c.filter(x=>x==="休").length}</div><div class="rcard-info"><div class="rcard-name">${RN[lang]&&RN[lang][k]||k}</div><div class="rcard-sub">${v.h}h · ${v.c.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join("")}
   <div class="al-setup fu d3"><h3>${t("alSetup")}</h3><div class="al-setup-hint" style="margin-bottom:8px;font-size:11px;color:var(--green);font-weight:600">${alYRange(curALY())}</div><div class="al-setup-row"><label>${t("alTotal")}</label><input type="number" id="alTI" value="${getAL().total||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-row"><label>${t("alUsed")}</label><input type="number" id="alUI" value="${getAL().used||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-hint">${t("alSkip")}</div></div>
   <div style="text-align:center;margin-top:14px"><span class="lang-tog" style="display:inline-flex;height:36px;border-color:#ddd"><button class="lt-btn${lang==='zh'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='zh'?'var(--pri-d)':'var(--tx3)'}" data-a="lzh">中文</button><button class="lt-btn${lang==='id'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='id'?'var(--pri-d)':'var(--tx3)'}" data-a="lid">ID</button></span></div></div>`;
 }
@@ -2293,4 +2294,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v110')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v111')caches.delete(n)})})}
