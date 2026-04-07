@@ -188,6 +188,18 @@ async function loadUsers(){
     const snap=await db.collection("users").get();
     allUsers=[];
     snap.forEach(doc=>{const d=doc.data();d._uid=doc.id;allUsers.push(d)});
+    // Build name map from leaves (leaves have uid+name)
+    const nameMap={};
+    allLeaves.forEach(l=>{if(l.uid&&l.name&&!l.uid.startsWith("admin_"))nameMap[l.uid]=l.name});
+    // Also try from all months (broader search)
+    try{
+      const lSnap=await db.collection("leaves").limit(200).get();
+      lSnap.forEach(doc=>{const d=doc.data();if(d.uid&&d.name&&!d.uid.startsWith("admin_"))nameMap[d.uid]=d.name});
+    }catch(e){}
+    // Merge names into users
+    allUsers.forEach(u=>{
+      if(!u.displayName&&nameMap[u._uid])u.displayName=nameMap[u._uid];
+    });
     allUsers.sort((a,b)=>(a.unit||"").localeCompare(b.unit||""));
   }catch(e){console.log("loadUsers err",e)}
 }
