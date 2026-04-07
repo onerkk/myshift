@@ -229,6 +229,7 @@ function _doRender(){
   else a.innerHTML=rCal();
   document.getElementById("mr").innerHTML=showAdmin?adminPanelHtml():wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():"";
   document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
+  if(document.getElementById("leaveTypeSel"))try{updateLeaveHours()}catch(e){}
 }
 
 function rType(){
@@ -310,7 +311,7 @@ function rMod(){
   const hasCust=ev.includes("custom");const custTxt=NOTES[ek(y,m,d)]||"";
   let custP="";if(hasCust){custP=`<div class="al-pick" style="border-color:var(--pri)"><label>📝 ${lang==="zh"?"備註內容":"Isi catatan"}</label><input type="text" id="custIn" value="${custTxt.replace(/"/g,'&quot;')}" placeholder="${lang==="zh"?"輸入備註...":"Tulis catatan..."}" maxlength="50" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:4px" oninput="NOTES['${ek(y,m,d)}']=this.value;sNotes()"></div>`}
   return`<div class="modal-bg" data-a="close"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
-  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${holL}${modalLeaveHtml(y,m,d)}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${custP}
+  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${custP}
   <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
 
 function fbBarHtml(){
@@ -528,14 +529,7 @@ function submitLeave(date){
   addLeave(date,tSel.value,parseFloat(hSel.value));
 }
 // Auto-init hours dropdown after modal renders
-const _origRender=render;
-// Will call updateLeaveHours after modal opens via MutationObserver
-setTimeout(()=>{
-  const obs=new MutationObserver(()=>{if(document.getElementById("leaveTypeSel"))updateLeaveHours()});
-  const mr=document.getElementById("mr");
-  if(mr)obs.observe(mr,{childList:true,subtree:true});
-},1000);
-
+// Call updateLeaveHours after render
 // ═══ ADMIN PANEL ═══
 let showAdmin=false;
 function adminPanelHtml(){
@@ -2283,4 +2277,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v107')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v108')caches.delete(n)})})}
