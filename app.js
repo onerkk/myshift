@@ -263,6 +263,8 @@ function rType(){
 
 function rWiz(){
   const c=cyc();
+  // If rotation doesn't exist (deleted/not loaded), go back to type selection
+  if(!R[S.rt]||!c.length){S.step="type";return rType()}
   // Merged step: show ALL shift types (early/mid/night/off) on one page
   if(!S.wT||(!S.wS&&S.wT==="w")||(!S.wN&&S.wT==="o")){
     const allSh=[...new Set(c)];
@@ -276,7 +278,7 @@ function rWiz(){
   if(S.wT==="o"&&S.wN&&S.wD===null){let mx=0;for(let i=0;i<c.length;i++){if(c[i]!=="休")continue;let j=i;while(j<c.length&&c[j]==="休")j++;if(c[j%c.length]===S.wN)mx=Math.max(mx,j-i)}return wS(t("q3o"),"2/2",`<div class="opts ${mx<=4?'c2':'c3'}">${Array.from({length:mx},(_,i)=>`<button class="opt-btn" data-a="wod" data-v="${i+1}">${t("dn").replace("#n#",i+1)}</button>`).join("")}</div>`);}
   return"";
 }
-function wS(q,step,ct){return`<div class="page"><div class="wiz-top fu"><button class="wiz-back" data-a="wb">←</button><div class="wiz-info"><div class="wiz-step">STEP ${step}</div><div class="wiz-q">${q}</div></div><div class="wiz-badge">${RN[lang][S.rt]}</div></div><div class="fu d1">${ct}</div></div>`}
+function wS(q,step,ct){return`<div class="page"><div class="wiz-top fu"><button class="wiz-back" data-a="wb">←</button><div class="wiz-info"><div class="wiz-step">STEP ${step}</div><div class="wiz-q">${q}</div></div><div class="wiz-badge">${(RN[lang]&&RN[lang][S.rt])||S.rt||""}</div></div><div class="fu d1">${ct}</div></div>`}
 
 function rCal(){
   const r=rot(),c=cyc(),y=S.yr,m=S.mo,dm=dim(y,m),fd=fdw(y,m),ic=y===TY&&m===TM;
@@ -314,7 +316,7 @@ function rCal(){
     if(payDay20<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay20=getPayDay(ny,nm,20)+dim(TY,TM)-TD}
     const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
     todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
-  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${RN[lang][S.rt]}${S.unit&&S.unit!=="__all"?` · ${S.unit}`:S.unit==="__all"?` · ${lang==="zh"?"全部單位":"All Units"}`:""}</span></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div></div>
+  return`<div class="top"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1><span>${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?` · ${S.unit}`:S.unit==="__all"?` · ${lang==="zh"?"全部單位":"All Units"}`:""}</span></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
   <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
@@ -772,7 +774,7 @@ async function shareCalendar(){
   const ml=isZh?`${y}年${m}月`:`${m}/${y}`;
   cx.textAlign="center";cx.fillText(ml,W/2,32);
   cx.font="11px 'Noto Sans TC',sans-serif";cx.fillStyle="rgba(255,255,255,.6)";
-  const rn=RN[lang][S.rt];cx.fillText(rn,W/2,46);
+  const rn=(RN[lang]&&RN[lang][S.rt])||S.rt||"";cx.fillText(rn,W/2,46);
   
   // Weekday row
   const wy=headerH;
@@ -2299,4 +2301,4 @@ if('serviceWorker' in navigator){
   })
 }
 // Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v114')caches.delete(n)})})}
+if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v115')caches.delete(n)})})}
