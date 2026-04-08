@@ -1958,78 +1958,67 @@ const WxSfx = (function(){
   
   function thunder(){
     if(!actx||muted) return;
-    const t0=actx.currentTime;
-    const type=Math.floor(Math.random()*5);
+    const now=actx.currentTime;
+    const distance=0.15+Math.random()*0.8;
+    const intensity=0.45+Math.random()*0.5;
+    const tail=0.35+Math.random()*0.6;
+    const lightningDelay=0.12+distance*2.2;
+    const ts=now+lightningDelay;
 
-    // 啪 crack
-    function crack(t){
-      const s=actx.createBufferSource();s.buffer=mkNoise(.1);
-      const f=actx.createBiquadFilter();f.type="bandpass";f.frequency.value=5000+Math.random()*2000;f.Q.value=1;
+    const bus=actx.createGain();bus.gain.value=1.0;bus.connect(masterGain);
+
+    // Crack layer
+    (function(){
+      const n=actx.createBufferSource();n.buffer=mkNoise(0.8);
+      const hp=actx.createBiquadFilter();hp.type="highpass";hp.frequency.value=1800-distance*900;
+      const bp=actx.createBiquadFilter();bp.type="bandpass";bp.frequency.value=2500-distance*1000;bp.Q.value=1.2;
       const g=actx.createGain();
-      g.gain.setValueAtTime(.35,t);
-      g.gain.exponentialRampToValueAtTime(.001,t+.05);
-      s.connect(f);f.connect(g);g.connect(masterGain);
-      s.start(t);s.stop(t+.1);
-    }
+      g.gain.setValueAtTime(.0001,ts);g.gain.linearRampToValueAtTime(.35+intensity*.5,ts+.004);g.gain.exponentialRampToValueAtTime(.0001,ts+.09);
+      n.connect(hp);hp.connect(bp);bp.connect(g);g.connect(bus);
+      n.start(ts);n.stop(ts+.12);
+    })();
 
-    // 轟隆 — EXACT same filter as heavy rain (bandpass 1500Hz, Q=0.5)
-    // but 3-4x louder, with hand-shaped gain envelope
-    function rumbleBody(t,dur,pattern){
-      const s=actx.createBufferSource();s.buffer=mkNoise(dur+.2);
-      const f=actx.createBiquadFilter();
-      f.type="bandpass";
-      f.frequency.value=1500;  // same as heavy rain
-      f.Q.value=0.5;           // same as heavy rain
+    // Boom layer
+    (function(){
+      const o1=actx.createOscillator();o1.type="sawtooth";
+      const o2=actx.createOscillator();o2.type="triangle";
+      const n=actx.createBufferSource();n.buffer=mkNoise(2.5);
+      const nlp=actx.createBiquadFilter();nlp.type="lowpass";nlp.frequency.value=220-distance*100;
+      const g1=actx.createGain(),g2=actx.createGain(),gn=actx.createGain(),mix=actx.createGain();
+      const bt=ts+.02;
+      o1.frequency.setValueAtTime(42+intensity*16-distance*10,bt);
+      o2.frequency.setValueAtTime(58+intensity*12-distance*10,bt);
+      g1.gain.setValueAtTime(.0001,bt);g1.gain.linearRampToValueAtTime(.16+intensity*.18,bt+.03);g1.gain.exponentialRampToValueAtTime(.0001,bt+1.2);
+      g2.gain.setValueAtTime(.0001,bt);g2.gain.linearRampToValueAtTime(.12+intensity*.14,bt+.05);g2.gain.exponentialRampToValueAtTime(.0001,bt+1.4);
+      gn.gain.setValueAtTime(.0001,bt);gn.gain.linearRampToValueAtTime(.25+intensity*.3,bt+.02);gn.gain.exponentialRampToValueAtTime(.0001,bt+1.0);
+      mix.gain.value=1.0;
+      o1.connect(g1);o2.connect(g2);n.connect(nlp);nlp.connect(gn);
+      g1.connect(mix);g2.connect(mix);gn.connect(mix);mix.connect(bus);
+      o1.start(bt);o2.start(bt+.01);n.start(bt);
+      o1.stop(bt+1.25);o2.stop(bt+1.45);n.stop(bt+1.1);
+    })();
+
+    // Rumble layer
+    (function(){
+      const n=actx.createBufferSource();n.buffer=mkNoise(6);
+      const lp=actx.createBiquadFilter();lp.type="lowpass";lp.frequency.value=500-distance*220;
+      const bp=actx.createBiquadFilter();bp.type="bandpass";bp.frequency.value=90+intensity*40;bp.Q.value=.4;
       const g=actx.createGain();
-      g.gain.setValueAtTime(.001,t);
-      for(const [dt,v] of pattern) g.gain.linearRampToValueAtTime(v,t+dt);
-      g.gain.linearRampToValueAtTime(.001,t+dur);
-      s.connect(f);f.connect(g);g.connect(masterGain);
-      s.start(t);s.stop(t+dur+.05);
-    }
+      const decay=1.8+tail*3.2+distance*1.5;
+      const rt=ts+.08;
+      g.gain.setValueAtTime(.0001,rt);g.gain.linearRampToValueAtTime(.18+intensity*.25+tail*.1,rt+.08);g.gain.exponentialRampToValueAtTime(.0001,rt+decay);
+      n.connect(lp);lp.connect(bp);bp.connect(g);g.connect(bus);
+      n.start(rt);n.stop(rt+decay+.2);
+    })();
 
-    // Rain = 0.18 gain. Thunder body = 0.5~0.7 (3-4x louder)
-    if(type===0){
-      // Close: crack → loud boom → rolling
-      crack(t0);
-      rumbleBody(t0+.03, 2.5+Math.random(), [
-        [.03,.7],[.2,.6],[.4,.5],[.6,.45],
-        [.8,.35],[1,.4],[1.2,.3],[1.4,.35],
-        [1.6,.22],[1.8,.28],[2,.12],[2.2,.05]
-      ]);
-    }
-    else if(type===1){
-      // Distant: slow rolling
-      rumbleBody(t0, 3.5+Math.random(), [
-        [.4,.15],[.8,.25],[1.2,.35],[1.5,.3],
-        [1.8,.38],[2.1,.28],[2.4,.32],[2.7,.2],[3,.1],[3.3,.04]
-      ]);
-    }
-    else if(type===2){
-      // Multi-crack → rolling
-      const n=2+Math.floor(Math.random()*2);
-      for(let i=0;i<n;i++) crack(t0+i*(.1+Math.random()*.08));
-      rumbleBody(t0+n*.12, 2.2+Math.random(), [
-        [.04,.65],[.2,.55],[.5,.42],[.7,.38],
-        [.9,.3],[1.1,.35],[1.3,.22],[1.6,.15],[1.9,.05]
-      ]);
-    }
-    else if(type===3){
-      // Long rolling, late crack
-      rumbleBody(t0, 4+Math.random(), [
-        [.3,.12],[.6,.2],[.9,.3],[1.1,.38],[1.4,.42],
-        [1.7,.35],[2,.4],[2.3,.3],[2.6,.35],
-        [2.9,.22],[3.2,.15],[3.6,.06]
-      ]);
-      if(Math.random()>.4) crack(t0+1.2+Math.random()*.8);
-    }
-    else{
-      // Sharp single: crack + short body
-      crack(t0);
-      rumbleBody(t0+.03, .7+Math.random()*.2, [
-        [.03,.55],[.15,.42],[.3,.25],[.5,.08]
-      ]);
-    }
+    // Reflection layer (echo taps)
+    const taps=[{d:.18,g:.16,c:900},{d:.33,g:.12,c:700},{d:.57,g:.08,c:500},{d:.82,g:.05,c:350}];
+    taps.forEach((tap,i)=>{
+      const dl=actx.createDelay(2.0);dl.delayTime.value=tap.d+distance*.25+i*.03;
+      const f=actx.createBiquadFilter();f.type="lowpass";f.frequency.value=tap.c-distance*180;
+      const g=actx.createGain();g.gain.value=tap.g+tail*.03;
+      bus.connect(dl);dl.connect(f);f.connect(g);g.connect(masterGain);
+    });
   }
   
   function stopAll(){stopRain();stopWind()}
