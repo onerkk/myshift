@@ -158,6 +158,16 @@ async function loadConfig(){
       cfg.leaveTypes=d.leaveTypes||[];
       cfg.rotations=d.rotations||[];
       cfg.admins=d.admins||[];
+      // Auto-fill otDeduct for existing leave types
+      const defaults={"特休":4,"annual":4,"sick":8,"病假":8,"事假":12,"personal":12,"喪假":4,"funeral":4,"婚假":4,"marriage":4,"產假":4,"maternity":4,"公假":0,"換休":4};
+      let needSave=false;
+      cfg.leaveTypes.forEach(lt=>{
+        if(lt.otDeduct===undefined){
+          lt.otDeduct=defaults[lt.id]!==undefined?defaults[lt.id]:(defaults[lt.name]!==undefined?defaults[lt.name]:4);
+          needSave=true;
+        }
+      });
+      if(needSave)saveConfig();
     }
   }catch(e){console.log("loadConfig err",e)}
 }
@@ -244,16 +254,20 @@ function delUnit(i){
 
 // ═══ LEAVE TYPE MANAGEMENT ═══
 function addLT(){
-  const n=document.getElementById("ltName"),s=document.getElementById("ltStep"),c=document.getElementById("ltColor");
+  const n=document.getElementById("ltName"),s=document.getElementById("ltStep"),c=document.getElementById("ltColor"),od=document.getElementById("ltOtDeduct");
   if(!n||!n.value.trim())return;
   const id=n.value.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,"").substring(0,20)||("lt_"+Date.now());
-  cfg.leaveTypes.push({id,name:n.value.trim(),nameId:n.value.trim(),step:parseFloat(s?s.value:1),color:c?c.value:"#607d8b"});
+  cfg.leaveTypes.push({id,name:n.value.trim(),nameId:n.value.trim(),step:parseFloat(s?s.value:1),color:c?c.value:"#607d8b",otDeduct:parseInt(od?od.value:4)});
   saveConfig().then(()=>{render()});
 }
 function delLT(i){
   if(!confirm("確定刪除「"+cfg.leaveTypes[i].name+"」？"))return;
   cfg.leaveTypes.splice(i,1);
   saveConfig().then(()=>{render()});
+}
+function updateLTOd(i,val){
+  cfg.leaveTypes[i].otDeduct=parseInt(val);
+  saveConfig().then(()=>{toast("已更新扣除規則")});
 }
 
 // ═══ ADMIN MANAGEMENT ═══
@@ -456,16 +470,26 @@ function renderUnits(){
 
 function renderLeaveTypes(){
   return`<div class="card"><h3>📋 假別列表 (${cfg.leaveTypes.length})</h3>
-    ${cfg.leaveTypes.map((lt,i)=>`<div class="card-row">
+    ${cfg.leaveTypes.map((lt,i)=>`<div class="card-row" style="flex-wrap:wrap">
       <div class="dot" style="background:${lt.color}"></div>
-      <div class="info"><div class="top">${lt.name}</div><div class="bot">每次 ${lt.step}h</div></div>
+      <div class="info" style="flex:1"><div class="top">${lt.name}</div><div class="bot">每次 ${lt.step}h</div></div>
       <button class="del-btn" onclick="delLT(${i})">刪除</button>
+      <div style="width:100%;margin-top:4px;display:flex;gap:4px;align-items:center">
+        <span style="font-size:10px;color:var(--tx2);white-space:nowrap">扣加班</span>
+        <select id="ltOd_${i}" class="input" style="flex:1;padding:4px;font-size:11px" onchange="updateLTOd(${i},this.value)">
+          <option value="0"${lt.otDeduct===0?' selected':''}>0h (公假)</option>
+          <option value="4"${lt.otDeduct===4||lt.otDeduct===undefined?' selected':''}>4h (全薪)</option>
+          <option value="8"${lt.otDeduct===8?' selected':''}>8h (半薪)</option>
+          <option value="12"${lt.otDeduct===12?' selected':''}>12h (無薪)</option>
+        </select>
+      </div>
     </div>`).join("")}
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bg4)">
       <label class="form-label">新增假別</label>
       <div class="form-row"><input id="ltName" class="input" placeholder="中文名稱"></div>
       <div class="form-row">
         <select id="ltStep" class="input"><option value="0.5">0.5h 計算</option><option value="1" selected>1h 計算</option></select>
+        <select id="ltOtDeduct" class="input"><option value="0">扣0h(公假)</option><option value="4" selected>扣4h(全薪)</option><option value="8">扣8h(半薪)</option><option value="12">扣12h(無薪)</option></select>
         <input id="ltColor" type="color" value="#607d8b" style="width:50px;height:40px;border:none;border-radius:8px;cursor:pointer">
       </div>
       <button class="add-btn" onclick="addLT()">＋ 新增假別</button>
