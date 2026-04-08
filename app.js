@@ -123,12 +123,12 @@ let APP_CFG={admins:[],
     {id:"5on_mixed",name:"做5休1＋做5休2",nameId:"5K1L+5K2L",hours:8,cycle:["早","早","早","早","早","休","早","早","早","早","早","休","休","中","中","中","中","中","休","中","中","中","中","中","休","休","晚","晚","晚","晚","晚","休","晚","晚","晚","晚","晚","休","休"]}
   ],
   leaveTypes:[
-    {id:"annual",name:"特休",nameId:"Cuti Tahunan",step:0.5,color:"#4caf50"},
-    {id:"sick",name:"病假",nameId:"Sakit",step:1,color:"#f44336"},
-    {id:"personal",name:"事假",nameId:"Izin Pribadi",step:1,color:"#ff9800"},
-    {id:"funeral",name:"喪假",nameId:"Duka Cita",step:1,color:"#616161"},
-    {id:"marriage",name:"婚假",nameId:"Nikah",step:1,color:"#e91e63"},
-    {id:"maternity",name:"產假",nameId:"Melahirkan",step:1,color:"#9c27b0"},
+    {id:"annual",name:"特休",nameId:"Cuti Tahunan",step:0.5,color:"#4caf50",otDeduct:4},
+    {id:"sick",name:"病假",nameId:"Sakit",step:1,color:"#f44336",otDeduct:8},
+    {id:"personal",name:"事假",nameId:"Izin Pribadi",step:1,color:"#ff9800",otDeduct:12},
+    {id:"funeral",name:"喪假",nameId:"Duka Cita",step:1,color:"#616161",otDeduct:4},
+    {id:"marriage",name:"婚假",nameId:"Nikah",step:1,color:"#e91e63",otDeduct:4},
+    {id:"maternity",name:"產假",nameId:"Melahirkan",step:1,color:"#9c27b0",otDeduct:4},
     {id:"official",name:"公假",nameId:"Dinas",step:1,color:"#2196f3"},
     {id:"comp",name:"補休",nameId:"Kompensasi",step:0.5,color:"#009688"}
   ]
@@ -181,20 +181,27 @@ function ek(y,m,d){return`${y}-${String(m).padStart(2,'0')}-${String(d).padStart
 function hk(m,d){return`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function gh(y,m,d){const h=getHOL(y,m,d);if(!h)return null;return h[lang]||null}
 function en(id){return t(id)}
-function calcOT(y,m,wd,sh){const dm=dim(y,m);let wdays=0;for(let d=1;d<=dm;d++){const dw=new Date(y,m-1,d).getDay();if(dw>=1&&dw<=5)wdays++}let hwd=0;for(let d=1;d<=dm;d++){const dw=new Date(y,m-1,d).getDay();if(dw>=1&&dw<=5&&isTWOff(y,m,d))hwd++}const rH=(wdays-hwd)*8;const tH=wd*sh;return{tH,oH:sh===12?wd*4:Math.max(0,tH-rH),rH}}
+function calcOT(y,m,wd,sh){const dm=dim(y,m);let wdays=0;for(let d=1;d<=dm;d++){const dw=new Date(y,m-1,d).getDay();if(dw>=1&&dw<=5)wdays++}let hwd=0;for(let d=1;d<=dm;d++){const dw=new Date(y,m-1,d).getDay();if(dw>=1&&dw<=5&&isTWOff(y,m,d))hwd++}const rH=(wdays-hwd)*8;const tH=wd*sh;let otDed=0;for(let d=1;d<=dm;d++){const lv=getLeaves(ek(y,m,d));lv.forEach(l=>{if(l.uid===(fbUser&&fbUser.uid)){const hrs=l.hours||0;const lt=getLT(l.leaveType);const dp8=lt&&lt.otDeduct!==undefined?lt.otDeduct:4;otDed+=(hrs/8)*dp8}})}return{tH,oH:sh===12?Math.max(0,wd*4-otDed):Math.max(0,tH-rH),rH}}
 function calcPayPeriod(y,m){
   const pm=m===1?12:m-1,py=m===1?y-1:y;
   const sd=new Date(py,pm-1,26),ed=new Date(y,m-1,25);
-  let wd=0,tH=0,leaveH=0;
+  let wd=0,tH=0,leaveH=0,otDeductTotal=0;
   for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
     const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate();
     const s=gs(cy,cm,cd);
     if(s&&s!=="休")wd++;
-    // Sum my leave hours in this period
     const dayLeaves=getLeaves(ek(cy,cm,cd));
-    dayLeaves.forEach(l=>{if(l.uid===(fbUser&&fbUser.uid))leaveH+=l.hours||0});
+    dayLeaves.forEach(l=>{
+      if(l.uid===(fbUser&&fbUser.uid)){
+        const hrs=l.hours||0;
+        leaveH+=hrs;
+        const lt=getLT(l.leaveType);
+        const deductPer8=lt&&lt.otDeduct!==undefined?lt.otDeduct:4;
+        otDeductTotal+=(hrs/8)*deductPer8;
+      }
+    });
   }
-  const r=rot();if(!r)return{sd,ed,wd,tH:0,oH:0,rH:0,sh:12,leaveH:0};
+  const r=rot();if(!r)return{sd,ed,wd,tH:0,oH:0,rH:0,sh:12,leaveH:0,otDeductTotal:0};
   const sh=r.h;tH=wd*sh;
   let wdays=0,hwd=0;
   for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
@@ -204,8 +211,8 @@ function calcPayPeriod(y,m){
   }
   const rH=(wdays-hwd)*8;
   const rawOH=sh===12?wd*4:Math.max(0,tH-rH);
-  const oH=Math.max(0,rawOH-leaveH);
-  return{sd,ed,wd,tH,oH,rH,sh,leaveH};
+  const oH=Math.max(0,rawOH-otDeductTotal);
+  return{sd,ed,wd,tH,oH,rH,sh,leaveH,otDeductTotal};
 }
 function payCardHtml(y,m){
   const pp=calcPayPeriod(y,m);
@@ -221,7 +228,7 @@ function payCardHtml(y,m){
     <div class="pay-grid">
       <div class="pay-stat"><div class="pay-stat-val">${pp.wd}</div><div class="pay-stat-lbl">${isZh?"出勤日":"Hari Kerja"}</div></div>
       <div class="pay-stat"><div class="pay-stat-val">${pp.tH}h</div><div class="pay-stat-lbl">${isZh?"總工時":"Total Jam"}</div></div>
-      <div class="pay-stat"><div class="pay-stat-val ot-val">${pp.oH}h</div><div class="pay-stat-lbl">${isZh?"加班":"Lembur"}${pp.leaveH?`<br><span style="color:var(--red);font-size:8px">-${pp.leaveH}h ${isZh?"請假":"cuti"}</span>`:""}</div></div>
+      <div class="pay-stat"><div class="pay-stat-val ot-val">${pp.oH}h</div><div class="pay-stat-lbl">${isZh?"加班":"Lembur"}${pp.otDeductTotal?`<br><span style="color:var(--red);font-size:8px">-${pp.otDeductTotal}h ${isZh?"扣除":"potong"}</span>`:""}</div></div>
     </div>
     <div class="pay-dates">
       <div class="pay-date-item"><span class="pay-date-icon">💰</span><span>${pay5}</span></div>
@@ -544,7 +551,7 @@ function updateLeaveHours(){
   if(!sel||!hSel)return;
   const lt=getLT(sel.value);
   const step=lt?lt.step:1;
-  const max=12;
+  const max=8;
   let opts="";
   for(let h=step;h<=max;h+=step){opts+=`<option value="${h}"${h===(step===0.5?4:8)?' selected':''}>${h}h</option>`}
   hSel.innerHTML=opts;
@@ -843,7 +850,9 @@ function rStats(){
       if(s==="早"){e++;wd++}else if(s==="晚"){n++;wd++}else if(s==="中"){m++;wd++}else if(s==="休")o++;
     }
     const r=rot();const sh=r?r.h:12;
-    const tH=wd*sh,oH=sh===12?wd*4:0;
+    let mOtDed=0;
+    for(let d=1;d<=dm;d++){const lv=getLeaves(ek(y,mo,d));lv.forEach(l=>{if(l.uid===(fbUser&&fbUser.uid)){const hrs=l.hours||0;const lt=getLT(l.leaveType);const dp8=lt&&lt.otDeduct!==undefined?lt.otDeduct:4;mOtDed+=(hrs/8)*dp8}})}
+    const tH=wd*sh,oH=sh===12?Math.max(0,wd*4-mOtDed):0;
     monthData.push({mo,e,n,m,o,wd,tH,oH});
   }
   const totals=monthData.reduce((a,md)=>({wd:a.wd+md.wd,tH:a.tH+md.tH,oH:a.oH+md.oH,e:a.e+md.e,n:a.n+md.n,m:a.m+md.m,o:a.o+md.o}),{wd:0,tH:0,oH:0,e:0,n:0,m:0,o:0});

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v129';
+const CACHE_NAME = 'myshift-v131';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
