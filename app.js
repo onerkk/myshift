@@ -5,7 +5,8 @@ fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 let fbUser=null;
 let fbAuthReady=false;
 let _initDone=false;
-function _doAuthInit(){if(_initDone)return;_initDone=true;loadAppConfig().then(()=>{loadLeaves();loadAdminEv();cloudLoad()})}
+function _doAuthInit(){if(_initDone)return;_initDone=true;loadAppConfig().then(()=>{loadLeaves();loadAdminEv();cloudLoad().then(()=>syncALYearLeaves())})}
+async function syncALYearLeaves(){if(!fbUser)return;try{const ay=curALY();const start=`${ay}-12-26`,end=`${ay+1}-12-25`;const startYM=`${ay}-12`,endYM=`${ay+1}-12`;const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).where("leaveType","==","annual").get();let changed=false;const found={};snap.forEach(doc=>{const v=doc.data();if(v.date>=start&&v.date<=end){found[v.date]=(found[v.date]||0)+(v.hours||0)}});for(const date in found){if(ALD[date]!==found[date]){ALD[date]=found[date];changed=true}}if(changed){sAL();render()}}catch(e){console.log("syncALYear err",e)}}
 fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){
   // Immediately save display name for admin panel
   try{fbDb.collection("users").doc(u.uid).set({displayName:u.displayName||"",email:u.email||"",photoURL:u.photoURL||"",lastLogin:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){}
