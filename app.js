@@ -31,8 +31,8 @@ function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
 function fbLogout(){_initDone=false;fbAuth.signOut()}
 let leavesCache={};
 async function loadLeaves(){try{const y=S.yr||TY,m=S.mo||TM;const snap=await fbDb.collection("leaves").where("ym","==",y+"-"+String(m).padStart(2,"0")).get();const d={};snap.forEach(doc=>{const v=doc.data();if(S.unit&&S.unit!=="__all"&&v.unit&&v.unit!==S.unit)return;const k=v.date;if(!d[k])d[k]=[];d[k].push({uid:v.uid,name:v.name,type:v.type,leaveType:v.leaveType||"",hours:v.hours||0,ts:v.ts,unit:v.unit||""})});leavesCache=d;render()}catch(e){console.log("loadLeaves err",e)}}
-async function addLeave(date,leaveTypeId,hours){if(!fbUser)return;try{const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).set({uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),type:"leave",leaveType:leaveTypeId,hours:hours||0,unit:S.unit||"",ts:firebase.firestore.FieldValue.serverTimestamp()});loadLeaves()}catch(e){console.log("addLeave err",e);alert((lang==="zh"?"請假失敗: ":"Leave failed: ")+e.message)}}
-async function removeLeave(date,leaveTypeId){if(!fbUser)return;if(leaveTypeId){const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).delete()}else{const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).where("date","==",date).get();const batch=fbDb.batch();snap.forEach(d=>batch.delete(d.ref));await batch.commit()}loadLeaves()}
+async function addLeave(date,leaveTypeId,hours){if(!fbUser)return;try{const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).set({uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),type:"leave",leaveType:leaveTypeId,hours:hours||0,unit:S.unit||"",ts:firebase.firestore.FieldValue.serverTimestamp()});if(leaveTypeId==="annual"){ALD[date]=(ALD[date]||0)+hours;sAL()}loadLeaves()}catch(e){console.log("addLeave err",e);alert((lang==="zh"?"請假失敗: ":"Leave failed: ")+e.message)}}
+async function removeLeave(date,leaveTypeId){if(!fbUser)return;if(leaveTypeId){const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).delete();if(leaveTypeId==="annual"){delete ALD[date];sAL()}}else{const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).where("date","==",date).get();const batch=fbDb.batch();let hadAnnual=false;snap.forEach(d=>{if(d.data().leaveType==="annual")hadAnnual=true;batch.delete(d.ref)});await batch.commit();if(hadAnnual){delete ALD[date];sAL()}}loadLeaves()}
 function getLeaves(date){return leavesCache[date]||[]}
 function myLeave(date){return getLeaves(date).filter(l=>l.uid===(fbUser&&fbUser.uid))}
 
@@ -317,8 +317,9 @@ function rCal(){
   const ml=lang==="zh"?`${y}年${m}月`:`${m}/${y}`;
   let todayBarH="";if(ic){const ts=gs(TY,TM,TD);if(ts){const tImg=SI[ts]||"";const tsName=sf(ts);
     let restInfo="",restDays=0;
-    if(ts!=="休"){for(let dd=1;dd<=30;dd++){const fd=new Date(TY,TM-1,TD+dd);if(gs(fd.getFullYear(),fd.getMonth()+1,fd.getDate())==="休"){restDays=dd;restInfo=(lang==="zh"?`${dd}天後休`:`${dd} hari lagi libur`);break}}}
-    else{let streak=0;for(let dd=0;dd<=14;dd++){const fd=new Date(TY,TM-1,TD+dd);if(gs(fd.getFullYear(),fd.getMonth()+1,fd.getDate())==="休")streak++;else break}if(streak>1)restInfo=(lang==="zh"?"連休 "+streak+" 天":"Libur "+streak+" hari");else restInfo=(lang==="zh"?"今天休假":"Hari ini libur")}
+    const _isOff=(y2,m2,d2)=>{if(gs(y2,m2,d2)==="休")return true;const ml2=myLeave(ek(y2,m2,d2));let lh=0;ml2.forEach(l=>lh+=l.hours||0);return lh>=8};
+    if(!_isOff(TY,TM,TD)){for(let dd=1;dd<=30;dd++){const fd=new Date(TY,TM-1,TD+dd);if(_isOff(fd.getFullYear(),fd.getMonth()+1,fd.getDate())){restDays=dd;restInfo=(lang==="zh"?`${dd}天後休`:`${dd} hari lagi libur`);break}}}
+    else{let streak=0;for(let dd=0;dd<=14;dd++){const fd=new Date(TY,TM-1,TD+dd);if(_isOff(fd.getFullYear(),fd.getMonth()+1,fd.getDate()))streak++;else break}if(streak>1)restInfo=(lang==="zh"?"連休 "+streak+" 天":"Libur "+streak+" hari");else restInfo=(lang==="zh"?"今天休假":"Hari ini libur")}
     let apd5=getPayDay(TY,TM,5),apd20=getPayDay(TY,TM,20);
     let payDay5=apd5-TD,payDay20=apd20-TD;
     if(payDay5<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay5=getPayDay(ny,nm,5)+dim(TY,TM)-TD}
