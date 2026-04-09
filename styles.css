@@ -118,6 +118,8 @@ input,select{font-family:inherit;outline:none}
 .leave-list{font-size:10px;color:var(--tx2);margin-top:4px}
 .leave-list span{display:inline-block;background:var(--red-l);color:var(--red);padding:2px 6px;border-radius:3px;margin:2px 2px;font-weight:600}
 .hol-strip{margin:4px 0 0;padding:8px 12px;background:var(--red-l);border-left:3px solid var(--red);border-radius:var(--r);font-size:13px;color:var(--red);font-weight:600}
+.lv-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.lv-chip{white-space:nowrap}
 
 /* Reminders */
 .rem-sec{margin:4px 0 0}
