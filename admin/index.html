@@ -1,564 +1,1018 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>靜月之光 管理後台</title>
+<meta name="theme-color" content="#0d0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0f0f1a">
-<title>我的班表 管理後台</title>
-<link rel="manifest" href="./manifest.json">
-<link rel="icon" href="./icon-192.png">
-<link rel="apple-touch-icon" href="./icon-192.png">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700;900&display=swap" rel="stylesheet">
+<meta name="apple-mobile-web-app-title" content="靜月後台">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="靜月後台">
+<link rel="manifest" href="admin-manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#0f0f1a;--bg2:#1a1a2e;--bg3:#252540;--bg4:#2f2f50;
-  --tx:#e8e8f0;--tx2:#9999b8;--tx3:#666680;
-  --pri:#7c5cfc;--pri-l:#9b80ff;--pri-d:#5a3fd9;
-  --green:#34d399;--red:#f87171;--amber:#fbbf24;--blue:#60a5fa;--pink:#f472b6;--teal:#2dd4bf;
-  --r:14px;--sh:0 4px 20px rgba(0,0,0,.4);
-  --grad:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  --bg:#0d0f14;--card:#161a23;--card-border:#262b38;
+  --text:#e2e4ea;--text-dim:#7a7f8e;--accent:#6c7bff;
+  --accent-glow:rgba(108,123,255,.15);--success:#34d399;
+  --warn:#fbbf24;--danger:#f87171;
+  --header-bg:linear-gradient(135deg,#2a2060 0%,#3b2a80 50%,#5c3a9e 100%);
 }
-html,body{height:100%;font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--tx);-webkit-tap-highlight-color:transparent;overflow-x:hidden}
-.app{min-height:100vh;display:flex;flex-direction:column}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none}
 
-/* Header */
-.header{background:var(--grad);padding:20px 16px 16px;position:sticky;top:0;z-index:100}
-.header h1{font-size:18px;font-weight:900;display:flex;align-items:center;gap:8px}
-.header h1 img{width:28px;height:28px;border-radius:8px}
-.header .badge{background:rgba(255,255,255,.2);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-left:auto}
-.header .user{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:rgba(255,255,255,.8)}
-.header .user img{width:24px;height:24px;border-radius:50%}
-.header .user button{margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer}
+/* ── Login ── */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-box{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:40px 30px;width:100%;max-width:360px;text-align:center}
+.login-box h2{margin-bottom:8px;font-size:20px}
+.login-box p{color:var(--text-dim);font-size:13px;margin-bottom:24px}
+.login-box input{width:100%;padding:12px 16px;border-radius:10px;border:1px solid var(--card-border);background:#0d0f14;color:var(--text);font-size:15px;outline:none;margin-bottom:16px}
+.login-box input:focus{border-color:var(--accent)}
+.login-box button{width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s}
+.login-box button:active{opacity:.7}
+.login-err{color:var(--danger);font-size:13px;margin-top:10px;display:none}
 
-/* Tabs */
-.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--bg3);position:sticky;top:76px;z-index:99;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.tabs::-webkit-scrollbar{display:none}
-.tab{padding:12px 16px;font-size:13px;font-weight:600;color:var(--tx3);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s}
-.tab.active{color:var(--pri-l);border-bottom-color:var(--pri)}
+/* ── Header ── */
+.header{background:var(--header-bg);padding:18px 20px 14px;position:sticky;top:0;z-index:100}
+.header h1{font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+.header h1 span{font-size:22px}
 
-/* Content */
-.content{flex:1;padding:16px}
+/* ── Tabs ── */
+.tabs{display:flex;gap:0;background:var(--card);border-bottom:1px solid var(--card-border);overflow-x:auto;-webkit-overflow-scrolling:touch;position:sticky;top:55px;z-index:99}
+.tab{flex:none;padding:13px 18px;font-size:13px;font-weight:500;color:var(--text-dim);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.tab:active{opacity:.6}
+
+/* ── Content ── */
+.content{padding:16px;max-width:800px;margin:0 auto}
 .section{display:none}
 .section.active{display:block}
 
-/* Cards */
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
-.stat-card{background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--r);padding:16px 12px;text-align:center}
-.stat-card .val{font-size:28px;font-weight:900;color:var(--pri-l)}
-.stat-card .val.green{color:var(--green)}
-.stat-card .val.amber{color:var(--amber)}
-.stat-card .val.blue{color:var(--blue)}
-.stat-card .val.pink{color:var(--pink)}
-.stat-card .val.teal{color:var(--teal)}
-.stat-card .lbl{font-size:11px;color:var(--tx2);margin-top:4px}
+/* ── Stats Grid ── */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:16px 12px;text-align:center;transition:border-color .2s}
+.stat-card:active{border-color:var(--accent)}
+.stat-num{font-size:28px;font-weight:700;color:var(--accent);line-height:1.2}
+.stat-label{font-size:11px;color:var(--text-dim);margin-top:4px;display:flex;align-items:center;justify-content:center;gap:4px}
 
-.card{background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:10px}
-.card h3{font-size:14px;font-weight:700;margin-bottom:10px}
-.card-row{display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg3);border-radius:8px;margin-bottom:6px}
-.card-row .name{flex:1;font-size:13px;font-weight:600}
-.card-row .sub{font-size:11px;color:var(--tx2)}
-.card-row .tag{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700}
-.del-btn{background:var(--red);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer}
-.add-btn{background:var(--pri);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-top:8px}
-.add-btn:active{opacity:.8}
+/* ── Notification List ── */
+.notify-section{margin-top:16px}
+.notify-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.notify-header h3{font-size:15px;font-weight:600}
+.btn-clear{padding:6px 14px;border-radius:8px;border:1px solid var(--danger);color:var(--danger);background:transparent;font-size:12px;cursor:pointer}
+.btn-clear:active{background:var(--danger);color:#fff}
+.notify-list{display:flex;flex-direction:column;gap:8px}
+.notify-item{background:var(--card);border:1px solid var(--card-border);border-radius:10px;padding:12px 14px}
+.notify-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.notify-mode{font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600}
+.mode-full{background:rgba(108,123,255,.15);color:var(--accent)}
+.mode-tarot{background:rgba(52,211,153,.15);color:var(--success)}
+.mode-ootk{background:rgba(251,191,36,.15);color:var(--warn)}
+.mode-followup{background:rgba(248,113,113,.15);color:var(--danger)}
+.notify-time{font-size:11px;color:var(--text-dim)}
+.notify-name{font-size:13px;font-weight:600}
+.notify-q{font-size:12px;color:var(--text-dim);margin-top:2px}
+.notify-badges{display:flex;gap:6px;margin-top:6px}
+.badge{font-size:10px;padding:2px 6px;border-radius:3px;background:#262b38;color:var(--text-dim)}
+.badge-paid{background:rgba(251,191,36,.15);color:var(--warn)}
 
-/* Form inputs */
-.input{width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--bg4);border-radius:8px;color:var(--tx);font-size:13px;font-family:inherit}
-.input:focus{outline:none;border-color:var(--pri)}
-.input::placeholder{color:var(--tx3)}
-select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239999b8' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
-.form-row{display:flex;gap:8px;margin-bottom:8px}
-.form-row .input{flex:1}
-.form-label{font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px;display:block}
+/* ── Inventory ── */
+.inv-upload{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px;margin-bottom:16px}
+.inv-upload h3{font-size:15px;margin-bottom:4px}
+.inv-upload p{font-size:12px;color:var(--text-dim);margin-bottom:14px}
+.btn-upload{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+.btn-upload:active{opacity:.7}
+.inv-current{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px}
+.inv-current h3{font-size:15px;margin-bottom:4px}
+.inv-count{font-size:12px;color:var(--text-dim);margin-bottom:12px}
+.inv-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.inv-table{width:100%;border-collapse:collapse;font-size:12px}
+.inv-table th{text-align:left;padding:8px 10px;background:#1c2030;color:var(--text-dim);font-weight:600;border-bottom:1px solid var(--card-border);white-space:nowrap}
+.inv-table td{padding:8px 10px;border-bottom:1px solid #1c2030;white-space:nowrap}
+.inv-table tr:hover td{background:var(--accent-glow)}
+.btn-download{padding:6px 14px;border-radius:8px;border:1px solid var(--card-border);color:var(--text);background:transparent;font-size:12px;cursor:pointer;margin-top:10px}
+.btn-download:active{background:var(--card-border)}
+.btn-del-item{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 6px}
 
-/* Leave records */
-.leave-row{display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:6px}
-.leave-row .dot{width:4px;height:32px;border-radius:2px}
-.leave-row .info{flex:1}
-.leave-row .info .top{font-size:13px;font-weight:600}
-.leave-row .info .bot{font-size:10px;color:var(--tx2);margin-top:2px}
+/* ── Worker ── */
+.worker-section{display:flex;flex-direction:column;gap:16px}
+.worker-card{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px}
+.worker-card h3{font-size:15px;margin-bottom:4px}
+.worker-card p{font-size:12px;color:var(--text-dim);margin-bottom:14px}
+.worker-status{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--success)}
+.status-dot.offline{background:var(--danger)}
+.worker-info{font-size:12px;color:var(--text-dim)}
+textarea.worker-editor{width:100%;min-height:200px;background:#0d0f14;color:var(--text);border:1px solid var(--card-border);border-radius:8px;padding:12px;font-family:'SF Mono',Menlo,monospace;font-size:11px;resize:vertical;outline:none}
+textarea.worker-editor:focus{border-color:var(--accent)}
+.btn-deploy{padding:10px 20px;border-radius:10px;border:none;background:var(--success);color:#0d0f14;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px}
+.btn-deploy:active{opacity:.7}
+.btn-deploy:disabled{opacity:.4;cursor:not-allowed}
+.cf-fields{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.cf-field label{font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px}
+.cf-field input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--card-border);background:#0d0f14;color:var(--text);font-size:13px;outline:none}
+.cf-field input:focus{border-color:var(--accent)}
 
-/* Login screen */
-.login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:30px}
-.login-screen img{width:80px;height:80px;border-radius:20px;margin-bottom:16px}
-.login-screen h1{font-size:22px;font-weight:900;margin-bottom:6px}
-.login-screen p{font-size:13px;color:var(--tx2);margin-bottom:30px}
-.login-btn{background:#fff;border:none;padding:14px 28px;border-radius:12px;font-size:14px;font-weight:700;color:#333;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:var(--sh)}
-.login-btn img{width:22px;height:22px}
-
-/* Loading */
-.loading{display:flex;align-items:center;justify-content:center;min-height:200px;color:var(--tx3)}
-.spinner{width:32px;height:32px;border:3px solid var(--bg3);border-top-color:var(--pri);border-radius:50%;animation:spin .8s linear infinite;margin-right:10px}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* Empty state */
-.empty{text-align:center;padding:40px 20px;color:var(--tx3);font-size:13px}
-
-/* Toast */
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;z-index:999;opacity:0;transition:opacity .3s}
+/* ── Toast ── */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#2a2e3a;color:var(--text);padding:10px 24px;border-radius:10px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;border:1px solid var(--card-border)}
 .toast.show{opacity:1}
 
-/* PWA install */
-.install-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bg3);padding:12px 16px;display:none;align-items:center;gap:10px;z-index:200}
-.install-bar button{background:var(--pri);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-left:auto}
+/* ── Loading ── */
+.loading{display:flex;justify-content:center;padding:40px}
+.loading::after{content:'';width:28px;height:28px;border:3px solid var(--card-border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:40px 20px;color:var(--text-dim);font-size:13px}
 </style>
 </head>
 <body>
-<div id="root"></div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script>
-firebase.initializeApp({apiKey:"AIzaSyBKgqmsDIZgqf8nxWTDdTqVS01H0TIOCj4",authDomain:"myshift-a67f1.firebaseapp.com",projectId:"myshift-a67f1"});
-const auth=firebase.auth(),db=firebase.firestore();
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
-// ═══ STATE ═══
-const SUPER_ADMIN=["onerkk@gmail.com"];
-let user=null,tab="overview",cfg={units:[],leaveTypes:[],admins:[]},allLeaves=[],allUsers=[];
-
-// ═══ AUTH ═══
-let _authReady=false,_redirectDone=false;
-auth.getRedirectResult().then(r=>{_redirectDone=true;if(r&&r.user){}}).catch(()=>{_redirectDone=true});
-auth.onAuthStateChanged(async u=>{
-  user=u;
-  if(!u&&!_redirectDone)return;
-  _authReady=true;
-  if(u&&SUPER_ADMIN.includes(u.email)){await loadAll()}
-  render();
-});
-setTimeout(()=>{_redirectDone=true;_authReady=true;render()},4000);
-
-function login(){
-  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{
-    if(e.code==='auth/popup-closed-by-user'||e.code==='auth/popup-blocked'||e.code==='auth/cancelled-popup-request'){
-      auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
-    }
-  });
-}
-function logout(){auth.signOut()}
-
-// ═══ DATA ═══
-async function loadAll(){
-  await loadConfig();
-  await loadLeaves();
-  await loadUsers();
-}
-
-async function loadConfig(){
-  try{
-    const doc=await db.collection("config").doc("app").get();
-    if(doc.exists){
-      const d=doc.data();
-      cfg.units=d.units||[];
-      cfg.leaveTypes=d.leaveTypes||[];
-      cfg.rotations=d.rotations||[];
-      cfg.admins=d.admins||[];
-      // Auto-fill otDeduct for existing leave types
-      const defaults={"特休":4,"annual":4,"sick":8,"病假":8,"事假":12,"personal":12,"喪假":4,"funeral":4,"婚假":4,"marriage":4,"產假":4,"maternity":4,"公假":0,"換休":4};
-      let needSave=false;
-      cfg.leaveTypes.forEach(lt=>{
-        if(lt.otDeduct===undefined){
-          lt.otDeduct=defaults[lt.id]!==undefined?defaults[lt.id]:(defaults[lt.name]!==undefined?defaults[lt.name]:4);
-          needSave=true;
-        }
-      });
-      if(needSave)saveConfig();
-    }
-  }catch(e){console.log("loadConfig err",e)}
-}
-
-async function saveConfig(){
-  try{
-    await db.collection("config").doc("app").set({rotations:cfg.rotations||[],
-      units:cfg.units,
-      leaveTypes:cfg.leaveTypes,
-      admins:cfg.admins,
-      ts:firebase.firestore.FieldValue.serverTimestamp()
-    },{merge:true});
-    toast("已儲存");
-  }catch(e){console.log("saveConfig err",e);toast("儲存失敗")}
-}
-
-async function loadLeaves(){
-  try{
-    const now=new Date();
-    const ym=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
-    const snap=await db.collection("leaves").where("ym","==",ym).get();
-    allLeaves=[];
-    snap.forEach(doc=>{const d=doc.data();d._id=doc.id;allLeaves.push(d)});
-    allLeaves.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  }catch(e){console.log("loadLeaves err",e)}
-}
-
-async function loadUsers(){
-  try{
-    const snap=await db.collection("users").get();
-    allUsers=[];
-    snap.forEach(doc=>{const d=doc.data();d._uid=doc.id;allUsers.push(d)});
-    // Build name map from leaves (leaves have uid+name)
-    const nameMap={};
-    allLeaves.forEach(l=>{if(l.uid&&l.name&&!l.uid.startsWith("admin_"))nameMap[l.uid]=l.name});
-    // Also try from all months (broader search)
-    try{
-      const lSnap=await db.collection("leaves").limit(200).get();
-      lSnap.forEach(doc=>{const d=doc.data();if(d.uid&&d.name&&!d.uid.startsWith("admin_"))nameMap[d.uid]=d.name});
-    }catch(e){}
-    // Merge names into users
-    allUsers.forEach(u=>{
-      if(!u.displayName&&nameMap[u._uid])u.displayName=nameMap[u._uid];
-    });
-    allUsers.sort((a,b)=>(a.unit||"").localeCompare(b.unit||""));
-  }catch(e){console.log("loadUsers err",e)}
-}
-
-async function setUserUnit(uid,unit){
-  try{await db.collection("users").doc(uid).set({unit:unit,lockedUnit:unit},{merge:true});toast("已鎖定單位");await loadUsers();render()}catch(e){toast("設定失敗")}
-}
-async function unlockUser(uid){
-  try{await db.collection("users").doc(uid).set({lockedUnit:""},{merge:true});toast("已解鎖");await loadUsers();render()}catch(e){toast("解鎖失敗")}
-}
-async function setUserRt(uid,rt){
-  if(!rt){toast("請選擇輪班規則");return}
-  try{await db.collection("users").doc(uid).set({rt:rt,lockedRt:rt,pos:0,ep:true,step:"cal"},{merge:true});toast("已鎖定輪班");await loadUsers();render()}catch(e){toast("設定失敗")}
-}
-async function unlockUserRt(uid){
-  try{await db.collection("users").doc(uid).set({lockedRt:""},{merge:true});toast("已解鎖輪班");await loadUsers();render()}catch(e){toast("解鎖失敗")}
-}
-async function removeUser(uid){
-  if(!confirm("確定刪除此使用者資料？"))return;
-  try{await db.collection("users").doc(uid).delete();toast("已刪除");await loadUsers();render()}catch(e){toast("刪除失敗")}
-}
-
-async function delLeave(id){
-  if(!confirm("確定刪除此筆請假？"))return;
-  try{await db.collection("leaves").doc(id).delete();await loadLeaves();render();toast("已刪除")}catch(e){toast("刪除失敗")}
-}
-
-// ═══ UNIT MANAGEMENT ═══
-function addUnit(){
-  const el=document.getElementById("newUnit");
-  if(!el||!el.value.trim())return;
-  cfg.units.push(el.value.trim());
-  saveConfig().then(()=>{render()});
-}
-function delUnit(i){
-  if(!confirm("確定刪除「"+cfg.units[i]+"」？"))return;
-  cfg.units.splice(i,1);
-  saveConfig().then(()=>{render()});
-}
-
-// ═══ LEAVE TYPE MANAGEMENT ═══
-function addLT(){
-  const n=document.getElementById("ltName"),s=document.getElementById("ltStep"),c=document.getElementById("ltColor"),od=document.getElementById("ltOtDeduct");
-  if(!n||!n.value.trim())return;
-  const id=n.value.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,"").substring(0,20)||("lt_"+Date.now());
-  cfg.leaveTypes.push({id,name:n.value.trim(),nameId:n.value.trim(),step:parseFloat(s?s.value:1),color:c?c.value:"#607d8b",otDeduct:parseInt(od?od.value:4)});
-  saveConfig().then(()=>{render()});
-}
-function delLT(i){
-  if(!confirm("確定刪除「"+cfg.leaveTypes[i].name+"」？"))return;
-  cfg.leaveTypes.splice(i,1);
-  saveConfig().then(()=>{render()});
-}
-function updateLTOd(i,val){
-  cfg.leaveTypes[i].otDeduct=parseInt(val);
-  saveConfig().then(()=>{toast("已更新扣除規則")});
-}
-
-// ═══ ADMIN MANAGEMENT ═══
-function addAdmin(){
-  const email=document.getElementById("adminEmail"),unit=document.getElementById("adminUnit"),name=document.getElementById("adminName");
-  if(!email||!email.value.trim())return;
-  cfg.admins.push({email:email.value.trim(),unit:unit?unit.value:"",name:name?name.value.trim():""});
-  saveConfig().then(()=>{render()});
-}
-function delAdmin(i){
-  if(!confirm("確定移除管理員「"+(cfg.admins[i].name||cfg.admins[i].email)+"」？"))return;
-  cfg.admins.splice(i,1);
-  saveConfig().then(()=>{render()});
-}
-
-// ═══ TOAST ═══
-function toast(msg){
-  const t=document.getElementById("toast");
-  if(!t)return;
-  t.textContent=msg;t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"),2000);
-}
-
-// ═══ RENDER ═══
-function render(){
-  const root=document.getElementById("root");
-  if(!user||!SUPER_ADMIN.includes(user.email)){
-    root.innerHTML=renderLogin();return;
-  }
-  root.innerHTML=renderApp();
-  if(deferredPrompt){const bar=document.getElementById("installBar");if(bar)bar.style.display="flex"}
-  document.querySelectorAll(".tab").forEach(t=>{
-    t.onclick=()=>{tab=t.dataset.tab;render()};
-  });
-}
-
-function renderLogin(){
-  if(!_authReady)return`<div class="login-screen"><div class="spinner"></div><span style="color:var(--tx2)">載入中...</span></div>`;
-  return`<div class="login-screen">
-    <img src="./icon-192.png" onerror="this.style.display='none'">
-    <h1>🔐 管理後台</h1>
-    <p>僅限超級管理員登入</p>
-    <button class="login-btn" onclick="login()">
-      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg">Google 登入
-    </button>
-  </div>`;
-}
-
-function renderApp(){
-  const tabs=["overview","users","rotations","units","leaveTypes","admins","leaves"];
-  const tabNames=["總覽","使用者","輪班規則","單位管理","假別管理","管理員","請假記錄"];
-  const pic=user.photoURL?`<img src="${user.photoURL}" referrerpolicy="no-referrer">`:"";
-
-  return`<div class="app">
-    <div class="header">
-      <h1><img src="./icon-192.png" onerror="this.style.display='none'">我的班表 管理後台<span class="badge">ADMIN</span></h1>
-      <div class="user">${pic}<span>${user.displayName||user.email}</span><button onclick="logout()">登出</button></div>
+<!-- ══ Login Screen ══ -->
+<div id="loginScreen" class="login-wrap">
+  <div class="login-box">
+    <h2>🌙 靜月之光</h2>
+    <p>管理後台</p>
+    <input type="password" id="tokenInput" placeholder="輸入管理員 Token" autocomplete="off">
+    <button onclick="doLogin()">登入</button>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--card-border)">
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px">或使用管理員 Google 帳號登入</div>
+      <button onclick="_adminGoogleLogin()" style="width:100%;padding:10px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid var(--card-border);color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#34A853" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#FBBC05" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Google 登入</button>
     </div>
-    <div class="tabs">${tabs.map((t,i)=>`<div class="tab${tab===t?' active':''}" data-tab="${t}">${tabNames[i]}</div>`).join("")}</div>
-    <div class="content">
-      <div class="section${tab==='overview'?' active':''}">${renderOverview()}</div>
-      <div class="section${tab==='users'?' active':''}">${renderUsers()}</div>
-      <div class="section${tab==='rotations'?' active':''}">${renderRotations()}</div>
-      <div class="section${tab==='units'?' active':''}">${renderUnits()}</div>
-      <div class="section${tab==='leaveTypes'?' active':''}">${renderLeaveTypes()}</div>
-      <div class="section${tab==='admins'?' active':''}">${renderAdmins()}</div>
-      <div class="section${tab==='leaves'?' active':''}">${renderLeaves()}</div>
-    </div>
-    <div id="toast" class="toast"></div>
-    <div id="installBar" class="install-bar"><span>📲 安裝管理後台到桌面</span><button onclick="installPWA()">安裝</button></div>
-  </div>`;
-}
-
-function renderOverview(){
-  const realLeaves=allLeaves.filter(l=>!l.uid.startsWith("admin_"));
-  const unitCounts={};
-  realLeaves.forEach(l=>{const u=l.unit||"未設定";unitCounts[u]=(unitCounts[u]||0)+1});
-  const totalHours=realLeaves.reduce((s,l)=>s+(l.hours||0),0);
-  const userUnits={};
-  allUsers.forEach(u=>{const un=u.unit||"未設定";userUnits[un]=(userUnits[un]||0)+1});
-
-  return`<div class="grid">
-    <div class="stat-card"><div class="val">${cfg.units.length}</div><div class="lbl">🏭 單位數</div></div>
-    <div class="stat-card"><div class="val green">${cfg.leaveTypes.length}</div><div class="lbl">📋 假別數</div></div>
-    <div class="stat-card"><div class="val amber">${cfg.admins.length}</div><div class="lbl">👑 管理員</div></div>
-    <div class="stat-card"><div class="val blue">${allUsers.length}</div><div class="lbl">👤 使用者</div></div>
-    <div class="stat-card"><div class="val pink">${realLeaves.length}</div><div class="lbl">📋 本月請假</div></div>
-    <div class="stat-card"><div class="val teal">${totalHours}h</div><div class="lbl">⏱ 請假時數</div></div>
+    <div id="loginErr" class="login-err"></div>
   </div>
-  <div class="card"><h3>👥 各單位人數</h3>
-    ${Object.entries(userUnits).map(([u,c])=>`<div class="card-row"><span class="name">${u}</span><span class="tag" style="background:var(--blue);color:#fff">${c} 人</span></div>`).join("")}
-  </div>
-  <div class="card"><h3>📊 各單位本月請假</h3>
-    ${Object.entries(unitCounts).length?Object.entries(unitCounts).map(([u,c])=>`<div class="card-row"><span class="name">${u}</span><span class="tag" style="background:var(--pri);color:#fff">${c} 筆</span></div>`).join(""):`<div class="empty">本月尚無請假記錄</div>`}
-  </div>
-  <button class="add-btn" onclick="loadAll().then(()=>render())">🔄 重新載入</button>`;
-}
+</div>
 
-let editingCycle=["早","早","早","早","休","休","晚","晚","晚","晚","休","休"];
-const SHIFT_TYPES=["早","中","晚","休"];
-const SHIFT_COLORS={"早":"#ff9800","中":"#9c27b0","晚":"#2196f3","休":"#4caf50"};
+<!-- ══ Main App ══ -->
+<div id="mainApp" style="display:none">
+  <div class="header">
+    <h1><span>🌙</span> 靜月之光 管理後台 <a href="https://jingyue.uk#admin=Qq-90109010" target="_blank" style="font-size:12px;background:rgba(255,255,255,.15);padding:4px 12px;border-radius:6px;color:#fff;margin-left:8px;text-decoration:none">前往網站 ↗</a></h1>
+    <div id="googleAuthBar" style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:12px"></div>
+  </div>
 
-function renderRotations(){
-  const rots=cfg.rotations||[];
-  return`<div class="card"><h3>🔄 輪班規則 (${rots.length})</h3>
-    ${rots.map((rot,i)=>{
-      const cycleVis=rot.cycle.map(s=>`<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:4px;font-size:10px;font-weight:700;color:#fff;background:${SHIFT_COLORS[s]||'#999'};margin:1px">${s}</span>`).join('');
-      return`<div class="card-row" style="flex-wrap:wrap">
-        <div class="info"><div class="top">${rot.name} </div><div class="bot">${rot.hours}h/班 · ${rot.cycle.length}天循環</div></div>
-        <button class="del-btn" onclick="delRotation(${i})">刪除</button>
-        <div style="width:100%;margin-top:6px;overflow-x:auto;white-space:nowrap">${cycleVis}</div>
-      </div>`}).join('')}
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bg4)">
-      <label class="form-label">新增輪班規則</label>
-      <div class="form-row"><input id="rotName" class="input" placeholder="中文名稱（如：做4休2）"></div>
-      <div class="form-row">
-        <select id="rotHours" class="input"><option value="12">12小時/班</option><option value="8">8小時/班</option></select>
-        <select id="rotLen" class="input" onchange="resizeCycle(+this.value)">
-          ${[4,6,8,10,12,14,16,18,20,24,28,30,36,39,42].map(n=>`<option value="${n}"${n===12?' selected':''}>${n}天</option>`).join('')}
-        </select>
+  <div class="tabs">
+    <div class="tab active" data-tab="dashboard">總覽</div>
+    <div class="tab" data-tab="inventory">庫存管理</div>
+    <div class="tab" data-tab="feedback">回饋</div>
+    <div class="tab" data-tab="worker">Worker管理</div>
+    <div class="tab" data-tab="users">用戶管理</div>
+    <div class="tab" data-tab="admins">管理員</div>
+  </div>
+
+  <div class="content">
+
+    <!-- ══ Dashboard ══ -->
+    <div id="sec-dashboard" class="section active">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-num" id="s-total">-</div><div class="stat-label">📊 總使用次數</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-today">-</div><div class="stat-label">📅 今日使用</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-paid">-</div><div class="stat-label">💰 付費次數</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-full">-</div><div class="stat-label">🔮 七維度</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-tarot">-</div><div class="stat-label">🃏 塔羅快讀</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-ootk">-</div><div class="stat-label">🗝️ 開鑰之法</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-followup">-</div><div class="stat-label">💬 追問</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-inv">-</div><div class="stat-label">📦 庫存品項</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-uptime">-</div><div class="stat-label">⏱ Worker</div></div>
       </div>
-      <label class="form-label" style="margin-top:8px">點擊每格切換班別（🟠早 🟣中 🔵晚 🟢休）</label>
-      <div id="cycleEditor" style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0">
-        ${editingCycle.map((s,i)=>`<button onclick="toggleCycleDay(${i})" style="width:36px;height:36px;border:none;border-radius:6px;font-size:13px;font-weight:700;color:#fff;background:${SHIFT_COLORS[s]||'#999'};cursor:pointer">${s}</button>`).join('')}
-      </div>
-      <button class="add-btn" onclick="addRotation()">＋ 新增輪班規則</button>
-    </div>
-  </div>`;
-}
 
-function toggleCycleDay(i){
-  const cur=editingCycle[i];
-  const idx=SHIFT_TYPES.indexOf(cur);
-  editingCycle[i]=SHIFT_TYPES[(idx+1)%SHIFT_TYPES.length];
-  render();
-}
-function resizeCycle(len){
-  while(editingCycle.length<len)editingCycle.push("休");
-  editingCycle.length=len;
-  render();
-}
-function addRotation(){
-  const n=document.getElementById("rotName"),h=document.getElementById("rotHours");
-  if(!n||!n.value.trim()){toast("請輸入名稱");return}
-  const id=n.value.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,"_").substring(0,20)||("rot_"+Date.now());
-  if(!cfg.rotations)cfg.rotations=[];
-  cfg.rotations.push({id,name:n.value.trim(),nameId:n.value.trim(),hours:parseInt(h?h.value:12),cycle:[...editingCycle]});
-  saveConfig().then(()=>{editingCycle=["早","早","早","早","休","休","晚","晚","晚","晚","休","休"];render()});
-}
-function delRotation(i){
-  if(!confirm("確定刪除「"+(cfg.rotations[i]?.name||"")+"」？"))return;
-  cfg.rotations.splice(i,1);
-  saveConfig().then(()=>render());
-}
-
-function renderUsers(){
-  return`<div class="card"><h3>👤 使用者白名單 (${allUsers.length})</h3>
-    ${allUsers.length?allUsers.map(u=>{
-      const locked=u.lockedUnit?true:false;
-      const lockedRt=u.lockedRt?true:false;
-      const rotMatch=cfg.rotations.find(r=>r.id===u.rt||r.name===u.rt||r.nameId===u.rt);
-      const rt=u.rt?(rotMatch?rotMatch.name:({"2on2off":"做2休2","4on2off":"做4休2","5on_mixed":"做5休1+2"}[u.rt]||u.rt)):"未設定";
-      const uName=u.displayName||u.email||u._uid.substring(0,10)+"...";
-      return`<div class="card-row" style="flex-wrap:wrap">
-        <div class="info" style="min-width:60%"><div class="top">${uName}</div><div class="bot">${rt} · ${u.unit||"未選擇單位"}</div></div>
-        <div style="width:100%;margin-top:6px">
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">
-            <span style="font-size:10px;color:var(--tx2);width:32px">單位</span>
-            <select id="uUnit_${u._uid}" class="input" style="flex:1;padding:6px;font-size:11px">
-              <option value="">-- 選擇 --</option>
-              ${cfg.units.map(un=>`<option value="${un}"${u.unit===un||u.lockedUnit===un?' selected':''}>${un}</option>`).join('')}
-            </select>
-            <button onclick="setUserUnit('${u._uid}',document.getElementById('uUnit_${u._uid}').value)" style="background:var(--pri);color:#fff;border:none;padding:6px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔒</button>
-            ${locked?`<button onclick="unlockUser('${u._uid}')" style="background:var(--amber);color:#000;border:none;padding:6px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔓</button>`:''}
-          </div>
-          <div style="display:flex;gap:4px;align-items:center">
-            <span style="font-size:10px;color:var(--tx2);width:32px">輪班</span>
-            <select id="uRt_${u._uid}" class="input" style="flex:1;padding:6px;font-size:11px">
-              <option value="">-- 選擇 --</option>
-              ${(cfg.rotations||[]).map(r=>`<option value="${r.id}"${u.rt===r.id||u.lockedRt===r.id?' selected':''}>${r.name}</option>`).join('')}
-            </select>
-            <button onclick="setUserRt('${u._uid}',document.getElementById('uRt_${u._uid}').value)" style="background:var(--teal);color:#000;border:none;padding:6px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔒</button>
-            ${lockedRt?`<button onclick="unlockUserRt('${u._uid}')" style="background:var(--amber);color:#000;border:none;padding:6px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🔓</button>`:''}
-          </div>
+      <div class="notify-section">
+        <div class="notify-header">
+          <h3>📋 最近使用紀錄</h3>
+          <button class="btn-clear" onclick="clearNotifications()">清除全部</button>
         </div>
-      </div>`}).join(""):`<div class="empty">尚無使用者</div>`}
-    <button class="add-btn" onclick="loadUsers().then(()=>render())">🔄 重新載入</button>
-  </div>`;
-}
-
-function renderUnits(){
-  return`<div class="card"><h3>🏭 單位列表 (${cfg.units.length})</h3>
-    ${cfg.units.map((u,i)=>`<div class="card-row"><span class="name">${u}</span><button class="del-btn" onclick="delUnit(${i})">刪除</button></div>`).join("")}
-    <div style="margin-top:12px">
-      <label class="form-label">新增單位</label>
-      <div class="form-row"><input id="newUnit" class="input" placeholder="輸入單位名稱"><button class="del-btn" style="background:var(--pri);padding:10px 16px" onclick="addUnit()">＋新增</button></div>
-    </div>
-  </div>`;
-}
-
-function renderLeaveTypes(){
-  return`<div class="card"><h3>📋 假別列表 (${cfg.leaveTypes.length})</h3>
-    ${cfg.leaveTypes.map((lt,i)=>`<div class="card-row" style="flex-wrap:wrap">
-      <div class="dot" style="background:${lt.color}"></div>
-      <div class="info" style="flex:1"><div class="top">${lt.name}</div><div class="bot">每次 ${lt.step}h</div></div>
-      <button class="del-btn" onclick="delLT(${i})">刪除</button>
-      <div style="width:100%;margin-top:4px;display:flex;gap:4px;align-items:center">
-        <span style="font-size:10px;color:var(--tx2);white-space:nowrap">扣加班</span>
-        <select id="ltOd_${i}" class="input" style="flex:1;padding:4px;font-size:11px" onchange="updateLTOd(${i},this.value)">
-          <option value="0"${lt.otDeduct===0?' selected':''}>0h (公假)</option>
-          <option value="4"${lt.otDeduct===4||lt.otDeduct===undefined?' selected':''}>4h (全薪)</option>
-          <option value="8"${lt.otDeduct===8?' selected':''}>8h (半薪)</option>
-          <option value="12"${lt.otDeduct===12?' selected':''}>12h (無薪)</option>
-        </select>
+        <div id="notifyList" class="notify-list"><div class="loading"></div></div>
       </div>
-    </div>`).join("")}
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bg4)">
-      <label class="form-label">新增假別</label>
-      <div class="form-row"><input id="ltName" class="input" placeholder="中文名稱"></div>
-      <div class="form-row">
-        <select id="ltStep" class="input"><option value="0.5">0.5h 計算</option><option value="1" selected>1h 計算</option></select>
-        <select id="ltOtDeduct" class="input"><option value="0">扣0h(公假)</option><option value="4" selected>扣4h(全薪)</option><option value="8">扣8h(半薪)</option><option value="12">扣12h(無薪)</option></select>
-        <input id="ltColor" type="color" value="#607d8b" style="width:50px;height:40px;border:none;border-radius:8px;cursor:pointer">
-      </div>
-      <button class="add-btn" onclick="addLT()">＋ 新增假別</button>
     </div>
-  </div>`;
-}
 
-function renderAdmins(){
-  return`<div class="card"><h3>👑 超級管理員</h3>
-    ${SUPER_ADMIN.map(e=>`<div class="card-row"><span class="name">🔐 ${e}</span><span class="tag" style="background:var(--amber);color:#000">SUPER</span></div>`).join("")}
+    <!-- ══ Inventory ══ -->
+    <div id="sec-inventory" class="section">
+      <div class="inv-upload">
+        <h3>📦 庫存資料更新</h3>
+        <p>上傳 Excel 檔案自動更新水晶庫存資料</p>
+        <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelUpload(event)">
+        <button class="btn-upload" onclick="document.getElementById('excelFile').click()">📂 選擇 Excel 檔案</button>
+      </div>
+      <div class="inv-current">
+        <h3>目前資料</h3>
+        <div class="inv-count" id="invCount">載入中...</div>
+        <div class="inv-table-wrap" id="invTableWrap"></div>
+        <button class="btn-download" onclick="downloadInventoryJSON()">⬇ 下載 JSON</button>
+      </div>
+    </div>
+
+    <!-- ══ Feedback ══ -->
+    <div id="sec-feedback" class="section">
+      <div class="notify-section">
+        <div class="notify-header">
+          <h3>📊 用戶回饋</h3>
+          <button onclick="clearAllFeedback()" style="padding:4px 12px;border-radius:6px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;font-size:12px;cursor:pointer;float:right;margin-top:-28px">🗑 清除全部</button>
+        </div>
+        <div id="feedbackList" class="notify-list"><div class="loading"></div></div>
+      </div>
+    </div>
+
+    <!-- ══ Worker ══ -->
+    <div id="sec-worker" class="section">
+      <div class="worker-section">
+        <div class="worker-card">
+          <h3>⚡ Worker 狀態</h3>
+          <div class="worker-status">
+            <div class="status-dot" id="workerDot"></div>
+            <span id="workerStatusText">檢查中...</span>
+          </div>
+          <div class="worker-info" id="workerVersion"></div>
+          <a href="https://console.anthropic.com/settings/billing" target="_blank" style="display:inline-block;margin-top:12px;padding:8px 16px;border-radius:8px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.3);color:#a78bfa;font-size:13px;font-weight:600;text-decoration:none">💰 查看 API 餘額</a>
+        </div>
+
+        <div class="worker-card">
+          <h3>🚀 部署 Worker</h3>
+          <p>上傳新的 worker.js 部署到 Cloudflare。需要 Cloudflare API 憑證。</p>
+          <div class="cf-fields">
+            <div class="cf-field">
+              <label>Account ID</label>
+              <input type="text" id="cfAccountId" value="4b1e8e7d70f88962c914932ee8c7655a" autocomplete="off">
+            </div>
+            <div class="cf-field">
+              <label>API Token</label>
+              <input type="password" id="cfApiToken" placeholder="Cloudflare API Token" autocomplete="off">
+            </div>
+            <div class="cf-field">
+              <label>Worker 名稱</label>
+              <input type="text" id="cfWorkerName" value="jy-ai-proxy" autocomplete="off">
+            </div>
+          </div>
+          <input type="file" id="workerFile" accept=".js" style="display:none" onchange="handleWorkerFile(event)">
+          <button class="btn-upload" onclick="document.getElementById('workerFile').click()">📂 選擇 worker.js</button>
+          <div id="workerFileName" style="font-size:12px;color:var(--text-dim);margin-top:8px"></div>
+          <button class="btn-deploy" id="btnDeploy" disabled onclick="deployWorker()">🚀 部署到 Cloudflare</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 用戶管理 ══ -->
+    <div id="sec-users" class="section">
+      <div class="worker-card" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3>👥 已登入用戶</h3>
+          <button onclick="loadUsersData()" style="padding:6px 14px;border-radius:8px;border:1px solid var(--accent);color:var(--accent);background:transparent;font-size:12px;cursor:pointer">🔄 刷新</button>
+        </div>
+        <div id="usersStats" style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap"></div>
+        <div id="usersList" style="display:flex;flex-direction:column;gap:10px"><div class="loading"></div></div>
+      </div>
+    </div>
+
+    <!-- ══ Admin Users ══ -->
+    <div id="sec-admins" class="section">
+      <div class="worker-card" style="margin-bottom:16px">
+        <h3>👤 管理員 Google 帳號白名單</h3>
+        <p>這些 Google 帳號登入後可直接進入管理後台（不需要 Token）</p>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <input type="email" id="newAdminEmail" placeholder="輸入 Google Email" style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--card-border);background:#0d0f14;color:var(--text);font-size:13px;outline:none" onkeydown="if(event.key==='Enter')addAdminUser()">
+          <button onclick="addAdminUser()" style="padding:10px 18px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">＋ 新增</button>
+        </div>
+        <div id="adminUserList" style="display:flex;flex-direction:column;gap:8px"><div class="loading"></div></div>
+      </div>
+    </div>
+
   </div>
-  <div class="card"><h3>📋 單位管理員 (${cfg.admins.length})</h3>
-    ${cfg.admins.length?cfg.admins.map((a,i)=>`<div class="card-row">
-      <div class="info"><div class="top">${a.name||a.email}</div><div class="bot">${a.email} · ${a.unit||"全部單位"}</div></div>
-      <button class="del-btn" onclick="delAdmin(${i})">移除</button>
-    </div>`).join(""):`<div class="empty">尚無單位管理員</div>`}
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bg4)">
-      <label class="form-label">新增管理員</label>
-      <div class="form-row"><input id="adminName" class="input" placeholder="姓名"><input id="adminEmail" class="input" placeholder="Google Email 帳號"></div>
-      <select id="adminUnit" class="input" style="margin-bottom:8px">
-        <option value="">全部單位</option>
-        ${cfg.units.map(u=>`<option value="${u}">${u}</option>`).join("")}
-      </select>
-      <button class="add-btn" onclick="addAdmin()">＋ 新增管理員</button>
-    </div>
-  </div>`;
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// Config
+// ═══════════════════════════════════════════════
+const WORKER_URL = 'https://jy-ai-proxy.onerkk.workers.dev';
+let adminToken = '';
+let inventoryData = [];
+let workerFileContent = null;
+
+// ═══════════════════════════════════════════════
+// Google OAuth（與主站共用 localStorage）
+// ═══════════════════════════════════════════════
+(function(){
+  // 從 hash 取 OAuth callback
+  var hash = window.location.hash || '';
+  var sm = hash.match(/[#&]jy_session=([^&]+)/);
+  var nm = hash.match(/[#&]jy_user=([^&]+)/);
+  if (sm) {
+    try {
+      localStorage.setItem('_jy_session', decodeURIComponent(sm[1]));
+      if (nm) localStorage.setItem('_jy_session_name', decodeURIComponent(nm[1]));
+    } catch(e){}
+    var clean = hash.replace(/[#&]jy_session=[^&]+/,'').replace(/[#&]jy_user=[^&]+/,'').replace(/^#&/,'#').replace(/^#$/,'');
+    history.replaceState({}, '', location.pathname + location.search + clean);
+  }
+})();
+
+function _adminGoogleLogin() {
+  var redirect = encodeURIComponent(window.location.href.split('#')[0]);
+  window.location.href = WORKER_URL + '/auth/google?redirect=' + redirect;
 }
 
-function renderLeaves(){
-  const realLeaves=allLeaves.filter(l=>!l.uid.startsWith("admin_"));
-  return`<div class="card"><h3>📋 本月請假記錄 (${realLeaves.length})</h3>
-    ${realLeaves.length?realLeaves.map(l=>{
-      const lt=cfg.leaveTypes.find(t=>t.id===l.leaveType);
-      const color=lt?lt.color:"#999";
-      const ltName=lt?lt.name:(l.leaveType||"請假");
-      let ts="";
-      if(l.ts&&l.ts.toDate){const d=l.ts.toDate();ts=`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
-      const hrsStr=l.hours?(' '+l.hours+'h'):'';
-      return`<div class="leave-row">
-        <div class="dot" style="background:${color}"></div>
-        <div class="info"><div class="top">${l.name} — ${ltName}${hrsStr}</div><div class="bot">${l.date} · ${l.unit||"未設定"} · 申請：${ts}</div></div>
-        <button class="del-btn" onclick="delLeave('${l._id}')">刪除</button>
-      </div>`
-    }).join(""):`<div class="empty">本月尚無請假記錄</div>`}
-    <button class="add-btn" onclick="loadLeaves().then(()=>render())">🔄 重新載入</button>
-  </div>`;
+function _adminGoogleLogout() {
+  var token = '';
+  try { token = localStorage.getItem('_jy_session') || ''; } catch(e){}
+  if (token) {
+    fetch(WORKER_URL + '/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_token: token })
+    }).catch(function(){});
+  }
+  try { localStorage.removeItem('_jy_session'); localStorage.removeItem('_jy_session_name'); } catch(e){}
+  _updateGoogleAuthBar();
 }
 
-// ═══ PWA INSTALL ═══
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;
-  const bar=document.getElementById("installBar");if(bar)bar.style.display="flex";
-});
-function installPWA(){
-  if(!deferredPrompt)return;
-  deferredPrompt.prompt();
-  deferredPrompt.userChoice.then(r=>{
-    if(r.outcome==='accepted'){const bar=document.getElementById("installBar");if(bar)bar.style.display="none"}
-    deferredPrompt=null;
+function _updateGoogleAuthBar() {
+  var bar = document.getElementById('googleAuthBar');
+  if (!bar) return;
+  var session = '';
+  var name = '';
+  try { session = localStorage.getItem('_jy_session') || ''; } catch(e){}
+  try { name = localStorage.getItem('_jy_session_name') || ''; } catch(e){}
+  if (session) {
+    bar.innerHTML =
+      '<span style="color:#34d399">✦ Google 已登入</span>' +
+      '<span style="color:rgba(255,255,255,.6)">' + (name || '').replace(/</g,'&lt;') + '</span>' +
+      '<button onclick="_adminGoogleLogout()" style="padding:3px 10px;border-radius:6px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);font-size:11px;border:1px solid rgba(255,255,255,.15);cursor:pointer">登出 Google</button>';
+  } else {
+    bar.innerHTML =
+      '<span style="color:var(--warn)">⚠ Google 未登入</span>' +
+      '<span style="color:rgba(255,255,255,.45);font-size:11px">（測試命理工具前請先登入）</span>' +
+      '<button onclick="_adminGoogleLogin()" style="padding:4px 14px;border-radius:6px;background:rgba(255,255,255,.1);color:#fff;font-size:12px;border:1px solid rgba(255,255,255,.15);cursor:pointer;display:flex;align-items:center;gap:4px">' +
+        '<svg width="14" height="14" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#34A853" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#FBBC05" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>' +
+        'Google 登入</button>';
+  }
+}
+
+// 驗證 Google session
+(function(){
+  var s = '';
+  try { s = localStorage.getItem('_jy_session') || ''; } catch(e){}
+  if (s) {
+    fetch(WORKER_URL + '/auth/me', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_token: s })
+    }).then(function(r){ return r.json(); }).then(function(data){
+      if (data.loggedIn) {
+        try { localStorage.setItem('_jy_session_name', data.name || data.email || ''); } catch(e){}
+      } else {
+        try { localStorage.removeItem('_jy_session'); localStorage.removeItem('_jy_session_name'); } catch(e){}
+      }
+      _updateGoogleAuthBar();
+    }).catch(function(){ _updateGoogleAuthBar(); });
+  } else {
+    // 延遲到 DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', _updateGoogleAuthBar);
+    } else {
+      setTimeout(_updateGoogleAuthBar, 0);
+    }
+  }
+})();
+
+// ═══════════════════════════════════════════════
+// Login
+// ═══════════════════════════════════════════════
+function doLogin() {
+  const token = document.getElementById('tokenInput').value.trim();
+  if (!token) return;
+  adminToken = token;
+  // verify by fetching notifications
+  fetch(`${WORKER_URL}/admin/notifications?token=${encodeURIComponent(token)}`)
+    .then(r => {
+      if (r.status === 401) throw new Error('Token 錯誤');
+      return r.json();
+    })
+    .then(() => {
+      localStorage.setItem('jy_admin_token', token);
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('mainApp').style.display = 'block';
+      loadDashboard();
+      loadInventory();
+      checkWorkerStatus();
+      _updateGoogleAuthBar();
+    })
+    .catch(e => {
+      const el = document.getElementById('loginErr');
+      el.textContent = e.message || '連線失敗';
+      el.style.display = 'block';
+    });
+}
+
+// auto-login
+(function() {
+  const saved = localStorage.getItem('jy_admin_token');
+  if (saved) { document.getElementById('tokenInput').value = saved; doLogin(); return; }
+  // ★ Google 白名單自動登入
+  var gs = '';
+  try { gs = localStorage.getItem('_jy_session') || ''; } catch(e){}
+  if (gs) {
+    fetch(WORKER_URL + '/admin/google-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_token: gs })
+    }).then(function(r){ return r.json(); }).then(function(data){
+      if (data.ok && data.admin_token) {
+        adminToken = data.admin_token;
+        localStorage.setItem('jy_admin_token', data.admin_token);
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        loadDashboard(); loadInventory(); checkWorkerStatus(); _updateGoogleAuthBar();
+      }
+    }).catch(function(){});
+  }
+  document.getElementById('tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+})();
+
+// ═══════════════════════════════════════════════
+// Tabs
+// ═══════════════════════════════════════════════
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('sec-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'feedback') loadFeedback();
+    if (tab.dataset.tab === 'admins') loadAdminUsers();
+    if (tab.dataset.tab === 'users') loadUsersData();
+    if (tab.dataset.tab === 'worker') checkWorkerStatus();
   });
+});
+
+// ═══════════════════════════════════════════════
+// Dashboard
+// ═══════════════════════════════════════════════
+async function loadDashboard() {
+  try {
+    const r = await fetch(`${WORKER_URL}/admin/notifications?token=${encodeURIComponent(adminToken)}`);
+    const data = await r.json();
+    const list = data.notifications || [];
+    
+    const today = new Date(Date.now() + 8*3600000).toISOString().slice(0,10);
+    const todayItems = list.filter(n => {
+      if (!n.time) return false;
+      if (n.time.startsWith(today)) return true;
+      try { var d8 = new Date(new Date(n.time).getTime() + 8*3600000); return d8.toISOString().slice(0,10) === today; } catch(_) { return false; }
+    });
+    
+    document.getElementById('s-total').textContent = list.length;
+    document.getElementById('s-today').textContent = todayItems.length;
+    document.getElementById('s-paid').textContent = list.filter(n => n.paid).length;
+    document.getElementById('s-full').textContent = list.filter(n => n.mode === 'full').length;
+    document.getElementById('s-tarot').textContent = list.filter(n => n.mode === 'tarot').length;
+    document.getElementById('s-ootk').textContent = list.filter(n => n.mode === 'ootk').length;
+    document.getElementById('s-followup').textContent = list.filter(n => n.followUp).length;
+    document.getElementById('s-uptime').textContent = '✓';
+    
+    renderNotifications(list);
+  } catch(e) {
+    document.getElementById('notifyList').innerHTML = '<div class="empty">載入失敗: ' + e.message + '</div>';
+  }
 }
 
-// ═══ PWA SERVICE WORKER ═══
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+function renderNotifications(list) {
+  const el = document.getElementById('notifyList');
+  if (!list.length) { el.innerHTML = '<div class="empty">暫無使用紀錄</div>'; return; }
+  
+  el.innerHTML = list.slice(0, 50).map(n => {
+    const modeMap = {
+      'full': ['七維度', 'mode-full'],
+      'tarot': ['塔羅快讀', 'mode-tarot'],
+      'ootk': ['開鑰之法', 'mode-ootk'],
+      'full_followup': ['七維度追問', 'mode-followup'],
+      'tarot_followup': ['塔羅追問', 'mode-followup'],
+      'ootk_followup': ['開鑰追問', 'mode-followup']
+    };
+    const [modeLabel, modeClass] = modeMap[n.mode] || [n.mode, 'mode-full'];
+    const time = n.time ? new Date(n.time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+    
+    return `<div class="notify-item">
+      <div class="notify-meta">
+        <span class="notify-mode ${modeClass}">${modeLabel}</span>
+        <span class="notify-time">${time}</span>
+      </div>
+      <div class="notify-name">${esc(n.name || '匿名')}${n.depth === 'opus' ? ' <span style="color:#c084fc;font-size:10px">🔮Opus</span>' : ''}</div>
+      ${n.email ? `<div style="font-size:11px;color:var(--text-dim);margin-top:1px">📧 ${esc(n.email)}</div>` : ''}
+      ${n.question ? `<div class="notify-q">❓ ${esc(n.question)}</div>` : ''}
+      ${n.photos && n.photos.length ? `<div class="notify-q" style="margin-top:4px;font-size:11px;color:#c084fc">📷 ${n.photos.join(', ')} <button onclick="_loadPhotos('${esc(n._key||'')}',this)" style="margin-left:6px;padding:2px 8px;border-radius:4px;background:rgba(147,51,234,.15);color:#c084fc;border:1px solid rgba(147,51,234,.25);font-size:10px;cursor:pointer">查看照片</button></div>` : ''}
+      ${n.result && n.result.closing ? `<div style="margin-top:6px;padding:6px 10px;border-radius:8px;background:rgba(212,175,55,.08);font-size:12px;color:var(--accent);font-weight:600">✦ ${esc(n.result.closing)}</div>` : ''}
+      ${n.result && n.result.yesNo && n.result.yesNo.length ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">${n.result.yesNo.map(y => '<span style="font-size:10px;padding:1px 6px;border-radius:10px;border:1px solid rgba(212,175,55,.2);color:var(--text-dim)">' + esc(y.q||'') + '：' + esc(y.a||'') + '</span>').join('')}</div>` : ''}
+      ${n.result && n.result.directAnswer ? `<div class="notify-q" style="margin-top:4px">📌 ${esc(n.result.directAnswer.substring(0, 300))}</div>` : ''}
+      ${n.result && n.result.story ? `<details style="margin-top:6px"><summary style="font-size:11px;color:var(--text-dim);cursor:pointer">💬 完整 story（${n.result.story.length}字）</summary><div style="margin-top:4px;font-size:11px;color:var(--text);border-left:2px solid var(--accent);padding-left:8px;white-space:pre-wrap;max-height:300px;overflow-y:auto">${esc(n.result.story)}</div></details>` : (n.story ? `<details style="margin-top:6px"><summary style="font-size:11px;color:var(--text-dim);cursor:pointer">💬 story（舊格式）</summary><div style="margin-top:4px;font-size:11px;color:var(--text);border-left:2px solid var(--accent);padding-left:8px;white-space:pre-wrap;max-height:300px;overflow-y:auto">${esc(n.story)}</div></details>` : '')}
+      ${n.result && n.result.layers ? `<div style="margin-top:4px;font-size:10px;color:var(--text-dim)">${Object.entries(n.result.layers).map(([k,v]) => k + '：' + esc(v)).join(' ｜ ')}</div>` : ''}
+      <div class="notify-badges">
+        ${n.paid ? '<span class="badge badge-paid">💰 付費</span>' : '<span class="badge">免費</span>'}
+        ${n.followUp ? '<span class="badge">追問</span>' : ''}
+        ${n.result && n.result.crystalRec ? '<span class="badge" style="background:rgba(147,51,234,.1);color:#c084fc">💎 ' + esc(n.result.crystalRec) + '</span>' : ''}
+        ${n.usage ? (function(){
+          var isOp = (n.depth === 'opus');
+          var pIn = isOp ? 5 : 3, pOut = isOp ? 25 : 15;
+          var pCR = isOp ? 0.5 : 0.3, pCW = isOp ? 6.25 : 3.75;
+          var inT = n.usage.in||0, outT = n.usage.out||0, cR = n.usage.cache_r||0, cW = n.usage.cache_w||0;
+          var regIn = Math.max(0, inT - cR - cW);
+          var usd = (regIn*pIn + cR*pCR + cW*pCW + outT*pOut) / 1e6;
+          var twd = (usd * 32).toFixed(1);
+          return '<span class="badge" style="background:rgba(212,175,55,.1);color:var(--accent)">≈NT$' + twd + '</span>' +
+            '<span class="badge" style="opacity:.35;font-size:9px">' + (isOp?'Opus':'Sonnet') + ' In:' + inT.toLocaleString() + (cR ? ' Cache:'+Math.round(cR/1000)+'K' : '') + ' Out:' + outT.toLocaleString() + '</span>';
+        })() : ''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
-// ═══ INIT ═══
-render();
+// ★ v39：查看用戶照片
+async function _loadPhotos(nKey, btn) {
+  if (!nKey) return;
+  btn.textContent = '載入中...';
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${WORKER_URL}/admin/photos?token=${encodeURIComponent(adminToken)}&key=${encodeURIComponent(nKey)}`);
+    const data = await r.json();
+    const photos = data.photos || {};
+    const keys = Object.keys(photos);
+    if (!keys.length) { btn.textContent = '無照片'; return; }
+    const labels = { face:'臉部', palmLeft:'左手掌', palmRight:'右手掌', crystal:'水晶' };
+    var container = btn.closest('.notify-q');
+    var gallery = document.createElement('div');
+    gallery.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:8px';
+    keys.forEach(function(k) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'text-align:center';
+      var img = document.createElement('img');
+      var src = photos[k];
+      if (src && src.indexOf('data:') !== 0) src = 'data:image/jpeg;base64,' + src;
+      img.src = src;
+      img.style.cssText = 'width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,.1)';
+      var label = document.createElement('div');
+      label.style.cssText = 'font-size:10px;color:var(--text-dim);margin-top:2px';
+      label.textContent = labels[k] || k;
+      wrap.appendChild(img);
+      wrap.appendChild(label);
+      gallery.appendChild(wrap);
+    });
+    container.appendChild(gallery);
+    btn.style.display = 'none';
+  } catch(e) {
+    btn.textContent = '載入失敗';
+    console.error(e);
+  }
+}
+
+async function clearNotifications() {
+  if (!confirm('確定清除所有使用紀錄？')) return;
+  try {
+    await fetch(`${WORKER_URL}/admin/notifications?token=${encodeURIComponent(adminToken)}`, { method: 'DELETE' });
+    toast('已清除');
+    loadDashboard();
+  } catch(e) { toast('清除失敗: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════
+// Feedback
+// ═══════════════════════════════════════════════
+// ★ v42：清除全部回饋
+async function clearAllFeedback() {
+  if (!confirm('確定清除全部回饋？此操作不可復原。')) return;
+  try {
+    const r = await fetch(`${WORKER_URL}/admin/feedback?token=${encodeURIComponent(adminToken)}`, { method: 'DELETE' });
+    const data = await r.json();
+    alert('已清除 ' + (data.deleted || 0) + ' 筆回饋');
+    loadFeedback();
+  } catch(e) { alert('清除失敗: ' + e.message); }
+}
+
+async function loadFeedback() {
+  const el = document.getElementById('feedbackList');
+  el.innerHTML = '<div class="loading"></div>';
+  try {
+    const r = await fetch(`${WORKER_URL}/admin/feedback?token=${encodeURIComponent(adminToken)}`);
+    const data = await r.json();
+    const list = data.feedbacks || [];
+    if (!list.length) { el.innerHTML = '<div class="empty">暫無回饋</div>'; return; }
+    el.innerHTML = list.map(fb => {
+      const time = fb.time ? new Date(fb.time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+      const ratingIcon = fb.rating === 'good' ? '👍 準' : '👎 不準';
+      const ratingClass = fb.rating === 'good' ? 'mode-tarot' : 'mode-followup';
+      const toolMap = { tarot: '🃏塔羅', ootk: '🔑開鑰', full: '🌙七維度' };
+      const toolBadge = fb.tool ? `<span class="notify-mode" style="background:rgba(212,175,55,.15);color:var(--gold)">${toolMap[fb.tool] || fb.tool}</span>` : '';
+      return `<div class="notify-item">
+        <div class="notify-meta">
+          <span class="notify-mode ${ratingClass}">${ratingIcon}</span>
+          ${toolBadge}
+          <span class="notify-time">${time}</span>
+        </div>
+        <div class="notify-name">${esc(fb.name || '匿名')}</div>
+        ${(fb.birth || fb.gender || fb.birthLocation) ? `<div class="notify-q" style="font-size:11px;color:var(--text-dim)">👤 ${[fb.gender === 'male' ? '男' : fb.gender === 'female' ? '女' : fb.gender, fb.birth, fb.birthTime, fb.birthLocation].filter(Boolean).map(esc).join(' ・ ')}</div>` : ''}
+        ${fb.question ? `<div class="notify-q">❓ ${esc(fb.question)}</div>` : ''}
+        ${fb.reasons ? `<div class="notify-q" style="margin-top:4px;color:var(--danger)">原因：${esc(fb.reasons)}</div>` : ''}
+        ${fb.comment ? `<div class="notify-q" style="margin-top:4px;color:var(--text-dim)">💬 ${esc(fb.comment)}</div>` : ''}
+        ${fb.cards ? `<div class="notify-q" style="margin-top:6px;font-size:11px;color:var(--text-dim);border-top:1px solid rgba(255,255,255,.06);padding-top:6px">🃏 ${esc(fb.cards)}</div>` : ''}
+        ${fb.aiClosing ? `<div class="notify-q" style="margin-top:4px;font-size:11px;color:var(--gold)">🔮 Closing: ${esc(fb.aiClosing)}</div>` : ''}
+        ${fb.aiDirectAnswer ? `<div class="notify-q" style="margin-top:4px;font-size:11px;color:var(--text-dim)">📋 ${esc(fb.aiDirectAnswer.substring(0,150))}${fb.aiDirectAnswer.length > 150 ? '…' : ''}</div>` : ''}
+        ${fb.aiYesNo ? `<div class="notify-q" style="margin-top:4px;font-size:11px;color:var(--text-dim)">🏷 ${esc(fb.aiYesNo)}</div>` : ''}
+        ${fb.aiStory ? `<details style="margin-top:6px"><summary style="font-size:11px;color:var(--text-dim);cursor:pointer">📖 展開完整 story</summary><div class="notify-q" style="margin-top:4px;font-size:11px;color:var(--text-dim);white-space:pre-wrap;max-height:300px;overflow-y:auto">${esc(fb.aiStory)}</div></details>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = '<div class="empty">載入失敗: ' + e.message + '</div>'; }
+}
+
+// ═══════════════════════════════════════════════
+// Inventory
+// ═══════════════════════════════════════════════
+async function loadInventory() {
+  try {
+    const r = await fetch(`${WORKER_URL}/admin/inventory?token=${encodeURIComponent(adminToken)}`);
+    const data = await r.json();
+    inventoryData = data.items || [];
+    renderInventory();
+    document.getElementById('s-inv').textContent = inventoryData.length;
+  } catch(e) {
+    document.getElementById('invCount').textContent = '載入失敗';
+  }
+}
+
+function renderInventory() {
+  document.getElementById('invCount').textContent = `品項數: ${inventoryData.length}`;
+  const wrap = document.getElementById('invTableWrap');
+  
+  if (!inventoryData.length) {
+    wrap.innerHTML = '<div class="empty">尚無庫存資料，請上傳 Excel</div>';
+    return;
+  }
+  
+  // get all keys from first item
+  const keys = Object.keys(inventoryData[0]);
+  
+  wrap.innerHTML = `<table class="inv-table">
+    <thead><tr>${keys.map(k => `<th>${esc(k)}</th>`).join('')}<th>操作</th></tr></thead>
+    <tbody>${inventoryData.map((item, i) => 
+      `<tr>${keys.map(k => `<td>${esc(String(item[k]||''))}</td>`).join('')}<td><button class="btn-del-item" onclick="deleteInvItem(${i})">✕</button></td></tr>`
+    ).join('')}</tbody>
+  </table>`;
+}
+
+function handleExcelUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = async function(ev) {
+    try {
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      // 優先讀「進銷總表」
+      const sheetName = wb.SheetNames.find(s => s === '進銷總表') || wb.SheetNames.find(s => s.includes('進銷')) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      
+      // 找到真正的標題行（含「品項」或「品名」或「水晶」的那行）
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      let headerRow = 0;
+      for (let r = range.s.r; r <= Math.min(range.s.r + 10, range.e.r); r++) {
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const cell = ws[XLSX.utils.encode_cell({r, c})];
+          const val = cell ? String(cell.v || '') : '';
+          if (val.includes('品項') || val.includes('品名') || val.includes('水晶名稱')) {
+            headerRow = r;
+            break;
+          }
+        }
+        if (headerRow > 0) break;
+      }
+      
+      const json = XLSX.utils.sheet_to_json(ws, { range: headerRow, defval: '' });
+      // 過濾空行（品項名稱為空的）
+      const filtered = json.filter(row => {
+        const name = row['品項名稱'] || row['品名'] || row['水晶名稱'] || row['name'] || '';
+        return name && typeof name === 'string' && name.length > 0;
+      });
+      
+      if (!filtered.length) { toast('找不到有效的庫存資料'); return; }
+      
+      // upload to KV
+      const r = await fetch(`${WORKER_URL}/admin/inventory?token=${encodeURIComponent(adminToken)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: filtered })
+      });
+      const result = await r.json();
+      
+      if (result.ok) {
+        inventoryData = filtered;
+        renderInventory();
+        document.getElementById('s-inv').textContent = filtered.length;
+        toast(`已更新 ${filtered.length} 筆庫存資料`);
+      } else {
+        toast('更新失敗: ' + (result.error || ''));
+      }
+    } catch(err) {
+      toast('解析失敗: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+}
+
+async function deleteInvItem(idx) {
+  inventoryData.splice(idx, 1);
+  // save back
+  try {
+    await fetch(`${WORKER_URL}/admin/inventory?token=${encodeURIComponent(adminToken)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: inventoryData })
+    });
+    renderInventory();
+    document.getElementById('s-inv').textContent = inventoryData.length;
+    toast('已刪除');
+  } catch(e) { toast('刪除失敗'); }
+}
+
+function downloadInventoryJSON() {
+  if (!inventoryData.length) { toast('沒有資料'); return; }
+  const blob = new Blob([JSON.stringify(inventoryData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'crystal_inventory.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════
+// Worker Management
+// ═══════════════════════════════════════════════
+async function checkWorkerStatus() {
+  try {
+    const r = await fetch(`${WORKER_URL}/version`);
+    const data = await r.json();
+    document.getElementById('workerDot').className = 'status-dot';
+    document.getElementById('workerStatusText').textContent = '運行中';
+    document.getElementById('workerVersion').textContent = `版本: ${data.version || 'unknown'} | 部署: ${data.deployed ? new Date(data.deployed).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) : '-'}`;
+  } catch(e) {
+    document.getElementById('workerDot').className = 'status-dot offline';
+    document.getElementById('workerStatusText').textContent = '離線';
+  }
+  
+  // restore CF credentials (localStorage = 永久保存)
+  const saved = localStorage.getItem('jy_cf_creds');
+  if (saved) {
+    try {
+      const c = JSON.parse(saved);
+      if (c.accountId) document.getElementById('cfAccountId').value = c.accountId;
+      if (c.workerName) document.getElementById('cfWorkerName').value = c.workerName;
+      if (c.apiToken) document.getElementById('cfApiToken').value = c.apiToken;
+    } catch(_) {}
+  }
+}
+
+function handleWorkerFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    workerFileContent = ev.target.result;
+    document.getElementById('workerFileName').textContent = `✓ ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+    document.getElementById('btnDeploy').disabled = false;
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+async function deployWorker() {
+  const accountId = document.getElementById('cfAccountId').value.trim();
+  const apiToken = document.getElementById('cfApiToken').value.trim();
+  const workerName = document.getElementById('cfWorkerName').value.trim() || 'jy-ai-proxy';
+  
+  if (!accountId || !apiToken) { toast('請填入 Cloudflare Account ID 和 API Token'); return; }
+  if (!workerFileContent) { toast('請先選擇 worker.js 檔案'); return; }
+  
+  // save creds to localStorage (永久保存，下次自動帶入)
+  localStorage.setItem('jy_cf_creds', JSON.stringify({ accountId, workerName, apiToken }));
+  
+  const btn = document.getElementById('btnDeploy');
+  btn.disabled = true;
+  btn.textContent = '⏳ 部署中...';
+  
+  try {
+    // 透過 Worker 中轉部署（避免 CORS 問題）
+    const r = await fetch(
+      `${WORKER_URL}/admin/deploy-worker?token=${encodeURIComponent(adminToken)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, apiToken, workerName, code: workerFileContent })
+      }
+    );
+    
+    const result = await r.json();
+    
+    if (result.success) {
+      toast('✓ Worker 部署成功！');
+      checkWorkerStatus();
+    } else {
+      const errMsg = result.errors?.map(e => e.message).join(', ') || result.error || '部署失敗';
+      toast('✗ ' + errMsg);
+    }
+  } catch(e) {
+    toast('部署錯誤: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🚀 部署到 Cloudflare';
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Admin User Management
+// ═══════════════════════════════════════════════
+async function loadAdminUsers() {
+  const el = document.getElementById('adminUserList');
+  el.innerHTML = '<div class="loading"></div>';
+  try {
+    const r = await fetch(`${WORKER_URL}/admin/users?token=${encodeURIComponent(adminToken)}`);
+    const data = await r.json();
+    const users = data.users || [];
+    if (!users.length) { el.innerHTML = '<div class="empty">尚未新增管理員帳號</div>'; return; }
+    el.innerHTML = users.map(email =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--card-border);border-radius:10px;padding:12px 14px">
+        <span style="font-size:13px">${esc(email)}</span>
+        <button onclick="removeAdminUser('${email.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;padding:2px 6px">✕</button>
+      </div>`
+    ).join('');
+  } catch(e) { el.innerHTML = '<div class="empty">載入失敗: ' + e.message + '</div>'; }
+}
+
+async function addAdminUser() {
+  const input = document.getElementById('newAdminEmail');
+  const email = input.value.trim().toLowerCase();
+  if (!email || !email.includes('@')) { toast('請輸入有效的 Email'); return; }
+  try {
+    const r = await fetch(`${WORKER_URL}/admin/users?token=${encodeURIComponent(adminToken)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await r.json();
+    if (data.ok) { toast('✓ 已新增 ' + email); input.value = ''; loadAdminUsers(); }
+    else { toast('失敗: ' + (data.error || '')); }
+  } catch(e) { toast('錯誤: ' + e.message); }
+}
+
+async function removeAdminUser(email) {
+  if (!confirm('確定移除 ' + email + '？')) return;
+  try {
+    const r = await fetch(`${WORKER_URL}/admin/users?token=${encodeURIComponent(adminToken)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await r.json();
+    if (data.ok) { toast('✓ 已移除'); loadAdminUsers(); }
+    else { toast('失敗: ' + (data.error || '')); }
+  } catch(e) { toast('錯誤: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════
+// 用戶管理
+// ═══════════════════════════════════════════════
+let _usersCache = [];
+async function loadUsersData() {
+  const el = document.getElementById('usersList');
+  el.innerHTML = '<div class="loading"></div>';
+  try {
+    const r = await fetch(`${WORKER_URL}/admin/users-data?token=${encodeURIComponent(adminToken)}`);
+    const data = await r.json();
+    _usersCache = data.users || [];
+    const totalUsers = _usersCache.length;
+    const members = _usersCache.filter(u => u.plan === 'member').length;
+    const freeUsers = totalUsers - members;
+
+    document.getElementById('usersStats').innerHTML =
+      `<span style="padding:6px 14px;border-radius:8px;background:rgba(108,123,255,.1);color:var(--accent);font-size:13px;font-weight:600">👥 ${totalUsers} 位用戶</span>` +
+      `<span style="padding:6px 14px;border-radius:8px;background:rgba(251,191,36,.1);color:var(--warn);font-size:13px;font-weight:600">👑 ${members} 位會員</span>` +
+      `<span style="padding:6px 14px;border-radius:8px;background:rgba(122,127,142,.15);color:var(--text-dim);font-size:13px;font-weight:600">🆓 ${freeUsers} 位免費</span>`;
+
+    if (!_usersCache.length) { el.innerHTML = '<div class="empty">尚無登入用戶</div>'; return; }
+    renderUsersList(_usersCache);
+  } catch(e) { el.innerHTML = '<div class="empty">載入失敗: ' + e.message + '</div>'; }
+}
+
+function renderUsersList(users) {
+  const el = document.getElementById('usersList');
+  el.innerHTML = users.map((u, idx) => {
+    const isMember = u.plan === 'member';
+    const planBadge = isMember
+      ? `<span style="padding:2px 8px;border-radius:4px;background:rgba(251,191,36,.15);color:var(--warn);font-size:11px;font-weight:600">👑 會員</span>`
+      : `<span style="padding:2px 8px;border-radius:4px;background:rgba(122,127,142,.15);color:var(--text-dim);font-size:11px;font-weight:600">🆓 免費</span>`;
+    const expires = isMember && u.subExpires
+      ? `<span style="font-size:10px;color:var(--text-dim)">到期 ${new Date(u.subExpires).toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei'})}</span>`
+      : '';
+
+    // 使用次數行
+    let quotaRows = '';
+    if (!isMember) {
+      quotaRows = `<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim)" data-user-idx="${idx}">
+        免費已用: <strong style="color:${u.freeUsed >= u.freeLimit ? 'var(--danger)' : 'var(--text)'}">${u.freeUsed}/${u.freeLimit}</strong>
+        <button onclick="_editQuota(${idx},'free_total',${u.freeUsed})" style="padding:1px 6px;border-radius:4px;background:rgba(108,123,255,.1);color:var(--accent);border:1px solid rgba(108,123,255,.2);font-size:10px;cursor:pointer">✏️</button>
+        <span style="margin-left:4px">上限:</span>
+        <strong style="color:var(--text)">${u.freeLimit}</strong>
+        <button onclick="_editQuota(${idx},'free_limit',${u.freeLimit})" style="padding:1px 6px;border-radius:4px;background:rgba(251,191,36,.1);color:var(--warn);border:1px solid rgba(251,191,36,.2);font-size:10px;cursor:pointer">✏️</button>
+      </div>`;
+    } else {
+      quotaRows = `<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--text-dim)" data-user-idx="${idx}">
+        <span>塔羅日: <strong style="color:var(--text)">${u.subDailyUsed}</strong><button onclick="_editQuota(${idx},'sub_daily',${u.subDailyUsed})" style="padding:1px 5px;border-radius:4px;background:rgba(108,123,255,.1);color:var(--accent);border:1px solid rgba(108,123,255,.2);font-size:10px;cursor:pointer;margin:0 1px">✏️</button>/<strong style="color:var(--warn)">${u.subDailyLimit}</strong><button onclick="_editQuota(${idx},'sub_daily_limit',${u.subDailyLimit})" style="padding:1px 5px;border-radius:4px;background:rgba(251,191,36,.1);color:var(--warn);border:1px solid rgba(251,191,36,.2);font-size:10px;cursor:pointer;margin-left:1px">✏️</button>
+        </span>
+        <span>七維月: <strong style="color:var(--text)">${u.d7MonthUsed}</strong><button onclick="_editQuota(${idx},'7d_month',${u.d7MonthUsed})" style="padding:1px 5px;border-radius:4px;background:rgba(108,123,255,.1);color:var(--accent);border:1px solid rgba(108,123,255,.2);font-size:10px;cursor:pointer;margin:0 1px">✏️</button>/<strong style="color:var(--warn)">${u.d7MonthLimit}</strong><button onclick="_editQuota(${idx},'7d_limit',${u.d7MonthLimit})" style="padding:1px 5px;border-radius:4px;background:rgba(251,191,36,.1);color:var(--warn);border:1px solid rgba(251,191,36,.2);font-size:10px;cursor:pointer;margin-left:1px">✏️</button>
+        </span>
+        <span>Opus月: <strong style="color:var(--text)">${u.opusMonthUsed}</strong><button onclick="_editQuota(${idx},'opus_month',${u.opusMonthUsed})" style="padding:1px 5px;border-radius:4px;background:rgba(108,123,255,.1);color:var(--accent);border:1px solid rgba(108,123,255,.2);font-size:10px;cursor:pointer;margin:0 1px">✏️</button>/<strong style="color:var(--warn)">${u.opusMonthLimit}</strong><button onclick="_editQuota(${idx},'opus_limit',${u.opusMonthLimit})" style="padding:1px 5px;border-radius:4px;background:rgba(251,191,36,.1);color:var(--warn);border:1px solid rgba(251,191,36,.2);font-size:10px;cursor:pointer;margin-left:1px">✏️</button>
+        </span>
+      </div>`;
+    }
+
+    // 授予/撤銷會員按鈕
+    const subAction = isMember
+      ? `<button onclick="_setSubscription('${u.email.replace(/'/g,"\\'")}','revoke')" style="padding:3px 10px;border-radius:6px;background:rgba(248,113,113,.1);color:var(--danger);border:1px solid rgba(248,113,113,.2);font-size:11px;cursor:pointer">撤銷會員</button>`
+      : `<button onclick="_setSubscription('${u.email.replace(/'/g,"\\'")}','grant')" style="padding:3px 10px;border-radius:6px;background:rgba(52,211,153,.1);color:var(--success);border:1px solid rgba(52,211,153,.2);font-size:11px;cursor:pointer">授予會員</button>`;
+
+    return `<div style="background:var(--card);border:1px solid var(--card-border);border-radius:10px;padding:14px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <div style="font-size:14px;font-weight:600">${esc(u.name || '未命名')}</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:2px">${esc(u.email)}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          ${planBadge}
+          ${subAction}
+        </div>
+      </div>
+      ${expires ? `<div style="margin-bottom:4px">${expires}</div>` : ''}
+      ${quotaRows}
+    </div>`;
+  }).join('');
+}
+
+function _editQuota(idx, quotaType, currentVal) {
+  const u = _usersCache[idx];
+  if (!u) return;
+  const labels = { free_total: '免費已用次數', free_limit: '免費上限', sub_daily: '今日塔羅/OOTK已用', '7d_month': '本月七維度已用', opus_month: '本月Opus已用', sub_daily_limit: '塔羅/OOTK每日上限', '7d_limit': '七維度每月上限', opus_limit: 'Opus每月上限' };
+  const newVal = prompt(`${u.email}\n修改【${labels[quotaType]}】\n目前: ${currentVal}\n\n輸入新數值:`, currentVal);
+  if (newVal === null) return;
+  const v = parseInt(newVal);
+  if (isNaN(v) || v < 0) { toast('請輸入有效數字'); return; }
+  fetch(`${WORKER_URL}/admin/update-quota?token=${encodeURIComponent(adminToken)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: u.email, quotaType, value: v })
+  }).then(r => r.json()).then(data => {
+    if (data.ok) { toast('✓ 已更新 ' + labels[quotaType] + ' → ' + v); loadUsersData(); }
+    else { toast('失敗: ' + (data.error || '')); }
+  }).catch(e => toast('錯誤: ' + e.message));
+}
+
+async function _setSubscription(email, action) {
+  const label = action === 'grant' ? '授予會員' : '撤銷會員';
+  if (!confirm(`確定要${label}？\n${email}`)) return;
+  let days = 30;
+  if (action === 'grant') {
+    const d = prompt('會員天數:', '30');
+    if (d === null) return;
+    days = parseInt(d) || 30;
+  }
+  try {
+    const r = await fetch(`${WORKER_URL}/admin/set-subscription?token=${encodeURIComponent(adminToken)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, action, days })
+    });
+    const data = await r.json();
+    if (data.ok) { toast(`✓ ${label}成功`); loadUsersData(); }
+    else { toast('失敗: ' + (data.error || '')); }
+  } catch(e) { toast('錯誤: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════════
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// PWA Service Worker 註冊
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('admin-sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
