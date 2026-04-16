@@ -15,7 +15,7 @@ fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user;fbAuthReady=true
 setTimeout(()=>{if(!fbAuthReady){fbAuthReady=true;render()}},3000);
 let _loading=false;
 async function cloudSave(force){if(!fbUser||(!force&&_loading))return;try{const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",displayName:fbUser.displayName||"",email:fbUser.email||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};if(JSON.stringify(NOTES)==='{}'){delete payload.notes}await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true})}catch(e){console.log("cloudSave err",e)}}
-async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();let needEpSave=false;if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;if(!d.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length};needEpSave=true};S.step="cal";const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true});try{localStorage.setItem("sb_c",dd)}catch(e){}sCk("sb_c",dd,3650)}if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}if(d.al){try{AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{}}catch(e){}}if(d.notes){try{const raw=d.notes;const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});if(Object.keys(_n).length){NOTES=_n;sNotes()}}catch(e){}}if(d.lockedUnit){S.unit=d.lockedUnit;S.lockedUnit=d.lockedUnit}else if(d.unit){S.unit=d.unit}if(d.lockedRt){S.lockedRt=d.lockedRt;if(R[d.lockedRt]){S.rt=d.lockedRt;if(S.pos===null&&d.pos!==null&&d.pos!==undefined)S.pos=d.pos;if(S.pos===null)S.pos=0;S.step="cal"}}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)};_loading=false;if(needEpSave)cloudSave(true);sEv();sAL();render();setTimeout(render,1000)}else{_loading=false;render()}}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
+async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;S.step="cal";const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true,unit:S.unit||""});try{localStorage.setItem("sb_c",dd)}catch(e){}sCk("sb_c",dd,3650)}if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}if(d.al){try{AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{}}catch(e){}}if(d.notes){try{const raw=d.notes;const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});if(Object.keys(_n).length){NOTES=_n;sNotes()}}catch(e){}}if(d.lockedUnit){S.unit=d.lockedUnit;S.lockedUnit=d.lockedUnit}else if(d.unit){S.unit=d.unit}if(d.lockedRt){S.lockedRt=d.lockedRt;if(R[d.lockedRt]){S.rt=d.lockedRt;if(S.pos===null&&d.pos!==null&&d.pos!==undefined)S.pos=d.pos;if(S.pos===null)S.pos=0;S.step="cal"}}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)};_loading=false;sEv();sAL();render();setTimeout(render,1000)}else{_loading=false;render()}}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
 let fbLoginPending=false;
 function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
   fbLoginPending=true;render();
@@ -111,6 +111,8 @@ const EI=["meeting","health","class","biztrip","pay","annualL","custom"];
 const EE={meeting:"📋",health:"🏥","class":"📚",biztrip:"🚗",pay:"💰",annualL:"🌴",custom:"📝"};
 const NOW=new Date(),TY=NOW.getFullYear(),TM=NOW.getMonth()+1,TD=NOW.getDate(),TR=new Date(TY,TM-1,TD);
 const EPOCH=new Date(2024,0,1);
+const EPOCH_UTC=Date.UTC(2024,0,1);
+function dayOff(y,m,d){return Math.floor((Date.UTC(y,m-1,d)-EPOCH_UTC)/864e5)}
 function getSeason(){const m=new Date().getMonth()+1;if(m>=3&&m<=5)return'spring';if(m>=6&&m<=8)return'summer';if(m>=9&&m<=11)return'autumn';return'winter'}
 
 
@@ -173,13 +175,13 @@ function alRem(){const a=getAL();return Math.max(0,(a.total||0)-alUsed())}
 let DP=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();DP=e;render()});
 function sCk(k,v,d){const e=new Date();e.setTime(e.getTime()+d*864e5);document.cookie=k+"="+encodeURIComponent(v)+";expires="+e.toUTCString()+";path=/;SameSite=Lax"}
 function gCk(k){const m=document.cookie.match(new RegExp('(?:^|; )'+k+'=([^;]*)'));return m?decodeURIComponent(m[1]):null}
-try{const c=JSON.parse(localStorage.getItem("sb_c"))||JSON.parse(gCk("sb_c"));if(c&&c.rt&&c.pos!==null&&c.pos!==undefined){S.rt=c.rt;S.pos=c.pos;if(c.unit)S.unit=c.unit;if(!c.ep){const cc=R[S.rt]?R[S.rt].c:[];if(cc.length){const todOff=Math.round((TR-EPOCH)/864e5);S.pos=((S.pos-todOff%cc.length)+cc.length*1000)%cc.length};sv()}S.step="cal"}}catch(e){}
+try{const c=JSON.parse(localStorage.getItem("sb_c"))||JSON.parse(gCk("sb_c"));if(c&&c.rt&&c.pos!==null&&c.pos!==undefined){S.rt=c.rt;S.pos=c.pos;if(c.unit)S.unit=c.unit;S.step="cal"}}catch(e){}
 function sv(){const d=JSON.stringify({rt:S.rt,pos:S.pos,ep:true,unit:S.unit||""});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650);cloudSave(true)}
 function rot(){return S.rt?R[S.rt]:null}
 function cyc(){return rot()?rot().c:[]}
 function dim(y,m){return new Date(y,m,0).getDate()}
 function fdw(y,m){return new Date(y,m-1,1).getDay()}
-function gs(y,m,d){const c=cyc();if(!c.length||S.pos===null)return null;let p=(S.pos+Math.round((new Date(y,m-1,d)-EPOCH)/864e5))%c.length;if(p<0)p+=c.length;return c[p]}
+function gs(y,m,d){const c=cyc();if(!c.length||S.pos===null)return null;let p=(S.pos+dayOff(y,m,d))%c.length;if(p<0)p+=c.length;return c[p]}
 function ek(y,m,d){return`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function hk(m,d){return`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function gh(y,m,d){const h=getHOL(y,m,d);if(!h)return null;return h[lang]||null}
@@ -620,8 +622,8 @@ function handle(e){
     case "wn":S.wN=el.dataset.v;S.wD=null;break;
     case "wizShift":S.wT="w";S.wS=el.dataset.v;S.wD=null;break;
     case "wizOff":{S.wT="o";S.wD=null;const sh=[...new Set(cyc().filter(x=>x!=="休"))];if(sh.length===1){S.wN=sh[0]}break}
-    case "wwd":{S.wD=+el.dataset.v;const ci=rW(S.wS,S.wD),c=cyc(),todOff=Math.round((TR-EPOCH)/864e5);S.pos=((ci-todOff%c.length)+c.length*1000)%c.length;S.step="cal";sv();break;}
-    case "wod":{S.wD=+el.dataset.v;const ci=rO(S.wN,S.wD),c=cyc(),todOff=Math.round((TR-EPOCH)/864e5);S.pos=((ci-todOff%c.length)+c.length*1000)%c.length;S.step="cal";sv();break;}
+    case "wwd":{S.wD=+el.dataset.v;const ci=rW(S.wS,S.wD),c=cyc(),todOff=dayOff(TY,TM,TD);S.pos=((ci-todOff%c.length)+c.length*1000)%c.length;S.step="cal";sv();break;}
+    case "wod":{S.wD=+el.dataset.v;const ci=rO(S.wN,S.wD),c=cyc(),todOff=dayOff(TY,TM,TD);S.pos=((ci-todOff%c.length)+c.length*1000)%c.length;S.step="cal";sv();break;}
     case "prev":if(S.mo===1){S.yr--;S.mo=12}else S.mo--;loadLeaves();loadAdminEv();break;
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();break;
     case "today":S.yr=TY;S.mo=TM;loadLeaves();loadAdminEv();break;

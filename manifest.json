@@ -1,8 +1,10 @@
 {
+  "id": "/myshift/",
   "name": "My Shift 我的班表",
   "short_name": "我的班表",
   "description": "輪班排班表 / Jadwal Kerja Shift",
-  "start_url": "./index.html",
+  "start_url": "/myshift/index.html",
+  "scope": "/myshift/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#e8f4fd",
@@ -23,7 +25,7 @@
   "shortcuts": [
     {
       "name": "我的班表",
-      "url": "./index.html",
+      "url": "/myshift/index.html",
       "icons": [{"src": "icons/icon-96x96.png", "sizes": "96x96"}]
     }
   ]
