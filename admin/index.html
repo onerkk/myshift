@@ -1,28 +1,21 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" translate="no">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>管理後台 / Admin Panel</title>
-<style>body{font-family:system-ui;padding:40px;text-align:center;color:#444}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="google" content="notranslate">
+<meta name="theme-color" content="#0f0f1a">
+<link rel="manifest" href="/myshift/admin/manifest.json">
+<link rel="apple-touch-icon" href="/myshift/admin/icon-192.png">
+<title>班表管理後台</title>
+<link rel="stylesheet" href="/myshift/admin/admin.css?v=1">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
-<body>
-<p>正在前往管理後台 / Redirecting to admin panel...</p>
-<p><a id="lnk" href="./admin/">點此繼續 / Tap to continue</a></p>
-<script>
-(function(){
-  var target = location.origin + '/myshift/admin/';
-  document.getElementById('lnk').href = target;
-  try {
-    if (window.top && window.top !== window) {
-      window.top.location.href = target;
-    } else {
-      window.location.replace(target);
-    }
-  } catch(e) {
-    window.location.replace(target);
-  }
-})();
-</script>
+<body translate="no">
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+<script src="/myshift/admin/admin.js?v=1"></script>
 </body>
 </html>

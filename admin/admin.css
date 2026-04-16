@@ -1,0 +1,62 @@
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100vh;background:#0f0f1a;color:#e8e8f0;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;font-size:14px}
+#app{max-width:720px;margin:0 auto;padding:12px;padding-bottom:60px}
+.hd{display:flex;align-items:center;gap:10px;padding:12px 4px;margin-bottom:12px;border-bottom:1px solid #2a2a3a}
+.hd h1{font-size:16px;font-weight:700;flex:1}
+.hd .u{font-size:11px;color:#888}
+.btn{background:#3a8fd4;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:active{opacity:.7}
+.btn.sm{padding:4px 10px;font-size:11px}
+.btn.red{background:#e74c3c}
+.btn.gray{background:#555}
+.btn.green{background:#27ae60}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.tabs{display:flex;gap:4px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.tab{background:#1a1a2a;color:#aaa;border:1px solid #2a2a3a;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.tab.active{background:#3a8fd4;color:#fff;border-color:#3a8fd4}
+.card{background:#1a1a2a;border:1px solid #2a2a3a;border-radius:10px;padding:14px;margin-bottom:12px}
+.card h2{font-size:13px;font-weight:700;margin-bottom:10px;color:#8ab4e8}
+.row{display:flex;align-items:center;gap:8px;padding:8px;background:#222237;border-radius:8px;margin-bottom:6px}
+.row .info{flex:1;min-width:0}
+.row .name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sub{font-size:11px;color:#888;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .color-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.add-box{background:#0f0f1a;border:1px dashed #3a3a4a;border-radius:8px;padding:10px;margin-top:10px}
+.add-box label{font-size:10px;color:#888;display:block;margin-bottom:4px}
+.inp{width:100%;background:#0f0f1a;color:#e8e8f0;border:1px solid #3a3a4a;border-radius:6px;padding:8px;font-size:13px;font-family:inherit}
+.inp:focus{outline:none;border-color:#3a8fd4}
+textarea.inp{resize:vertical;min-height:60px;font-family:ui-monospace,monospace}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.login-box{max-width:360px;margin:60px auto;text-align:center;padding:30px 20px;background:#1a1a2a;border-radius:16px;border:1px solid #2a2a3a}
+.login-box h1{font-size:20px;margin-bottom:20px}
+.login-box p{color:#888;margin-bottom:20px;font-size:13px}
+.loading{text-align:center;padding:40px;color:#888}
+.empty{text-align:center;padding:20px;color:#666;font-size:12px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.toast.err{background:#e74c3c}
+.toast.ok{background:#27ae60}
+.cycle-chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+.chip{background:#2a2a3a;border-radius:4px;padding:2px 6px;font-size:10px}
+.chip.e{background:#1e3a5f;color:#8ab4e8}
+.chip.m{background:#5a4a1e;color:#f4c770}
+.chip.n{background:#4a1e5f;color:#c48ae8}
+.chip.o{background:#333;color:#888}
+.badge{display:inline-block;background:#3a3a4a;color:#aaa;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px}
+.badge.su{background:#e74c3c;color:#fff}
+.badge.ad{background:#3a8fd4;color:#fff}
+.link{background:none;border:none;color:#8ab4e8;font-size:11px;cursor:pointer;padding:2px 4px;text-decoration:underline}
+.user-detail{background:#0f0f1a;border-radius:8px;padding:10px;margin-top:8px;font-size:12px}
+.user-detail div{padding:3px 0}
+.sep{height:1px;background:#2a2a3a;margin:8px 0}
+.search-box{margin-bottom:10px}
+.lock-btn{background:#555;color:#fff;border:none;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer}
+.lock-btn.active{background:#e74c3c}
+.footer{text-align:center;color:#555;font-size:10px;padding:20px 0}
+@media (max-width:480px){
+  #app{padding:8px}
+  .card{padding:10px}
+  .row{padding:6px;gap:6px}
+  .row .name{font-size:12px}
+}

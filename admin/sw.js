@@ -1,27 +1,17 @@
-const CACHE_NAME = 'myshift-admin-v5';
-
-self.addEventListener('install', event => {
-  event.waitUntil(self.skipWaiting());
+const CACHE_NAME='myshift-admin-v1';
+self.addEventListener('install',e=>{e.waitUntil(self.skipWaiting())});
+self.addEventListener('activate',e=>{
+  e.waitUntil(caches.keys().then(n=>Promise.all(n.filter(x=>x!==CACHE_NAME).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))
 });
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(names =>
-      Promise.all(names.filter(n => n.startsWith('myshift-admin-') && n !== CACHE_NAME).map(n => caches.delete(n)))
-    ).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  url.search = '';
-  const cacheKey = url.toString();
-  event.respondWith(
-    fetch(event.request).then(response => {
-      if (!response || response.status !== 200) return response;
-      const clone = response.clone();
-      caches.open(CACHE_NAME).then(cache => cache.put(cacheKey, clone));
-      return response;
-    }).catch(() => caches.match(cacheKey))
+self.addEventListener('fetch',e=>{
+  const u=new URL(e.request.url);u.search='';
+  const k=u.toString();
+  e.respondWith(
+    fetch(e.request).then(r=>{
+      if(!r||r.status!==200)return r;
+      const c=r.clone();
+      caches.open(CACHE_NAME).then(x=>x.put(k,c));
+      return r;
+    }).catch(()=>caches.match(k))
   );
 });
