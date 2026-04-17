@@ -2019,8 +2019,10 @@ const WxFx = (function(){
       // Flowers at bottom
       for(let i=0;i<5+Math.floor(Math.random()*4);i++) seasonParts.push(mkFlower());
       if(!noc&&(ts==='morning'||ts==='day'||ts==='dusk')){
-        if(Math.random()>.3) seasonParts.push(mkButterfly());
-        if(Math.random()>.6) seasonParts.push(mkButterfly());
+        // 白天至少 1 隻蝴蝶，最多 3 隻
+        seasonParts.push(mkButterfly());
+        if(Math.random()>.4) seasonParts.push(mkButterfly());
+        if(Math.random()>.7) seasonParts.push(mkButterfly());
       }
       if(!noc&&ts==='night'){
         for(let i=0;i<4+Math.floor(Math.random()*4);i++) seasonParts.push(mkFirefly());
@@ -2152,17 +2154,26 @@ const WxFx = (function(){
         }
         const imgArr=FX_IMG.swallowtail;
         const img=imgArr[p.frame];
-        if(FX_IMG.swallowtailReady&&img&&img.complete&&img.naturalWidth){
+        if(img&&img.complete&&img.naturalWidth){
+          // 圖片已載入：畫真實蝴蝶
           ctx.save();
           ctx.translate(p.x,p.y);
-          // 旋轉朝向飛行方向（圖片原本朝上 -π/2，所以加 π/2）
           ctx.rotate(p.angle+Math.PI/2);
           ctx.globalAlpha=p.alpha;
           const s=p.size;
           ctx.drawImage(img,-s/2,-s/2,s,s);
           ctx.restore();
         }else{
-          // Fallback: 圖片還沒載入完成時不畫（避免閃爍）
+          // 圖片未載入 (路徑錯、404、還在下載)：畫程序化橢圓蝴蝶作為 fallback
+          const wing=Math.abs(Math.sin(p.frame*.8))*.7+.3;
+          const r=p.size*.15;
+          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle+Math.PI/2);
+          ctx.fillStyle=`rgba(255,200,50,${p.alpha*.7})`;
+          ctx.beginPath();ctx.ellipse(-r*.6,0,r*wing,r*.7,-.3,0,Math.PI*2);ctx.fill();
+          ctx.beginPath();ctx.ellipse(r*.6,0,r*wing,r*.7,.3,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle=`rgba(60,40,30,${p.alpha})`;
+          ctx.beginPath();ctx.ellipse(0,0,1.5,r*.4,0,0,Math.PI*2);ctx.fill();
+          ctx.restore();
         }
       }
       else if(p.type==='dfly'){
@@ -2241,8 +2252,28 @@ const WxFx = (function(){
   }
 
   function getMode(){return mode}
-  return{update,getMode};
+  function _debug(){
+    const stat=FX_IMG.swallowtail.map((img,i)=>({
+      idx:i+1,
+      src:img.src,
+      complete:img.complete,
+      naturalWidth:img.naturalWidth,
+      naturalHeight:img.naturalHeight,
+      loaded:img.complete&&img.naturalWidth>0
+    }));
+    const bflyCount=seasonParts.filter(p=>p.type==='bfly').length;
+    console.table(stat);
+    console.log("Season:",curSeason,"TimeSlot:",curTimeSlot,"Mode:",mode,"Butterflies alive:",bflyCount);
+    return{stat,bflyCount,season:curSeason,ts:curTimeSlot,mode};
+  }
+  function _spawnBfly(n){
+    n=n||3;
+    for(let i=0;i<n;i++) seasonParts.push(mkButterfly());
+    return"Spawned "+n+" butterflies. Total: "+seasonParts.filter(p=>p.type==='bfly').length;
+  }
+  return{update,getMode,_debug,_spawnBfly};
 })();
+try{window.WxFx=WxFx}catch(e){}
 
 // ═══ WEATHER SOUND ENGINE ═══
 const WxSfx = (function(){
