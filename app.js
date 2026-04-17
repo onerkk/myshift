@@ -4,8 +4,8 @@ const fbAuth=firebase.auth(),fbDb=firebase.firestore();
 fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 let fbUser=null;
 let fbAuthReady=false;
-let _initDone=false;
-function _doAuthInit(){if(_initDone)return;_initDone=true;loadAppConfig().then(()=>{cloudLoad().then(()=>{loadLeaves();loadAdminEv();syncALYearLeaves()})})}
+let _initDone=false;let _cloudLoading=false;
+function _doAuthInit(){if(_initDone)return;_initDone=true;_cloudLoading=true;render();loadAppConfig().then(()=>{cloudLoad().then(()=>{_cloudLoading=false;render();loadLeaves();loadAdminEv();syncALYearLeaves()}).catch(()=>{_cloudLoading=false;render()})})}
 async function syncALYearLeaves(){if(!fbUser)return;try{const ay=curALY();const start=`${ay}-12-26`,end=`${ay+1}-12-25`;const rst=AL_RESET_TS[ay]||0;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).get();let changed=false;const found={};snap.forEach(doc=>{const v=doc.data();if(!annualIds.has(v.leaveType)||v.date<start||v.date>end)return;const lts=v.ts&&v.ts.seconds?v.ts.seconds*1000:0;if(rst&&lts&&lts<rst)return;found[v.date]=(found[v.date]||0)+(v.hours||0)});for(const date in found){if(ALD[date]!==found[date]){ALD[date]=found[date];changed=true}}if(changed){sAL();render()}}catch(e){console.log("syncALYear err",e)}}
 fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){
   // Immediately save display name for admin panel
@@ -252,7 +252,7 @@ function render(){
 function _doRender(){
   _renderRAF=null;
   const a=document.getElementById("app");
-  if(!fbAuthReady){
+  if(!fbAuthReady||_cloudLoading){
     a.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--tx3);font-size:13px">⏳ ${lang==="zh"?"載入中...":"Loading..."}</div>`;
     return;
   }
