@@ -6,7 +6,7 @@ let fbUser=null;
 let fbAuthReady=false;
 let _initDone=false;
 function _doAuthInit(){if(_initDone)return;_initDone=true;loadAppConfig().then(()=>{cloudLoad().then(()=>{loadLeaves();loadAdminEv();syncALYearLeaves()})})}
-async function syncALYearLeaves(){if(!fbUser)return;try{const ay=curALY();const start=`${ay}-12-26`,end=`${ay+1}-12-25`;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).get();let changed=false;const found={};snap.forEach(doc=>{const v=doc.data();if(annualIds.has(v.leaveType)&&v.date>=start&&v.date<=end){found[v.date]=(found[v.date]||0)+(v.hours||0)}});for(const date in found){if(ALD[date]!==found[date]){ALD[date]=found[date];changed=true}}for(const date in ALD){if(date>=start&&date<=end&&!found[date]){const hasEvMark=EVS[date]&&EVS[date].includes("annualL");if(!hasEvMark){delete ALD[date];changed=true}}}if(changed){sAL();render()}}catch(e){console.log("syncALYear err",e)}}
+async function syncALYearLeaves(){if(!fbUser)return;try{const ay=curALY();const start=`${ay}-12-26`,end=`${ay+1}-12-25`;const rst=AL_RESET_TS[ay]||0;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).get();let changed=false;const found={};snap.forEach(doc=>{const v=doc.data();if(!annualIds.has(v.leaveType)||v.date<start||v.date>end)return;const lts=v.ts&&v.ts.seconds?v.ts.seconds*1000:0;if(rst&&lts&&lts<rst)return;found[v.date]=(found[v.date]||0)+(v.hours||0)});for(const date in found){if(ALD[date]!==found[date]){ALD[date]=found[date];changed=true}}if(changed){sAL();render()}}catch(e){console.log("syncALYear err",e)}}
 fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){
   // Immediately save display name for admin panel
   try{fbDb.collection("users").doc(u.uid).set({displayName:u.displayName||"",email:u.email||"",photoURL:u.photoURL||"",lastLogin:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){}
@@ -32,8 +32,8 @@ function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
 function fbLogout(){_initDone=false;fbAuth.signOut()}
 let leavesCache={};
 async function loadLeaves(){try{const y=S.yr||TY,m=S.mo||TM;const ym1=y+"-"+String(m).padStart(2,"0");const pm=m===1?12:m-1,py=m===1?y-1:y;const ym2=py+"-"+String(pm).padStart(2,"0");const snap=await fbDb.collection("leaves").where("ym","in",[ym1,ym2]).get();const d={};snap.forEach(doc=>{const v=doc.data();if(S.unit&&S.unit!=="__all"&&v.unit&&v.unit!==S.unit)return;const k=v.date;if(!d[k])d[k]=[];d[k].push({uid:v.uid,name:v.name,type:v.type,leaveType:v.leaveType||"",hours:v.hours||0,ts:v.ts,unit:v.unit||""})});leavesCache=d;_syncAnnualToALD();render()}catch(e){console.log("loadLeaves err",e)}}
-function _syncAnnualToALD(){if(!fbUser)return;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");let changed=false;for(const date in leavesCache){let h=0;leavesCache[date].forEach(l=>{if(l.uid===fbUser.uid&&annualIds.has(l.leaveType))h+=l.hours||0});if(h>0){if(ALD[date]!==h){ALD[date]=h;changed=true}}else{const hadAnnual=leavesCache[date].some(l=>l.uid===fbUser.uid&&annualIds.has(l.leaveType));if(!hadAnnual&&ALD[date]){/* don't delete - might be from other month's mark */}}}if(changed)sAL()}
-async function addLeave(date,leaveTypeId,hours){if(!fbUser)return;try{const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).set({uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),type:"leave",leaveType:leaveTypeId,hours:hours||0,unit:S.unit||"",ts:firebase.firestore.FieldValue.serverTimestamp()});if(_isAnnualLT(leaveTypeId)){ALD[date]=hours;sAL()}loadLeaves()}catch(e){console.log("addLeave err",e);alert((lang==="zh"?"請假失敗: ":"Leave failed: ")+e.message)}}
+function _syncAnnualToALD(){if(!fbUser)return;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");let changed=false;for(const date in leavesCache){let h=0;leavesCache[date].forEach(l=>{if(l.uid!==fbUser.uid||!annualIds.has(l.leaveType))return;const ay=alYear(+date.slice(0,4),+date.slice(5,7),+date.slice(8,10));const rst=AL_RESET_TS[ay]||0;const lts=l.ts&&l.ts.seconds?l.ts.seconds*1000:0;if(rst&&lts&&lts<rst)return;h+=l.hours||0});if(h>0){if(ALD[date]!==h){ALD[date]=h;changed=true}}}if(changed)sAL()}
+async function addLeave(date,leaveTypeId,hours){if(!fbUser)return;try{const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).set({uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),type:"leave",leaveType:leaveTypeId,hours:hours||0,unit:S.unit||"",ts:firebase.firestore.FieldValue.serverTimestamp()});if(_isAnnualLT(leaveTypeId)){ALD[date]=hours;sAL()}loadLeaves()}catch(e){console.log("addLeave err",e);if(/INTERNAL ASSERTION/i.test(e.message||"")){if(confirm(lang==="zh"?"雲端連線出現異常，需重新載入頁面才能繼續。現在重新載入？":"Connection error. Reload?"))location.reload();return}alert((lang==="zh"?"請假失敗: ":"Leave failed: ")+e.message)}}
 function _isAnnualLT(id){const lt=getLT(id);return id==="annual"||(lt&&(lt.name==="特休"||lt.nameId==="Cuti Tahunan"))}
 async function removeLeave(date,leaveTypeId){if(!fbUser)return;if(leaveTypeId){const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).delete();if(_isAnnualLT(leaveTypeId)){delete ALD[date];sAL()}}else{const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).where("date","==",date).get();const batch=fbDb.batch();let hadAnnual=false;snap.forEach(d=>{if(_isAnnualLT(d.data().leaveType))hadAnnual=true;batch.delete(d.ref)});await batch.commit();if(hadAnnual){delete ALD[date];sAL()}}loadLeaves()}
 function getLeaves(date){return leavesCache[date]||[]}
@@ -162,6 +162,7 @@ let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb
 function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}cloudSave()}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
 let ALD={};try{ALD=JSON.parse(localStorage.getItem("sb_ald"))||JSON.parse(gCk("sb_ald"))||{}}catch(e){}
+let AL_RESET_TS={};try{AL_RESET_TS=JSON.parse(localStorage.getItem("sb_al_reset"))||{}}catch(e){}
 let NOTES={};try{NOTES=JSON.parse(localStorage.getItem("sb_notes"))||JSON.parse(gCk("sb_notes"))||{}}catch(e){}
 function sNotes(){const d=JSON.stringify(NOTES);try{localStorage.setItem("sb_notes",d)}catch(e){}try{sCk("sb_notes",d,3650)}catch(e){}cloudSave()}
 function alYear(y,m,d){return(m>12||(m===12&&d>=26))?y:y-1}
@@ -657,28 +658,17 @@ function handle(e){
       const cur=getAL();
       const yRange=alYRange(curALY());
       const isZh=lang==="zh";
-      const totalPrompt=isZh?`設定 ${yRange} 特休總時數：\n（將清除本年度所有特休紀錄，剩餘 = 輸入的數字）`:`Total jam cuti ${yRange}:\n(Akan hapus semua catatan cuti tahunan)`;
+      const totalPrompt=isZh?`設定 ${yRange} 特休總時數：\n（重設後剩餘 = 輸入的數字，之前紀錄不再扣除）`:`Total jam cuti ${yRange}:`;
       const tIn=prompt(totalPrompt,cur.total||"");
       if(tIn===null)return;
       const total=parseFloat(tIn);
       if(isNaN(total)||total<0){alert(isZh?"請輸入有效數字":"Masukkan angka valid");return}
-      // 清除本地本年度 ALD
+      // 清本地本年度 ALD
       const ay=curALY(),start=`${ay}-12-26`,end=`${ay+1}-12-25`;
       for(const k in ALD){if(k>=start&&k<=end)delete ALD[k]}
-      // 清除 Firestore 本年度特休請假紀錄
-      if(fbUser){
-        (async()=>{
-          try{
-            const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).get();
-            const batch=fbDb.batch();let n=0;
-            snap.forEach(d=>{
-              const v=d.data();
-              if(_isAnnualLT(v.leaveType)&&v.date>=start&&v.date<=end){batch.delete(d.ref);n++}
-            });
-            if(n>0){await batch.commit();if(typeof loadLeaves==='function')loadLeaves()}
-          }catch(e){console.log("alReset err",e)}
-        })();
-      }
+      // 設定重置時間戳：此時間之後的特休紀錄才會計入
+      AL_RESET_TS[ay]=Date.now();
+      try{localStorage.setItem("sb_al_reset",JSON.stringify(AL_RESET_TS))}catch(e){}
       setAL(total,0);
       return;
     }
