@@ -6,7 +6,7 @@ let fbUser=null;
 let fbAuthReady=false;
 let _initDone=false;
 function _doAuthInit(){if(_initDone)return;_initDone=true;loadAppConfig().then(()=>{cloudLoad().then(()=>{loadLeaves();loadAdminEv();syncALYearLeaves()})})}
-async function syncALYearLeaves(){if(!fbUser)return;try{const ay=curALY();const start=`${ay}-12-26`,end=`${ay+1}-12-25`;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).get();let changed=false;const found={};snap.forEach(doc=>{const v=doc.data();if(annualIds.has(v.leaveType)&&v.date>=start&&v.date<=end){found[v.date]=(found[v.date]||0)+(v.hours||0)}});for(const date in found){if(ALD[date]!==found[date]){ALD[date]=found[date];changed=true}}for(const date in ALD){if(date>=start&&date<=end&&!found[date]){const hasEvMark=EVS[date]&&EVS[date].includes("annualL");if(!hasEvMark){delete ALD[date];changed=true}}}if(changed){sAL();render()}console.log("syncALYear done",{annualIds:[...annualIds],found,ALD_keys:Object.keys(ALD),changed})}catch(e){console.log("syncALYear err",e)}}
+async function syncALYearLeaves(){if(!fbUser)return;try{const ay=curALY();const start=`${ay}-12-26`,end=`${ay+1}-12-25`;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).get();let changed=false;const found={};snap.forEach(doc=>{const v=doc.data();if(annualIds.has(v.leaveType)&&v.date>=start&&v.date<=end){found[v.date]=(found[v.date]||0)+(v.hours||0)}});for(const date in found){if(ALD[date]!==found[date]){ALD[date]=found[date];changed=true}}for(const date in ALD){if(date>=start&&date<=end&&!found[date]){const hasEvMark=EVS[date]&&EVS[date].includes("annualL");if(!hasEvMark){delete ALD[date];changed=true}}}if(changed){sAL();render()}}catch(e){console.log("syncALYear err",e)}}
 fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){
   // Immediately save display name for admin panel
   try{fbDb.collection("users").doc(u.uid).set({displayName:u.displayName||"",email:u.email||"",photoURL:u.photoURL||"",lastLogin:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){}
@@ -281,7 +281,7 @@ function rWiz(){
   // If rotation doesn't exist (deleted/not loaded), go back to type selection
   if(!R[S.rt]||!c.length){S.step="type";return rType()}
   // Merged step: show ALL shift types (early/mid/night/off) on one page
-  if(!S.wT||(!S.wS&&S.wT==="w")||(!S.wN&&S.wT==="o")){
+  if(!S.wT){
     const allSh=[...new Set(c)];
     const shiftBtns=allSh.filter(x=>x!=="休").map(s=>`<button class="opt-btn" data-a="wizShift" data-v="${s}"><img class="oi" src="${SI[s]}">${sf(s)}</button>`).join("");
     const offBtn=`<button class="opt-btn" data-a="wizOff"><img class="oi" src="${IMG.off}">${t("off")}</button>`;
@@ -445,15 +445,23 @@ function tideHtml(){
   const byDate={};
   tideData.tides.forEach(t=>{if(!byDate[t.date])byDate[t.date]=[];byDate[t.date].push(t)});
   const dates=Object.keys(byDate).sort().slice(0,7);
+  const todayTides=byDate[dates[0]]||[];
+  const todayHi=todayTides.filter(x=>x.type==="滿潮").sort((a,b)=>b.height-a.height)[0];
+  const todayLo=todayTides.filter(x=>x.type==="乾潮").sort((a,b)=>a.height-b.height)[0];
+  const todaySummary=(todayHi||todayLo)?`<span style="font-size:10px;color:var(--tx3);margin-left:6px">${todayHi?`<span style="color:var(--red)">▲${todayHi.time.slice(11,16)} ${todayHi.height}cm</span>`:""}${todayHi&&todayLo?"　":""}${todayLo?`<span style="color:#1565c0">▼${todayLo.time.slice(11,16)} ${todayLo.height}cm</span>`:""}</span>`:"";
+  const header=`<div onclick="toggleTide()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;${tideCollapsed?'':'margin-bottom:6px'}"><div style="font-size:12px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🌊 ${tideData.station} ${lang==="zh"?"潮汐":"Pasut"}${tideCollapsed?todaySummary:""}</div><div style="font-size:14px;color:var(--tx3);padding:0 4px">${tideCollapsed?"▾":"▴"}</div></div>`;
+  if(tideCollapsed)return`<div class="tide-card fi">${header}</div>`;
   const fc=dates.map((date,i)=>{
     const dt=new Date(date),dw=dt.getDay();
     const items=byDate[date];
     const hi=items.filter(x=>x.type==="滿潮").sort((a,b)=>b.height-a.height)[0];
     const lo=items.filter(x=>x.type==="乾潮").sort((a,b)=>a.height-b.height)[0];
     return`<div class="tide-day${i===0?' today':''}" onclick="showTideDetail('${date}');event.stopPropagation()"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div style="font-size:9px;color:var(--red);font-weight:600">▲${hi?hi.time.slice(11,16):""}</div><div style="font-size:12px;font-weight:700;color:var(--red)">${hi?hi.height+"cm":""}</div><div style="font-size:9px;color:#1565c0;font-weight:600">▼${lo?lo.time.slice(11,16):""}</div><div style="font-size:10px;color:#1565c0">${lo?lo.height+"cm":""}</div></div>`}).join("");
-  return`<div class="tide-card fi"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:12px;font-weight:700">🌊 ${tideData.station} ${lang==="zh"?"潮汐預報":"Pasang Surut"}</div><div style="font-size:9px;color:var(--tx3)">▸ ${lang==="zh"?"點選看詳情":"Ketuk detail"}</div></div><div class="tide-fc">${fc}</div></div>`}
+  return`<div class="tide-card fi">${header}<div style="font-size:9px;color:var(--tx3);text-align:right;margin-bottom:4px">▸ ${lang==="zh"?"點日期看詳情":"Ketuk detail"}</div><div class="tide-fc">${fc}</div></div>`}
 
 let wxDetailShow=false,wxDetailDay=0,tideDetailShow=false,tideDetailDay=0;
+let tideCollapsed=true;try{const v=localStorage.getItem("sb_tideCol");if(v==="0")tideCollapsed=false}catch(e){}
+function toggleTide(){tideCollapsed=!tideCollapsed;try{localStorage.setItem("sb_tideCol",tideCollapsed?"1":"0")}catch(e){}render()}
 function showWxDetail(){wxDetailShow=true;wxDetailDay=0;render()}
 function showTideDetail(d){tideDetailShow=true;tideDetailDay=d||0;render()}
 function closeWxDetail(){wxDetailShow=false;render()}
