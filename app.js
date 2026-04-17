@@ -316,7 +316,7 @@ function rCal(){
   let chips=Object.entries(st).map(([s,n])=>`<div class="dash-item"><div class="dash-val ${SC[s]}">${n}</div><div class="dash-lbl">${sf(s)}</div></div>`).join("");
   chips+=`<div class="dash-item"><div class="dash-val w">${wk}</div><div class="dash-lbl">${t("workD")}</div></div>`;
   const hH="";
-  const alH=getAL().total>0?`<div class="al-bar fi"><span class="al-bar-label">🌴 ${t("alRem")} (${alYRange(curALY())})</span><span class="al-bar-val">${alRem()} ${t("hr")}</span></div>`:"";
+  const alH=getAL().total>0?`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer"><span class="al-bar-label">🌴 ${t("alRem")} (${alYRange(curALY())})</span><span class="al-bar-val">${alRem()} ${t("hr")}</span></div>`:`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer;background:rgba(76,175,80,.08);color:var(--green);font-weight:600;justify-content:center;text-align:center"><span>🌴 ${lang==="zh"?`點此設定 ${curALY()+1} 年度特休時數`:`Atur cuti tahun ${curALY()+1}`}</span></div>`;
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent),showI=(!!DP||isIOS)&&!S.instH;
   let instH="";if(showI){instH=`<div class="install-wrap"><div class="install-card"><img class="install-icon" src="${IMG.icon}"><div class="install-info"><div class="install-title">${t("instT")}</div><div class="install-sub">${DP?t("instS"):t("instSi")}</div></div>${DP?`<button class="install-btn" data-a="inst">${t("instB")}</button>`:''}<button class="install-x" data-a="hideI">✕</button></div></div>`}
   const ml=lang==="zh"?`${y}年${m}月`:`${m}/${y}`;
@@ -645,6 +645,22 @@ function handle(e){
     case "alh":{const{y,m,d}=S.modal;const sel=document.getElementById("alSel");if(sel)ALD[ek(y,m,d)]=parseFloat(sel.value);sAL();return}
     case "inst":if(DP){DP.prompt();DP.userChoice.then(()=>{DP=null;render()})}break;
     case "hideI":S.instH=true;break;
+    case "alEdit":{
+      const cur=getAL();
+      const yRange=alYRange(curALY());
+      const isZh=lang==="zh";
+      const totalPrompt=isZh?`設定 ${yRange} 特休總時數：`:`Total jam cuti ${yRange}:`;
+      const tIn=prompt(totalPrompt,cur.total||"");
+      if(tIn===null)return;
+      const total=parseFloat(tIn);
+      if(isNaN(total)||total<0){alert(isZh?"請輸入有效數字":"Masukkan angka valid");return}
+      const usedPrompt=isZh?"已使用時數（通常填 0，請假紀錄會自動扣除）：":"Sudah dipakai (biasanya 0):";
+      const uIn=prompt(usedPrompt,cur.used||0);
+      if(uIn===null)return;
+      const used=parseFloat(uIn)||0;
+      setAL(total,used);
+      return;
+    }
     case "wxR":wxErr=false;wxData=null;try{localStorage.removeItem('_wxPos')}catch(e){}render();loadWx();return;
   }
   render();
