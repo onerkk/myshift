@@ -1251,6 +1251,20 @@ const WxFx = (function(){
   let lightningTimer=0, lightningAlpha=0;
   let heatPhase=0;
   let ambientHour=-1;
+  // ── Real photo FX assets ──
+  const FX_IMG={swallowtail:[],swallowtailReady:false};
+  function _preloadFx(){
+    // 鳳蝶 6 幀振翅動畫
+    const base="./images/fx/butterfly/";
+    let loaded=0;
+    for(let i=1;i<=6;i++){
+      const img=new Image();
+      img.onload=()=>{loaded++;if(loaded===6)FX_IMG.swallowtailReady=true};
+      img.onerror=()=>{loaded++;if(loaded===6)FX_IMG.swallowtailReady=true};
+      img.src=base+"swallowtail-"+String(i).padStart(2,"0")+".png";
+      FX_IMG.swallowtail.push(img);
+    }
+  }
   
   function init(){
     if(canvas) return;
@@ -1261,6 +1275,7 @@ const WxFx = (function(){
     ctx=canvas.getContext("2d");
     resize();
     window.addEventListener("resize",resize);
+    _preloadFx();
     // Generate stars once
     stars=[];
     for(let i=0;i<80;i++) stars.push({x:Math.random(),y:Math.random()*0.6,r:0.5+Math.random()*1.5,tw:Math.random()*Math.PI*2,sp:0.01+Math.random()*0.02});
@@ -1941,12 +1956,16 @@ const WxFx = (function(){
       life:250+Math.random()*350,c,petals:5+Math.floor(Math.random()*2)}
   }
   function mkButterfly(){
-    const cols=[[255,200,50],[180,120,255],[100,200,255],[255,130,80],[200,255,130]];
-    const c=cols[Math.floor(Math.random()*cols.length)];
-    return{type:"bfly",x:Math.random()*_w,y:_h*.15+Math.random()*_h*.5,
-      speed:.6+Math.random()*1,angle:Math.random()*Math.PI*2,
-      turn:.02+Math.random()*.02,wingPhase:Math.random()*Math.PI*2,
-      wingSpeed:.1+Math.random()*.08,r:4+Math.random()*3,alpha:.3+Math.random()*.25,c}
+    // kind: 0=swallowtail (未來可擴充 purple/orange 紫斑蝶/樺斑蝶)
+    const kind=0;
+    const size=36+Math.random()*24;// 最終畫面尺寸 36-60px
+    return{type:"bfly",kind,x:Math.random()*_w,y:_h*.15+Math.random()*_h*.5,
+      speed:.5+Math.random()*.8,angle:Math.random()*Math.PI*2,
+      turn:.015+Math.random()*.02,
+      frame:Math.floor(Math.random()*6),
+      frameTimer:0,
+      frameInterval:3+Math.floor(Math.random()*2),// 每 3-4 render frame 換一張 (~60fps/3=20fps 振翅)
+      size,alpha:.85+Math.random()*.15}
   }
   function mkFirefly(){
     return{type:"ffly",x:Math.random()*_w,y:_h*.15+Math.random()*_h*.7,
@@ -2123,20 +2142,28 @@ const WxFx = (function(){
         ctx.restore();
       }
       else if(p.type==='bfly'){
-        p.angle+=p.turn*(Math.sin(p.wingPhase*.3)>0?1:-1);
+        p.angle+=p.turn*(Math.sin(p.frame*.7)>0?1:-1);
         p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.6;
-        p.wingPhase+=p.wingSpeed;
-        const wing=Math.abs(Math.sin(p.wingPhase));
-        if(p.x<-30||p.x>_w+30||p.y<-30||p.y>_h+30){
+        // 翅膀幀切換
+        p.frameTimer++;
+        if(p.frameTimer>=p.frameInterval){p.frameTimer=0;p.frame=(p.frame+1)%6}
+        if(p.x<-60||p.x>_w+60||p.y<-60||p.y>_h+60){
           p.x=Math.random()*_w;p.y=_h*.15+Math.random()*_h*.5;p.angle=Math.random()*Math.PI*2;
         }
-        ctx.save();ctx.translate(p.x,p.y);
-        ctx.fillStyle=`rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.alpha*wing})`;
-        ctx.beginPath();ctx.ellipse(-p.r*.5,0,p.r*wing,p.r*.7,-.3,0,Math.PI*2);ctx.fill();
-        ctx.beginPath();ctx.ellipse(p.r*.5,0,p.r*wing,p.r*.7,.3,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle=`rgba(60,40,30,${p.alpha})`;
-        ctx.beginPath();ctx.ellipse(0,0,1.5,p.r*.4,0,0,Math.PI*2);ctx.fill();
-        ctx.restore();
+        const imgArr=FX_IMG.swallowtail;
+        const img=imgArr[p.frame];
+        if(FX_IMG.swallowtailReady&&img&&img.complete&&img.naturalWidth){
+          ctx.save();
+          ctx.translate(p.x,p.y);
+          // 旋轉朝向飛行方向（圖片原本朝上 -π/2，所以加 π/2）
+          ctx.rotate(p.angle+Math.PI/2);
+          ctx.globalAlpha=p.alpha;
+          const s=p.size;
+          ctx.drawImage(img,-s/2,-s/2,s,s);
+          ctx.restore();
+        }else{
+          // Fallback: 圖片還沒載入完成時不畫（避免閃爍）
+        }
       }
       else if(p.type==='dfly'){
         p.angle+=p.turn*(Math.random()>.5?1:-1);
