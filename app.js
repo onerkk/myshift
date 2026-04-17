@@ -170,7 +170,7 @@ function alYRange(ay){return`${ay}/12/26 ~ ${ay+1}/12/25`}
 function getAL(){const y=curALY();return AL[y]||{total:0,used:0}}
 function setAL(total,used){const y=curALY();AL[y]={total,used};sAL()}
 function sAL(){const a=JSON.stringify(AL),d=JSON.stringify(ALD);try{localStorage.setItem("sb_al2",a);localStorage.setItem("sb_ald",d)}catch(e){}try{sCk("sb_al2",a,3650);sCk("sb_ald",d,3650)}catch(e){}cloudSave()}
-function alUsed(){const ay=curALY();const a=AL[ay]||{};let s=a.used||0;const start=`${ay}-12-26`,end=`${ay+1}-12-25`;for(let k in ALD){if(k>=start&&k<=end)s+=ALD[k]}return s}
+function alUsed(){const ay=curALY();const start=`${ay}-12-26`,end=`${ay+1}-12-25`;let s=0;for(let k in ALD){if(k>=start&&k<=end)s+=ALD[k]}return s}
 function alRem(){const a=getAL();return Math.max(0,(a.total||0)-alUsed())}
 let DP=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();DP=e;render()});
 function sCk(k,v,d){const e=new Date();e.setTime(e.getTime()+d*864e5);document.cookie=k+"="+encodeURIComponent(v)+";expires="+e.toUTCString()+";path=/;SameSite=Lax"}
@@ -657,16 +657,29 @@ function handle(e){
       const cur=getAL();
       const yRange=alYRange(curALY());
       const isZh=lang==="zh";
-      const totalPrompt=isZh?`設定 ${yRange} 特休總時數：`:`Total jam cuti ${yRange}:`;
+      const totalPrompt=isZh?`設定 ${yRange} 特休總時數：\n（將清除本年度所有特休紀錄，剩餘 = 輸入的數字）`:`Total jam cuti ${yRange}:\n(Akan hapus semua catatan cuti tahunan)`;
       const tIn=prompt(totalPrompt,cur.total||"");
       if(tIn===null)return;
       const total=parseFloat(tIn);
       if(isNaN(total)||total<0){alert(isZh?"請輸入有效數字":"Masukkan angka valid");return}
-      const usedPrompt=isZh?"已使用時數（通常填 0，請假紀錄會自動扣除）：":"Sudah dipakai (biasanya 0):";
-      const uIn=prompt(usedPrompt,cur.used||0);
-      if(uIn===null)return;
-      const used=parseFloat(uIn)||0;
-      setAL(total,used);
+      // 清除本地本年度 ALD
+      const ay=curALY(),start=`${ay}-12-26`,end=`${ay+1}-12-25`;
+      for(const k in ALD){if(k>=start&&k<=end)delete ALD[k]}
+      // 清除 Firestore 本年度特休請假紀錄
+      if(fbUser){
+        (async()=>{
+          try{
+            const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).get();
+            const batch=fbDb.batch();let n=0;
+            snap.forEach(d=>{
+              const v=d.data();
+              if(_isAnnualLT(v.leaveType)&&v.date>=start&&v.date<=end){batch.delete(d.ref);n++}
+            });
+            if(n>0){await batch.commit();if(typeof loadLeaves==='function')loadLeaves()}
+          }catch(e){console.log("alReset err",e)}
+        })();
+      }
+      setAL(total,0);
       return;
     }
     case "wxR":wxErr=false;wxData=null;try{localStorage.removeItem('_wxPos')}catch(e){}render();loadWx();return;
