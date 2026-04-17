@@ -1253,7 +1253,7 @@ const WxFx = (function(){
   let ambientHour=-1;
   // ── Real photo FX assets ──
   const FX_IMG={swallowtail:[],purple:[],monarch:[],maple:[],cloud:[],bolt:[],drop:null,
-    blossom:[],flower:[],dfly:[],frost_img:[],debris_img:[]};
+    blossom:[],flower:[],dfly:[],frost_img:[],debris_img:[],firefly:[],sun:[]};
   function _preloadFx(){
     const kinds=[
       {key:"swallowtail",dir:"butterfly/",prefix:"swallowtail-",count:6},
@@ -1267,6 +1267,8 @@ const WxFx = (function(){
       {key:"dfly",dir:"dragonfly/",prefix:"dfly-",count:6},
       {key:"frost_img",dir:"frost/",prefix:"snow-",count:4},
       {key:"debris_img",dir:"debris/",prefix:"leaf-",count:3},
+      {key:"firefly",dir:"firefly/",prefix:"firefly-",count:4},
+      {key:"sun",dir:"sun/",prefix:"sun-",count:3},
     ];
     kinds.forEach(k=>{
       for(let i=1;i<=k.count;i++){
@@ -1362,9 +1364,12 @@ const WxFx = (function(){
   }
   
   function mkSnow(){
+    const big=Math.random()<0.22;
     return{type:"snow",x:Math.random()*_w, y:Math.random()*_h*-0.5, r:2+Math.random()*4,
       speed:0.6+Math.random()*1.8, drift:Math.random()*1.2-0.6,
-      alpha:0.5+Math.random()*0.4, wobble:Math.random()*Math.PI*2};
+      alpha:0.5+Math.random()*0.4, wobble:Math.random()*Math.PI*2,
+      big,size:20+Math.random()*16,imgIdx:Math.floor(Math.random()*4),
+      rot:Math.random()*Math.PI*2,rs:(Math.random()-0.5)*0.04};
   }
   
   function mkFog(){
@@ -1421,7 +1426,17 @@ const WxFx = (function(){
   let _sunPhase=Math.random()*Math.PI*2;
   
   function drawSunDisc(x,y,r,coreR,coreG,coreB,coreA,glowA,rayA,rayCount){
-    // Outer glow
+    // 依色溫選圖: 紅系日落(coreR-coreG>100) → sun-03
+    //           白系正午(coreG>=220)      → sun-02
+    //           黃金色(其他)              → sun-01
+    let sunIdx=0;
+    if(coreR-coreG>100) sunIdx=2;
+    else if(coreG>=220) sunIdx=1;
+    else sunIdx=0;
+    const simg=FX_IMG.sun&&FX_IMG.sun[sunIdx];
+    const useImg=simg&&simg.complete&&simg.naturalWidth>0&&coreA>0.05;
+
+    // Outer glow (照片也保留外光暈,與天空色融合)
     const g2=ctx.createRadialGradient(x,y,r*0.3,x,y,r*2.5);
     g2.addColorStop(0,`rgba(${coreR},${coreG},${coreB},${glowA*0.4})`);
     g2.addColorStop(0.4,`rgba(${coreR},${coreG},${coreB},${glowA*0.15})`);
@@ -1451,15 +1466,24 @@ const WxFx = (function(){
       }
       ctx.restore();
     }
-    // Core disc
-    const g1=ctx.createRadialGradient(x,y,0,x,y,r);
-    g1.addColorStop(0,`rgba(255,255,230,${coreA})`);
-    g1.addColorStop(0.5,`rgba(${coreR},${coreG},${coreB},${coreA*0.7})`);
-    g1.addColorStop(1,`rgba(${coreR},${coreG},${coreB},0)`);
-    ctx.fillStyle=g1;
-    ctx.beginPath();
-    ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fill();
+    // Core: 真實照片 or 程序化漸層
+    if(useImg){
+      const sz=r*2.4;
+      ctx.save();
+      ctx.globalAlpha=Math.min(1,coreA*2.5);
+      ctx.drawImage(simg,x-sz/2,y-sz/2,sz,sz);
+      ctx.restore();
+      ctx.globalAlpha=1;
+    }else{
+      const g1=ctx.createRadialGradient(x,y,0,x,y,r);
+      g1.addColorStop(0,`rgba(255,255,230,${coreA})`);
+      g1.addColorStop(0.5,`rgba(${coreR},${coreG},${coreB},${coreA*0.7})`);
+      g1.addColorStop(1,`rgba(${coreR},${coreG},${coreB},0)`);
+      ctx.fillStyle=g1;
+      ctx.beginPath();
+      ctx.arc(x,y,r,0,Math.PI*2);
+      ctx.fill();
+    }
   }
   
   function drawAmbient(){
@@ -1829,12 +1853,32 @@ const WxFx = (function(){
       p.wobble+=0.02;
       p.x+=Math.sin(p.wobble)*p.drift+0.15;
       if(p.y>_h+10){p.y=-10;p.x=Math.random()*_w}
-      ctx.beginPath();
-      ctx.fillStyle=`rgba(255,255,255,${p.alpha})`;
-      ctx.shadowColor="rgba(255,255,255,0.5)";
-      ctx.shadowBlur=p.r*2;
-      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-      ctx.fill();
+      if(p.big){
+        const simg=FX_IMG.frost_img[p.imgIdx||0];
+        const sz=p.size||24;
+        p.rot=(p.rot||0)+(p.rs||0);
+        if(simg&&simg.complete&&simg.naturalWidth>0){
+          ctx.save();
+          ctx.translate(p.x,p.y);
+          ctx.rotate(p.rot);
+          ctx.globalAlpha=p.alpha*.85;
+          ctx.drawImage(simg,-sz/2,-sz/2,sz,sz);
+          ctx.restore();
+          ctx.globalAlpha=1;
+        }else{
+          ctx.beginPath();
+          ctx.fillStyle=`rgba(255,255,255,${p.alpha})`;
+          ctx.arc(p.x,p.y,p.r*1.6,0,Math.PI*2);
+          ctx.fill();
+        }
+      }else{
+        ctx.beginPath();
+        ctx.fillStyle=`rgba(255,255,255,${p.alpha})`;
+        ctx.shadowColor="rgba(255,255,255,0.5)";
+        ctx.shadowBlur=p.r*2;
+        ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        ctx.fill();
+      }
     });
     ctx.shadowBlur=0;
   }
@@ -2048,7 +2092,8 @@ const WxFx = (function(){
     return{type:"ffly",x:Math.random()*_w,y:_h*.15+Math.random()*_h*.7,
       speed:.15+Math.random()*.35,angle:Math.random()*Math.PI*2,
       turn:.008+Math.random()*.025,pulse:Math.random()*Math.PI*2,
-      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,maxA:.35+Math.random()*.5}
+      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,maxA:.55+Math.random()*.4,
+      imgIdx:Math.floor(Math.random()*4),size:18+Math.random()*14}
   }
   function mkLeaf(){
     const imgIdx=Math.floor(Math.random()*4);// 4 張楓葉隨機挑
@@ -2317,13 +2362,30 @@ const WxFx = (function(){
         if(p.x<-20)p.x=_w+10;if(p.x>_w+20)p.x=-10;
         if(p.y<_h*.1)p.y=_h*.9;if(p.y>_h*.95)p.y=_h*.2;
         if(a>.01){
-          const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
-          g.addColorStop(0,`rgba(200,255,100,${a})`);
-          g.addColorStop(.5,`rgba(150,230,50,${a*.3})`);
-          g.addColorStop(1,"rgba(150,230,50,0)");
-          ctx.fillStyle=g;ctx.fillRect(p.x-p.r*3,p.y-p.r*3,p.r*6,p.r*6);
-          ctx.beginPath();ctx.fillStyle=`rgba(220,255,150,${a*1.2})`;
-          ctx.arc(p.x,p.y,p.r*.5,0,Math.PI*2);ctx.fill();
+          const fimg=FX_IMG.firefly[p.imgIdx||0];
+          const sz=p.size||24;
+          if(fimg&&fimg.complete&&fimg.naturalWidth>0){
+            // 外光暈(脈動放大)
+            const gr=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,sz*.9);
+            gr.addColorStop(0,`rgba(200,255,120,${a*.35})`);
+            gr.addColorStop(1,"rgba(180,230,80,0)");
+            ctx.fillStyle=gr;
+            ctx.fillRect(p.x-sz,p.y-sz,sz*2,sz*2);
+            // 照片本體(脈動透明度)
+            ctx.save();
+            ctx.globalAlpha=Math.min(1,a*1.8);
+            ctx.drawImage(fimg,p.x-sz/2,p.y-sz/2,sz,sz);
+            ctx.restore();
+            ctx.globalAlpha=1;
+          }else{
+            const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
+            g.addColorStop(0,`rgba(200,255,100,${a})`);
+            g.addColorStop(.5,`rgba(150,230,50,${a*.3})`);
+            g.addColorStop(1,"rgba(150,230,50,0)");
+            ctx.fillStyle=g;ctx.fillRect(p.x-p.r*3,p.y-p.r*3,p.r*6,p.r*6);
+            ctx.beginPath();ctx.fillStyle=`rgba(220,255,150,${a*1.2})`;
+            ctx.arc(p.x,p.y,p.r*.5,0,Math.PI*2);ctx.fill();
+          }
         }
       }
       else if(p.type==='leaf'){
