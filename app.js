@@ -4,18 +4,157 @@ const fbAuth=firebase.auth(),fbDb=firebase.firestore();
 fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 let fbUser=null;
 let fbAuthReady=false;
+
+// ═══════════════════════════════════════════════════════════════
+// Firestore 寫入佇列 — 序列化所有寫入操作，避免 SDK INTERNAL ASSERTION bug
+// 所有對 Firestore 的寫入都應透過 fsEnqueue(fn) 進行
+// ═══════════════════════════════════════════════════════════════
+const _fsQueue=[];let _fsRunning=false;
+function fsEnqueue(fn,label){
+  return new Promise((resolve,reject)=>{
+    _fsQueue.push({fn,label:label||"",resolve,reject});
+    _fsDrain();
+  });
+}
+async function _fsDrain(){
+  if(_fsRunning)return;
+  _fsRunning=true;
+  while(_fsQueue.length){
+    const job=_fsQueue.shift();
+    try{
+      const r=await job.fn();
+      job.resolve(r);
+    }catch(e){
+      console.log("fs err ["+job.label+"]",e);
+      // 偵測 Firestore SDK 致命錯誤
+      if(/INTERNAL ASSERTION/i.test(e&&e.message||"")){
+        _fsQueue.length=0;// 清空佇列
+        _fsRunning=false;
+        _handleFatalFsError();
+        job.reject(e);
+        return;
+      }
+      job.reject(e);
+    }
+    // 每個寫入之間留小小間隔，避免 SDK 壓力過大
+    await new Promise(r=>setTimeout(r,50));
+  }
+  _fsRunning=false;
+}
+let _fatalShown=false;
+function _handleFatalFsError(){
+  if(_fatalShown)return;_fatalShown=true;
+  setTimeout(()=>{
+    if(confirm(lang==="zh"?"雲端連線出現異常，需重新載入頁面才能繼續。現在重新載入？":"Connection error. Reload?")){
+      location.reload();
+    }
+  },100);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// cloudSave debounce — 短時間多次呼叫只執行最後一次
+// ═══════════════════════════════════════════════════════════════
+let _cloudSaveTimer=null;
+function _scheduleCloudSave(){
+  if(_cloudSaveTimer)clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer=setTimeout(()=>{_cloudSaveTimer=null;cloudSave()},800);
+}
+
 let _initDone=false;let _cloudLoading=false;
 function _doAuthInit(){if(_initDone)return;_initDone=true;_cloudLoading=true;render();loadAppConfig().then(()=>{cloudLoad().then(()=>{_cloudLoading=false;render();loadLeaves();loadAdminEv();syncALYearLeaves()}).catch(()=>{_cloudLoading=false;render()})})}
-async function syncALYearLeaves(){if(!fbUser)return;try{const ay=curALY();const start=`${ay}-12-26`,end=`${ay+1}-12-25`;const rst=AL_RESET_TS[ay]||0;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).get();let changed=false;const found={};snap.forEach(doc=>{const v=doc.data();if(!annualIds.has(v.leaveType)||v.date<start||v.date>end)return;const lts=v.ts&&v.ts.seconds?v.ts.seconds*1000:0;if(rst&&lts&&lts<rst)return;found[v.date]=(found[v.date]||0)+(v.hours||0)});for(const date in found){if(ALD[date]!==found[date]){ALD[date]=found[date];changed=true}}if(changed){sAL();render()}}catch(e){console.log("syncALYear err",e)}}
+function syncALYearLeaves(){
+  if(!fbUser)return Promise.resolve();
+  return fsEnqueue(async()=>{
+    const ay=curALY();
+    const start=`${ay}-12-26`,end=`${ay+1}-12-25`;
+    const rst=AL_RESET_TS[ay]||0;
+    const annualIds=new Set();
+    getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});
+    if(!annualIds.size)annualIds.add("annual");
+    const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).get();
+    let changed=false;
+    const found={};
+    snap.forEach(doc=>{
+      const v=doc.data();
+      if(!annualIds.has(v.leaveType)||v.date<start||v.date>end)return;
+      const lts=v.ts&&v.ts.seconds?v.ts.seconds*1000:0;
+      if(rst&&lts&&lts<rst)return;
+      found[v.date]=(found[v.date]||0)+(v.hours||0);
+    });
+    for(const date in found){if(ALD[date]!==found[date]){ALD[date]=found[date];changed=true}}
+    if(changed){sAL();render()}
+  },"syncALYear").catch(e=>console.log("syncALYear err",e));
+}
 fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){
   // Immediately save display name for admin panel
-  try{fbDb.collection("users").doc(u.uid).set({displayName:u.displayName||"",email:u.email||"",photoURL:u.photoURL||"",lastLogin:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){}
+  fsEnqueue(()=>fbDb.collection("users").doc(u.uid).set({displayName:u.displayName||"",email:u.email||"",photoURL:u.photoURL||"",lastLogin:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),"loginTouch").catch(()=>{});
   _doAuthInit()}else{loadAdminEv()}render()});
 fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user;fbAuthReady=true;render();_doAuthInit()}}).catch(()=>{});
 setTimeout(()=>{if(!fbAuthReady){fbAuthReady=true;render()}},3000);
 let _loading=false;
-async function cloudSave(force){if(!fbUser||(!force&&_loading))return;try{const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",displayName:fbUser.displayName||"",email:fbUser.email||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};if(JSON.stringify(NOTES)==='{}'){delete payload.notes}await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true})}catch(e){console.log("cloudSave err",e)}}
-async function cloudLoad(){if(!fbUser)return;_loading=true;try{const doc=await fbDb.collection("users").doc(fbUser.uid).get();if(doc.exists){const d=doc.data();if(d.rt&&d.pos!==null&&d.pos!==undefined){S.rt=d.rt;S.pos=d.pos;S.step="cal";const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true,unit:S.unit||""});try{localStorage.setItem("sb_c",dd)}catch(e){}sCk("sb_c",dd,3650)}if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}if(d.al){try{AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{}}catch(e){}}if(d.notes){try{const raw=d.notes;const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});if(Object.keys(_n).length){NOTES=_n;sNotes()}}catch(e){}}if(d.lockedUnit){S.unit=d.lockedUnit;S.lockedUnit=d.lockedUnit}else if(d.unit){S.unit=d.unit}if(d.lockedRt){S.lockedRt=d.lockedRt;if(R[d.lockedRt]){S.rt=d.lockedRt;if(S.pos===null&&d.pos!==null&&d.pos!==undefined)S.pos=d.pos;if(S.pos===null)S.pos=0;S.step="cal"}}if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)};_loading=false;sEv();sAL();render();setTimeout(render,1000)}else{_loading=false;render()}}catch(e){console.log("cloudLoad err",e);_loading=false;render()}}
+function cloudSave(force){
+  if(!fbUser||(!force&&_loading))return Promise.resolve();
+  return fsEnqueue(async()=>{
+    const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",displayName:fbUser.displayName||"",email:fbUser.email||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};
+    if(JSON.stringify(NOTES)==='{}')delete payload.notes;
+    await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true});
+  },"cloudSave");
+}
+function cloudLoad(){
+  if(!fbUser)return Promise.resolve();
+  _loading=true;
+  return fsEnqueue(async()=>{
+    const doc=await fbDb.collection("users").doc(fbUser.uid).get();
+    if(!doc.exists)return;
+    const d=doc.data();
+    if(d.rt&&d.pos!==null&&d.pos!==undefined){
+      S.rt=d.rt;S.pos=d.pos;S.step="cal";
+      const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true,unit:S.unit||""});
+      try{localStorage.setItem("sb_c",dd)}catch(e){}
+      sCk("sb_c",dd,3650);
+    }
+    if(d.ev){try{EVS=JSON.parse(typeof d.ev==='string'?d.ev:JSON.stringify(d.ev))}catch(e){}}
+    if(d.al){
+      try{
+        AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));
+        ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{};
+      }catch(e){}
+    }
+    if(d.notes){
+      try{
+        const raw=d.notes;
+        const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});
+        if(Object.keys(_n).length)NOTES=_n;
+      }catch(e){}
+    }
+    if(d.lockedUnit){S.unit=d.lockedUnit;S.lockedUnit=d.lockedUnit}
+    else if(d.unit){S.unit=d.unit}
+    if(d.lockedRt){
+      S.lockedRt=d.lockedRt;
+      if(R[d.lockedRt]){
+        S.rt=d.lockedRt;
+        if(S.pos===null&&d.pos!==null&&d.pos!==undefined)S.pos=d.pos;
+        if(S.pos===null)S.pos=0;
+        S.step="cal";
+      }
+    }
+    if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)}
+    // 只更新本地儲存，不觸發 cloudSave（否則 race condition）
+    try{
+      localStorage.setItem("sb_ev",JSON.stringify(EVS));
+      localStorage.setItem("sb_al2",JSON.stringify(AL));
+      localStorage.setItem("sb_ald",JSON.stringify(ALD));
+      localStorage.setItem("sb_notes",JSON.stringify(NOTES));
+    }catch(e){}
+  },"cloudLoad").then(()=>{
+    _loading=false;
+    render();
+  }).catch(e=>{
+    _loading=false;
+    console.log("cloudLoad err",e);
+    render();
+  });
+}
 let fbLoginPending=false;
 function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
   fbLoginPending=true;render();
@@ -31,11 +170,77 @@ function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
 }
 function fbLogout(){_initDone=false;fbAuth.signOut()}
 let leavesCache={};
-async function loadLeaves(){try{const y=S.yr||TY,m=S.mo||TM;const ym1=y+"-"+String(m).padStart(2,"0");const pm=m===1?12:m-1,py=m===1?y-1:y;const ym2=py+"-"+String(pm).padStart(2,"0");const snap=await fbDb.collection("leaves").where("ym","in",[ym1,ym2]).get();const d={};snap.forEach(doc=>{const v=doc.data();if(S.unit&&S.unit!=="__all"&&v.unit&&v.unit!==S.unit)return;const k=v.date;if(!d[k])d[k]=[];d[k].push({uid:v.uid,name:v.name,type:v.type,leaveType:v.leaveType||"",hours:v.hours||0,ts:v.ts,unit:v.unit||""})});leavesCache=d;_syncAnnualToALD();render()}catch(e){console.log("loadLeaves err",e)}}
+function loadLeaves(){
+  return fsEnqueue(async()=>{
+    const y=S.yr||TY,m=S.mo||TM;
+    const ym1=y+"-"+String(m).padStart(2,"0");
+    const pm=m===1?12:m-1,py=m===1?y-1:y;
+    const ym2=py+"-"+String(pm).padStart(2,"0");
+    const snap=await fbDb.collection("leaves").where("ym","in",[ym1,ym2]).get();
+    const d={};
+    snap.forEach(doc=>{
+      const v=doc.data();
+      if(S.unit&&S.unit!=="__all"&&v.unit&&v.unit!==S.unit)return;
+      const k=v.date;
+      if(!d[k])d[k]=[];
+      d[k].push({uid:v.uid,name:v.name,type:v.type,leaveType:v.leaveType||"",hours:v.hours||0,ts:v.ts,unit:v.unit||""});
+    });
+    leavesCache=d;
+    _syncAnnualToALD();
+    render();
+  },"loadLeaves").catch(e=>{console.log("loadLeaves err",e)});
+}
 function _syncAnnualToALD(){if(!fbUser)return;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");let changed=false;for(const date in leavesCache){let h=0;leavesCache[date].forEach(l=>{if(l.uid!==fbUser.uid||!annualIds.has(l.leaveType))return;const ay=alYear(+date.slice(0,4),+date.slice(5,7),+date.slice(8,10));const rst=AL_RESET_TS[ay]||0;const lts=l.ts&&l.ts.seconds?l.ts.seconds*1000:0;if(rst&&lts&&lts<rst)return;h+=l.hours||0});if(h>0){if(ALD[date]!==h){ALD[date]=h;changed=true}}}if(changed)sAL()}
-async function addLeave(date,leaveTypeId,hours){if(!fbUser)return;try{const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).set({uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),type:"leave",leaveType:leaveTypeId,hours:hours||0,unit:S.unit||"",ts:firebase.firestore.FieldValue.serverTimestamp()});if(_isAnnualLT(leaveTypeId)){ALD[date]=hours;sAL()}loadLeaves()}catch(e){console.log("addLeave err",e);if(/INTERNAL ASSERTION/i.test(e.message||"")){if(confirm(lang==="zh"?"雲端連線出現異常，需重新載入頁面才能繼續。現在重新載入？":"Connection error. Reload?"))location.reload();return}alert((lang==="zh"?"請假失敗: ":"Leave failed: ")+e.message)}}
+function addLeave(date,leaveTypeId,hours){
+  if(!fbUser)return Promise.resolve();
+  return fsEnqueue(async()=>{
+    const id=fbUser.uid+"_"+date+"_"+leaveTypeId;
+    await fbDb.collection("leaves").doc(id).set({
+      uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),
+      type:"leave",leaveType:leaveTypeId,hours:hours||0,unit:S.unit||"",
+      ts:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    if(_isAnnualLT(leaveTypeId)){ALD[date]=hours;sAL()}
+    S.modal=null;
+    render();
+  },"addLeave").then(()=>{
+    // 寫入成功後再排入 loadLeaves（會等前面寫入結束才跑）
+    loadLeaves();
+  }).catch(e=>{
+    if(!/INTERNAL ASSERTION/i.test(e&&e.message||"")){
+      alert((lang==="zh"?"請假失敗: ":"Leave failed: ")+(e&&e.message||""));
+    }
+  });
+}
 function _isAnnualLT(id){const lt=getLT(id);return id==="annual"||(lt&&(lt.name==="特休"||lt.nameId==="Cuti Tahunan"))}
-async function removeLeave(date,leaveTypeId){if(!fbUser)return;if(leaveTypeId){const id=fbUser.uid+"_"+date+"_"+leaveTypeId;await fbDb.collection("leaves").doc(id).delete();if(_isAnnualLT(leaveTypeId)){delete ALD[date];sAL()}}else{const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).where("date","==",date).get();const batch=fbDb.batch();let hadAnnual=false;snap.forEach(d=>{if(_isAnnualLT(d.data().leaveType))hadAnnual=true;batch.delete(d.ref)});await batch.commit();if(hadAnnual){delete ALD[date];sAL()}}loadLeaves()}
+function removeLeave(date,leaveTypeId){
+  if(!fbUser)return Promise.resolve();
+  return fsEnqueue(async()=>{
+    if(leaveTypeId){
+      const id=fbUser.uid+"_"+date+"_"+leaveTypeId;
+      await fbDb.collection("leaves").doc(id).delete();
+      if(_isAnnualLT(leaveTypeId)){delete ALD[date];sAL()}
+    }else{
+      const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).where("date","==",date).get();
+      let hadAnnual=false;
+      const toDelete=[];
+      snap.forEach(d=>{if(_isAnnualLT(d.data().leaveType))hadAnnual=true;toDelete.push(d.ref)});
+      // 不用 batch，改為逐筆刪除（batch 容易觸發 SDK bug）
+      for(const ref of toDelete){
+        await ref.delete();
+        await new Promise(r=>setTimeout(r,30));
+      }
+      if(hadAnnual){delete ALD[date];sAL()}
+    }
+    render();
+  },"removeLeave").then(()=>{
+    loadLeaves();
+  }).catch(e=>{
+    if(!/INTERNAL ASSERTION/i.test(e&&e.message||"")){
+      alert((lang==="zh"?"取消失敗: ":"Remove failed: ")+(e&&e.message||""));
+    }
+  });
+}
 function getLeaves(date){return leavesCache[date]||[]}
 function myLeave(date){return getLeaves(date).filter(l=>l.uid===(fbUser&&fbUser.uid))}
 
@@ -43,8 +248,27 @@ const ADMIN_EMAILS=["onerkk@gmail.com","asus0814999@gmail.com"];
 const ADMIN_EV=["meeting","health"];
 function isAdmin(){if(!fbUser)return false;if(ADMIN_EMAILS.includes(fbUser.email))return true;return APP_CFG.admins&&APP_CFG.admins.some(a=>a.email===fbUser.email)}
 let adminEvCache={};
-async function loadAdminEv(){try{const y=S.yr||TY,m=S.mo||TM;const snap=await fbDb.collection("adminEvents").where("ym","==",y+"-"+String(m).padStart(2,"0")).get();const d={};snap.forEach(doc=>{const v=doc.data();const k=v.date;if(!d[k])d[k]=[];d[k].push(v.type)});adminEvCache=d;render()}catch(e){console.log("loadAdminEv err",e)}}
-async function setAdminEv(date,type,add){if(!isAdmin())return;const id=type+"_"+date;if(add){await fbDb.collection("adminEvents").doc(id).set({date:date,ym:date.slice(0,7),type:type,ts:firebase.firestore.FieldValue.serverTimestamp()})}else{await fbDb.collection("adminEvents").doc(id).delete()}loadAdminEv()}
+function loadAdminEv(){
+  return fsEnqueue(async()=>{
+    const y=S.yr||TY,m=S.mo||TM;
+    const snap=await fbDb.collection("adminEvents").where("ym","==",y+"-"+String(m).padStart(2,"0")).get();
+    const d={};
+    snap.forEach(doc=>{const v=doc.data();const k=v.date;if(!d[k])d[k]=[];d[k].push(v.type)});
+    adminEvCache=d;
+    render();
+  },"loadAdminEv").catch(e=>console.log("loadAdminEv err",e));
+}
+function setAdminEv(date,type,add){
+  if(!isAdmin())return Promise.resolve();
+  return fsEnqueue(async()=>{
+    const id=type+"_"+date;
+    if(add){
+      await fbDb.collection("adminEvents").doc(id).set({date:date,ym:date.slice(0,7),type:type,ts:firebase.firestore.FieldValue.serverTimestamp()});
+    }else{
+      await fbDb.collection("adminEvents").doc(id).delete();
+    }
+  },"setAdminEv").then(()=>loadAdminEv()).catch(e=>console.log("setAdminEv err",e));
+}
 function getAdminEv(date){return adminEvCache[date]||[]}
 function hasAdminEv(date){return getAdminEv(date).length>0}
 const IMG={icon:"./images/icon.png",early:"./images/early.png",night:"./images/night.png",mid:"./images/mid.png",off:"./images/off.png"};
@@ -142,42 +366,47 @@ const UNITS_DEFAULT=APP_CFG.units.slice();
 function getUnits(){return APP_CFG.units}
 function getLeaveTypes(){return APP_CFG.leaveTypes}
 function getLT(id){return APP_CFG.leaveTypes.find(t=>t.id===id)}
-async function loadAppConfig(){
-  try{const doc=await fbDb.collection("config").doc("app").get();
-    if(doc.exists){const d=doc.data();
+function loadAppConfig(){
+  return fsEnqueue(async()=>{
+    const doc=await fbDb.collection("config").doc("app").get();
+    if(doc.exists){
+      const d=doc.data();
       if(d.units&&d.units.length)APP_CFG.units=d.units;
       if(d.leaveTypes&&d.leaveTypes.length)APP_CFG.leaveTypes=d.leaveTypes;
       if(d.admins)APP_CFG.admins=d.admins;
       if(d.rotations&&d.rotations.length)APP_CFG.rotations=d.rotations;
       rebuildR();
     }
-  }catch(e){console.log("loadCfg err",e)}
+  },"loadAppConfig").catch(e=>console.log("loadCfg err",e));
 }
-async function saveAppConfig(){
-  if(!isAdmin())return;
-  try{await fbDb.collection("config").doc("app").set({units:APP_CFG.units,leaveTypes:APP_CFG.leaveTypes,admins:APP_CFG.admins||[],rotations:APP_CFG.rotations||[],ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){console.log("saveCfg err",e)}
+function saveAppConfig(){
+  if(!isAdmin())return Promise.resolve();
+  return fsEnqueue(()=>fbDb.collection("config").doc("app").set({
+    units:APP_CFG.units,leaveTypes:APP_CFG.leaveTypes,admins:APP_CFG.admins||[],rotations:APP_CFG.rotations||[],
+    ts:firebase.firestore.FieldValue.serverTimestamp()
+  },{merge:true}),"saveCfg").catch(e=>console.log("saveCfg err",e));
 }
 let S={step:"type",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false,unit:"",lockedUnit:"",lockedRt:""};
 let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb_ev"))||{}}catch(e){}
-function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}cloudSave()}
+function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}_scheduleCloudSave()}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
 let ALD={};try{ALD=JSON.parse(localStorage.getItem("sb_ald"))||JSON.parse(gCk("sb_ald"))||{}}catch(e){}
 let AL_RESET_TS={};try{AL_RESET_TS=JSON.parse(localStorage.getItem("sb_al_reset"))||{}}catch(e){}
 let NOTES={};try{NOTES=JSON.parse(localStorage.getItem("sb_notes"))||JSON.parse(gCk("sb_notes"))||{}}catch(e){}
-function sNotes(){const d=JSON.stringify(NOTES);try{localStorage.setItem("sb_notes",d)}catch(e){}try{sCk("sb_notes",d,3650)}catch(e){}cloudSave()}
+function sNotes(){const d=JSON.stringify(NOTES);try{localStorage.setItem("sb_notes",d)}catch(e){}try{sCk("sb_notes",d,3650)}catch(e){}_scheduleCloudSave()}
 function alYear(y,m,d){return(m>12||(m===12&&d>=26))?y:y-1}
 function curALY(){return alYear(TY,TM,TD)}
 function alYRange(ay){return`${ay}/12/26 ~ ${ay+1}/12/25`}
 function getAL(){const y=curALY();return AL[y]||{total:0,used:0}}
 function setAL(total,used){const y=curALY();AL[y]={total,used};sAL()}
-function sAL(){const a=JSON.stringify(AL),d=JSON.stringify(ALD);try{localStorage.setItem("sb_al2",a);localStorage.setItem("sb_ald",d)}catch(e){}try{sCk("sb_al2",a,3650);sCk("sb_ald",d,3650)}catch(e){}cloudSave()}
+function sAL(){const a=JSON.stringify(AL),d=JSON.stringify(ALD);try{localStorage.setItem("sb_al2",a);localStorage.setItem("sb_ald",d)}catch(e){}try{sCk("sb_al2",a,3650);sCk("sb_ald",d,3650)}catch(e){}_scheduleCloudSave()}
 function alUsed(){const ay=curALY();const start=`${ay}-12-26`,end=`${ay+1}-12-25`;let s=0;for(let k in ALD){if(k>=start&&k<=end)s+=ALD[k]}return s}
 function alRem(){const a=getAL();return Math.max(0,(a.total||0)-alUsed())}
 let DP=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();DP=e;render()});
 function sCk(k,v,d){const e=new Date();e.setTime(e.getTime()+d*864e5);document.cookie=k+"="+encodeURIComponent(v)+";expires="+e.toUTCString()+";path=/;SameSite=Lax"}
 function gCk(k){const m=document.cookie.match(new RegExp('(?:^|; )'+k+'=([^;]*)'));return m?decodeURIComponent(m[1]):null}
 try{const c=JSON.parse(localStorage.getItem("sb_c"))||JSON.parse(gCk("sb_c"));if(c&&c.rt&&c.pos!==null&&c.pos!==undefined){S.rt=c.rt;S.pos=c.pos;if(c.unit)S.unit=c.unit;S.step="cal"}}catch(e){}
-function sv(){const d=JSON.stringify({rt:S.rt,pos:S.pos,ep:true,unit:S.unit||""});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650);cloudSave(true)}
+function sv(){const d=JSON.stringify({rt:S.rt,pos:S.pos,ep:true,unit:S.unit||""});try{localStorage.setItem("sb_c",d)}catch(e){}sCk("sb_c",d,3650);_scheduleCloudSave()}
 function rot(){return S.rt?R[S.rt]:null}
 function cyc(){return rot()?rot().c:[]}
 function dim(y,m){return new Date(y,m,0).getDate()}
@@ -410,17 +639,31 @@ function modalLeaveHtml(y,m,d){
   }
   return html;
 }
-async function adminSetLeave(date){
-  if(!isAdmin())return;
+function adminSetLeave(date){
+  if(!isAdmin())return Promise.resolve();
   const n=parseInt(document.getElementById("adminLeaveN").value)||0;
   const current=getLeaves(date);
   const adminEntries=current.filter(l=>l.uid.startsWith("admin_"));
-  for(const e of adminEntries){await fbDb.collection("leaves").doc(e.uid+"_"+date).delete()}
   const realCount=current.filter(l=>!l.uid.startsWith("admin_")).length;
   const need=n-realCount;
-  if(need<0){alert(lang==="zh"?"已有 "+realCount+" 人實際請假，無法設低於此數":realCount+" orang sudah cuti, tidak bisa kurang");loadLeaves();return;}
-  for(let i=0;i<need;i++){const id="admin_"+i+"_"+date;await fbDb.collection("leaves").doc(id).set({uid:"admin_"+i,name:lang==="zh"?"員工":"Staff",date:date,ym:date.slice(0,7),type:"leave",leaveType:"admin",hours:0,unit:S.unit||"",ts:firebase.firestore.FieldValue.serverTimestamp()})}
-  loadLeaves();
+  if(need<0){alert(lang==="zh"?"已有 "+realCount+" 人實際請假，無法設低於此數":realCount+" orang sudah cuti, tidak bisa kurang");loadLeaves();return Promise.resolve();}
+  return fsEnqueue(async()=>{
+    // 先逐筆刪除舊的 admin entries
+    for(const e of adminEntries){
+      await fbDb.collection("leaves").doc(e.uid+"_"+date).delete();
+      await new Promise(r=>setTimeout(r,40));
+    }
+    // 逐筆寫入新的
+    for(let i=0;i<need;i++){
+      const id="admin_"+i+"_"+date;
+      await fbDb.collection("leaves").doc(id).set({
+        uid:"admin_"+i,name:lang==="zh"?"員工":"Staff",date:date,ym:date.slice(0,7),
+        type:"leave",leaveType:"admin",hours:0,unit:S.unit||"",
+        ts:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      await new Promise(r=>setTimeout(r,40));
+    }
+  },"adminSetLeave").then(()=>loadLeaves()).catch(e=>console.log("adminSetLeave err",e));
 }
 function adminEvModalHtml(y,m,d){
   const date=ek(y,m,d),aevs=getAdminEv(date);
@@ -637,7 +880,7 @@ function handle(e){
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();break;
     case "today":S.yr=TY;S.mo=TM;loadLeaves();loadAdminEv();break;
     case "chUnit":{if(S.lockedUnit){alert(lang==="zh"?"單位已被管理員鎖定，無法更改":"Unit dikunci oleh admin");break}const sel=document.getElementById("unitChg");if(sel){S.unit=sel.value;sv();loadLeaves();render()}}break;
-    case "reset":if(S.lockedRt){S.pos=null;S.step="wiz";S.wT=S.wS=S.wN=S.wD=null;break}S.step="type";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){fbDb.collection("users").doc(fbUser.uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}).catch(()=>{})}break;
+    case "reset":if(S.lockedRt){S.pos=null;S.step="wiz";S.wT=S.wS=S.wN=S.wD=null;break}S.step="type";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){fsEnqueue(()=>fbDb.collection("users").doc(fbUser.uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}),"reset").catch(()=>{})}break;
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
     case "help":S.showH=true;break;
@@ -647,8 +890,8 @@ function handle(e){
     case "closeStats":S.showStats=false;break;
 
     case "closeH":S.showH=false;break;
-    case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);cloudSave();break;
-    case "lid":lang="id";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);cloudSave();break;
+    case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);_scheduleCloudSave();break;
+    case "lid":lang="id";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);_scheduleCloudSave();break;
     case "lang":lang=lang==="zh"?"id":"zh";try{localStorage.setItem("sb_l",lang)}catch(e){}break;
     case "tev":{const{y,m,d}=S.modal;const k=ek(y,m,d),eid=el.dataset.eid;if(!EVS[k])EVS[k]=[];const i=EVS[k].indexOf(eid);if(i>=0){EVS[k].splice(i,1);if(eid==="annualL")delete ALD[k];if(eid==="custom"){delete NOTES[k];sNotes()}}else{EVS[k].push(eid);if(eid==="annualL"&&!ALD[k])ALD[k]=4}if(!EVS[k].length)delete EVS[k];sEv();sAL();break}
     case "alh":{const{y,m,d}=S.modal;const sel=document.getElementById("alSel");if(sel)ALD[ek(y,m,d)]=parseFloat(sel.value);sAL();return}
