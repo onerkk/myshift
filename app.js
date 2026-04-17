@@ -36,8 +36,8 @@ async function _fsDrain(){
       }
       job.reject(e);
     }
-    // 每個寫入之間留小小間隔，避免 SDK 壓力過大
-    await new Promise(r=>setTimeout(r,50));
+    // 讓出事件迴圈一輪（不固定 sleep，避免累積延遲）
+    await Promise.resolve();
   }
   _fsRunning=false;
 }
@@ -193,21 +193,35 @@ function loadLeaves(){
 function _syncAnnualToALD(){if(!fbUser)return;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");let changed=false;for(const date in leavesCache){let h=0;leavesCache[date].forEach(l=>{if(l.uid!==fbUser.uid||!annualIds.has(l.leaveType))return;const ay=alYear(+date.slice(0,4),+date.slice(5,7),+date.slice(8,10));const rst=AL_RESET_TS[ay]||0;const lts=l.ts&&l.ts.seconds?l.ts.seconds*1000:0;if(rst&&lts&&lts<rst)return;h+=l.hours||0});if(h>0){if(ALD[date]!==h){ALD[date]=h;changed=true}}}if(changed)sAL()}
 function addLeave(date,leaveTypeId,hours){
   if(!fbUser)return Promise.resolve();
+  // 樂觀 UI：立即更新本地 cache、關閉 modal、重繪畫面
+  const entry={uid:fbUser.uid,name:fbUser.displayName||fbUser.email,type:"leave",leaveType:leaveTypeId,hours:hours||0,ts:{seconds:Math.floor(Date.now()/1000)},unit:S.unit||""};
+  if(!leavesCache[date])leavesCache[date]=[];
+  // 若同 uid+leaveType 已存在，覆蓋；否則新增
+  const idx=leavesCache[date].findIndex(l=>l.uid===fbUser.uid&&l.leaveType===leaveTypeId);
+  if(idx>=0)leavesCache[date][idx]=entry;else leavesCache[date].push(entry);
+  if(_isAnnualLT(leaveTypeId)){ALD[date]=hours;sAL()}
+  S.modal=null;
+  render();
+  // 背景寫入 Firestore
+  const id=fbUser.uid+"_"+date+"_"+leaveTypeId;
   return fsEnqueue(async()=>{
-    const id=fbUser.uid+"_"+date+"_"+leaveTypeId;
     await fbDb.collection("leaves").doc(id).set({
       uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),
       type:"leave",leaveType:leaveTypeId,hours:hours||0,unit:S.unit||"",
       ts:firebase.firestore.FieldValue.serverTimestamp()
     });
-    if(_isAnnualLT(leaveTypeId)){ALD[date]=hours;sAL()}
-    S.modal=null;
-    render();
   },"addLeave").then(()=>{
-    // 寫入成功後再排入 loadLeaves（會等前面寫入結束才跑）
-    loadLeaves();
+    loadLeaves();// 同步真實資料（包含 server ts）
   }).catch(e=>{
     if(!/INTERNAL ASSERTION/i.test(e&&e.message||"")){
+      // 寫入失敗：回滾本地 cache
+      if(leavesCache[date]){
+        const j=leavesCache[date].findIndex(l=>l.uid===fbUser.uid&&l.leaveType===leaveTypeId);
+        if(j>=0)leavesCache[date].splice(j,1);
+        if(!leavesCache[date].length)delete leavesCache[date];
+      }
+      if(_isAnnualLT(leaveTypeId)){delete ALD[date];sAL()}
+      render();
       alert((lang==="zh"?"請假失敗: ":"Leave failed: ")+(e&&e.message||""));
     }
   });
@@ -215,28 +229,43 @@ function addLeave(date,leaveTypeId,hours){
 function _isAnnualLT(id){const lt=getLT(id);return id==="annual"||(lt&&(lt.name==="特休"||lt.nameId==="Cuti Tahunan"))}
 function removeLeave(date,leaveTypeId){
   if(!fbUser)return Promise.resolve();
+  // 樂觀 UI：先從本地 cache 移除
+  let backup=null;
+  let backupALD=null;
+  if(leavesCache[date]){
+    backup=leavesCache[date].slice();
+    if(leaveTypeId){
+      leavesCache[date]=leavesCache[date].filter(l=>!(l.uid===fbUser.uid&&l.leaveType===leaveTypeId));
+      if(_isAnnualLT(leaveTypeId)&&ALD[date]){backupALD={[date]:ALD[date]};delete ALD[date];sAL()}
+    }else{
+      const hadAnnual=leavesCache[date].some(l=>l.uid===fbUser.uid&&_isAnnualLT(l.leaveType));
+      leavesCache[date]=leavesCache[date].filter(l=>l.uid!==fbUser.uid);
+      if(hadAnnual&&ALD[date]){backupALD={[date]:ALD[date]};delete ALD[date];sAL()}
+    }
+    if(!leavesCache[date].length)delete leavesCache[date];
+  }
+  render();
   return fsEnqueue(async()=>{
     if(leaveTypeId){
       const id=fbUser.uid+"_"+date+"_"+leaveTypeId;
       await fbDb.collection("leaves").doc(id).delete();
-      if(_isAnnualLT(leaveTypeId)){delete ALD[date];sAL()}
     }else{
       const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).where("date","==",date).get();
-      let hadAnnual=false;
       const toDelete=[];
-      snap.forEach(d=>{if(_isAnnualLT(d.data().leaveType))hadAnnual=true;toDelete.push(d.ref)});
-      // 不用 batch，改為逐筆刪除（batch 容易觸發 SDK bug）
+      snap.forEach(d=>{toDelete.push(d.ref)});
       for(const ref of toDelete){
         await ref.delete();
         await new Promise(r=>setTimeout(r,30));
       }
-      if(hadAnnual){delete ALD[date];sAL()}
     }
-    render();
   },"removeLeave").then(()=>{
     loadLeaves();
   }).catch(e=>{
     if(!/INTERNAL ASSERTION/i.test(e&&e.message||"")){
+      // 回滾
+      if(backup){leavesCache[date]=backup}
+      if(backupALD){Object.assign(ALD,backupALD);sAL()}
+      render();
       alert((lang==="zh"?"取消失敗: ":"Remove failed: ")+(e&&e.message||""));
     }
   });
@@ -2606,19 +2635,16 @@ const WxSfx = (function(){
 })();
 
 if('serviceWorker' in navigator){
+  let _swRefreshing=false;
   navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{
     reg.update();
-    reg.addEventListener('updatefound',()=>{
-      const nw=reg.installing;
-      if(nw)nw.addEventListener('statechange',()=>{
-        if(nw.state==='activated')location.reload()
-      })
-    });
-    setInterval(()=>reg.update(),60000);
+    // 每 5 分鐘檢查一次；新版本會在下次使用者完全關閉 app 後自動生效
+    setInterval(()=>reg.update(),300000);
   }).catch(()=>{});
-  let refreshing=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(!refreshing){refreshing=true;location.reload()}
+    if(_swRefreshing)return;
+    _swRefreshing=true;
+    location.reload();
   })
 }
 // Note: 舊版曾寫死 'myshift-v136' 導致每次開 app 都清快取。現在由 SW 自己依 CACHE_NAME 管理。

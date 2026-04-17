@@ -1,7 +1,12 @@
-const CACHE_NAME = 'myshift-v155';
+const CACHE_NAME = 'myshift-v156';
 
 self.addEventListener('install', event => {
-  event.waitUntil(self.skipWaiting());
+  // 新 SW 等使用者下次開啟 app 才接管，避免操作中被打斷
+  // 若需要立即更新，可透過 postMessage('SKIP_WAITING') 主動觸發
+});
+
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
