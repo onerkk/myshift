@@ -2089,11 +2089,14 @@ const WxFx = (function(){
       size,alpha:.85+Math.random()*.15}
   }
   function mkFirefly(){
+    const isDark=document.documentElement.getAttribute('data-theme')==='dark';
     return{type:"ffly",x:Math.random()*_w,y:_h*.15+Math.random()*_h*.7,
       speed:.15+Math.random()*.35,angle:Math.random()*Math.PI*2,
       turn:.008+Math.random()*.025,pulse:Math.random()*Math.PI*2,
-      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,maxA:.55+Math.random()*.4,
-      imgIdx:Math.floor(Math.random()*4),size:18+Math.random()*14}
+      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,
+      maxA:isDark?(.75+Math.random()*.25):(.55+Math.random()*.4),
+      imgIdx:Math.floor(Math.random()*4),
+      size:isDark?(22+Math.random()*18):(18+Math.random()*14)}
   }
   function mkLeaf(){
     const imgIdx=Math.floor(Math.random()*4);// 4 張楓葉隨機挑
@@ -2895,6 +2898,25 @@ const WxSfx = (function(){
   },15000);
 
   return{setMode,toggle,triggerThunder,isMuted,initAudio,setSeasonSnd,stopSeasonSnd};
+})();
+
+// ══════════════ AUTO DARK MODE (21:00-05:00) ══════════════
+(function(){
+  function applyTheme(){
+    const h=new Date().getHours();
+    const dark=(h>=21||h<5);
+    const cur=document.documentElement.getAttribute('data-theme');
+    const want=dark?'dark':'';
+    if(cur!==want){
+      if(want) document.documentElement.setAttribute('data-theme','dark');
+      else document.documentElement.removeAttribute('data-theme');
+      const mt=document.querySelector('meta[name="theme-color"]');
+      if(mt) mt.setAttribute('content',dark?'#000000':'#00897b');
+    }
+  }
+  applyTheme();
+  setInterval(applyTheme,60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)applyTheme()});
 })();
 
 if('serviceWorker' in navigator){

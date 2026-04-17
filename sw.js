@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v162';
+const CACHE_NAME = 'myshift-v163';
 
 self.addEventListener('install', event => {
   // 新 SW 等使用者下次開啟 app 才接管，避免操作中被打斷
