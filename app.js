@@ -337,6 +337,7 @@ const NOW=new Date(),TY=NOW.getFullYear(),TM=NOW.getMonth()+1,TD=NOW.getDate(),T
 const EPOCH=new Date(2024,0,1);
 const EPOCH_UTC=Date.UTC(2024,0,1);
 function dayOff(y,m,d){return Math.floor((Date.UTC(y,m-1,d)-EPOCH_UTC)/864e5)}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
 function getSeason(){const m=new Date().getMonth()+1;if(m>=3&&m<=5)return'spring';if(m>=6&&m<=8)return'summer';if(m>=9&&m<=11)return'autumn';return'winter'}
 
 
@@ -397,7 +398,22 @@ function sNotes(){const d=JSON.stringify(NOTES);try{localStorage.setItem("sb_not
 function alYear(y,m,d){return(m>12||(m===12&&d>=26))?y:y-1}
 function curALY(){return alYear(TY,TM,TD)}
 function alYRange(ay){return`${ay}/12/26 ~ ${ay+1}/12/25`}
-function getAL(){const y=curALY();return AL[y]||{total:0,used:0}}
+function getAL(){
+  const y=curALY();
+  if(AL[y]&&AL[y].total)return AL[y];
+  // Fallback：若當前年度無資料，但有其他年度資料（可能是舊版本 key 錯存），遷移過來
+  const otherKeys=Object.keys(AL).filter(k=>AL[k]&&AL[k].total>0);
+  if(otherKeys.length===1){
+    // 只有一筆紀錄 → 大機率是要的，遷移
+    const src=otherKeys[0];
+    AL[y]={total:AL[src].total,used:AL[src].used||0};
+    if(src!==String(y))delete AL[src];
+    try{localStorage.setItem("sb_al2",JSON.stringify(AL))}catch(e){}
+    _scheduleCloudSave();
+    return AL[y];
+  }
+  return AL[y]||{total:0,used:0};
+}
 function setAL(total,used){const y=curALY();AL[y]={total,used};sAL()}
 function sAL(){const a=JSON.stringify(AL),d=JSON.stringify(ALD);try{localStorage.setItem("sb_al2",a);localStorage.setItem("sb_ald",d)}catch(e){}try{sCk("sb_al2",a,3650);sCk("sb_ald",d,3650)}catch(e){}_scheduleCloudSave()}
 function alUsed(){const ay=curALY();const start=`${ay}-12-26`,end=`${ay+1}-12-25`;let s=0;for(let k in ALD){if(k>=start&&k<=end)s+=ALD[k]}return s}
@@ -485,16 +501,25 @@ function _doRender(){
     a.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--tx3);font-size:13px">⏳ ${lang==="zh"?"載入中...":"Loading..."}</div>`;
     return;
   }
-  if(S.step==="type")a.innerHTML=rType();
-  else if(S.step==="wiz")a.innerHTML=rWiz();
-  else a.innerHTML=rCal();
-  document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():"";
-  document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
-  if(document.getElementById("leaveTypeSel"))try{updateLeaveHours()}catch(e){}
+  try{
+    if(S.step==="type")a.innerHTML=rType();
+    else if(S.step==="wiz")a.innerHTML=rWiz();
+    else a.innerHTML=rCal();
+    document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():"";
+    document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
+    if(document.getElementById("leaveTypeSel"))try{updateLeaveHours()}catch(e){}
+  }catch(err){
+    console.log("render err",err);
+    a.innerHTML=`<div style="padding:30px;color:#e74c3c;font-size:13px;line-height:1.6">
+      <div style="font-size:16px;font-weight:700;margin-bottom:10px">⚠️ ${lang==="zh"?"畫面渲染出錯":"Render error"}</div>
+      <div style="background:#fff3e0;padding:10px;border-radius:6px;margin-bottom:12px;word-break:break-all;font-family:monospace;font-size:11px">${esc(err&&err.message||"unknown")}</div>
+      <button onclick="location.reload()" style="background:#00897b;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">${lang==="zh"?"重新載入":"Reload"}</button>
+    </div>`;
+  }
 }
 
 function rType(){
-  const unitOpts=getUnits().map(u=>`<option value="${u}"${S.unit===u?' selected':''}>${u}</option>`).join('');
+  const unitOpts=getUnits().map(u=>`<option value="${esc(u)}"${S.unit===u?' selected':''}>${esc(u)}</option>`).join('');
   return`<div class="page"><div class="hero fu"><img src="${IMG.icon}"><h1>${t("app")}</h1><p>${t("desc")}</p></div>
   <div class="al-setup fu d1" style="margin-bottom:10px"><h3>🏭 ${lang==="zh"?"選擇單位":"Pilih Unit"}</h3>
     <select id="unitSel" onchange="if(S.lockedUnit){this.value=S.lockedUnit;alert(lang==='zh'?'單位已被管理員鎖定':'Unit dikunci');return}S.unit=this.value;sv();if(fbUser)loadLeaves()" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff">
@@ -502,7 +527,7 @@ function rType(){
     </select>
   </div>
   ${Object.keys(R).length?Object.entries(R).map(([k,v],i)=>`<button class="rcard fu d${(i%3)+1}" data-a="pick" data-k="${k}"><div class="rcard-icon">${v.c.filter(x=>x!=="休").length>9?"":v.c.filter(x=>x!=="休").length}${v.c.filter(x=>x!=="休").length>9?k.substring(0,3):":"+v.c.filter(x=>x==="休").length}</div><div class="rcard-info"><div class="rcard-name">${RN[lang]&&RN[lang][k]||k}</div><div class="rcard-sub">${v.h}h · ${v.c.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join(""):`<div style="padding:20px;text-align:center;color:var(--tx3);font-size:13px">${lang==="zh"?"⚠️ 尚未設定輪班規則，請管理員到後台設定":"⚠️ Belum ada aturan shift"}</div>`}
-  <div class="al-setup fu d3"><h3>${t("alSetup")}</h3><div class="al-setup-hint" style="margin-bottom:8px;font-size:11px;color:var(--green);font-weight:600">${alYRange(curALY())}</div><div class="al-setup-row"><label>${t("alTotal")}</label><input type="number" id="alTI" value="${getAL().total||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-row"><label>${t("alUsed")}</label><input type="number" id="alUI" value="${getAL().used||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-hint">${t("alSkip")}</div></div>
+  <div class="al-setup fu d3"><h3>${t("alSetup")}</h3><div class="al-setup-hint" style="margin-bottom:8px;font-size:11px;color:var(--green);font-weight:600">${alYRange(curALY())}</div><div class="al-setup-row"><label>${t("alTotal")}</label><input type="number" id="alTI" value="${getAL().total||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-hint">${t("alSkip")}</div></div>
   ${!fbUser&&fbAuthReady?`<div style="text-align:center;margin-top:14px"><button onclick="fbLogin()" style="background:#fff;border:1px solid #ddd;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,.08)"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px">${lang==="zh"?"Google 登入":"Login Google"}</button></div>`:fbUser?`<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--green);font-weight:600">✅ ${fbUser.displayName||fbUser.email}</div>`:""}<div style="text-align:center;margin-top:14px"><span class="lang-tog" style="display:inline-flex;height:36px;border-color:#ddd"><button class="lt-btn${lang==='zh'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='zh'?'var(--pri-d)':'var(--tx3)'}" data-a="lzh">中文</button><button class="lt-btn${lang==='id'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='id'?'var(--pri-d)':'var(--tx3)'}" data-a="lid">ID</button></span></div></div>`;
 }
 
@@ -542,7 +567,7 @@ function rCal(){
   if(adParts.length)holH+=`<div class="hol-strip" style="background:rgba(198,40,40,.06);border-left-color:var(--red);color:var(--red)">📢 ${adParts.join("　")}</div>`;
   if(lvParts.length)holH+=`<div class="hol-strip" style="background:var(--amber-l);border-left-color:var(--amber);color:#b36b00;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px">📋 ${lvParts.map(p=>`<span style="white-space:nowrap">${p}</span>`).join("")}</div>`;
   const rems=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const evs=EVS[ek(y,m,d)];if(evs&&evs.length){const s=gs(y,m,d),dw=new Date(y,m-1,d).getDay();evs.forEach(eid=>rems.push({d,dw,shift:sf(s),eid}))}}
-  let remH="";if(rems.length){remH=`<div class="rem-sec"><div class="rem-title">${t("rem")}</div><div class="rem-list">${rems.map(r=>{const nm=r.eid==="custom"&&NOTES[ek(y,m,r.d)]?NOTES[ek(y,m,r.d)]:en(r.eid);return`<div class="rem-item" data-a="open" data-d="${r.d}"><div class="rem-date"><div class="d">${r.d}</div><div class="w">${WK[r.dw]}</div></div><div class="rem-info"><div class="rem-name">${nm}</div><div class="rem-shift">${r.shift}</div></div><div style="font-size:16px">${EE[r.eid]||"📌"}</div></div>`}).join("")}</div></div>`}
+  let remH="";if(rems.length){remH=`<div class="rem-sec"><div class="rem-title">${t("rem")}</div><div class="rem-list">${rems.map(r=>{const nm=r.eid==="custom"&&NOTES[ek(y,m,r.d)]?esc(NOTES[ek(y,m,r.d)]):en(r.eid);return`<div class="rem-item" data-a="open" data-d="${r.d}"><div class="rem-date"><div class="d">${r.d}</div><div class="w">${WK[r.dw]}</div></div><div class="rem-info"><div class="rem-name">${nm}</div><div class="rem-shift">${r.shift}</div></div><div style="font-size:16px">${EE[r.eid]||"📌"}</div></div>`}).join("")}</div></div>`}
   let chips=Object.entries(st).map(([s,n])=>`<div class="dash-item"><div class="dash-val ${SC[s]}">${n}</div><div class="dash-lbl">${sf(s)}</div></div>`).join("");
   chips+=`<div class="dash-item"><div class="dash-val w">${wk}</div><div class="dash-lbl">${t("workD")}</div></div>`;
   const hH="";
@@ -578,7 +603,7 @@ function rMod(){
   const hasAL=ev.includes("annualL");const dayAL=ALD[ek(y,m,d)]||0;
   let alP="";if(hasAL){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayAL?' selected':''}>${h} ${t("hr")}</option>`}alP=`<div class="al-pick"><label>🌴 ${t("alPick")} (${t("alRem")}: ${alRem()}${t("hr")})</label><select id="alSel" data-a="alh">${opts}</select></div>`}
   const hasCust=ev.includes("custom");const custTxt=NOTES[ek(y,m,d)]||"";
-  let custP="";if(hasCust){custP=`<div class="al-pick" style="border-color:var(--pri)"><label>📝 ${lang==="zh"?"備註內容":"Isi catatan"}</label><input type="text" id="custIn" value="${custTxt.replace(/"/g,'&quot;')}" placeholder="${lang==="zh"?"輸入備註...":"Tulis catatan..."}" maxlength="50" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:4px" oninput="NOTES['${ek(y,m,d)}']=this.value;sNotes()"></div>`}
+  let custP="";if(hasCust){custP=`<div class="al-pick" style="border-color:var(--pri)"><label>📝 ${lang==="zh"?"備註內容":"Isi catatan"}</label><input type="text" id="custIn" value="${esc(custTxt)}" placeholder="${lang==="zh"?"輸入備註...":"Tulis catatan..."}" maxlength="50" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:4px" oninput="NOTES['${ek(y,m,d)}']=this.value;sNotes()"></div>`}
   return`<div class="modal-bg" data-a="close"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
   <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${custP}
   <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
@@ -594,7 +619,7 @@ function fbBarHtml(){
   </div>`;
   const pic=fbUser.photoURL?`<img class="fb-avatar" src="${fbUser.photoURL}" referrerpolicy="no-referrer">`:"";
   const name=fbUser.displayName||fbUser.email||"";
-  return`<div class="fb-bar fi"><div class="fb-user">${pic}<span>${name}</span></div><button onclick="fbLogout()" style="background:var(--tx3)">${lang==="zh"?"登出":"Logout"}</button></div>${S.unit?"":`<div style="margin:4px 0;padding:8px 10px;background:#fff3e0;border-radius:8px;border:1px solid #ffcc80;font-size:11px;color:#e65100;font-weight:600">⚠️ ${lang==="zh"?"請先選擇單位（重設後可設定）":"Pilih unit terlebih dahulu (reset untuk setting)"}</div>`}`;
+  return`<div class="fb-bar fi"><div class="fb-user">${pic}<span>${esc(name)}</span></div><button onclick="fbLogout()" style="background:var(--tx3)">${lang==="zh"?"登出":"Logout"}</button></div>${S.unit?"":`<div style="margin:4px 0;padding:8px 10px;background:#fff3e0;border-radius:8px;border:1px solid #ffcc80;font-size:11px;color:#e65100;font-weight:600">⚠️ ${lang==="zh"?"請先選擇單位（重設後可設定）":"Pilih unit terlebih dahulu (reset untuk setting)"}</div>`}`;
 }
 function modalLeaveHtml(y,m,d){
   const date=ek(y,m,d),leaves=getLeaves(date),myLeaves=leaves.filter(l=>l.uid===(fbUser&&fbUser.uid));
@@ -605,7 +630,7 @@ function modalLeaveHtml(y,m,d){
       html+=`<div class="leave-info">${lang==="zh"?"📋 今日 "+realLeaves.length+" 人請假":"📋 "+realLeaves.length+" orang cuti"}<div class="leave-list">${realLeaves.map(l=>{
         let timeStr="";const lt=getLT(l.leaveType);const ltName=lt?(lang==="zh"?lt.name:lt.nameId):l.leaveType;
         if(l.ts&&l.ts.toDate){const dt=l.ts.toDate();timeStr=` ${String(dt.getMonth()+1)}/${dt.getDate()} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`}
-        return`<span style="border-left:3px solid ${lt?lt.color:'#999'};padding-left:4px">${l.name} ${ltName} ${l.hours}h${l.unit&&l.unit!==S.unit?' ['+l.unit+']':''}${timeStr?'<br><small style="color:var(--tx3)">'+timeStr+'</small>':''}</span>`
+        return`<span style="border-left:3px solid ${lt?lt.color:'#999'};padding-left:4px">${esc(l.name)} ${esc(ltName)} ${l.hours}h${l.unit&&l.unit!==S.unit?' ['+esc(l.unit)+']':''}${timeStr?'<br><small style="color:var(--tx3)">'+timeStr+'</small>':''}</span>`
       }).join("")}</div></div>`;
     }else if(leaves.length){
       html+=`<div class="leave-info">${lang==="zh"?"📋 今日 "+leaves.length+" 人請假":"📋 "+leaves.length+" orang cuti"}</div>`;
@@ -641,7 +666,9 @@ function modalLeaveHtml(y,m,d){
 }
 function adminSetLeave(date){
   if(!isAdmin())return Promise.resolve();
-  const n=parseInt(document.getElementById("adminLeaveN").value)||0;
+  const inp=document.getElementById("adminLeaveN");
+  if(!inp)return Promise.resolve();
+  const n=parseInt(inp.value)||0;
   const current=getLeaves(date);
   const adminEntries=current.filter(l=>l.uid.startsWith("admin_"));
   const realCount=current.filter(l=>!l.uid.startsWith("admin_")).length;
@@ -792,7 +819,7 @@ function rHelp(){
   ${colorLegend}${stepsHtml}</div>
   <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee">
     <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:700;color:var(--tx)">🏭 ${isZh?"切換單位":"Ganti Unit"}</label><div style="display:flex;gap:6px;margin-top:6px"><select id="unitChg" style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;font-weight:600"><option value="">${isZh?"-- 無 --":"-- None --"}</option>${isAdmin()?`<option value="__all"${S.unit==="__all"?" selected":""}>${isZh?"全部單位":"Semua Unit"}</option>`:""}
-${getUnits().map(u=>`<option value="${u}"${S.unit===u?' selected':''}>${u}</option>`).join('')}</select><button data-a="chUnit" style="padding:8px 14px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">${isZh?"確認":"OK"}</button></div></div>
+${getUnits().map(u=>`<option value="${esc(u)}"${S.unit===u?' selected':''}>${esc(u)}</option>`).join('')}</select><button data-a="chUnit" style="padding:8px 14px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">${isZh?"確認":"OK"}</button></div></div>
     <button class="modal-done" data-a="closeH">${t("done")}</button>
     
     <button class="modal-done" data-a="reset" style="background:var(--red);margin-top:6px">${isZh?"⚠️ 重新設定班表":"⚠️ Reset Jadwal"}</button>
@@ -826,8 +853,8 @@ let showAdmin=false;
 function adminPanelHtml(){
   if(!isAdmin()||!showAdmin)return"";
   const isZh=lang==="zh";
-  let unitsHtml=APP_CFG.units.map((u,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:var(--card);border-radius:6px"><span style="flex:1;font-size:12px">${u}</span><button onclick="adminDelUnit(${i})" style="background:var(--red);color:#fff;border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">✕</button></div>`).join("");
-  let ltHtml=APP_CFG.leaveTypes.map((lt,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:var(--card);border-radius:6px;border-left:3px solid ${lt.color}"><span style="flex:1;font-size:12px">${isZh?lt.name:lt.nameId} (${lt.step}h)</span><button onclick="adminDelLT(${i})" style="background:var(--red);color:#fff;border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">✕</button></div>`).join("");
+  let unitsHtml=APP_CFG.units.map((u,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:var(--card);border-radius:6px"><span style="flex:1;font-size:12px">${esc(u)}</span><button onclick="adminDelUnit(${i})" style="background:var(--red);color:#fff;border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">✕</button></div>`).join("");
+  let ltHtml=APP_CFG.leaveTypes.map((lt,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:var(--card);border-radius:6px;border-left:3px solid ${lt.color}"><span style="flex:1;font-size:12px">${esc(isZh?lt.name:lt.nameId)} (${lt.step}h)</span><button onclick="adminDelLT(${i})" style="background:var(--red);color:#fff;border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">✕</button></div>`).join("");
   return`<div class="modal-bg" onclick="showAdmin=false;render()"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div>
     <div class="modal-title">⚙️ ${isZh?"管理員後台":"Admin Panel"}</div>
     <div style="margin:12px 0"><h3 style="font-size:13px;margin-bottom:6px">🏭 ${isZh?"單位管理":"Unit Management"}</h3>${unitsHtml}
@@ -866,6 +893,7 @@ function getMonthLeaveHours(y,m){
 
 function handle(e){
   const el=e.currentTarget,a=el.dataset.a;
+  try{
   switch(a){
     case "pick":{if(S.lockedRt){alert(lang==="zh"?"輪班規則已被管理員鎖定":"Shift dikunci oleh admin");break}const ti=document.getElementById("alTI"),ui=document.getElementById("alUI");setAL(parseFloat(ti&&ti.value)||0,parseFloat(ui&&ui.value)||0);S.rt=el.dataset.k;S.step="wiz";S.wT=S.wS=S.wN=S.wD=null;break}
     case "wb":if(S.wD!==null)S.wD=null;else if(S.wS){S.wS=null;S.wT=null}else if(S.wN){S.wN=null;S.wT=null}else if(S.wT)S.wT=null;else{S.step="type";S.wT=null;S.wS=null;S.wN=null;S.wD=null}break;
@@ -892,7 +920,7 @@ function handle(e){
     case "closeH":S.showH=false;break;
     case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);_scheduleCloudSave();break;
     case "lid":lang="id";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);_scheduleCloudSave();break;
-    case "lang":lang=lang==="zh"?"id":"zh";try{localStorage.setItem("sb_l",lang)}catch(e){}break;
+    case "lang":lang=lang==="zh"?"id":"zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);_scheduleCloudSave();break;
     case "tev":{const{y,m,d}=S.modal;const k=ek(y,m,d),eid=el.dataset.eid;if(!EVS[k])EVS[k]=[];const i=EVS[k].indexOf(eid);if(i>=0){EVS[k].splice(i,1);if(eid==="annualL")delete ALD[k];if(eid==="custom"){delete NOTES[k];sNotes()}}else{EVS[k].push(eid);if(eid==="annualL"&&!ALD[k])ALD[k]=4}if(!EVS[k].length)delete EVS[k];sEv();sAL();break}
     case "alh":{const{y,m,d}=S.modal;const sel=document.getElementById("alSel");if(sel)ALD[ek(y,m,d)]=parseFloat(sel.value);sAL();return}
     case "inst":if(DP){DP.prompt();DP.userChoice.then(()=>{DP=null;render()})}break;
@@ -901,15 +929,13 @@ function handle(e){
       const cur=getAL();
       const yRange=alYRange(curALY());
       const isZh=lang==="zh";
-      const totalPrompt=isZh?`設定 ${yRange} 特休總時數：\n（重設後剩餘 = 輸入的數字，之前紀錄不再扣除）`:`Total jam cuti ${yRange}:`;
+      const totalPrompt=isZh?`設定 ${yRange} 特休總時數：\n（重設後剩餘 = 輸入的數字）`:`Total jam cuti ${yRange}:`;
       const tIn=prompt(totalPrompt,cur.total||"");
       if(tIn===null)return;
       const total=parseFloat(tIn);
       if(isNaN(total)||total<0){alert(isZh?"請輸入有效數字":"Masukkan angka valid");return}
-      // 清本地本年度 ALD
       const ay=curALY(),start=`${ay}-12-26`,end=`${ay+1}-12-25`;
       for(const k in ALD){if(k>=start&&k<=end)delete ALD[k]}
-      // 設定重置時間戳：此時間之後的特休紀錄才會計入
       AL_RESET_TS[ay]=Date.now();
       try{localStorage.setItem("sb_al_reset",JSON.stringify(AL_RESET_TS))}catch(e){}
       setAL(total,0);
@@ -918,6 +944,11 @@ function handle(e){
     case "wxR":wxErr=false;wxData=null;try{localStorage.removeItem('_wxPos')}catch(e){}render();loadWx();return;
   }
   render();
+  }catch(err){
+    console.log("handle err ["+a+"]",err);
+    try{render()}catch(e2){}
+    alert((lang==="zh"?"操作失敗：":"Error: ")+(err&&err.message||"unknown"));
+  }
 }
 let wxData=null,wxErr=false;
 try{render();}catch(e){document.getElementById("app").innerHTML="<div style='padding:20px;color:red;font-size:14px;word-break:break-all'><b>ERROR:</b><br>"+e.message+"</div>";}
@@ -925,15 +956,21 @@ try{render();}catch(e){document.getElementById("app").innerHTML="<div style='pad
 (function(){
   let sx=0,sy=0,swiping=false;
   document.addEventListener("touchstart",e=>{
-    if(S.step!=="cal"||S.modal||S.showH||wxDetailShow||tideDetailShow)return;
-    sx=e.touches[0].clientX;sy=e.touches[0].clientY;swiping=true;
+    try{
+      if(S.step!=="cal"||S.modal||S.showH||wxDetailShow||tideDetailShow)return;
+      if(!e.touches||!e.touches[0])return;
+      sx=e.touches[0].clientX;sy=e.touches[0].clientY;swiping=true;
+    }catch(err){swiping=false}
   },{passive:true});
   document.addEventListener("touchend",e=>{
-    if(!swiping)return;swiping=false;
-    const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;
-    if(Math.abs(dx)<60||Math.abs(dy)>Math.abs(dx)*0.7)return;
-    if(dx<0){if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();render()}
-    else{if(S.mo===1){S.yr--;S.mo=12}else S.mo--;loadLeaves();loadAdminEv();render()}
+    try{
+      if(!swiping)return;swiping=false;
+      if(!e.changedTouches||!e.changedTouches[0])return;
+      const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;
+      if(Math.abs(dx)<60||Math.abs(dy)>Math.abs(dx)*0.7)return;
+      if(dx<0){if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();render()}
+      else{if(S.mo===1){S.yr--;S.mo=12}else S.mo--;loadLeaves();loadAdminEv();render()}
+    }catch(err){swiping=false}
   },{passive:true});
 })();
 
@@ -1039,6 +1076,7 @@ loadAdminEv();
 
 // ═══ SHARE CALENDAR ═══
 async function shareCalendar(){
+  try{
   const isZh=lang==="zh";
   const y=S.yr,m=S.mo,dm=dim(y,m),fd=fdw(y,m);
   const r=rot(),c=cyc();
@@ -1109,6 +1147,10 @@ async function shareCalendar(){
       const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;a.click();URL.revokeObjectURL(a.href);
     }
   },"image/png");
+  }catch(err){
+    console.log("share err",err);
+    alert((lang==="zh"?"分享失敗：":"Share failed: ")+(err&&err.message||"unknown"));
+  }
 }
 
 // ═══ ANNUAL STATS ═══
@@ -1141,7 +1183,8 @@ function rStats(){
   // Annual leave — use AL year (y-1)/12/26 ~ y/12/25
   const aly=y-1;
   const alData=AL[aly]||{total:0,used:0};
-  let alUsedCalc=alData.used||0;
+  const alRst=AL_RESET_TS[aly]||0;// 若有重置紀錄，只計算重置後的 ALD
+  let alUsedCalc=0;
   const alStart=`${aly}-12-26`,alEnd=`${aly+1}-12-25`;
   for(let k in ALD){if(k>=alStart&&k<=alEnd)alUsedCalc+=ALD[k]}
   const alTotal=alData.total||0;
@@ -2578,5 +2621,4 @@ if('serviceWorker' in navigator){
     if(!refreshing){refreshing=true;location.reload()}
   })
 }
-// Force clear all old caches on version change
-if('caches' in window){caches.keys().then(names=>{names.forEach(n=>{if(n!=='myshift-v136')caches.delete(n)})})}
+// Note: 舊版曾寫死 'myshift-v136' 導致每次開 app 都清快取。現在由 SW 自己依 CACHE_NAME 管理。
