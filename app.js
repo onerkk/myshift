@@ -1252,18 +1252,36 @@ const WxFx = (function(){
   let heatPhase=0;
   let ambientHour=-1;
   // ── Real photo FX assets ──
-  const FX_IMG={swallowtail:[],swallowtailReady:false};
-  function _preloadFx(){
-    // 鳳蝶 6 幀振翅動畫
-    const base="./images/fx/butterfly/";
+  const FX_IMG={
+    purple:[],purpleReady:false,
+    monarch:[],monarchReady:false,
+    maple:[],mapleReady:false,
+    cloud:[],cloudReady:false,
+    bolt:[],boltReady:false,
+    drop:null,dropReady:false
+  };
+  function _preloadBatch(base,prefix,count,key){
     let loaded=0;
-    for(let i=1;i<=6;i++){
+    for(let i=1;i<=count;i++){
       const img=new Image();
-      img.onload=()=>{loaded++;if(loaded===6)FX_IMG.swallowtailReady=true};
-      img.onerror=()=>{loaded++;if(loaded===6)FX_IMG.swallowtailReady=true};
-      img.src=base+"swallowtail-"+String(i).padStart(2,"0")+".png";
-      FX_IMG.swallowtail.push(img);
+      img.onload=()=>{loaded++;if(loaded===count)FX_IMG[key+"Ready"]=true};
+      img.onerror=()=>{loaded++;if(loaded===count)FX_IMG[key+"Ready"]=true};
+      img.src=base+prefix+"-"+String(i).padStart(2,"0")+".png";
+      FX_IMG[key].push(img);
     }
+  }
+  function _preloadFx(){
+    _preloadBatch("./images/fx/butterfly/","purple",6,"purple");
+    _preloadBatch("./images/fx/butterfly/","monarch",6,"monarch");
+    _preloadBatch("./images/fx/maple/","maple",4,"maple");
+    _preloadBatch("./images/fx/cloud/","cloud",3,"cloud");
+    _preloadBatch("./images/fx/lightning/","bolt",4,"bolt");
+    // Single drop image
+    const d=new Image();
+    d.onload=()=>{FX_IMG.dropReady=true};
+    d.onerror=()=>{FX_IMG.dropReady=true};
+    d.src="./images/fx/rain/drop.png";
+    FX_IMG.drop=d;
   }
   
   function init(){
@@ -1341,8 +1359,10 @@ const WxFx = (function(){
     const speed=heavy?14+Math.random()*10:7+Math.random()*6;
     const len=heavy?22+Math.random()*18:12+Math.random()*12;
     const drift=wind?5+Math.random()*6:1+Math.random()*2;
-    return{type:"rain",x:Math.random()*_w*1.4-_w*.2, y:Math.random()*_h*-1, speed, len, drift,
-      alpha:heavy?0.35+Math.random()*0.25:0.18+Math.random()*0.18,
+    // depth: 0.4 遠小+淡, 1.0 近大+實。原始 len 當成水滴高度基準
+    const depth=0.4+Math.random()*0.6;
+    return{type:"rain",x:Math.random()*_w*1.4-_w*.2, y:Math.random()*_h*-1, speed, len, drift, depth,
+      alpha:(heavy?0.55+Math.random()*0.3:0.35+Math.random()*0.3)*depth,
       width:heavy?2+Math.random():1.2+Math.random()*0.5};
   }
   
@@ -1578,7 +1598,10 @@ const WxFx = (function(){
     topG.addColorStop(1,"rgba(60,70,90,0)");
     ctx.fillStyle=topG;
     ctx.fillRect(0,0,_w,_h*0.3);
-    
+
+    const img=FX_IMG.drop;
+    const hasImg=img&&img.complete&&img.naturalWidth;
+
     particles.forEach(p=>{
       if(p.type!=="rain") return;
       p.y+=p.speed;
@@ -1588,12 +1611,26 @@ const WxFx = (function(){
         p.y=-p.len-Math.random()*_h*0.3;
         p.x=Math.random()*_w*1.4-_w*.2;
       }
-      ctx.beginPath();
-      ctx.strokeStyle=`rgba(180,200,230,${p.alpha})`;
-      ctx.lineWidth=p.width;
-      ctx.moveTo(p.x,p.y);
-      ctx.lineTo(p.x+p.drift*2.5,p.y+p.len);
-      ctx.stroke();
+      if(hasImg){
+        // 用水滴圖片，依深度 & drift 方向旋轉
+        const h=p.len*(p.depth||1)*0.9;
+        const w=h*0.35;// 水滴寬高比 ~0.35
+        const ang=Math.atan2(p.speed,p.drift*2.5)-Math.PI/2;// 飛行方向
+        ctx.save();
+        ctx.translate(p.x,p.y);
+        ctx.rotate(ang);
+        ctx.globalAlpha=p.alpha;
+        ctx.drawImage(img,-w/2,-h/2,w,h);
+        ctx.restore();
+      }else{
+        // fallback: 線條
+        ctx.beginPath();
+        ctx.strokeStyle=`rgba(180,200,230,${p.alpha})`;
+        ctx.lineWidth=p.width;
+        ctx.moveTo(p.x,p.y);
+        ctx.lineTo(p.x+p.drift*2.5,p.y+p.len);
+        ctx.stroke();
+      }
     });
     drawSplashes();
   }
@@ -1620,32 +1657,61 @@ const WxFx = (function(){
     drawLightning();
   }
   
+  // 閃電當前顯示狀態：觸發時記錄挑選的圖片與位置
+  let lightningImg=null, lightningX=0, lightningScale=1, lightningFlip=false;
   function drawLightning(){
     lightningTimer--;
     if(lightningTimer<=0){
-      lightningAlpha=0.4+Math.random()*0.3;
+      lightningAlpha=0.55+Math.random()*0.35;
       if(typeof WxSfx!=='undefined') WxSfx.triggerThunder();
       lightningTimer=mode==="typhoon"?60+Math.random()*150:100+Math.random()*250;
-      let lx=_w*0.2+Math.random()*_w*0.6,ly=0;
-      ctx.beginPath();
-      ctx.strokeStyle=`rgba(220,230,255,${lightningAlpha*1.5})`;
-      ctx.lineWidth=2.5;
-      ctx.moveTo(lx,ly);
-      for(let seg=0;seg<8;seg++){
-        lx+=(Math.random()-0.5)*60;
-        ly+=_h/8;
-        ctx.lineTo(lx,ly);
+      // 從 4 張閃電圖隨機挑一張（要求圖已載入，否則 fallback）
+      const bolts=FX_IMG.bolt.filter(im=>im&&im.complete&&im.naturalWidth);
+      if(bolts.length){
+        lightningImg=bolts[Math.floor(Math.random()*bolts.length)];
+        lightningX=_w*0.15+Math.random()*_w*0.7;// 水平位置
+        lightningScale=0.85+Math.random()*0.35;// 大小變化
+        lightningFlip=Math.random()<0.5;// 左右翻轉增加多樣性
+      }else{
+        lightningImg=null;
+        // fallback: 折線
+        let lx=_w*0.2+Math.random()*_w*0.6,ly=0;
+        ctx.beginPath();
+        ctx.strokeStyle=`rgba(220,230,255,${lightningAlpha*1.5})`;
+        ctx.lineWidth=2.5;
+        ctx.moveTo(lx,ly);
+        for(let seg=0;seg<8;seg++){
+          lx+=(Math.random()-0.5)*60;
+          ly+=_h/8;
+          ctx.lineTo(lx,ly);
+        }
+        ctx.stroke();
+        ctx.lineWidth=8;
+        ctx.strokeStyle=`rgba(180,200,255,${lightningAlpha*0.3})`;
+        ctx.stroke();
       }
-      ctx.stroke();
-      ctx.lineWidth=8;
-      ctx.strokeStyle=`rgba(180,200,255,${lightningAlpha*0.3})`;
-      ctx.stroke();
     }
     if(lightningAlpha>0){
-      ctx.fillStyle=`rgba(220,230,255,${lightningAlpha})`;
+      // 畫閃電圖片（閃爍期間持續顯示，透明度隨 lightningAlpha 衰減）
+      if(lightningImg){
+        const imgH=_h*lightningScale;
+        const imgW=imgH*(lightningImg.naturalWidth/lightningImg.naturalHeight);
+        ctx.save();
+        ctx.globalAlpha=Math.min(1,lightningAlpha*1.8);
+        if(lightningFlip){
+          ctx.translate(lightningX,0);
+          ctx.scale(-1,1);
+          ctx.drawImage(lightningImg,-imgW/2,0,imgW,imgH);
+        }else{
+          ctx.drawImage(lightningImg,lightningX-imgW/2,0,imgW,imgH);
+        }
+        ctx.restore();
+      }
+      // 全屏白光覆蓋
+      ctx.fillStyle=`rgba(220,230,255,${lightningAlpha*0.6})`;
       ctx.fillRect(0,0,_w,_h);
-      lightningAlpha*=0.82;
-      if(lightningAlpha<0.005)lightningAlpha=0;
+      lightningAlpha*=0.78;
+      if(lightningAlpha<0.005){lightningAlpha=0;lightningImg=null;}
     }
   }
   
@@ -1956,15 +2022,13 @@ const WxFx = (function(){
       life:250+Math.random()*350,c,petals:5+Math.floor(Math.random()*2)}
   }
   function mkButterfly(){
-    // kind: 0=swallowtail (未來可擴充 purple/orange 紫斑蝶/樺斑蝶)
-    const kind=0;
+    // kind: "purple" 紫斑蝶 / "monarch" 帝王斑蝶，隨機混合
+    const kind=Math.random()<0.5?"purple":"monarch";
+    const imgIdx=Math.floor(Math.random()*6);// 6 張靜態姿勢隨機挑
     const size=36+Math.random()*24;// 最終畫面尺寸 36-60px
-    return{type:"bfly",kind,x:Math.random()*_w,y:_h*.15+Math.random()*_h*.5,
+    return{type:"bfly",kind,imgIdx,x:Math.random()*_w,y:_h*.15+Math.random()*_h*.5,
       speed:.5+Math.random()*.8,angle:Math.random()*Math.PI*2,
       turn:.015+Math.random()*.02,
-      frame:Math.floor(Math.random()*6),
-      frameTimer:0,
-      frameInterval:3+Math.floor(Math.random()*2),// 每 3-4 render frame 換一張 (~60fps/3=20fps 振翅)
       size,alpha:.85+Math.random()*.15}
   }
   function mkFirefly(){
@@ -1974,13 +2038,13 @@ const WxFx = (function(){
       ps:.015+Math.random()*.035,r:2+Math.random()*2.5,maxA:.35+Math.random()*.5}
   }
   function mkLeaf(){
-    const cols=[[200,75,25],[220,135,25],[180,55,15],[240,175,45],[160,95,15],[190,50,10]];
-    const c=cols[Math.floor(Math.random()*cols.length)];
-    return{type:"leaf",x:Math.random()*_w*1.3-_w*.15,y:-15-Math.random()*_h*.3,
-      size:5+Math.random()*7,speed:.5+Math.random()*1,drift:.6+Math.random()*1.2,
+    // imgIdx 0-3 對應 maple-01 ~ maple-04.png
+    const imgIdx=Math.floor(Math.random()*4);
+    return{type:"leaf",imgIdx,x:Math.random()*_w*1.3-_w*.15,y:-15-Math.random()*_h*.3,
+      size:14+Math.random()*18,speed:.5+Math.random()*1,drift:.6+Math.random()*1.2,
       wobble:Math.random()*Math.PI*2,ws:.01+Math.random()*.015,
       rot:Math.random()*Math.PI*2,rs:.012+Math.random()*.035,
-      alpha:.3+Math.random()*.35,c}
+      alpha:.6+Math.random()*.3}
   }
   function mkFrostSpark(){
     return{type:"fspark",x:Math.random()*_w,y:Math.random()*_h,
@@ -1994,9 +2058,10 @@ const WxFx = (function(){
       dir:Math.random()>.5?1:-1}
   }
   function mkCloud(){
-    return{type:"cloud",x:-200-Math.random()*200,y:Math.random()*_h*.2,
-      w:150+Math.random()*200,h:40+Math.random()*50,
-      speed:.15+Math.random()*.25,alpha:.06+Math.random()*.06}
+    const imgIdx=Math.floor(Math.random()*3);
+    return{type:"cloud",imgIdx,x:-200-Math.random()*200,y:Math.random()*_h*.2,
+      w:180+Math.random()*220,h:60+Math.random()*60,
+      speed:.15+Math.random()*.25,alpha:.35+Math.random()*.25}
   }
   function mkDragonfly(){
     return{type:"dfly",x:Math.random()*_w,y:_h*.1+Math.random()*_h*.3,
@@ -2096,13 +2161,21 @@ const WxFx = (function(){
       if(p.type==='cloud'){
         p.x+=p.speed;
         if(p.x>_w+p.w){p.x=-p.w-Math.random()*100;p.y=Math.random()*_h*.2}
-        // Draw cloud as overlapping circles
-        ctx.fillStyle=`rgba(160,170,185,${p.alpha})`;
-        const cx=p.x+p.w/2,cy=p.y+p.h/2;
-        for(let j=0;j<5;j++){
-          const ox=(j-2)*p.w*.18,oy=Math.sin(j*1.2)*p.h*.2;
-          const rr=p.w*.15+Math.sin(j*2)*p.w*.05;
-          ctx.beginPath();ctx.arc(cx+ox,cy+oy,rr,0,Math.PI*2);ctx.fill();
+        const img=FX_IMG.cloud[p.imgIdx];
+        if(img&&img.complete&&img.naturalWidth){
+          ctx.save();
+          ctx.globalAlpha=p.alpha;
+          ctx.drawImage(img,p.x,p.y,p.w,p.h);
+          ctx.restore();
+        }else{
+          // fallback: overlapping circles
+          ctx.fillStyle=`rgba(200,210,220,${p.alpha*.3})`;
+          const cx=p.x+p.w/2,cy=p.y+p.h/2;
+          for(let j=0;j<5;j++){
+            const ox=(j-2)*p.w*.18,oy=Math.sin(j*1.2)*p.h*.2;
+            const rr=p.w*.15+Math.sin(j*2)*p.w*.05;
+            ctx.beginPath();ctx.arc(cx+ox,cy+oy,rr,0,Math.PI*2);ctx.fill();
+          }
         }
       }
       else if(p.type==='blossom'){
@@ -2144,18 +2217,15 @@ const WxFx = (function(){
         ctx.restore();
       }
       else if(p.type==='bfly'){
-        p.angle+=p.turn*(Math.sin(p.frame*.7)>0?1:-1);
+        p.angle+=p.turn*(Math.sin(p.x*.01+p.y*.01)>0?1:-1);
         p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.6;
-        // 翅膀幀切換
-        p.frameTimer++;
-        if(p.frameTimer>=p.frameInterval){p.frameTimer=0;p.frame=(p.frame+1)%6}
         if(p.x<-60||p.x>_w+60||p.y<-60||p.y>_h+60){
           p.x=Math.random()*_w;p.y=_h*.15+Math.random()*_h*.5;p.angle=Math.random()*Math.PI*2;
         }
-        const imgArr=FX_IMG.swallowtail;
-        const img=imgArr[p.frame];
+        const imgArr=FX_IMG[p.kind]||FX_IMG.purple;
+        const img=imgArr[p.imgIdx];
         if(img&&img.complete&&img.naturalWidth){
-          // 圖片已載入：畫真實蝴蝶
+          // 圖片已載入：畫真實蝴蝶（靜態姿勢，靠飛行方向旋轉）
           ctx.save();
           ctx.translate(p.x,p.y);
           ctx.rotate(p.angle+Math.PI/2);
@@ -2165,13 +2235,12 @@ const WxFx = (function(){
           ctx.restore();
         }else{
           // 圖片未載入 (路徑錯、404、還在下載)：畫程序化橢圓蝴蝶作為 fallback
-          const wing=Math.abs(Math.sin(p.frame*.8))*.7+.3;
           const r=p.size*.15;
           ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle+Math.PI/2);
-          ctx.fillStyle=`rgba(255,200,50,${p.alpha*.7})`;
-          ctx.beginPath();ctx.ellipse(-r*.6,0,r*wing,r*.7,-.3,0,Math.PI*2);ctx.fill();
-          ctx.beginPath();ctx.ellipse(r*.6,0,r*wing,r*.7,.3,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle=`rgba(60,40,30,${p.alpha})`;
+          ctx.fillStyle=p.kind==="monarch"?`rgba(255,140,40,${p.alpha*.7})`:`rgba(140,80,180,${p.alpha*.7})`;
+          ctx.beginPath();ctx.ellipse(-r*.6,0,r,r*.7,-.3,0,Math.PI*2);ctx.fill();
+          ctx.beginPath();ctx.ellipse(r*.6,0,r,r*.7,.3,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle=`rgba(40,30,20,${p.alpha})`;
           ctx.beginPath();ctx.ellipse(0,0,1.5,r*.4,0,0,Math.PI*2);ctx.fill();
           ctx.restore();
         }
@@ -2215,19 +2284,29 @@ const WxFx = (function(){
         p.y+=p.speed;p.x+=p.drift;p.wobble+=p.ws;p.rot+=p.rs;
         p.x+=Math.sin(p.wobble)*1.1;p.speed+=Math.sin(p.wobble*2)*.015;
         if(p.y>_h+25){seasonParts.splice(i,1);continue}
-        const sz=p.size;
-        ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-        ctx.beginPath();ctx.moveTo(0,-sz);
-        ctx.quadraticCurveTo(sz*.5,-sz*.3,sz*.8,-sz*.6);
-        ctx.quadraticCurveTo(sz*.4,0,sz*.6,sz*.4);
-        ctx.quadraticCurveTo(sz*.2,sz*.3,0,sz*.8);
-        ctx.quadraticCurveTo(-sz*.2,sz*.3,-sz*.6,sz*.4);
-        ctx.quadraticCurveTo(-sz*.4,0,-sz*.8,-sz*.6);
-        ctx.quadraticCurveTo(-sz*.5,-sz*.3,0,-sz);
-        ctx.fillStyle=`rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.alpha})`;ctx.fill();
-        ctx.strokeStyle=`rgba(${Math.max(0,p.c[0]-40)},${Math.max(0,p.c[1]-30)},${p.c[2]},${p.alpha*.4})`;
-        ctx.lineWidth=.5;ctx.beginPath();ctx.moveTo(0,-sz*.7);ctx.lineTo(0,sz*.5);ctx.stroke();
-        ctx.restore();
+        const img=FX_IMG.maple[p.imgIdx];
+        if(img&&img.complete&&img.naturalWidth){
+          ctx.save();
+          ctx.translate(p.x,p.y);
+          ctx.rotate(p.rot);
+          ctx.globalAlpha=p.alpha;
+          const s=p.size;
+          ctx.drawImage(img,-s/2,-s/2,s,s);
+          ctx.restore();
+        }else{
+          // fallback 程序化繪製
+          const sz=p.size*.5;
+          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
+          ctx.beginPath();ctx.moveTo(0,-sz);
+          ctx.quadraticCurveTo(sz*.5,-sz*.3,sz*.8,-sz*.6);
+          ctx.quadraticCurveTo(sz*.4,0,sz*.6,sz*.4);
+          ctx.quadraticCurveTo(sz*.2,sz*.3,0,sz*.8);
+          ctx.quadraticCurveTo(-sz*.2,sz*.3,-sz*.6,sz*.4);
+          ctx.quadraticCurveTo(-sz*.4,0,-sz*.8,-sz*.6);
+          ctx.quadraticCurveTo(-sz*.5,-sz*.3,0,-sz);
+          ctx.fillStyle=`rgba(200,90,30,${p.alpha})`;ctx.fill();
+          ctx.restore();
+        }
       }
       else if(p.type==='fspark'){
         p.pulse+=p.ps;
@@ -2253,18 +2332,18 @@ const WxFx = (function(){
 
   function getMode(){return mode}
   function _debug(){
-    const stat=FX_IMG.swallowtail.map((img,i)=>({
-      idx:i+1,
-      src:img.src,
-      complete:img.complete,
-      naturalWidth:img.naturalWidth,
-      naturalHeight:img.naturalHeight,
-      loaded:img.complete&&img.naturalWidth>0
-    }));
-    const bflyCount=seasonParts.filter(p=>p.type==='bfly').length;
-    console.table(stat);
-    console.log("Season:",curSeason,"TimeSlot:",curTimeSlot,"Mode:",mode,"Butterflies alive:",bflyCount);
-    return{stat,bflyCount,season:curSeason,ts:curTimeSlot,mode};
+    const keys=["purple","monarch","maple","cloud","bolt"];
+    const status=keys.map(k=>{
+      const arr=FX_IMG[k];
+      const loaded=arr.filter(im=>im&&im.complete&&im.naturalWidth>0).length;
+      return{key:k,total:arr.length,loaded,ready:FX_IMG[k+"Ready"]};
+    });
+    const dropStatus={key:"drop",loaded:FX_IMG.drop&&FX_IMG.drop.complete&&FX_IMG.drop.naturalWidth>0?1:0,ready:FX_IMG.dropReady};
+    console.table([...status,dropStatus]);
+    const counts={};
+    seasonParts.forEach(p=>{counts[p.type]=(counts[p.type]||0)+1});
+    console.log("Season:",curSeason,"TimeSlot:",curTimeSlot,"Mode:",mode,"Parts:",counts);
+    return{status,dropStatus,counts,season:curSeason,ts:curTimeSlot,mode};
   }
   function _spawnBfly(n){
     n=n||3;
