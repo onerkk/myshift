@@ -1253,7 +1253,7 @@ const WxFx = (function(){
   let ambientHour=-1;
   // ── Real photo FX assets ──
   const FX_IMG={swallowtail:[],purple:[],monarch:[],maple:[],cloud:[],bolt:[],drop:null,
-    blossom:[],flower:[],dfly:[],frost_img:[],debris_img:[],firefly:[],sun:[]};
+    blossom:[],flower:[],dfly:[],frost_img:[],debris_img:[],frog:[],pleaf:[],lpad:[]};
   function _preloadFx(){
     const kinds=[
       {key:"swallowtail",dir:"butterfly/",prefix:"swallowtail-",count:6},
@@ -1267,8 +1267,9 @@ const WxFx = (function(){
       {key:"dfly",dir:"dragonfly/",prefix:"dfly-",count:6},
       {key:"frost_img",dir:"frost/",prefix:"snow-",count:4},
       {key:"debris_img",dir:"debris/",prefix:"leaf-",count:3},
-      {key:"firefly",dir:"firefly/",prefix:"firefly-",count:4},
-      {key:"sun",dir:"sun/",prefix:"sun-",count:3},
+      {key:"frog",dir:"frog/",prefix:"frog-",count:4},
+      {key:"pleaf",dir:"pleaf/",prefix:"leaf-",count:3},
+      {key:"lpad",dir:"lilypad/",prefix:"pad-",count:1},
     ];
     kinds.forEach(k=>{
       for(let i=1;i<=k.count;i++){
@@ -1364,12 +1365,9 @@ const WxFx = (function(){
   }
   
   function mkSnow(){
-    const big=Math.random()<0.22;
     return{type:"snow",x:Math.random()*_w, y:Math.random()*_h*-0.5, r:2+Math.random()*4,
       speed:0.6+Math.random()*1.8, drift:Math.random()*1.2-0.6,
-      alpha:0.5+Math.random()*0.4, wobble:Math.random()*Math.PI*2,
-      big,size:20+Math.random()*16,imgIdx:Math.floor(Math.random()*4),
-      rot:Math.random()*Math.PI*2,rs:(Math.random()-0.5)*0.04};
+      alpha:0.5+Math.random()*0.4, wobble:Math.random()*Math.PI*2};
   }
   
   function mkFog(){
@@ -1426,17 +1424,7 @@ const WxFx = (function(){
   let _sunPhase=Math.random()*Math.PI*2;
   
   function drawSunDisc(x,y,r,coreR,coreG,coreB,coreA,glowA,rayA,rayCount){
-    // 依色溫選圖: 紅系日落(coreR-coreG>100) → sun-03
-    //           白系正午(coreG>=220)      → sun-02
-    //           黃金色(其他)              → sun-01
-    let sunIdx=0;
-    if(coreR-coreG>100) sunIdx=2;
-    else if(coreG>=220) sunIdx=1;
-    else sunIdx=0;
-    const simg=FX_IMG.sun&&FX_IMG.sun[sunIdx];
-    const useImg=simg&&simg.complete&&simg.naturalWidth>0&&coreA>0.05;
-
-    // Outer glow (照片也保留外光暈,與天空色融合)
+    // Outer glow
     const g2=ctx.createRadialGradient(x,y,r*0.3,x,y,r*2.5);
     g2.addColorStop(0,`rgba(${coreR},${coreG},${coreB},${glowA*0.4})`);
     g2.addColorStop(0.4,`rgba(${coreR},${coreG},${coreB},${glowA*0.15})`);
@@ -1466,33 +1454,24 @@ const WxFx = (function(){
       }
       ctx.restore();
     }
-    // Core: 真實照片 or 程序化漸層
-    if(useImg){
-      const sz=r*2.4;
-      ctx.save();
-      ctx.globalAlpha=Math.min(1,coreA*2.5);
-      ctx.drawImage(simg,x-sz/2,y-sz/2,sz,sz);
-      ctx.restore();
-      ctx.globalAlpha=1;
-    }else{
-      const g1=ctx.createRadialGradient(x,y,0,x,y,r);
-      g1.addColorStop(0,`rgba(255,255,230,${coreA})`);
-      g1.addColorStop(0.5,`rgba(${coreR},${coreG},${coreB},${coreA*0.7})`);
-      g1.addColorStop(1,`rgba(${coreR},${coreG},${coreB},0)`);
-      ctx.fillStyle=g1;
-      ctx.beginPath();
-      ctx.arc(x,y,r,0,Math.PI*2);
-      ctx.fill();
-    }
+    // Core disc
+    const g1=ctx.createRadialGradient(x,y,0,x,y,r);
+    g1.addColorStop(0,`rgba(255,255,230,${coreA})`);
+    g1.addColorStop(0.5,`rgba(${coreR},${coreG},${coreB},${coreA*0.7})`);
+    g1.addColorStop(1,`rgba(${coreR},${coreG},${coreB},0)`);
+    ctx.fillStyle=g1;
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fill();
   }
   
   function drawAmbient(){
     const h=new Date().getHours(),m=new Date().getMinutes();
     const t=h+m/60;
     
-    if(t>=21||t<5){
-      // Night
-      const intensity=(t>=21)? Math.min((t-21)/1,1) : 1;
+    if(t>=19||t<5){
+      // Night（19:00 起；19-20 為進入夜間的漸變，20:00 起完整夜色）
+      const intensity=(t>=19&&t<20)? Math.min((t-19)/1,1) : 1;
       const grd=ctx.createLinearGradient(0,0,0,_h);
       grd.addColorStop(0,`rgba(8,15,40,${0.35*intensity})`);
       grd.addColorStop(0.5,`rgba(12,20,50,${0.25*intensity})`);
@@ -1516,8 +1495,8 @@ const WxFx = (function(){
       grd.addColorStop(1,"rgba(255,200,150,0)");
       ctx.fillStyle=grd;
       ctx.fillRect(0,0,_w,_h*0.7);
-      const sunY=_h*0.15-p*_h*0.08;
-      drawSunDisc(_w*0.8,sunY,25+p*15, 255,150,50, 0.3*p, 0.25*p, 0.08*p, 10);
+      const sunY=_h*0.22-p*_h*0.06;
+      drawSunDisc(_w*0.8,sunY,25+p*15, 255,150,50, 0.5*p, 0.4*p, 0.15*p, 10);
       const starA=(1-p)*0.7;
       if(starA>0.05) stars.forEach(s=>{
         s.tw+=s.sp;
@@ -1527,60 +1506,60 @@ const WxFx = (function(){
         ctx.fill();
       });
     } else if(t>=7&&t<10){
-      // Morning sun
+      // Morning sun（下移避開 header，拉大 alpha 讓可見）
       const p=(t-7)/3;
-      drawSunDisc(_w*0.75,_h*0.06,20+p*8, 255,200,80, 0.15, 0.12*p, 0.04*p, 8);
+      drawSunDisc(_w*0.75,_h*0.14,22+p*10, 255,200,80, 0.35, 0.25*p, 0.10*p, 8);
     } else if(t>=10&&t<15){
-      // Midday — overhead sun with rays
+      // Midday — overhead sun with rays（下移避開 header、加大、提亮）
       const p=Math.min((t-10)/2,1);
       const ep=t>12?Math.max(0,(15-t)/3):p;
-      drawSunDisc(_w*0.5,_h*0.02,18+ep*6, 255,230,100, 0.2*ep, 0.15*ep, 0.05*ep, 12);
+      drawSunDisc(_w*0.5,_h*0.12,24+ep*8, 255,230,100, 0.45*ep, 0.30*ep, 0.12*ep, 12);
       if(ep>0.3){
-        const fg=ctx.createRadialGradient(_w*0.5,_h*0.02,0,_w*0.5,_h*0.02,_w*0.4);
-        fg.addColorStop(0,`rgba(255,255,200,${0.06*ep})`);
+        const fg=ctx.createRadialGradient(_w*0.5,_h*0.12,0,_w*0.5,_h*0.12,_w*0.5);
+        fg.addColorStop(0,`rgba(255,255,200,${0.10*ep})`);
         fg.addColorStop(1,"rgba(255,255,200,0)");
         ctx.fillStyle=fg;
-        ctx.fillRect(0,0,_w,_h*0.3);
+        ctx.fillRect(0,0,_w,_h*0.35);
       }
     } else if(t>=15&&t<17){
-      // Afternoon — golden sun moving right
+      // Afternoon — golden sun moving right（下移避開 header）
       const p=(t-15)/2;
       const sunX=_w*(0.6+p*0.2);
-      const sunY=_h*(0.03+p*0.05);
-      drawSunDisc(sunX,sunY,22+p*12, 255,180,50, 0.2+p*0.1, 0.2*p, 0.06*p, 10);
+      const sunY=_h*(0.12+p*0.03);
+      drawSunDisc(sunX,sunY,26+p*10, 255,180,50, 0.4+p*0.1, 0.30*p, 0.12*p, 10);
       const grd=ctx.createRadialGradient(sunX,sunY,0,sunX,sunY,_w*0.5);
-      grd.addColorStop(0,`rgba(255,190,60,${0.08*p})`);
+      grd.addColorStop(0,`rgba(255,190,60,${0.12*p})`);
       grd.addColorStop(1,"rgba(255,200,80,0)");
       ctx.fillStyle=grd;
       ctx.fillRect(0,0,_w,_h*0.4);
-    } else if(t>=17&&t<19){
-      // Sunset — large orange-red sun with dramatic rays
-      const p=(t-17)/2;
+    } else if(t>=17&&t<18){
+      // Sunset — large orange-red sun with dramatic rays（下移避開 header）
+      const p=t-17;
       const grd=ctx.createLinearGradient(0,0,0,_h*0.5);
-      grd.addColorStop(0,`rgba(200,60,20,${0.15+p*0.2})`);
-      grd.addColorStop(0.4,`rgba(160,40,80,${0.08+p*0.12})`);
+      grd.addColorStop(0,`rgba(200,60,20,${0.18+p*0.22})`);
+      grd.addColorStop(0.4,`rgba(160,40,80,${0.10+p*0.15})`);
       grd.addColorStop(1,"rgba(80,30,100,0)");
       ctx.fillStyle=grd;
       ctx.fillRect(0,0,_w,_h*0.5);
-      const sunY=_h*(0.08+p*0.1);
-      drawSunDisc(_w*0.85,sunY,35-p*10, 230,70,20, 0.35*(1-p*0.5), 0.3*(1-p*0.5), 0.12*(1-p*0.4), 14);
-    } else if(t>=19&&t<21){
-      // Evening — afterglow + blue + stars
-      const p=(t-19)/2;
-      if(p<0.5){
-        const ag=ctx.createLinearGradient(0,0,0,_h*0.3);
-        ag.addColorStop(0,`rgba(180,60,40,${0.08*(1-p*2)})`);
-        ag.addColorStop(1,"rgba(100,40,60,0)");
-        ctx.fillStyle=ag;
-        ctx.fillRect(0,0,_w,_h*0.3);
-      }
+      const sunY=_h*(0.15+p*0.08);
+      drawSunDisc(_w*0.85,sunY,38-p*10, 230,70,20, 0.5*(1-p*0.4), 0.4*(1-p*0.4), 0.18*(1-p*0.3), 14);
+    } else if(t>=18&&t<19){
+      // Afterglow — 餘暉快速消退，為 19 點轉夜做準備
+      const p=t-18;
+      const ag=ctx.createLinearGradient(0,0,0,_h*0.3);
+      ag.addColorStop(0,`rgba(180,60,40,${0.12*(1-p)})`);
+      ag.addColorStop(1,"rgba(100,40,60,0)");
+      ctx.fillStyle=ag;
+      ctx.fillRect(0,0,_w,_h*0.3);
+      // 淺藍夜幕逐漸覆上
       const grd=ctx.createLinearGradient(0,0,0,_h);
-      grd.addColorStop(0,`rgba(20,30,70,${0.12+p*0.23})`);
-      grd.addColorStop(0.6,`rgba(15,25,60,${0.06+p*0.18})`);
-      grd.addColorStop(1,`rgba(10,20,50,${0.04+p*0.14})`);
+      grd.addColorStop(0,`rgba(20,30,70,${0.06+p*0.12})`);
+      grd.addColorStop(0.6,`rgba(15,25,60,${0.03+p*0.09})`);
+      grd.addColorStop(1,`rgba(10,20,50,${0.02+p*0.07})`);
       ctx.fillStyle=grd;
       ctx.fillRect(0,0,_w,_h);
-      const starA=p*0.8;
+      // 星星淡淡出現
+      const starA=p*0.4;
       if(starA>0.05) stars.forEach(s=>{
         s.tw+=s.sp;
         ctx.beginPath();
@@ -1853,32 +1832,12 @@ const WxFx = (function(){
       p.wobble+=0.02;
       p.x+=Math.sin(p.wobble)*p.drift+0.15;
       if(p.y>_h+10){p.y=-10;p.x=Math.random()*_w}
-      if(p.big){
-        const simg=FX_IMG.frost_img[p.imgIdx||0];
-        const sz=p.size||24;
-        p.rot=(p.rot||0)+(p.rs||0);
-        if(simg&&simg.complete&&simg.naturalWidth>0){
-          ctx.save();
-          ctx.translate(p.x,p.y);
-          ctx.rotate(p.rot);
-          ctx.globalAlpha=p.alpha*.85;
-          ctx.drawImage(simg,-sz/2,-sz/2,sz,sz);
-          ctx.restore();
-          ctx.globalAlpha=1;
-        }else{
-          ctx.beginPath();
-          ctx.fillStyle=`rgba(255,255,255,${p.alpha})`;
-          ctx.arc(p.x,p.y,p.r*1.6,0,Math.PI*2);
-          ctx.fill();
-        }
-      }else{
-        ctx.beginPath();
-        ctx.fillStyle=`rgba(255,255,255,${p.alpha})`;
-        ctx.shadowColor="rgba(255,255,255,0.5)";
-        ctx.shadowBlur=p.r*2;
-        ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-        ctx.fill();
-      }
+      ctx.beginPath();
+      ctx.fillStyle=`rgba(255,255,255,${p.alpha})`;
+      ctx.shadowColor="rgba(255,255,255,0.5)";
+      ctx.shadowBlur=p.r*2;
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fill();
     });
     ctx.shadowBlur=0;
   }
@@ -2075,28 +2034,11 @@ const WxFx = (function(){
       life:250+Math.random()*350,c,petals:5+Math.floor(Math.random()*2),
       size:22+Math.random()*18,imgIdx:Math.floor(Math.random()*4)}
   }
-  function mkButterfly(){
-    // 三種蝴蝶隨機挑選：鳳蝶(黃黑)、紫斑蝶(深紫)、君主斑蝶(橘黑)
-    const kinds=["swallowtail","purple","monarch"];
-    const kind=kinds[Math.floor(Math.random()*kinds.length)];
-    const size=36+Math.random()*24;
-    return{type:"bfly",kind,x:Math.random()*_w,y:_h*.15+Math.random()*_h*.5,
-      speed:.5+Math.random()*.8,angle:Math.random()*Math.PI*2,
-      turn:.015+Math.random()*.02,
-      frame:Math.floor(Math.random()*6),
-      frameTimer:0,
-      frameInterval:3+Math.floor(Math.random()*2),
-      size,alpha:.85+Math.random()*.15}
-  }
   function mkFirefly(){
-    const isDark=document.documentElement.getAttribute('data-theme')==='dark';
     return{type:"ffly",x:Math.random()*_w,y:_h*.15+Math.random()*_h*.7,
       speed:.15+Math.random()*.35,angle:Math.random()*Math.PI*2,
       turn:.008+Math.random()*.025,pulse:Math.random()*Math.PI*2,
-      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,
-      maxA:isDark?(.75+Math.random()*.25):(.55+Math.random()*.4),
-      imgIdx:Math.floor(Math.random()*4),
-      size:isDark?(22+Math.random()*18):(18+Math.random()*14)}
+      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,maxA:.35+Math.random()*.5}
   }
   function mkLeaf(){
     const imgIdx=Math.floor(Math.random()*4);// 4 張楓葉隨機挑
@@ -2126,11 +2068,70 @@ const WxFx = (function(){
       imgIdx:Math.floor(Math.random()*3)}
   }
   function mkDragonfly(){
+    // state: flying（飛行）/ perched（停棲）/ leaving（離開中）
     return{type:"dfly",x:Math.random()*_w,y:_h*.1+Math.random()*_h*.3,
       speed:1.5+Math.random()*2,angle:Math.random()*Math.PI*2,
       turn:.03+Math.random()*.03,wingPhase:Math.random()*Math.PI*2,
       alpha:.6+Math.random()*.25,r:5+Math.random()*3,
-      size:30+Math.random()*20,imgIdx:Math.floor(Math.random()*6)}
+      size:30+Math.random()*20,imgIdx:Math.floor(Math.random()*6),
+      state:"flying",
+      // 飛行計時器：隨機 600-1500 幀後想找葉子停
+      flyTimer:600+Math.floor(Math.random()*900),
+      perchTimer:0,perchLeafIdx:-1}
+  }
+  function mkButterfly(){
+    // 三種蝴蝶隨機挑選：鳳蝶(黃黑)、紫斑蝶(深紫)、君主斑蝶(橘黑)
+    const kinds=["swallowtail","purple","monarch"];
+    const kind=kinds[Math.floor(Math.random()*kinds.length)];
+    const size=36+Math.random()*24;
+    return{type:"bfly",kind,x:Math.random()*_w,y:_h*.15+Math.random()*_h*.5,
+      speed:.5+Math.random()*.8,angle:Math.random()*Math.PI*2,
+      turn:.015+Math.random()*.02,
+      frame:Math.floor(Math.random()*6),
+      frameTimer:0,
+      frameInterval:3+Math.floor(Math.random()*2),
+      size,alpha:.85+Math.random()*.15,
+      state:"flying",
+      // 蝴蝶停得比較少，900-2400 幀才想停
+      flyTimer:900+Math.floor(Math.random()*1500),
+      perchTimer:0,perchLeafIdx:-1}
+  }
+  // 樹葉（蜻蜓、蝴蝶停棲用）固定位置不移動
+  function mkPerchLeaf(){
+    return{type:"pleaf",
+      x:_w*(.15+Math.random()*.7),
+      y:_h*(.25+Math.random()*.4), // 避開底部，讓蜻蜓停在畫面中上
+      size:40+Math.random()*20,
+      rot:(Math.random()-.5)*.5,
+      imgIdx:Math.floor(Math.random()*3),
+      alpha:.85+Math.random()*.1,
+      // 永久停棲點，不會被移除
+      permanent:true}
+  }
+  // 荷葉（青蛙坐的位置）固定在畫面下半部
+  function mkLilypad(){
+    return{type:"lpad",
+      x:_w*(.1+Math.random()*.8),
+      y:_h*(.7+Math.random()*.2), // 底部水面
+      size:55+Math.random()*25,
+      rot:(Math.random()-.5)*.3,
+      alpha:.88+Math.random()*.08,
+      permanent:true}
+  }
+  // 青蛙：坐在荷葉上，偶爾跳
+  function mkFrog(lilyIdx){
+    return{type:"frog",
+      lilyIdx, // 歸屬的荷葉 index（動態查找）
+      x:0,y:0, // 由荷葉位置決定
+      size:32+Math.random()*8,
+      imgIdx:0,
+      state:"sitting",
+      blinkTimer:120+Math.floor(Math.random()*180),
+      jumpTimer:400+Math.floor(Math.random()*1200), // 6-27 秒想跳一次
+      jumpProgress:0,jumpFromX:0,jumpFromY:0,jumpToX:0,jumpToY:0,
+      facing:Math.random()>.5?1:-1,
+      alpha:.95,
+      permanent:true}
   }
 
   // ── Seeding ──
@@ -2146,21 +2147,44 @@ const WxFx = (function(){
       for(let i=0;i<12+Math.floor(Math.random()*8);i++) seasonParts.push(mkBlossom());
       // Flowers at bottom
       for(let i=0;i<5+Math.floor(Math.random()*4);i++) seasonParts.push(mkFlower());
+      // 春天白天：2-3 片停棲葉給蝴蝶停
       if(!noc&&(ts==='morning'||ts==='day'||ts==='dusk')){
+        for(let i=0;i<2+Math.floor(Math.random()*2);i++) seasonParts.push(mkPerchLeaf());
         // 白天至少 1 隻蝴蝶，最多 3 隻
         seasonParts.push(mkButterfly());
         if(Math.random()>.4) seasonParts.push(mkButterfly());
         if(Math.random()>.7) seasonParts.push(mkButterfly());
       }
+      // 春夜加入荷葉+青蛙
       if(!noc&&ts==='night'){
         for(let i=0;i<4+Math.floor(Math.random()*4);i++) seasonParts.push(mkFirefly());
+        // 2 片荷葉
+        for(let i=0;i<2;i++) seasonParts.push(mkLilypad());
+        // 第一隻青蛙歸屬第一片荷葉
+        const lilies=seasonParts.filter(q=>q.type==='lpad');
+        if(lilies.length>0){
+          seasonParts.push(mkFrog(seasonParts.indexOf(lilies[0])));
+        }
       }
     } else if(s==='summer'){
       if(!noc&&(ts==='day'||ts==='morning')){
+        // 2-3 片停棲葉給蜻蜓停
+        for(let i=0;i<2+Math.floor(Math.random()*2);i++) seasonParts.push(mkPerchLeaf());
         if(Math.random()>.4) seasonParts.push(mkDragonfly());
         if(Math.random()>.7) seasonParts.push(mkDragonfly());
       } else if(!noc&&(ts==='night'||ts==='dusk')){
         for(let i=0;i<8+Math.floor(Math.random()*8);i++) seasonParts.push(mkFirefly());
+        // 夏夜 2-3 片荷葉加青蛙
+        const numLily=2+Math.floor(Math.random()*2);
+        for(let i=0;i<numLily;i++) seasonParts.push(mkLilypad());
+        const lilies=seasonParts.filter(q=>q.type==='lpad');
+        if(lilies.length>0){
+          seasonParts.push(mkFrog(seasonParts.indexOf(lilies[0])));
+          // 第二隻青蛙可能出現
+          if(Math.random()>.5&&lilies.length>1){
+            seasonParts.push(mkFrog(seasonParts.indexOf(lilies[1])));
+          }
+        }
       }
     } else if(s==='autumn'){
       for(let i=0;i<8+Math.floor(Math.random()*6);i++) seasonParts.push(mkLeaf());
@@ -2181,7 +2205,7 @@ const WxFx = (function(){
     if(s!==curSeason||ts!==curTimeSlot||modeChanged||seasonTimer>1500){seedSeason(s,ts);seasonTimer=0}
     // Purge creatures immediately during bad weather (in case any survived)
     if(noCreatures()){
-      seasonParts=seasonParts.filter(p=>p.type!=='bfly'&&p.type!=='dfly'&&p.type!=='ffly');
+      seasonParts=seasonParts.filter(p=>p.type!=='bfly'&&p.type!=='dfly'&&p.type!=='ffly'&&p.type!=='frog'&&p.type!=='lpad'&&p.type!=='pleaf');
     }
 
     // Random bursts
@@ -2297,18 +2321,57 @@ const WxFx = (function(){
         }
       }
       else if(p.type==='bfly'){
-        p.angle+=p.turn*(Math.sin(p.frame*.7)>0?1:-1);
-        p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.6;
-        // 翅膀幀切換
-        p.frameTimer++;
-        if(p.frameTimer>=p.frameInterval){p.frameTimer=0;p.frame=(p.frame+1)%6}
-        if(p.x<-60||p.x>_w+60||p.y<-60||p.y>_h+60){
-          p.x=Math.random()*_w;p.y=_h*.15+Math.random()*_h*.5;p.angle=Math.random()*Math.PI*2;
+        // 找停棲目標：樹葉
+        if(p.state==="flying"){
+          p.angle+=p.turn*(Math.sin(p.frame*.7)>0?1:-1);
+          p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.6;
+          p.flyTimer--;
+          if(p.flyTimer<=0){
+            // 找最近的樹葉停棲
+            const leaves=seasonParts.filter(q=>q.type==='pleaf');
+            if(leaves.length>0){
+              const leaf=leaves[Math.floor(Math.random()*leaves.length)];
+              p.perchLeafIdx=seasonParts.indexOf(leaf);
+              p.state="approaching";p.targetX=leaf.x;p.targetY=leaf.y-leaf.size*.35;
+            }else{p.flyTimer=600+Math.floor(Math.random()*600)}
+          }
+          // 超出畫面太遠 → 自然離開（移除）
+          if(p.x<-80||p.x>_w+80||p.y<-80||p.y>_h+80){
+            seasonParts.splice(i,1);continue;
+          }
+        } else if(p.state==="approaching"){
+          // 平滑接近葉子
+          const dx=p.targetX-p.x,dy=p.targetY-p.y;
+          const dist=Math.hypot(dx,dy);
+          if(dist<3){
+            p.state="perched";p.x=p.targetX;p.y=p.targetY;
+            p.perchTimer=300+Math.floor(Math.random()*600); // 5-15 秒
+            p.angle=-Math.PI/2; // 朝上
+          } else {
+            p.angle=Math.atan2(dy,dx);
+            p.x+=Math.cos(p.angle)*p.speed*1.2;
+            p.y+=Math.sin(p.angle)*p.speed*1.2;
+          }
+        } else if(p.state==="perched"){
+          p.perchTimer--;
+          if(p.perchTimer<=0){
+            p.state="leaving";
+            p.angle=-Math.PI/2+(Math.random()-.5)*.6; // 往上飛走
+          }
+        } else if(p.state==="leaving"){
+          p.x+=Math.cos(p.angle)*p.speed;
+          p.y+=Math.sin(p.angle)*p.speed;
+          if(p.x<-80||p.x>_w+80||p.y<-80||p.y>_h+80){
+            seasonParts.splice(i,1);continue;
+          }
         }
+        // 翅膀幀切換（停棲時減緩）
+        p.frameTimer++;
+        const fInt=p.state==="perched"?p.frameInterval*4:p.frameInterval;
+        if(p.frameTimer>=fInt){p.frameTimer=0;p.frame=(p.frame+1)%6}
         const imgArr=FX_IMG[p.kind]||FX_IMG.swallowtail;
         const img=imgArr[p.frame];
         if(img&&img.complete&&img.naturalWidth){
-          // 圖片已載入：畫真實蝴蝶
           ctx.save();
           ctx.translate(p.x,p.y);
           ctx.rotate(p.angle+Math.PI/2);
@@ -2317,7 +2380,7 @@ const WxFx = (function(){
           ctx.drawImage(img,-s/2,-s/2,s,s);
           ctx.restore();
         }else{
-          // 圖片未載入 (路徑錯、404、還在下載)：畫程序化橢圓蝴蝶作為 fallback
+          // Fallback 程序化蝴蝶
           const wing=Math.abs(Math.sin(p.frame*.8))*.7+.3;
           const r=p.size*.15;
           ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle+Math.PI/2);
@@ -2330,11 +2393,47 @@ const WxFx = (function(){
         }
       }
       else if(p.type==='dfly'){
-        p.angle+=p.turn*(Math.random()>.5?1:-1);
-        p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.4;
         p.wingPhase=(p.wingPhase||0)+.2;
-        if(p.x<-30||p.x>_w+30||p.y<-20||p.y>_h*.5){
-          p.x=Math.random()*_w;p.y=_h*.1+Math.random()*_h*.3;p.angle=Math.random()*Math.PI*2;
+        if(p.state==="flying"){
+          p.angle+=p.turn*(Math.random()>.5?1:-1);
+          p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.4;
+          p.flyTimer--;
+          if(p.flyTimer<=0){
+            const leaves=seasonParts.filter(q=>q.type==='pleaf');
+            if(leaves.length>0){
+              const leaf=leaves[Math.floor(Math.random()*leaves.length)];
+              p.perchLeafIdx=seasonParts.indexOf(leaf);
+              p.state="approaching";p.targetX=leaf.x;p.targetY=leaf.y-leaf.size*.3;
+            }else{p.flyTimer=400+Math.floor(Math.random()*600)}
+          }
+          if(p.x<-50||p.x>_w+50||p.y<-30||p.y>_h+30){
+            seasonParts.splice(i,1);continue;
+          }
+        } else if(p.state==="approaching"){
+          const dx=p.targetX-p.x,dy=p.targetY-p.y;
+          const dist=Math.hypot(dx,dy);
+          if(dist<4){
+            p.state="perched";p.x=p.targetX;p.y=p.targetY;
+            p.perchTimer=400+Math.floor(Math.random()*600); // 6-16 秒
+            p.angle=0;
+          } else {
+            p.angle=Math.atan2(dy,dx);
+            p.x+=Math.cos(p.angle)*p.speed*1.3;
+            p.y+=Math.sin(p.angle)*p.speed*1.3;
+          }
+        } else if(p.state==="perched"){
+          p.perchTimer--;
+          if(p.perchTimer<=0){
+            p.state="leaving";
+            // 往畫面外一個方向離開
+            p.angle=Math.random()*Math.PI*2;
+          }
+        } else if(p.state==="leaving"){
+          p.x+=Math.cos(p.angle)*p.speed*1.2;
+          p.y+=Math.sin(p.angle)*p.speed*1.2;
+          if(p.x<-50||p.x>_w+50||p.y<-30||p.y>_h+30){
+            seasonParts.splice(i,1);continue;
+          }
         }
         const dimg=FX_IMG.dfly[p.imgIdx||0];
         const sz=p.size||35;
@@ -2342,11 +2441,11 @@ const WxFx = (function(){
           ctx.save();
           ctx.translate(p.x,p.y);
           ctx.rotate(p.angle);
-          ctx.globalAlpha=p.alpha;
+          ctx.globalAlpha=p.state==="perched"?p.alpha:p.alpha;
+          // 停棲時翅膀慢慢振動（半透明 tint）；飛行時正常
           ctx.drawImage(dimg,-sz/2,-sz/2,sz,sz);
           ctx.restore();
         }else{
-          // Fallback: 程序化蜻蜓
           const wf=Math.abs(Math.sin(p.wingPhase));
           ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);
           ctx.fillStyle=`rgba(40,80,120,${p.alpha})`;
@@ -2354,6 +2453,144 @@ const WxFx = (function(){
           ctx.fillStyle=`rgba(180,220,255,${p.alpha*.4*wf})`;
           ctx.beginPath();ctx.ellipse(-2,-3,p.r*.8*wf,p.r*.3,-.4,0,Math.PI*2);ctx.fill();
           ctx.beginPath();ctx.ellipse(-2,3,p.r*.8*wf,p.r*.3,.4,0,Math.PI*2);ctx.fill();
+          ctx.restore();
+        }
+      }
+      else if(p.type==='pleaf'){
+        // 靜態停棲樹葉（給蜻蜓、蝴蝶停）
+        const sz=p.size;
+        const img=FX_IMG.pleaf&&FX_IMG.pleaf[p.imgIdx||0];
+        if(img&&img.complete&&img.naturalWidth>0){
+          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
+          ctx.globalAlpha=p.alpha;
+          ctx.drawImage(img,-sz/2,-sz/2,sz,sz);
+          ctx.restore();
+        }else{
+          // Fallback: 程序化葉片（綠色橢圓帶葉脈）
+          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
+          ctx.globalAlpha=p.alpha;
+          const grad=ctx.createRadialGradient(0,0,sz*.1,0,0,sz*.55);
+          grad.addColorStop(0,"rgba(120,180,80,.9)");
+          grad.addColorStop(.7,"rgba(80,140,50,.85)");
+          grad.addColorStop(1,"rgba(50,100,30,.75)");
+          ctx.fillStyle=grad;
+          ctx.beginPath();ctx.ellipse(0,0,sz*.5,sz*.3,0,0,Math.PI*2);ctx.fill();
+          ctx.strokeStyle="rgba(40,80,20,.5)";ctx.lineWidth=1;
+          ctx.beginPath();ctx.moveTo(-sz*.5,0);ctx.lineTo(sz*.5,0);ctx.stroke();
+          ctx.restore();
+        }
+      }
+      else if(p.type==='lpad'){
+        // 荷葉（青蛙坐的）
+        const sz=p.size;
+        const img=FX_IMG.lpad&&FX_IMG.lpad[0];
+        if(img&&img.complete&&img.naturalWidth>0){
+          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
+          ctx.globalAlpha=p.alpha;
+          ctx.drawImage(img,-sz/2,-sz/2,sz,sz);
+          ctx.restore();
+        }else{
+          // Fallback: 圓形荷葉
+          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
+          ctx.globalAlpha=p.alpha;
+          const grad=ctx.createRadialGradient(0,0,sz*.1,0,0,sz*.5);
+          grad.addColorStop(0,"rgba(150,200,100,.95)");
+          grad.addColorStop(.8,"rgba(90,150,60,.9)");
+          grad.addColorStop(1,"rgba(60,110,40,.8)");
+          ctx.fillStyle=grad;
+          ctx.beginPath();ctx.arc(0,0,sz*.5,0,Math.PI*2);ctx.fill();
+          // V 形缺口（荷葉特徵）
+          ctx.fillStyle="rgba(0,0,0,0)";
+          ctx.globalCompositeOperation="destination-out";
+          ctx.beginPath();
+          ctx.moveTo(0,0);
+          ctx.lineTo(sz*.45,-sz*.08);
+          ctx.lineTo(sz*.45,sz*.08);
+          ctx.closePath();ctx.fill();
+          ctx.globalCompositeOperation="source-over";
+          ctx.restore();
+        }
+      }
+      else if(p.type==='frog'){
+        // 青蛙狀態機：sitting / crouching / jumping
+        // 先同步到荷葉位置
+        const lily=seasonParts[p.lilyIdx];
+        if(!lily||lily.type!=='lpad'){
+          // 荷葉不見了（例如 seed 重來），重找
+          const lilies=seasonParts.filter(q=>q.type==='lpad');
+          if(lilies.length===0){seasonParts.splice(i,1);continue}
+          p.lilyIdx=seasonParts.indexOf(lilies[0]);
+        }
+        const lly=seasonParts[p.lilyIdx];
+        if(p.state==="sitting"){
+          p.x=lly.x;p.y=lly.y-lly.size*.25; // 坐在荷葉中央上方
+          p.blinkTimer--;
+          if(p.blinkTimer<=0){
+            p.imgIdx=p.imgIdx===1?0:1; // 0=正常眼 1=眨眼
+            p.blinkTimer=p.imgIdx===1?8:120+Math.floor(Math.random()*180);
+          }
+          p.jumpTimer--;
+          if(p.jumpTimer<=0){
+            // 找另一片荷葉跳過去
+            const others=seasonParts.map((q,idx)=>({q,idx})).filter(o=>o.q.type==='lpad'&&o.idx!==p.lilyIdx);
+            if(others.length>0){
+              const target=others[Math.floor(Math.random()*others.length)];
+              p.jumpFromX=p.x;p.jumpFromY=p.y;
+              p.jumpToX=target.q.x;p.jumpToY=target.q.y-target.q.size*.25;
+              p.jumpTargetLilyIdx=target.idx;
+              p.jumpProgress=0;p.state="crouching";p.crouchTimer=15;
+              p.facing=p.jumpToX>p.jumpFromX?1:-1;
+              p.imgIdx=2; // 蓄力
+            } else {
+              p.jumpTimer=400+Math.floor(Math.random()*1200);
+            }
+          }
+        } else if(p.state==="crouching"){
+          p.crouchTimer--;
+          if(p.crouchTimer<=0){
+            p.state="jumping";p.imgIdx=3; // 跳躍姿勢
+          }
+        } else if(p.state==="jumping"){
+          p.jumpProgress+=.03;
+          if(p.jumpProgress>=1){
+            p.state="sitting";
+            p.lilyIdx=p.jumpTargetLilyIdx;
+            p.imgIdx=0;p.blinkTimer=120+Math.floor(Math.random()*180);
+            p.jumpTimer=400+Math.floor(Math.random()*1200);
+          } else {
+            // 拋物線
+            const t=p.jumpProgress;
+            p.x=p.jumpFromX+(p.jumpToX-p.jumpFromX)*t;
+            const arc=-Math.sin(t*Math.PI)*60;
+            p.y=p.jumpFromY+(p.jumpToY-p.jumpFromY)*t+arc;
+          }
+        }
+        const sz=p.size;
+        const fimg=FX_IMG.frog&&FX_IMG.frog[p.imgIdx||0];
+        if(fimg&&fimg.complete&&fimg.naturalWidth>0){
+          ctx.save();ctx.translate(p.x,p.y);
+          if(p.facing===-1) ctx.scale(-1,1);
+          ctx.globalAlpha=p.alpha;
+          ctx.drawImage(fimg,-sz/2,-sz/2,sz,sz);
+          ctx.restore();
+        }else{
+          // Fallback: 程序化綠色青蛙
+          ctx.save();ctx.translate(p.x,p.y);
+          ctx.globalAlpha=p.alpha;
+          // 身體
+          ctx.fillStyle="#5a8f3a";
+          ctx.beginPath();ctx.ellipse(0,2,sz*.35,sz*.28,0,0,Math.PI*2);ctx.fill();
+          // 頭
+          ctx.fillStyle="#6ba84a";
+          ctx.beginPath();ctx.ellipse(0,-sz*.15,sz*.3,sz*.22,0,0,Math.PI*2);ctx.fill();
+          // 眼睛
+          ctx.fillStyle="#fff";
+          ctx.beginPath();ctx.arc(-sz*.12,-sz*.25,sz*.08,0,Math.PI*2);ctx.fill();
+          ctx.beginPath();ctx.arc(sz*.12,-sz*.25,sz*.08,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle="#000";
+          const ey=p.imgIdx===1?sz*.02:0;
+          ctx.beginPath();ctx.arc(-sz*.12,-sz*.25+ey,sz*.04,0,Math.PI*2);ctx.fill();
+          ctx.beginPath();ctx.arc(sz*.12,-sz*.25+ey,sz*.04,0,Math.PI*2);ctx.fill();
           ctx.restore();
         }
       }
@@ -2365,30 +2602,13 @@ const WxFx = (function(){
         if(p.x<-20)p.x=_w+10;if(p.x>_w+20)p.x=-10;
         if(p.y<_h*.1)p.y=_h*.9;if(p.y>_h*.95)p.y=_h*.2;
         if(a>.01){
-          const fimg=FX_IMG.firefly[p.imgIdx||0];
-          const sz=p.size||24;
-          if(fimg&&fimg.complete&&fimg.naturalWidth>0){
-            // 外光暈(脈動放大)
-            const gr=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,sz*.9);
-            gr.addColorStop(0,`rgba(200,255,120,${a*.35})`);
-            gr.addColorStop(1,"rgba(180,230,80,0)");
-            ctx.fillStyle=gr;
-            ctx.fillRect(p.x-sz,p.y-sz,sz*2,sz*2);
-            // 照片本體(脈動透明度)
-            ctx.save();
-            ctx.globalAlpha=Math.min(1,a*1.8);
-            ctx.drawImage(fimg,p.x-sz/2,p.y-sz/2,sz,sz);
-            ctx.restore();
-            ctx.globalAlpha=1;
-          }else{
-            const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
-            g.addColorStop(0,`rgba(200,255,100,${a})`);
-            g.addColorStop(.5,`rgba(150,230,50,${a*.3})`);
-            g.addColorStop(1,"rgba(150,230,50,0)");
-            ctx.fillStyle=g;ctx.fillRect(p.x-p.r*3,p.y-p.r*3,p.r*6,p.r*6);
-            ctx.beginPath();ctx.fillStyle=`rgba(220,255,150,${a*1.2})`;
-            ctx.arc(p.x,p.y,p.r*.5,0,Math.PI*2);ctx.fill();
-          }
+          const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
+          g.addColorStop(0,`rgba(200,255,100,${a})`);
+          g.addColorStop(.5,`rgba(150,230,50,${a*.3})`);
+          g.addColorStop(1,"rgba(150,230,50,0)");
+          ctx.fillStyle=g;ctx.fillRect(p.x-p.r*3,p.y-p.r*3,p.r*6,p.r*6);
+          ctx.beginPath();ctx.fillStyle=`rgba(220,255,150,${a*1.2})`;
+          ctx.arc(p.x,p.y,p.r*.5,0,Math.PI*2);ctx.fill();
         }
       }
       else if(p.type==='leaf'){
@@ -2789,18 +3009,52 @@ const WxSfx = (function(){
 
   function croakFrog(){
     if(!actx||muted)return;
-    const f=300+Math.random()*200;
-    const osc=actx.createOscillator();osc.type="sawtooth";
-    const g=actx.createGain();const flt=actx.createBiquadFilter();
-    flt.type="lowpass";flt.frequency.value=800;
-    g.gain.setValueAtTime(0,actx.currentTime);
-    g.gain.linearRampToValueAtTime(.03,actx.currentTime+.05);
-    g.gain.setValueAtTime(.025,actx.currentTime+.15);
-    g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.4);
-    osc.frequency.setValueAtTime(f,actx.currentTime);
-    osc.frequency.linearRampToValueAtTime(f*.7,actx.currentTime+.3);
-    osc.connect(flt);flt.connect(g);g.connect(masterGain);
-    osc.start();osc.stop(actx.currentTime+.5);
+    // 連續 2-4 聲「呱」，每聲極短帶脈衝顆粒感
+    const calls=2+Math.floor(Math.random()*3);
+    const baseF=180+Math.random()*120; // 蛙種基頻 180-300Hz
+    let t=actx.currentTime;
+    for(let n=0;n<calls;n++){
+      const dur=0.08+Math.random()*0.07; // 每聲 80-150ms
+      // 主振盪：鋸齒，做共振峰
+      const osc=actx.createOscillator();
+      osc.type="sawtooth";
+      osc.frequency.setValueAtTime(baseF*(0.95+Math.random()*0.1),t);
+      osc.frequency.exponentialRampToValueAtTime(baseF*0.75,t+dur);
+      // 帶通濾波模擬聲道共振峰
+      const flt=actx.createBiquadFilter();
+      flt.type="bandpass";
+      flt.frequency.value=700+Math.random()*200;
+      flt.Q.value=6;
+      // 第二個共振峰（高頻「呱」的亮度）
+      const flt2=actx.createBiquadFilter();
+      flt2.type="bandpass";
+      flt2.frequency.value=1600+Math.random()*400;
+      flt2.Q.value=4;
+      const mix=actx.createGain();mix.gain.value=0.7;
+      const mix2=actx.createGain();mix2.gain.value=0.3;
+      // 脈衝顆粒感：用 LFO 調變振幅，50-80Hz 讓它聽起來「顆顆顆」
+      const lfo=actx.createOscillator();
+      lfo.type="square";
+      lfo.frequency.value=55+Math.random()*25;
+      const lfoG=actx.createGain();
+      lfoG.gain.value=0.5;
+      // 總包絡
+      const env=actx.createGain();
+      env.gain.setValueAtTime(0,t);
+      env.gain.linearRampToValueAtTime(0.12,t+0.01);
+      env.gain.setValueAtTime(0.10,t+dur*0.6);
+      env.gain.exponentialRampToValueAtTime(0.001,t+dur);
+      // 連接：osc -> flt & flt2 -> mix -> env(受 lfo 調變) -> masterGain
+      osc.connect(flt);osc.connect(flt2);
+      flt.connect(mix);flt2.connect(mix2);
+      mix.connect(env);mix2.connect(env);
+      lfo.connect(lfoG);lfoG.connect(env.gain);
+      env.connect(masterGain);
+      osc.start(t);osc.stop(t+dur+0.02);
+      lfo.start(t);lfo.stop(t+dur+0.02);
+      // 兩聲之間的間隔（青蛙通常 120-250ms）
+      t+=dur+0.12+Math.random()*0.13;
+    }
   }
 
   function startCicada(){
@@ -2898,25 +3152,6 @@ const WxSfx = (function(){
   },15000);
 
   return{setMode,toggle,triggerThunder,isMuted,initAudio,setSeasonSnd,stopSeasonSnd};
-})();
-
-// ══════════════ AUTO DARK MODE (21:00-05:00) ══════════════
-(function(){
-  function applyTheme(){
-    const h=new Date().getHours();
-    const dark=(h>=21||h<5);
-    const cur=document.documentElement.getAttribute('data-theme');
-    const want=dark?'dark':'';
-    if(cur!==want){
-      if(want) document.documentElement.setAttribute('data-theme','dark');
-      else document.documentElement.removeAttribute('data-theme');
-      const mt=document.querySelector('meta[name="theme-color"]');
-      if(mt) mt.setAttribute('content',dark?'#000000':'#00897b');
-    }
-  }
-  applyTheme();
-  setInterval(applyTheme,60000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)applyTheme()});
 })();
 
 if('serviceWorker' in navigator){
