@@ -2053,12 +2053,14 @@ const WxFx = (function(){
       size:22+Math.random()*18,imgIdx:Math.floor(Math.random()*4)}
   }
   function mkFirefly(){
+    const isDark=document.documentElement.getAttribute('data-theme')==='dark';
     return{type:"ffly",x:Math.random()*_w,y:_h*.15+Math.random()*_h*.7,
       speed:.15+Math.random()*.35,angle:Math.random()*Math.PI*2,
       turn:.008+Math.random()*.025,pulse:Math.random()*Math.PI*2,
-      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,maxA:.35+Math.random()*.5,
+      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,
+      maxA:isDark?(.75+Math.random()*.25):(.35+Math.random()*.5),
       imgIdx:Math.floor(Math.random()*4),
-      size:14+Math.random()*10}
+      size:isDark?(20+Math.random()*14):(14+Math.random()*10)}
   }
   function mkLeaf(){
     const imgIdx=Math.floor(Math.random()*4);// 4 張楓葉隨機挑
@@ -3276,6 +3278,46 @@ const WxSfx = (function(){
   },15000);
 
   return{setMode,toggle,triggerThunder,isMuted,initAudio,setSeasonSnd,stopSeasonSnd};
+})();
+
+// ══════════════ AUTO DARK MODE (18:00 漸變 → 19:00 全黑, 05:00 恢復) ══════════════
+(function(){
+  let _dimLayer=null;
+  function ensureDim(){
+    if(_dimLayer) return _dimLayer;
+    _dimLayer=document.createElement('div');
+    _dimLayer.id='_dim';
+    _dimLayer.style.cssText='position:fixed;inset:0;background:#000;pointer-events:none;z-index:9999;opacity:0;transition:opacity 30s linear';
+    document.body.appendChild(_dimLayer);
+    return _dimLayer;
+  }
+  function applyTheme(){
+    const now=new Date();
+    const t=now.getHours()+now.getMinutes()/60;
+    // 19:00-05:00 → 全 dark mode (UI 換配色, 無遮罩)
+    // 18:00-19:00 → 過渡期 (UI 仍白天配色, 遮罩漸暗 0→0.75)
+    // 05:00-18:00 → 白天
+    let darkUI=false,dimAlpha=0;
+    if(t>=19||t<5){darkUI=true;dimAlpha=0;}
+    else if(t>=18&&t<19){darkUI=false;dimAlpha=(t-18)*0.75;}
+    const cur=document.documentElement.getAttribute('data-theme');
+    const want=darkUI?'dark':'';
+    if(cur!==want){
+      if(want) document.documentElement.setAttribute('data-theme','dark');
+      else document.documentElement.removeAttribute('data-theme');
+      const mt=document.querySelector('meta[name="theme-color"]');
+      if(mt) mt.setAttribute('content',darkUI?'#000000':(dimAlpha>0?'#3a3a3a':'#00897b'));
+    }
+    const dim=ensureDim();
+    dim.style.opacity=String(dimAlpha);
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',applyTheme);
+  }else{
+    applyTheme();
+  }
+  setInterval(applyTheme,60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)applyTheme()});
 })();
 
 if('serviceWorker' in navigator){
