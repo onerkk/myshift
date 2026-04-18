@@ -1954,6 +1954,8 @@ const WxFx = (function(){
     ctx.clearRect(0,0,_w,_h);
     if(mode!=="typhoon") canvas.style.transform="";
     
+    // Ambient: 太陽/夜色/星星（白天晚上都要畫）
+    drawAmbient();
     // Weather overlay
     if(mode==="heat") drawHeat();
     else if(mode==="rain"||mode==="heavy") drawRain();
@@ -2109,27 +2111,29 @@ const WxFx = (function(){
       permanent:true}
   }
   // 荷葉（青蛙坐的位置）固定在畫面下半部
+  let _lpadIdCounter=0;
   function mkLilypad(){
     return{type:"lpad",
+      padId:++_lpadIdCounter, // 獨立 ID，不受 array index 影響
       x:_w*(.1+Math.random()*.8),
       y:_h*(.7+Math.random()*.2), // 底部水面
-      size:55+Math.random()*25,
+      size:90+Math.random()*30, // 放大荷葉 90-120（原本 55-80 太小）
       rot:(Math.random()-.5)*.3,
       alpha:.88+Math.random()*.08,
       permanent:true}
   }
   // 青蛙：坐在荷葉上，偶爾跳
-  function mkFrog(lilyIdx){
+  function mkFrog(padId){
     return{type:"frog",
-      lilyIdx, // 歸屬的荷葉 index（動態查找）
-      x:0,y:0, // 由荷葉位置決定
-      size:32+Math.random()*8,
+      padId, // 歸屬的荷葉 ID
+      x:0,y:0,
+      size:44+Math.random()*8, // 放大青蛙 44-52（原本 32-40 太小）
       imgIdx:0,
       state:"sitting",
       blinkTimer:120+Math.floor(Math.random()*180),
-      jumpTimer:400+Math.floor(Math.random()*1200), // 6-27 秒想跳一次
+      jumpTimer:400+Math.floor(Math.random()*1200),
       jumpProgress:0,jumpFromX:0,jumpFromY:0,jumpToX:0,jumpToY:0,
-      facing:Math.random()>.5?1:-1,
+      facing:1, // 預設朝左（配合原圖方向）
       alpha:.95,
       permanent:true}
   }
@@ -2158,13 +2162,10 @@ const WxFx = (function(){
       // 春夜加入荷葉+青蛙
       if(!noc&&ts==='night'){
         for(let i=0;i<4+Math.floor(Math.random()*4);i++) seasonParts.push(mkFirefly());
-        // 2 片荷葉
-        for(let i=0;i<2;i++) seasonParts.push(mkLilypad());
-        // 第一隻青蛙歸屬第一片荷葉
-        const lilies=seasonParts.filter(q=>q.type==='lpad');
-        if(lilies.length>0){
-          seasonParts.push(mkFrog(seasonParts.indexOf(lilies[0])));
-        }
+        // 2 片荷葉 + 1 隻青蛙
+        const lilies=[];
+        for(let i=0;i<2;i++){const lp=mkLilypad();seasonParts.push(lp);lilies.push(lp)}
+        if(lilies.length>0) seasonParts.push(mkFrog(lilies[0].padId));
       }
     } else if(s==='summer'){
       if(!noc&&(ts==='day'||ts==='morning')){
@@ -2174,15 +2175,14 @@ const WxFx = (function(){
         if(Math.random()>.7) seasonParts.push(mkDragonfly());
       } else if(!noc&&(ts==='night'||ts==='dusk')){
         for(let i=0;i<8+Math.floor(Math.random()*8);i++) seasonParts.push(mkFirefly());
-        // 夏夜 2-3 片荷葉加青蛙
+        // 夏夜 2-3 片荷葉 + 1-2 隻青蛙
         const numLily=2+Math.floor(Math.random()*2);
-        for(let i=0;i<numLily;i++) seasonParts.push(mkLilypad());
-        const lilies=seasonParts.filter(q=>q.type==='lpad');
+        const lilies=[];
+        for(let i=0;i<numLily;i++){const lp=mkLilypad();seasonParts.push(lp);lilies.push(lp)}
         if(lilies.length>0){
-          seasonParts.push(mkFrog(seasonParts.indexOf(lilies[0])));
-          // 第二隻青蛙可能出現
+          seasonParts.push(mkFrog(lilies[0].padId));
           if(Math.random()>.5&&lilies.length>1){
-            seasonParts.push(mkFrog(seasonParts.indexOf(lilies[1])));
+            seasonParts.push(mkFrog(lilies[1].padId));
           }
         }
       }
@@ -2513,34 +2513,42 @@ const WxFx = (function(){
       }
       else if(p.type==='frog'){
         // 青蛙狀態機：sitting / crouching / jumping
-        // 先同步到荷葉位置
-        const lily=seasonParts[p.lilyIdx];
-        if(!lily||lily.type!=='lpad'){
-          // 荷葉不見了（例如 seed 重來），重找
-          const lilies=seasonParts.filter(q=>q.type==='lpad');
-          if(lilies.length===0){seasonParts.splice(i,1);continue}
-          p.lilyIdx=seasonParts.indexOf(lilies[0]);
+        // 用 padId 找目前歸屬的荷葉（index 會漂移所以不用）
+        let lly=null;
+        for(let j=0;j<seasonParts.length;j++){
+          const q=seasonParts[j];
+          if(q.type==='lpad'&&q.padId===p.padId){lly=q;break;}
         }
-        const lly=seasonParts[p.lilyIdx];
+        if(!lly){
+          // 歸屬的荷葉沒了，找任一片荷葉重新歸屬
+          const anyLily=seasonParts.find(q=>q.type==='lpad');
+          if(!anyLily){seasonParts.splice(i,1);continue;}
+          p.padId=anyLily.padId;lly=anyLily;
+        }
         if(p.state==="sitting"){
-          p.x=lly.x;p.y=lly.y-lly.size*.25; // 坐在荷葉中央上方
+          // 青蛙屁股坐在荷葉中心稍上方
+          // 荷葉 size 是寬度，青蛙中心 y 要比荷葉中心高「青蛙半高」
+          p.x=lly.x;
+          p.y=lly.y-p.size*0.35; // 青蛙站在荷葉表面
           p.blinkTimer--;
           if(p.blinkTimer<=0){
-            p.imgIdx=p.imgIdx===1?0:1; // 0=正常眼 1=眨眼
-            p.blinkTimer=p.imgIdx===1?8:120+Math.floor(Math.random()*180);
+            p.imgIdx=p.imgIdx===1?0:1;
+            // 眨眼短（5-10 frame ≈ 0.1s），正常長（2-5 秒）
+            p.blinkTimer=p.imgIdx===1?(5+Math.floor(Math.random()*6)):(120+Math.floor(Math.random()*180));
           }
           p.jumpTimer--;
           if(p.jumpTimer<=0){
-            // 找另一片荷葉跳過去
-            const others=seasonParts.map((q,idx)=>({q,idx})).filter(o=>o.q.type==='lpad'&&o.idx!==p.lilyIdx);
+            // 找另一片荷葉跳
+            const others=seasonParts.filter(q=>q.type==='lpad'&&q.padId!==p.padId);
             if(others.length>0){
               const target=others[Math.floor(Math.random()*others.length)];
               p.jumpFromX=p.x;p.jumpFromY=p.y;
-              p.jumpToX=target.q.x;p.jumpToY=target.q.y-target.q.size*.25;
-              p.jumpTargetLilyIdx=target.idx;
-              p.jumpProgress=0;p.state="crouching";p.crouchTimer=15;
-              p.facing=p.jumpToX>p.jumpFromX?1:-1;
-              p.imgIdx=2; // 蓄力
+              p.jumpToX=target.x;p.jumpToY=target.y-p.size*0.35;
+              p.jumpTargetPadId=target.padId;
+              p.jumpProgress=0;p.state="crouching";p.crouchTimer=20;
+              // facing：原圖青蛙朝「左」，所以往「左」跳 facing=1（不翻），往「右」跳 facing=-1（翻）
+              p.facing=p.jumpToX<p.jumpFromX?1:-1;
+              p.imgIdx=2;
             } else {
               p.jumpTimer=400+Math.floor(Math.random()*1200);
             }
@@ -2548,21 +2556,20 @@ const WxFx = (function(){
         } else if(p.state==="crouching"){
           p.crouchTimer--;
           if(p.crouchTimer<=0){
-            p.state="jumping";p.imgIdx=3; // 跳躍姿勢
+            p.state="jumping";p.imgIdx=3;
           }
         } else if(p.state==="jumping"){
-          p.jumpProgress+=.03;
+          p.jumpProgress+=.025;
           if(p.jumpProgress>=1){
             p.state="sitting";
-            p.lilyIdx=p.jumpTargetLilyIdx;
+            p.padId=p.jumpTargetPadId;
             p.imgIdx=0;p.blinkTimer=120+Math.floor(Math.random()*180);
             p.jumpTimer=400+Math.floor(Math.random()*1200);
           } else {
-            // 拋物線
-            const t=p.jumpProgress;
-            p.x=p.jumpFromX+(p.jumpToX-p.jumpFromX)*t;
-            const arc=-Math.sin(t*Math.PI)*60;
-            p.y=p.jumpFromY+(p.jumpToY-p.jumpFromY)*t+arc;
+            const tt=p.jumpProgress;
+            p.x=p.jumpFromX+(p.jumpToX-p.jumpFromX)*tt;
+            const arc=-Math.sin(tt*Math.PI)*80;
+            p.y=p.jumpFromY+(p.jumpToY-p.jumpFromY)*tt+arc;
           }
         }
         const sz=p.size;
@@ -2577,13 +2584,10 @@ const WxFx = (function(){
           // Fallback: 程序化綠色青蛙
           ctx.save();ctx.translate(p.x,p.y);
           ctx.globalAlpha=p.alpha;
-          // 身體
           ctx.fillStyle="#5a8f3a";
           ctx.beginPath();ctx.ellipse(0,2,sz*.35,sz*.28,0,0,Math.PI*2);ctx.fill();
-          // 頭
           ctx.fillStyle="#6ba84a";
           ctx.beginPath();ctx.ellipse(0,-sz*.15,sz*.3,sz*.22,0,0,Math.PI*2);ctx.fill();
-          // 眼睛
           ctx.fillStyle="#fff";
           ctx.beginPath();ctx.arc(-sz*.12,-sz*.25,sz*.08,0,Math.PI*2);ctx.fill();
           ctx.beginPath();ctx.arc(sz*.12,-sz*.25,sz*.08,0,Math.PI*2);ctx.fill();
