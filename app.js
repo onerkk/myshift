@@ -374,7 +374,7 @@ let lang="zh";try{lang=localStorage.getItem("sb_l")||gCk("sb_l")||"zh"}catch(e){
 function t(k){return (L[lang]&&L[lang][k])||L.zh[k]||k}
 function sf(s){return t(s)}
 // ═══ ADMIN CONFIG (loaded from Firestore) ═══
-let APP_CFG={admins:[],
+let APP_CFG={admins:[],visualFx:{enabled:true},
   units:["冷抽二股A板","冷抽二股B板","冷抽二股C板","冷抽一股A板","冷抽一股B板","冷抽一股C板","熱處理A板","熱處理B板","品管","其他"],
   rotations:[
     {id:"4on2off",name:"做4休2",nameId:"4K 2L",hours:12,cycle:["早","早","早","早","休","休","晚","晚","晚","晚","休","休"]},
@@ -393,6 +393,7 @@ let APP_CFG={admins:[],
   ]
 };
 const UNITS_DEFAULT=APP_CFG.units.slice();
+try{window.APP_CFG=APP_CFG}catch(e){}
 function getUnits(){return APP_CFG.units}
 function getLeaveTypes(){return APP_CFG.leaveTypes}
 function getLT(id){return APP_CFG.leaveTypes.find(t=>t.id===id)}
@@ -405,14 +406,28 @@ function loadAppConfig(){
       if(d.leaveTypes&&d.leaveTypes.length)APP_CFG.leaveTypes=d.leaveTypes;
       if(d.admins)APP_CFG.admins=d.admins;
       if(d.rotations&&d.rotations.length)APP_CFG.rotations=d.rotations;
+      if(d.visualFx&&typeof d.visualFx.enabled==='boolean') APP_CFG.visualFx.enabled=d.visualFx.enabled;
       rebuildR();
+      applyVisualFxSetting();
     }
   },"loadAppConfig").catch(e=>console.log("loadCfg err",e));
+}
+// 全域 FX 開關：套用設定（影響 canvas 顯示 + 聲音）
+function applyVisualFxSetting(){
+  const on=APP_CFG.visualFx&&APP_CFG.visualFx.enabled!==false;
+  try{
+    const cv=document.getElementById('wxCanvas');
+    if(cv) cv.style.display=on?'':'none';
+  }catch(e){}
+  try{
+    if(!on && window.WxFx && window.WxFx._forceSilence) window.WxFx._forceSilence();
+  }catch(e){}
 }
 function saveAppConfig(){
   if(!isAdmin())return Promise.resolve();
   return fsEnqueue(()=>fbDb.collection("config").doc("app").set({
     units:APP_CFG.units,leaveTypes:APP_CFG.leaveTypes,admins:APP_CFG.admins||[],rotations:APP_CFG.rotations||[],
+    visualFx:APP_CFG.visualFx||{enabled:true},
     ts:firebase.firestore.FieldValue.serverTimestamp()
   },{merge:true}),"saveCfg").catch(e=>console.log("saveCfg err",e));
 }
@@ -1967,6 +1982,13 @@ const WxFx = (function(){
   // ═══ MAIN LOOP ═══
   function loop(){
     raf=requestAnimationFrame(loop);
+    // 全域 FX 停用 → 完全不畫
+    try{
+      if(window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false){
+        ctx.clearRect(0,0,_w,_h);
+        return;
+      }
+    }catch(e){}
     ctx.clearRect(0,0,_w,_h);
     if(mode!=="typhoon") canvas.style.transform="";
     
@@ -2956,7 +2978,16 @@ const WxFx = (function(){
     for(let i=0;i<n;i++) seasonParts.push(mkLeaf());
     return"Spawned "+n+" leaves. Total: "+seasonParts.filter(p=>p.type==='leaf').length;
   }
-  return{update,getMode,_debug,_spawnBfly,_spawnLeaf};
+  // 強制靜音（由全域 FX 開關呼叫）
+  function _forceSilence(){
+    try{
+      if(masterGain) masterGain.gain.value=0;
+      stopSeasonSnd();
+      if(actx&&actx.state==='running'){try{actx.suspend()}catch(e){}}
+      muted=true;
+    }catch(e){}
+  }
+  return{update,getMode,_debug,_spawnBfly,_spawnLeaf,_forceSilence};
 })();
 try{window.WxFx=WxFx}catch(e){}
 
@@ -2970,6 +3001,10 @@ const WxSfx = (function(){
   try{muted=localStorage.getItem("sb_sfx")!=="on"}catch(e){}
   
   function initAudio(){
+    // 全域 FX 停用時，拒絕啟動音訊
+    try{
+      if(window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false) return false;
+    }catch(e){}
     if(_initialized) return true;
     try{
       actx=new (window.AudioContext||window.webkitAudioContext)();
@@ -3149,6 +3184,15 @@ const WxSfx = (function(){
   }
   
   function toggle(){
+    // 全域 FX 停用時，無法解除靜音
+    try{
+      if(window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false){
+        muted=true;
+        if(masterGain) masterGain.gain.value=0;
+        render();
+        return;
+      }
+    }catch(e){}
     if(!initAudio()) return;
     muted=!muted;
     try{localStorage.setItem("sb_sfx",muted?"off":"on")}catch(e){}
