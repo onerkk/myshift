@@ -1253,7 +1253,8 @@ const WxFx = (function(){
   let ambientHour=-1;
   // ── Real photo FX assets ──
   const FX_IMG={swallowtail:[],purple:[],monarch:[],maple:[],cloud:[],bolt:[],drop:null,
-    blossom:[],flower:[],dfly:[],frost_img:[],debris_img:[],frog:[],pleaf:[],lpad:[]};
+    blossom:[],flower:[],dfly:[],frost_img:[],debris_img:[],frog:[],pleaf:[],lpad:[],
+    firefly:[],sun:[]};
   function _preloadFx(){
     const kinds=[
       {key:"swallowtail",dir:"butterfly/",prefix:"swallowtail-",count:6},
@@ -1270,6 +1271,8 @@ const WxFx = (function(){
       {key:"frog",dir:"frog/",prefix:"frog-",count:4},
       {key:"pleaf",dir:"pleaf/",prefix:"leaf-",count:3},
       {key:"lpad",dir:"lilypad/",prefix:"pad-",count:1},
+      {key:"firefly",dir:"firefly/",prefix:"firefly-",count:4},
+      {key:"sun",dir:"sun/",prefix:"sun-",count:3}, // sun-01 正午黃 / sun-02 日出日落橘 / sun-03 深夕陽紅
     ];
     kinds.forEach(k=>{
       for(let i=1;i<=k.count;i++){
@@ -1423,15 +1426,16 @@ const WxFx = (function(){
   // ═══ AMBIENT DAY/NIGHT ═══
   let _sunPhase=Math.random()*Math.PI*2;
   
-  function drawSunDisc(x,y,r,coreR,coreG,coreB,coreA,glowA,rayA,rayCount){
-    // Outer glow
-    const g2=ctx.createRadialGradient(x,y,r*0.3,x,y,r*2.5);
-    g2.addColorStop(0,`rgba(${coreR},${coreG},${coreB},${glowA*0.4})`);
-    g2.addColorStop(0.4,`rgba(${coreR},${coreG},${coreB},${glowA*0.15})`);
+  // 參數：x, y, r（太陽半徑）, coreR/G/B（光暈色調 RGB）, coreA（太陽本體 alpha）, glowA（光暈強度）, rayA（光芒強度）, rayCount（光芒數量）, sunIdx（0=正午黃/1=晨昏橘/2=深夕陽紅）
+  function drawSunDisc(x,y,r,coreR,coreG,coreB,coreA,glowA,rayA,rayCount,sunIdx){
+    // 1. 外層光暈（用背景顏色，在太陽後面發光）
+    const g2=ctx.createRadialGradient(x,y,r*0.3,x,y,r*2.8);
+    g2.addColorStop(0,`rgba(${coreR},${coreG},${coreB},${glowA*0.5})`);
+    g2.addColorStop(0.4,`rgba(${coreR},${coreG},${coreB},${glowA*0.2})`);
     g2.addColorStop(1,`rgba(${coreR},${coreG},${coreB},0)`);
     ctx.fillStyle=g2;
     ctx.fillRect(x-r*3,y-r*3,r*6,r*6);
-    // Light rays
+    // 2. 光芒（晨昏時顯著）
     if(rayA>0.01){
       _sunPhase+=0.003;
       ctx.save();
@@ -1454,15 +1458,27 @@ const WxFx = (function(){
       }
       ctx.restore();
     }
-    // Core disc
-    const g1=ctx.createRadialGradient(x,y,0,x,y,r);
-    g1.addColorStop(0,`rgba(255,255,230,${coreA})`);
-    g1.addColorStop(0.5,`rgba(${coreR},${coreG},${coreB},${coreA*0.7})`);
-    g1.addColorStop(1,`rgba(${coreR},${coreG},${coreB},0)`);
-    ctx.fillStyle=g1;
-    ctx.beginPath();
-    ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fill();
+    // 3. 太陽本體——用對應時段的真實照片
+    const idx=Math.min(Math.max(sunIdx||0,0),(FX_IMG.sun.length-1));
+    const sunImg=FX_IMG.sun&&FX_IMG.sun[idx];
+    if(sunImg&&sunImg.complete&&sunImg.naturalWidth>0){
+      ctx.save();
+      ctx.globalAlpha=coreA;
+      // 照片本身已經有色調，不再疊色調濾鏡避免過色
+      const sz=r*2.8;
+      ctx.drawImage(sunImg,x-sz/2,y-sz/2,sz,sz);
+      ctx.restore();
+    } else {
+      // Fallback：原本的漸層圓
+      const g1=ctx.createRadialGradient(x,y,0,x,y,r);
+      g1.addColorStop(0,`rgba(255,255,230,${coreA})`);
+      g1.addColorStop(0.5,`rgba(${coreR},${coreG},${coreB},${coreA*0.7})`);
+      g1.addColorStop(1,`rgba(${coreR},${coreG},${coreB},0)`);
+      ctx.fillStyle=g1;
+      ctx.beginPath();
+      ctx.arc(x,y,r,0,Math.PI*2);
+      ctx.fill();
+    }
   }
   
   function drawAmbient(){
@@ -1496,7 +1512,7 @@ const WxFx = (function(){
       ctx.fillStyle=grd;
       ctx.fillRect(0,0,_w,_h*0.7);
       const sunY=_h*0.22-p*_h*0.06;
-      drawSunDisc(_w*0.8,sunY,25+p*15, 255,150,50, 0.5*p, 0.4*p, 0.15*p, 10);
+      drawSunDisc(_w*0.8,sunY,25+p*15, 255,150,50, 0.5*p, 0.4*p, 0.15*p, 10, 1);
       const starA=(1-p)*0.7;
       if(starA>0.05) stars.forEach(s=>{
         s.tw+=s.sp;
@@ -1508,12 +1524,12 @@ const WxFx = (function(){
     } else if(t>=7&&t<10){
       // Morning sun（下移避開 header，拉大 alpha 讓可見）
       const p=(t-7)/3;
-      drawSunDisc(_w*0.75,_h*0.14,22+p*10, 255,200,80, 0.35, 0.25*p, 0.10*p, 8);
+      drawSunDisc(_w*0.75,_h*0.14,22+p*10, 255,200,80, 0.35, 0.25*p, 0.10*p, 8, 0);
     } else if(t>=10&&t<15){
       // Midday — overhead sun with rays（下移避開 header、加大、提亮）
       const p=Math.min((t-10)/2,1);
       const ep=t>12?Math.max(0,(15-t)/3):p;
-      drawSunDisc(_w*0.5,_h*0.12,24+ep*8, 255,230,100, 0.45*ep, 0.30*ep, 0.12*ep, 12);
+      drawSunDisc(_w*0.5,_h*0.12,24+ep*8, 255,230,100, 0.45*ep, 0.30*ep, 0.12*ep, 12, 0);
       if(ep>0.3){
         const fg=ctx.createRadialGradient(_w*0.5,_h*0.12,0,_w*0.5,_h*0.12,_w*0.5);
         fg.addColorStop(0,`rgba(255,255,200,${0.10*ep})`);
@@ -1526,7 +1542,7 @@ const WxFx = (function(){
       const p=(t-15)/2;
       const sunX=_w*(0.6+p*0.2);
       const sunY=_h*(0.12+p*0.03);
-      drawSunDisc(sunX,sunY,26+p*10, 255,180,50, 0.4+p*0.1, 0.30*p, 0.12*p, 10);
+      drawSunDisc(sunX,sunY,26+p*10, 255,180,50, 0.4+p*0.1, 0.30*p, 0.12*p, 10, 1);
       const grd=ctx.createRadialGradient(sunX,sunY,0,sunX,sunY,_w*0.5);
       grd.addColorStop(0,`rgba(255,190,60,${0.12*p})`);
       grd.addColorStop(1,"rgba(255,200,80,0)");
@@ -1542,7 +1558,7 @@ const WxFx = (function(){
       ctx.fillStyle=grd;
       ctx.fillRect(0,0,_w,_h*0.5);
       const sunY=_h*(0.15+p*0.08);
-      drawSunDisc(_w*0.85,sunY,38-p*10, 230,70,20, 0.5*(1-p*0.4), 0.4*(1-p*0.4), 0.18*(1-p*0.3), 14);
+      drawSunDisc(_w*0.85,sunY,38-p*10, 230,70,20, 0.5*(1-p*0.4), 0.4*(1-p*0.4), 0.18*(1-p*0.3), 14, 2);
     } else if(t>=18&&t<19){
       // Afterglow — 餘暉快速消退，為 19 點轉夜做準備
       const p=t-18;
@@ -2040,7 +2056,9 @@ const WxFx = (function(){
     return{type:"ffly",x:Math.random()*_w,y:_h*.15+Math.random()*_h*.7,
       speed:.15+Math.random()*.35,angle:Math.random()*Math.PI*2,
       turn:.008+Math.random()*.025,pulse:Math.random()*Math.PI*2,
-      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,maxA:.35+Math.random()*.5}
+      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,maxA:.35+Math.random()*.5,
+      imgIdx:Math.floor(Math.random()*4),
+      size:14+Math.random()*10}
   }
   function mkLeaf(){
     const imgIdx=Math.floor(Math.random()*4);// 4 張楓葉隨機挑
@@ -2117,7 +2135,7 @@ const WxFx = (function(){
       padId:++_lpadIdCounter, // 獨立 ID，不受 array index 影響
       x:_w*(.1+Math.random()*.8),
       y:_h*(.7+Math.random()*.2), // 底部水面
-      size:90+Math.random()*30, // 放大荷葉 90-120（原本 55-80 太小）
+      size:65+Math.random()*20, // 65-85 適中（太大搶戲、太小青蛙擺不上）
       rot:(Math.random()-.5)*.3,
       alpha:.88+Math.random()*.08,
       permanent:true}
@@ -2127,7 +2145,7 @@ const WxFx = (function(){
     return{type:"frog",
       padId, // 歸屬的荷葉 ID
       x:0,y:0,
-      size:44+Math.random()*8, // 放大青蛙 44-52（原本 32-40 太小）
+      size:32+Math.random()*6, // 32-38（小於荷葉，才會顯得是坐在上面）
       imgIdx:0,
       state:"sitting",
       blinkTimer:120+Math.floor(Math.random()*180),
@@ -2526,14 +2544,15 @@ const WxFx = (function(){
           p.padId=anyLily.padId;lly=anyLily;
         }
         if(p.state==="sitting"){
-          // 青蛙屁股坐在荷葉中心稍上方
-          // 荷葉 size 是寬度，青蛙中心 y 要比荷葉中心高「青蛙半高」
+          // 青蛙坐在荷葉「表面」上：
+          // 荷葉俯視圖中心在 lly.y、荷葉實際顯示範圍約 lly.size*0.5（因為橢圓被壓扁）
+          // 青蛙圖從中心延伸 ±p.size/2
+          // 要讓青蛙腳底接近荷葉中心、身體大部分在荷葉上方
           p.x=lly.x;
-          p.y=lly.y-p.size*0.35; // 青蛙站在荷葉表面
+          p.y=lly.y-p.size*0.45; // 腳底剛好踩在荷葉中心
           p.blinkTimer--;
           if(p.blinkTimer<=0){
             p.imgIdx=p.imgIdx===1?0:1;
-            // 眨眼短（5-10 frame ≈ 0.1s），正常長（2-5 秒）
             p.blinkTimer=p.imgIdx===1?(5+Math.floor(Math.random()*6)):(120+Math.floor(Math.random()*180));
           }
           p.jumpTimer--;
@@ -2543,7 +2562,7 @@ const WxFx = (function(){
             if(others.length>0){
               const target=others[Math.floor(Math.random()*others.length)];
               p.jumpFromX=p.x;p.jumpFromY=p.y;
-              p.jumpToX=target.x;p.jumpToY=target.y-p.size*0.35;
+              p.jumpToX=target.x;p.jumpToY=target.y-p.size*0.45;
               p.jumpTargetPadId=target.padId;
               p.jumpProgress=0;p.state="crouching";p.crouchTimer=20;
               // facing：原圖青蛙朝「左」，所以往「左」跳 facing=1（不翻），往「右」跳 facing=-1（翻）
@@ -2606,13 +2625,28 @@ const WxFx = (function(){
         if(p.x<-20)p.x=_w+10;if(p.x>_w+20)p.x=-10;
         if(p.y<_h*.1)p.y=_h*.9;if(p.y>_h*.95)p.y=_h*.2;
         if(a>.01){
-          const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
-          g.addColorStop(0,`rgba(200,255,100,${a})`);
-          g.addColorStop(.5,`rgba(150,230,50,${a*.3})`);
+          const fimg=FX_IMG.firefly&&FX_IMG.firefly[p.imgIdx||0];
+          // 先畫光暈（永遠畫，是螢火蟲的靈魂）
+          const glowR=p.r*4;
+          const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,glowR);
+          g.addColorStop(0,`rgba(200,255,100,${a*0.8})`);
+          g.addColorStop(.4,`rgba(180,240,80,${a*0.4})`);
           g.addColorStop(1,"rgba(150,230,50,0)");
-          ctx.fillStyle=g;ctx.fillRect(p.x-p.r*3,p.y-p.r*3,p.r*6,p.r*6);
-          ctx.beginPath();ctx.fillStyle=`rgba(220,255,150,${a*1.2})`;
-          ctx.arc(p.x,p.y,p.r*.5,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle=g;ctx.fillRect(p.x-glowR,p.y-glowR,glowR*2,glowR*2);
+          // 再疊上真實螢火蟲照片
+          if(fimg&&fimg.complete&&fimg.naturalWidth>0){
+            const sz=p.size||16;
+            ctx.save();
+            ctx.translate(p.x,p.y);
+            ctx.rotate(p.angle+Math.PI/2);
+            ctx.globalAlpha=Math.min(1,a*1.8); // 螢火蟲本體透明度隨脈衝變化
+            ctx.drawImage(fimg,-sz/2,-sz/2,sz,sz);
+            ctx.restore();
+          } else {
+            // fallback：亮點
+            ctx.beginPath();ctx.fillStyle=`rgba(220,255,150,${a*1.2})`;
+            ctx.arc(p.x,p.y,p.r*.5,0,Math.PI*2);ctx.fill();
+          }
         }
       }
       else if(p.type==='leaf'){
