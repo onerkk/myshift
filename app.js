@@ -1489,9 +1489,9 @@ const WxFx = (function(){
       // Night（19:00 起；19-20 為進入夜間的漸變，20:00 起完整夜色）
       const intensity=(t>=19&&t<20)? Math.min((t-19)/1,1) : 1;
       const grd=ctx.createLinearGradient(0,0,0,_h);
-      grd.addColorStop(0,`rgba(8,15,40,${0.35*intensity})`);
-      grd.addColorStop(0.5,`rgba(12,20,50,${0.25*intensity})`);
-      grd.addColorStop(1,`rgba(15,25,55,${0.18*intensity})`);
+      grd.addColorStop(0,`rgba(5,10,30,${0.65*intensity})`);
+      grd.addColorStop(0.5,`rgba(8,15,38,${0.55*intensity})`);
+      grd.addColorStop(1,`rgba(12,20,45,${0.45*intensity})`);
       ctx.fillStyle=grd;
       ctx.fillRect(0,0,_w,_h);
       stars.forEach(s=>{
@@ -2145,7 +2145,7 @@ const WxFx = (function(){
     return{type:"frog",
       padId, // 歸屬的荷葉 ID
       x:0,y:0,
-      size:32+Math.random()*6, // 32-38（小於荷葉，才會顯得是坐在上面）
+      size:45+Math.random()*10, // 45-55（比例略小於荷葉但視覺清晰）
       imgIdx:0,
       state:"sitting",
       blinkTimer:120+Math.floor(Math.random()*180),
@@ -2177,9 +2177,9 @@ const WxFx = (function(){
         if(Math.random()>.4) seasonParts.push(mkButterfly());
         if(Math.random()>.7) seasonParts.push(mkButterfly());
       }
-      // 春夜加入荷葉+青蛙
-      if(!noc&&ts==='night'){
-        for(let i=0;i<4+Math.floor(Math.random()*4);i++) seasonParts.push(mkFirefly());
+      // 春夜加入荷葉+青蛙（青蛙雨天也要坐著，只有 harsh 天氣才移除）
+      if(ts==='night'&&!isHarsh()){
+        if(!noc) for(let i=0;i<4+Math.floor(Math.random()*4);i++) seasonParts.push(mkFirefly());
         // 2 片荷葉 + 1 隻青蛙
         const lilies=[];
         for(let i=0;i<2;i++){const lp=mkLilypad();seasonParts.push(lp);lilies.push(lp)}
@@ -2191,8 +2191,8 @@ const WxFx = (function(){
         for(let i=0;i<2+Math.floor(Math.random()*2);i++) seasonParts.push(mkPerchLeaf());
         if(Math.random()>.4) seasonParts.push(mkDragonfly());
         if(Math.random()>.7) seasonParts.push(mkDragonfly());
-      } else if(!noc&&(ts==='night'||ts==='dusk')){
-        for(let i=0;i<8+Math.floor(Math.random()*8);i++) seasonParts.push(mkFirefly());
+      } else if(!isHarsh()&&(ts==='night'||ts==='dusk')){
+        if(!noc) for(let i=0;i<8+Math.floor(Math.random()*8);i++) seasonParts.push(mkFirefly());
         // 夏夜 2-3 片荷葉 + 1-2 隻青蛙
         const numLily=2+Math.floor(Math.random()*2);
         const lilies=[];
@@ -2222,8 +2222,12 @@ const WxFx = (function(){
     const modeChanged=(mode!==lastMode);lastMode=mode;
     if(s!==curSeason||ts!==curTimeSlot||modeChanged||seasonTimer>1500){seedSeason(s,ts);seasonTimer=0}
     // Purge creatures immediately during bad weather (in case any survived)
-    if(noCreatures()){
+    if(isHarsh()){
+      // Harsh 天氣：清除所有生物（含青蛙、荷葉）
       seasonParts=seasonParts.filter(p=>p.type!=='bfly'&&p.type!=='dfly'&&p.type!=='ffly'&&p.type!=='frog'&&p.type!=='lpad'&&p.type!=='pleaf');
+    } else if(noCreatures()){
+      // Moderate 天氣（雨、霧、風）：只清除飛行生物，青蛙+荷葉保留
+      seasonParts=seasonParts.filter(p=>p.type!=='bfly'&&p.type!=='dfly'&&p.type!=='ffly'&&p.type!=='pleaf');
     }
 
     // Random bursts
@@ -2259,9 +2263,10 @@ const WxFx = (function(){
       }
     }
 
-    // Draw particles
+    // Draw particles（frog 延後畫，避免被 lpad 等蓋住）
     for(let i=seasonParts.length-1;i>=0;i--){
       const p=seasonParts[i];
+      if(p.type==='frog') continue; // 青蛙最後統一處理
 
       if(p.type==='cloud'){
         p.x+=p.speed;
@@ -2691,6 +2696,87 @@ const WxFx = (function(){
         const g=ctx.createRadialGradient(p.x+p.w/2,p.y,0,p.x+p.w/2,p.y,p.w/2);
         g.addColorStop(0,`rgba(200,210,225,${p.alpha})`);g.addColorStop(1,"rgba(200,210,225,0)");
         ctx.fillStyle=g;ctx.fillRect(p.x,p.y-p.h,p.w,p.h*2);
+      }
+    }
+    // === 青蛙最後畫（確保在荷葉/其他粒子之上）===
+    for(let i=seasonParts.length-1;i>=0;i--){
+      const p=seasonParts[i];
+      if(p.type!=='frog') continue;
+      // 青蛙狀態機：sitting / crouching / jumping
+      let lly=null;
+      for(let j=0;j<seasonParts.length;j++){
+        const q=seasonParts[j];
+        if(q.type==='lpad'&&q.padId===p.padId){lly=q;break;}
+      }
+      if(!lly){
+        const anyLily=seasonParts.find(q=>q.type==='lpad');
+        if(!anyLily){seasonParts.splice(i,1);continue;}
+        p.padId=anyLily.padId;lly=anyLily;
+      }
+      if(p.state==="sitting"){
+        p.x=lly.x;
+        p.y=lly.y-p.size*0.45;
+        p.blinkTimer--;
+        if(p.blinkTimer<=0){
+          p.imgIdx=p.imgIdx===1?0:1;
+          p.blinkTimer=p.imgIdx===1?(5+Math.floor(Math.random()*6)):(120+Math.floor(Math.random()*180));
+        }
+        p.jumpTimer--;
+        if(p.jumpTimer<=0){
+          const others=seasonParts.filter(q=>q.type==='lpad'&&q.padId!==p.padId);
+          if(others.length>0){
+            const target=others[Math.floor(Math.random()*others.length)];
+            p.jumpFromX=p.x;p.jumpFromY=p.y;
+            p.jumpToX=target.x;p.jumpToY=target.y-p.size*0.45;
+            p.jumpTargetPadId=target.padId;
+            p.jumpProgress=0;p.state="crouching";p.crouchTimer=20;
+            p.facing=p.jumpToX<p.jumpFromX?1:-1;
+            p.imgIdx=2;
+          } else {
+            p.jumpTimer=400+Math.floor(Math.random()*1200);
+          }
+        }
+      } else if(p.state==="crouching"){
+        p.crouchTimer--;
+        if(p.crouchTimer<=0){p.state="jumping";p.imgIdx=3;}
+      } else if(p.state==="jumping"){
+        p.jumpProgress+=.025;
+        if(p.jumpProgress>=1){
+          p.state="sitting";
+          p.padId=p.jumpTargetPadId;
+          p.imgIdx=0;p.blinkTimer=120+Math.floor(Math.random()*180);
+          p.jumpTimer=400+Math.floor(Math.random()*1200);
+        } else {
+          const tt=p.jumpProgress;
+          p.x=p.jumpFromX+(p.jumpToX-p.jumpFromX)*tt;
+          const arc=-Math.sin(tt*Math.PI)*80;
+          p.y=p.jumpFromY+(p.jumpToY-p.jumpFromY)*tt+arc;
+        }
+      }
+      const sz=p.size;
+      const fimg=FX_IMG.frog&&FX_IMG.frog[p.imgIdx||0];
+      if(fimg&&fimg.complete&&fimg.naturalWidth>0){
+        ctx.save();ctx.translate(p.x,p.y);
+        if(p.facing===-1) ctx.scale(-1,1);
+        ctx.globalAlpha=p.alpha;
+        ctx.drawImage(fimg,-sz/2,-sz/2,sz,sz);
+        ctx.restore();
+      }else{
+        // Fallback: 程序化綠色青蛙
+        ctx.save();ctx.translate(p.x,p.y);
+        ctx.globalAlpha=p.alpha;
+        ctx.fillStyle="#5a8f3a";
+        ctx.beginPath();ctx.ellipse(0,2,sz*.35,sz*.28,0,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle="#6ba84a";
+        ctx.beginPath();ctx.ellipse(0,-sz*.15,sz*.3,sz*.22,0,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle="#fff";
+        ctx.beginPath();ctx.arc(-sz*.12,-sz*.25,sz*.08,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(sz*.12,-sz*.25,sz*.08,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle="#000";
+        const ey=p.imgIdx===1?sz*.02:0;
+        ctx.beginPath();ctx.arc(-sz*.12,-sz*.25+ey,sz*.04,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(sz*.12,-sz*.25+ey,sz*.04,0,Math.PI*2);ctx.fill();
+        ctx.restore();
       }
     }
     if(seasonParts.length>130) seasonParts.splice(0,seasonParts.length-130);
