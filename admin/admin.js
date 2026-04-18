@@ -12,7 +12,7 @@ const SUPER_ADMINS=["onerkk@gmail.com","asus0814999@gmail.com"];
 let user=null;
 let authReady=false;
 let activeTab="units";
-let CFG={units:[],rotations:[],leaveTypes:[],admins:[]};
+let CFG={units:[],rotations:[],leaveTypes:[],admins:[],visualFx:{enabled:true}};
 let USERS=[];
 let expandedUserId=null;
 let userSearch="";
@@ -63,6 +63,7 @@ async function loadAll(){
       CFG.rotations=d.rotations||[];
       CFG.leaveTypes=d.leaveTypes||[];
       CFG.admins=d.admins||[];
+      CFG.visualFx=d.visualFx&&typeof d.visualFx.enabled==='boolean'?d.visualFx:{enabled:true};
     }
     if(isAdmin()){
       const snap=await fbDb.collection("users").get();
@@ -84,6 +85,7 @@ async function saveCfg(silent){
   try{
     await fbDb.collection("config").doc("app").set({
       units:CFG.units,rotations:CFG.rotations,leaveTypes:CFG.leaveTypes,admins:CFG.admins,
+      visualFx:CFG.visualFx||{enabled:true},
       ts:firebase.firestore.FieldValue.serverTimestamp()
     },{merge:true});
     if(!silent)toast("已儲存","ok");
@@ -101,7 +103,7 @@ function render(){
     app.innerHTML=`<div class="login-box"><h1>⛔ 權限不足</h1><p>您的帳號（${esc(user.email)}）不是管理員</p><button class="btn gray" onclick="logout()">登出</button></div>`;
     return;
   }
-  app.innerHTML=headerHtml()+tabsHtml()+tabBodyHtml()+`<div class="footer">MyShift Admin v1</div>`;
+  app.innerHTML=headerHtml()+tabsHtml()+tabBodyHtml()+`<div class="footer">MyShift Admin v2</div>`;
   bind();
 }
 
@@ -130,7 +132,8 @@ function tabsHtml(){
     {id:"rotations",label:"🔄 輪班規則"},
     {id:"leaveTypes",label:"📋 假別"},
     {id:"admins",label:"👑 管理員"},
-    {id:"users",label:"👥 使用者"}
+    {id:"users",label:"👥 使用者"},
+    {id:"appearance",label:"🎨 外觀"}
   ];
   return `<div class="tabs">${tabs.map(t=>`<button class="tab ${activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`).join("")}</div>`;
 }
@@ -144,6 +147,7 @@ function tabBodyHtml(){
     case"leaveTypes":return leaveTypesTabHtml();
     case"admins":return adminsTabHtml();
     case"users":return usersTabHtml();
+    case"appearance":return appearanceTabHtml();
   }
   return"";
 }
@@ -361,6 +365,42 @@ async function delAdmin(i){
   if(!confirm("確定移除「"+CFG.admins[i].email+"」的管理員權限？"))return;
   CFG.admins.splice(i,1);
   await saveCfg();
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 6: 外觀 / 特效
+// ═══════════════════════════════════════════════════════════════
+function appearanceTabHtml(){
+  const on=CFG.visualFx&&CFG.visualFx.enabled!==false;
+  return `<div class="card">
+    <h2>🎨 天氣動畫與音效</h2>
+    <div style="color:#aaa;font-size:12px;line-height:1.6;margin-bottom:14px">
+      一鍵控制全部使用者的前景特效，包含：<br>
+      • 天氣動畫（雨、雪、雲、太陽、星星、螢火蟲等）<br>
+      • 生態動畫（青蛙、蜻蜓、蝴蝶、荷葉、花瓣等）<br>
+      • 環境音效（雨聲、風聲、青蛙、蟲鳴、鳥叫）<br>
+      關閉後，所有使用者下次開 app（或重新同步雲端設定後）即停用，可省電與減輕效能負擔。
+    </div>
+    <div class="row" style="padding:12px">
+      <div class="info">
+        <div class="name">啟用動畫與音效</div>
+        <div class="sub">目前狀態：<span style="color:${on?'#27ae60':'#e74c3c'};font-weight:700">${on?'✅ 已啟用':'⛔ 已停用'}</span></div>
+      </div>
+      <button class="btn ${on?'red':'green'}" onclick="toggleVisualFx()">
+        ${on?'一鍵停用':'一鍵啟用'}
+      </button>
+    </div>
+  </div>`;
+}
+async function toggleVisualFx(){
+  if(!CFG.visualFx) CFG.visualFx={enabled:true};
+  const now=CFG.visualFx.enabled!==false;
+  const next=!now;
+  if(!confirm(next?"確定要啟用所有使用者的動畫與音效？":"確定要停用所有使用者的動畫與音效？\n\n這會影響全部已登入的使用者。"))return;
+  CFG.visualFx.enabled=next;
+  await saveCfg(true);
+  toast(next?"已啟用動畫與音效":"已停用動畫與音效","ok");
   render();
 }
 

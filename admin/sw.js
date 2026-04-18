@@ -1,4 +1,4 @@
-const CACHE_NAME='myshift-admin-v1';
+const CACHE_NAME='myshift-admin-v2';
 self.addEventListener('install',e=>{e.waitUntil(self.skipWaiting())});
 self.addEventListener('activate',e=>{
   e.waitUntil(caches.keys().then(n=>Promise.all(n.filter(x=>x!==CACHE_NAME).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))
