@@ -1306,7 +1306,7 @@ const WxFx = (function(){
     if(canvas) return;
     canvas=document.createElement("canvas");
     canvas.id="wxfx";
-    canvas.style.cssText="position:fixed;inset:0;z-index:25;pointer-events:none";
+    canvas.style.cssText="position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0.5";
     document.body.appendChild(canvas);
     ctx=canvas.getContext("2d");
     resize();
@@ -2144,7 +2144,7 @@ const WxFx = (function(){
   function mkPerchLeaf(){
     return{type:"pleaf",
       x:_w*(.15+Math.random()*.7),
-      y:_h*(.25+Math.random()*.4), // 避開底部，讓蜻蜓停在畫面中上
+      y:_h*(.65+Math.random()*.23), // 畫面下方，跟荷葉同一區帶
       size:40+Math.random()*20,
       rot:(Math.random()-.5)*.5,
       imgIdx:Math.floor(Math.random()*3),
@@ -2317,6 +2317,9 @@ const WxFx = (function(){
     }
 
     // Draw particles（frog 延後畫，避免被 lpad 等蓋住）
+    // 排序：飛行生物（蝴蝶/蜻蜓/螢火蟲）移到陣列前端，反向迭代時最後畫 → 在 pleaf/lpad 之上
+    const _zOrder={bfly:0,dfly:0,ffly:0,frog:1,lpad:2,pleaf:2};
+    seasonParts.sort((a,b)=>(_zOrder[a.type]??9)-(_zOrder[b.type]??9));
     for(let i=seasonParts.length-1;i>=0;i--){
       const p=seasonParts[i];
       if(p.type==='frog') continue; // 青蛙最後統一處理
