@@ -2142,20 +2142,49 @@ const WxFx = (function(){
       alpha:.88+Math.random()*.08,
       permanent:true}
   }
-  // 青蛙：坐在荷葉上，偶爾跳
+  // 青蛙：坐在荷葉上，偶爾跳、偶爾伸舌頭吃蟲（夜晚螢火蟲/白天蜻蜓）
   function mkFrog(padId){
     return{type:"frog",
-      padId, // 歸屬的荷葉 ID
+      padId,
       x:0,y:0,
-      size:45+Math.random()*10, // 45-55（比例略小於荷葉但視覺清晰）
+      size:45+Math.random()*10,
       imgIdx:0,
       state:"sitting",
       blinkTimer:120+Math.floor(Math.random()*180),
       jumpTimer:400+Math.floor(Math.random()*1200),
+      huntTimer:180+Math.floor(Math.random()*240),
+      tongueProgress:0,
+      tongueFromX:0,tongueFromY:0,tongueToX:0,tongueToY:0,
+      preyRef:null,
       jumpProgress:0,jumpFromX:0,jumpFromY:0,jumpToX:0,jumpToY:0,
-      facing:1, // 預設朝左（配合原圖方向）
+      facing:1,
       alpha:.95,
       permanent:true}
+  }
+  // 畫青蛙舌頭（全域座標）
+  function drawFrogTongue(p){
+    if(p.state!=='catching'&&p.state!=='retracting') return;
+    const t=Math.max(0,Math.min(1,p.tongueProgress));
+    if(t<=0.01) return;
+    const fx=p.tongueFromX,fy=p.tongueFromY;
+    const tx=p.tongueToX,ty=p.tongueToY;
+    const cx=fx+(tx-fx)*t,cy=fy+(ty-fy)*t;
+    ctx.save();
+    ctx.strokeStyle='rgba(230,85,120,0.92)';
+    ctx.lineWidth=2.2;
+    ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(fx,fy);
+    ctx.lineTo(cx,cy);
+    ctx.stroke();
+    ctx.fillStyle='rgba(245,120,150,0.95)';
+    ctx.beginPath();
+    ctx.arc(cx,cy,2.8,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    if(p.state==='retracting'&&p.preyRef){
+      p.preyRef.x=cx;p.preyRef.y=cy;
+    }
   }
 
   // ── Seeding ──
@@ -2551,33 +2580,80 @@ const WxFx = (function(){
           p.padId=anyLily.padId;lly=anyLily;
         }
         if(p.state==="sitting"){
-          // 青蛙坐在荷葉「表面」上：
-          // 荷葉俯視圖中心在 lly.y、荷葉實際顯示範圍約 lly.size*0.5（因為橢圓被壓扁）
-          // 青蛙圖從中心延伸 ±p.size/2
-          // 要讓青蛙腳底接近荷葉中心、身體大部分在荷葉上方
           p.x=lly.x;
-          p.y=lly.y-p.size*0.45; // 腳底剛好踩在荷葉中心
+          p.y=lly.y-p.size*0.45;
           p.blinkTimer--;
           if(p.blinkTimer<=0){
             p.imgIdx=p.imgIdx===1?0:1;
             p.blinkTimer=p.imgIdx===1?(5+Math.floor(Math.random()*6)):(120+Math.floor(Math.random()*180));
           }
-          p.jumpTimer--;
-          if(p.jumpTimer<=0){
-            // 找另一片荷葉跳
-            const others=seasonParts.filter(q=>q.type==='lpad'&&q.padId!==p.padId);
-            if(others.length>0){
-              const target=others[Math.floor(Math.random()*others.length)];
-              p.jumpFromX=p.x;p.jumpFromY=p.y;
-              p.jumpToX=target.x;p.jumpToY=target.y-p.size*0.45;
-              p.jumpTargetPadId=target.padId;
-              p.jumpProgress=0;p.state="crouching";p.crouchTimer=20;
-              // facing：原圖青蛙朝「左」，所以往「左」跳 facing=1（不翻），往「右」跳 facing=-1（翻）
-              p.facing=p.jumpToX<p.jumpFromX?1:-1;
-              p.imgIdx=2;
-            } else {
-              p.jumpTimer=400+Math.floor(Math.random()*1200);
+          p.huntTimer--;
+          if(p.huntTimer<=0){
+            const mouthX=p.x,mouthY=p.y-p.size*0.05;
+            const maxR=160;
+            let best=null,bestD=maxR*maxR;
+            for(let k=0;k<seasonParts.length;k++){
+              const q=seasonParts[k];
+              if(q.type!=='ffly'&&q.type!=='dfly') continue;
+              if(q.type==='dfly'&&q.state!=='flying') continue;
+              const dx=q.x-mouthX,dy=q.y-mouthY;
+              const d2=dx*dx+dy*dy;
+              if(d2<bestD){bestD=d2;best=q;}
             }
+            if(best){
+              p.preyRef=best;
+              p.tongueFromX=mouthX;p.tongueFromY=mouthY;
+              p.tongueToX=best.x;p.tongueToY=best.y;
+              p.tongueProgress=0;
+              p.state="catching";
+              p.imgIdx=1;
+              p.facing=best.x<p.x?1:-1;
+              p.huntTimer=0;
+            } else {
+              p.huntTimer=120+Math.floor(Math.random()*180);
+            }
+          }
+          if(p.state==="sitting"){
+            p.jumpTimer--;
+            if(p.jumpTimer<=0){
+              const others=seasonParts.filter(q=>q.type==='lpad'&&q.padId!==p.padId);
+              if(others.length>0){
+                const target=others[Math.floor(Math.random()*others.length)];
+                p.jumpFromX=p.x;p.jumpFromY=p.y;
+                p.jumpToX=target.x;p.jumpToY=target.y-p.size*0.45;
+                p.jumpTargetPadId=target.padId;
+                p.jumpProgress=0;p.state="crouching";p.crouchTimer=20;
+                p.facing=p.jumpToX<p.jumpFromX?1:-1;
+                p.imgIdx=2;
+              } else {
+                p.jumpTimer=400+Math.floor(Math.random()*1200);
+              }
+            }
+          }
+        } else if(p.state==="catching"){
+          p.tongueProgress+=0.15;
+          if(p.preyRef&&seasonParts.indexOf(p.preyRef)>=0){
+            p.tongueToX=p.preyRef.x;p.tongueToY=p.preyRef.y;
+          } else {
+            p.preyRef=null;p.state="retracting";p.tongueProgress=1;
+          }
+          if(p.tongueProgress>=1){
+            p.tongueProgress=1;
+            p.state="retracting";
+          }
+        } else if(p.state==="retracting"){
+          p.tongueProgress-=0.2;
+          if(p.tongueProgress<=0){
+            p.tongueProgress=0;
+            if(p.preyRef){
+              const idx=seasonParts.indexOf(p.preyRef);
+              if(idx>=0) seasonParts.splice(idx,1);
+              p.preyRef=null;
+            }
+            p.state="sitting";
+            p.imgIdx=0;
+            p.huntTimer=240+Math.floor(Math.random()*360);
+            p.blinkTimer=60+Math.floor(Math.random()*120);
           }
         } else if(p.state==="crouching"){
           p.crouchTimer--;
@@ -2623,6 +2699,7 @@ const WxFx = (function(){
           ctx.beginPath();ctx.arc(sz*.12,-sz*.25+ey,sz*.04,0,Math.PI*2);ctx.fill();
           ctx.restore();
         }
+        drawFrogTongue(p);
       }
       else if(p.type==='ffly'){
         p.angle+=p.turn*(Math.sin(p.pulse*.5)>0?1:-1);
@@ -2723,20 +2800,73 @@ const WxFx = (function(){
           p.imgIdx=p.imgIdx===1?0:1;
           p.blinkTimer=p.imgIdx===1?(5+Math.floor(Math.random()*6)):(120+Math.floor(Math.random()*180));
         }
-        p.jumpTimer--;
-        if(p.jumpTimer<=0){
-          const others=seasonParts.filter(q=>q.type==='lpad'&&q.padId!==p.padId);
-          if(others.length>0){
-            const target=others[Math.floor(Math.random()*others.length)];
-            p.jumpFromX=p.x;p.jumpFromY=p.y;
-            p.jumpToX=target.x;p.jumpToY=target.y-p.size*0.45;
-            p.jumpTargetPadId=target.padId;
-            p.jumpProgress=0;p.state="crouching";p.crouchTimer=20;
-            p.facing=p.jumpToX<p.jumpFromX?1:-1;
-            p.imgIdx=2;
-          } else {
-            p.jumpTimer=400+Math.floor(Math.random()*1200);
+        p.huntTimer--;
+        if(p.huntTimer<=0){
+          const mouthX=p.x,mouthY=p.y-p.size*0.05;
+          const maxR=160;
+          let best=null,bestD=maxR*maxR;
+          for(let k=0;k<seasonParts.length;k++){
+            const q=seasonParts[k];
+            if(q.type!=='ffly'&&q.type!=='dfly') continue;
+            if(q.type==='dfly'&&q.state!=='flying') continue;
+            const dx=q.x-mouthX,dy=q.y-mouthY;
+            const d2=dx*dx+dy*dy;
+            if(d2<bestD){bestD=d2;best=q;}
           }
+          if(best){
+            p.preyRef=best;
+            p.tongueFromX=mouthX;p.tongueFromY=mouthY;
+            p.tongueToX=best.x;p.tongueToY=best.y;
+            p.tongueProgress=0;
+            p.state="catching";
+            p.imgIdx=1;
+            p.facing=best.x<p.x?1:-1;
+            p.huntTimer=0;
+          } else {
+            p.huntTimer=120+Math.floor(Math.random()*180);
+          }
+        }
+        if(p.state==="sitting"){
+          p.jumpTimer--;
+          if(p.jumpTimer<=0){
+            const others=seasonParts.filter(q=>q.type==='lpad'&&q.padId!==p.padId);
+            if(others.length>0){
+              const target=others[Math.floor(Math.random()*others.length)];
+              p.jumpFromX=p.x;p.jumpFromY=p.y;
+              p.jumpToX=target.x;p.jumpToY=target.y-p.size*0.45;
+              p.jumpTargetPadId=target.padId;
+              p.jumpProgress=0;p.state="crouching";p.crouchTimer=20;
+              p.facing=p.jumpToX<p.jumpFromX?1:-1;
+              p.imgIdx=2;
+            } else {
+              p.jumpTimer=400+Math.floor(Math.random()*1200);
+            }
+          }
+        }
+      } else if(p.state==="catching"){
+        p.tongueProgress+=0.15;
+        if(p.preyRef&&seasonParts.indexOf(p.preyRef)>=0){
+          p.tongueToX=p.preyRef.x;p.tongueToY=p.preyRef.y;
+        } else {
+          p.preyRef=null;p.state="retracting";p.tongueProgress=1;
+        }
+        if(p.tongueProgress>=1){
+          p.tongueProgress=1;
+          p.state="retracting";
+        }
+      } else if(p.state==="retracting"){
+        p.tongueProgress-=0.2;
+        if(p.tongueProgress<=0){
+          p.tongueProgress=0;
+          if(p.preyRef){
+            const idx=seasonParts.indexOf(p.preyRef);
+            if(idx>=0) seasonParts.splice(idx,1);
+            p.preyRef=null;
+          }
+          p.state="sitting";
+          p.imgIdx=0;
+          p.huntTimer=240+Math.floor(Math.random()*360);
+          p.blinkTimer=60+Math.floor(Math.random()*120);
         }
       } else if(p.state==="crouching"){
         p.crouchTimer--;
@@ -2780,6 +2910,7 @@ const WxFx = (function(){
         ctx.beginPath();ctx.arc(sz*.12,-sz*.25+ey,sz*.04,0,Math.PI*2);ctx.fill();
         ctx.restore();
       }
+      drawFrogTongue(p);
     }
     if(seasonParts.length>130) seasonParts.splice(0,seasonParts.length-130);
   }
