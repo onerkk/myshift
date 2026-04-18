@@ -1306,7 +1306,7 @@ const WxFx = (function(){
     if(canvas) return;
     canvas=document.createElement("canvas");
     canvas.id="wxfx";
-    canvas.style.cssText="position:fixed;inset:0;z-index:15;pointer-events:none";
+    canvas.style.cssText="position:fixed;inset:0;z-index:25;pointer-events:none";
     document.body.appendChild(canvas);
     ctx=canvas.getContext("2d");
     resize();
