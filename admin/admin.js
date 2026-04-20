@@ -302,7 +302,8 @@ async function addLT(){
   const otDeduct=otStr===""?null:parseFloat(otStr);
   const color=$("newLTColor").value||"#607d8b";
   if(!name)return toast("中文名必填","err");
-  const id=name.toLowerCase().replace(/[^a-z0-9]/g,"_")||("lt_"+Date.now());
+  // 保留中文與英數，其他符號（含 /、空白、.）轉成 _，再去頭尾底線
+  const id=(name.toLowerCase().replace(/[\s/\\.#$\[\]]+/g,"_").replace(/^_+|_+$/g,""))||("lt_"+Date.now());
   if(CFG.leaveTypes.some(lt=>lt.id===id))return toast("ID 已存在","err");
   const o={id,name,nameId,step,color};
   if(otDeduct!=null)o.otDeduct=otDeduct;
