@@ -727,44 +727,46 @@ function salaryEstHtml(y,m){
 // ═══════════════════════════════════════════════════════════════
 function rSalary(){
   const isZh=lang==="zh";
-  // 欄位 helper：placeholder 留空，避免誤判為已填值；可選 hint 顯示在欄位下方
-  const num=(id,label,val,hint)=>`<div style="margin-bottom:10px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">${label}</label><input type="number" id="${id}" value="${val||""}" inputmode="numeric" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff">${hint?`<div style="font-size:10px;color:var(--tx3);margin-top:3px;line-height:1.4">${hint}</div>`:""}</div>`;
-  return`<div class="modal-bg" data-a="salClose"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()" style="max-width:480px"><div class="modal-handle"></div>
+  // 欄位 helper:
+  // - placeholder 用 "例:XXXX" 前綴,跟「真實填入值」視覺區隔,避免上次「以為填了其實是空的」bug 重演
+  // - background 跟 color 改用 CSS 變數,深色模式時自動跟著切換
+  const num=(id,label,val,hint,ph)=>`<div style="margin-bottom:10px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">${label}</label><input type="number" id="${id}" value="${val||""}"${ph?` placeholder="${isZh?"例:":"Cth:"}${ph}"`:""} inputmode="numeric" class="sal-in" style="width:100%;padding:10px;border:1px solid var(--tx3);border-radius:8px;font-size:14px;font-weight:600;background:var(--card);color:var(--tx)">${hint?`<div style="font-size:10px;color:var(--tx3);margin-top:3px;line-height:1.4">${hint}</div>`:""}</div>`;
+  return`<style>.sal-in::placeholder{color:var(--tx3);opacity:.55;font-weight:400}.sal-in:focus{border-color:#00897b;outline:none;box-shadow:0 0 0 2px rgba(0,137,123,.15)}</style><div class="modal-bg" data-a="salClose"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()" style="max-width:480px"><div class="modal-handle"></div>
     <div class="modal-title">💰 ${isZh?"薪資設定":"Atur Gaji"}</div>
     <div style="background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:10px;margin:10px 0;font-size:11px;color:#e65100;line-height:1.6">
-      ⚠️ ${isZh?"資料僅儲存於本機，不上傳雲端。清除瀏覽器資料會遺失，建議拍照備份。對照薪資條填入即可，未填的欄位視為 0。":"Data hanya di HP, tidak ke cloud."}
+      ⚠️ ${isZh?"資料僅儲存於本機,不上傳雲端。清除瀏覽器資料會遺失,建議拍照備份。對照薪資條填入即可,未填的欄位視為 0。":"Data hanya di HP, tidak ke cloud."}
     </div>
 
     <div style="background:rgba(0,150,136,.05);border-radius:10px;padding:12px;margin-bottom:12px">
       <div style="font-size:13px;font-weight:700;color:#00695c;margin-bottom:10px">📈 ${isZh?"應領項目":"Pendapatan"}</div>
-      ${num("sal_base",isZh?"職能俸（月薪本俸）":"Gaji Pokok",SAL.base,isZh?"必填。對照薪資條上「職能俸」或「本薪」欄位":"Wajib")}
-      ${num("sal_meal",isZh?"伙食津貼":"Tunjangan Makan",SAL.meal)}
-      ${num("sal_transport",isZh?"交通津貼":"Transport",SAL.transport)}
-      ${num("sal_position",isZh?"崗位津貼":"Tunjangan Posisi",SAL.position)}
-      ${num("sal_night",isZh?"夜點費（每次晚班的單價）":"Tunjangan Malam / shift",SAL.night,isZh?"會自動 × 當月晚班次數。算法：薪資條夜點費總額 ÷ 該月晚班天數":"")}
+      ${num("sal_base",isZh?"職能俸(月薪本俸)":"Gaji Pokok",SAL.base,isZh?"必填。對照薪資條上「職能俸」或「本薪」欄位":"Wajib")}
+      ${num("sal_meal",isZh?"伙食津貼":"Tunjangan Makan",SAL.meal,null,"3000")}
+      ${num("sal_transport",isZh?"交通津貼":"Transport",SAL.transport,null,"1000")}
+      ${num("sal_position",isZh?"崗位津貼":"Tunjangan Posisi",SAL.position,null,"500")}
+      ${num("sal_night",isZh?"夜點費(每次晚班的單價)":"Tunjangan Malam / shift",SAL.night,isZh?"會自動 × 當月晚班次數。算法:薪資條夜點費總額 ÷ 該月晚班天數":"","489")}
     </div>
 
     <div style="background:rgba(198,40,40,.04);border-radius:10px;padding:12px;margin-bottom:12px">
-      <div style="font-size:13px;font-weight:700;color:#b71c1c;margin-bottom:10px">📉 ${isZh?"應扣項目（每月固定）":"Potongan Tetap"}</div>
-      ${num("sal_union",isZh?"工會會費":"Iuran Serikat",SAL.union)}
-      ${num("sal_welfare",isZh?"福利金":"Kesejahteraan",SAL.welfare)}
-      ${num("sal_laborIns",isZh?"勞保自付":"BPJS TK",SAL.laborIns)}
-      ${num("sal_healthIns",isZh?"健保自付":"BPJS Kes",SAL.healthIns)}
-      ${num("sal_otherDed",isZh?"其他固定扣款":"Potongan Lain",SAL.otherDed,isZh?"員工持股信託、自願提繳勞退等每月固定金額扣款":"")}
+      <div style="font-size:13px;font-weight:700;color:#b71c1c;margin-bottom:10px">📉 ${isZh?"應扣項目(每月固定)":"Potongan Tetap"}</div>
+      ${num("sal_union",isZh?"工會會費":"Iuran Serikat",SAL.union,null,"85")}
+      ${num("sal_welfare",isZh?"福利金":"Kesejahteraan",SAL.welfare,null,"173")}
+      ${num("sal_laborIns",isZh?"勞保自付":"BPJS TK",SAL.laborIns,null,"1145")}
+      ${num("sal_healthIns",isZh?"健保自付":"BPJS Kes",SAL.healthIns,null,"1129")}
+      ${num("sal_otherDed",isZh?"其他固定扣款":"Potongan Lain",SAL.otherDed,isZh?"員工持股信託、自願提繳勞退等每月固定金額扣款":"","3033")}
     </div>
 
     <div style="background:rgba(63,81,181,.04);border-radius:10px;padding:12px;margin-bottom:12px">
-      <div style="font-size:13px;font-weight:700;color:#283593;margin-bottom:10px">⚙️ ${isZh?"加班費規則（勞基法預設）":"Aturan Lembur"}</div>
+      <div style="font-size:13px;font-weight:700;color:#283593;margin-bottom:10px">⚙️ ${isZh?"加班費規則(勞基法預設)":"Aturan Lembur"}</div>
       <div style="display:flex;gap:8px">
-        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"前 2h 倍率":"2h Awal x"}</label><input type="number" id="sal_otTier1Rate" value="${SAL.otTier1Rate}" step="0.01" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px"></div>
-        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"後段倍率":"Sisa x"}</label><input type="number" id="sal_otTier2Rate" value="${SAL.otTier2Rate}" step="0.01" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px"></div>
-        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"免稅 h":"Bebas Pjk h"}</label><input type="number" id="sal_otTaxFreeH" value="${SAL.otTaxFreeH}" inputmode="numeric" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px"></div>
-        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"病假倍率":"Sakit x"}</label><input type="number" id="sal_sickRate" value="${SAL.sickRate}" step="0.1" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"前 2h 倍率":"2h Awal x"}</label><input type="number" id="sal_otTier1Rate" value="${SAL.otTier1Rate}" step="0.01" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"後段倍率":"Sisa x"}</label><input type="number" id="sal_otTier2Rate" value="${SAL.otTier2Rate}" step="0.01" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"免稅 h":"Bebas Pjk h"}</label><input type="number" id="sal_otTaxFreeH" value="${SAL.otTaxFreeH}" inputmode="numeric" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"病假倍率":"Sakit x"}</label><input type="number" id="sal_sickRate" value="${SAL.sickRate}" step="0.1" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
       </div>
     </div>
 
     <div style="display:flex;gap:10px;margin-top:14px">
-      <button data-a="salReset" style="flex:1;background:#fff;border:1px solid #ddd;color:var(--tx2);padding:12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">${isZh?"清除全部":"Reset"}</button>
+      <button data-a="salReset" style="flex:1;background:var(--card);border:1px solid var(--tx3);color:var(--tx2);padding:12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">${isZh?"清除全部":"Reset"}</button>
       <button data-a="salSave" style="flex:2;background:#00897b;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isZh?"💾 儲存並啟用預估":"💾 Simpan"}</button>
     </div>
     <div style="height:20px"></div>
