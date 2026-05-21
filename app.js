@@ -427,7 +427,7 @@ let APP_CFG={admins:[],visualFx:{enabled:true},
   ],
   leaveTypes:[
     {id:"annual",name:"特休",nameId:"Cuti Tahunan",step:0.5,color:"#4caf50",otDeduct:4},
-    {id:"sick",name:"病假",nameId:"Sakit",step:1,color:"#f44336",otDeduct:8},
+    {id:"sick",name:"病假",nameId:"Sakit",step:1,color:"#f44336",otDeduct:2},
     {id:"personal",name:"事假",nameId:"Izin Pribadi",step:1,color:"#ff9800",otDeduct:12},
     {id:"funeral",name:"喪假",nameId:"Duka Cita",step:1,color:"#616161",otDeduct:4},
     {id:"marriage",name:"婚假",nameId:"Nikah",step:1,color:"#e91e63",otDeduct:4},
@@ -539,7 +539,7 @@ function calcOT(y,m,wd,sh){const dm=dim(y,m);let wdays=0;for(let d=1;d<=dm;d++){
 function calcPayPeriod(y,m){
   const pm=m===1?12:m-1,py=m===1?y-1:y;
   const sd=new Date(py,pm-1,26),ed=new Date(y,m-1,25);
-  let wd=0,tH=0,leaveH=0,otDeductTotal=0,typhoonH=0,typhoonOtDed=0;
+  let wd=0,tH=0,leaveH=0,otDeductTotal=0,typhoonH=0;
   for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
     const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate();
     const s=gs(cy,cm,cd);
@@ -554,12 +554,17 @@ function calcPayPeriod(y,m){
         otDeductTotal+=(hrs/8)*deductPer8;
       }
     });
-    // 颱風假時數（同 otDeduct=4 邏輯，跟特休一樣的加班扣減比例）
+    // 颱風假時數：按班長扣減加班（12h 班整日颱風 → 扣 4h 加班；8h 班整日 → 扣 0h）
     const tyHours=TYD[ek(cy,cm,cd)]||0;
-    if(tyHours&&s&&s!=="休"){typhoonH+=tyHours;typhoonOtDed+=(tyHours/8)*4}
+    if(tyHours&&s&&s!=="休")typhoonH+=tyHours;
   }
-  const r=rot();if(!r)return{sd,ed,wd,tH:0,oH:0,rH:0,sh:12,leaveH:0,otDeductTotal:0,typhoonH:0};
-  const sh=r.h;tH=Math.max(0,wd*sh-typhoonH);
+  const r=rot();if(!r)return{sd,ed,wd,tH:0,oH:0,rH:0,sh:12,leaveH:0,otDeductTotal:0,typhoonH:0,typhoonOtDed:0};
+  const sh=r.h;
+  // 每天班內隱含加班 = sh - 8（12h 班是 4h、8h 班是 0h）
+  const dailyOT=Math.max(0,sh-8);
+  // 颱風假按比例扣加班：(整體颱風時數 / 班長) × 每天隱含加班
+  const typhoonOtDed=Math.round((typhoonH/sh)*dailyOT*10)/10;
+  tH=Math.max(0,wd*sh-typhoonH);
   let wdays=0,hwd=0;
   for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
     const dw=dt.getDay(),cm=dt.getMonth()+1,cd=dt.getDate();
@@ -569,7 +574,7 @@ function calcPayPeriod(y,m){
   const rH=(wdays-hwd)*8;
   const rawOH=sh===12?wd*4:Math.max(0,wd*sh-rH);
   const oH=Math.max(0,rawOH-otDeductTotal-typhoonOtDed);
-  return{sd,ed,wd,tH,oH,rH,sh,leaveH,otDeductTotal,typhoonH};
+  return{sd,ed,wd,tH,oH,rH,sh,leaveH,otDeductTotal,typhoonH,typhoonOtDed};
 }
 function payCardHtml(y,m){
   const pp=calcPayPeriod(y,m);
@@ -585,7 +590,7 @@ function payCardHtml(y,m){
     <div class="pay-grid">
       <div class="pay-stat"><div class="pay-stat-val">${pp.wd}</div><div class="pay-stat-lbl">${isZh?"出勤日":"Hari Kerja"}</div></div>
       <div class="pay-stat"><div class="pay-stat-val">${pp.tH}h</div><div class="pay-stat-lbl">${isZh?"總工時":"Total Jam"}</div></div>
-      <div class="pay-stat"><div class="pay-stat-val ot-val">${pp.oH}h</div><div class="pay-stat-lbl">${isZh?"加班":"Lembur"}${pp.otDeductTotal?`<br><span style="color:var(--red);font-size:8px">-${pp.otDeductTotal}h ${isZh?"扣除":"potong"}</span>`:""}${pp.typhoonH?`<br><span style="color:#0288d1;font-size:8px">🌀 -${pp.typhoonH}h</span>`:""}</div></div>
+      <div class="pay-stat"><div class="pay-stat-val ot-val">${pp.oH}h</div><div class="pay-stat-lbl">${isZh?"加班":"Lembur"}${pp.otDeductTotal?`<br><span style="color:var(--red);font-size:8px">-${pp.otDeductTotal}h ${isZh?"扣除":"potong"}</span>`:""}${pp.typhoonOtDed?`<br><span style="color:#0288d1;font-size:8px">🌀 -${pp.typhoonOtDed}h ${isZh?"颱風":"topan"}</span>`:""}</div></div>
     </div>
     <div class="pay-dates">
       <div class="pay-date-item"><span class="pay-date-icon">💰</span><span>${pay5}</span></div>
@@ -608,24 +613,43 @@ function calcSalaryEst(y,m){
   if(!pp||!rot())return null;
   const baseSum=SAL.base+SAL.meal+SAL.transport+SAL.position;
   const hourly=baseSum/240;
-  // 走訪期間統計晚班數與病假時數
-  let nightCount=0,sickH=0;
+  const sh=rot().h;
+  // 班內隱含加班 = sh - 8（12h 班 = 4h，對半 2h前/2h後）
+  const dailyOT=Math.max(0,sh-8);
+  const dailyFront=dailyOT/2,dailyBack=dailyOT/2;
+  // 走訪期間統計晚班數、病假時數、前後段加班扣減
+  let nightCount=0,sickH=0,frontDed=0,backDed=0,tyFront=0,tyBack=0;
   for(let dt=new Date(pp.sd);dt<=pp.ed;dt.setDate(dt.getDate()+1)){
     const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate();
     const s=gs(cy,cm,cd);
     if(s==="晚")nightCount++;
+    // 請假按假別分配前後扣減
     const dayLeaves=getLeaves(ek(cy,cm,cd));
     dayLeaves.forEach(l=>{
-      if(l.uid===(fbUser&&fbUser.uid)&&l.leaveType==="sick")sickH+=l.hours||0;
+      if(l.uid===(fbUser&&fbUser.uid)){
+        if(l.leaveType==="sick")sickH+=l.hours||0;
+        const hrs=l.hours||0;
+        const lt=getLT(l.leaveType);
+        const dp8=lt&&lt.otDeduct!==undefined?lt.otDeduct:4;
+        const totalDed=(hrs/8)*dp8;
+        // 規則：整日請假類（otDeduct>=4）對半扣前後；半日類（otDeduct<4，如病假 2）只扣後段
+        if(dp8>=4){frontDed+=totalDed/2;backDed+=totalDed/2}
+        else backDed+=totalDed;
+      }
     });
+    // 颱風假按比例扣前後（跟特休同邏輯，對半）
+    const tyHours=TYD[ek(cy,cm,cd)]||0;
+    if(tyHours&&s&&s!=="休"){
+      const tyDed=(tyHours/sh)*dailyOT;
+      tyFront+=tyDed/2;tyBack+=tyDed/2;
+    }
   }
-  const otH=pp.oH;
-  // 加班費分段：oH 對半拆，前半 ×1.34、後半 ×1.67
-  const otHalf=otH/2;
-  const otPay1=otHalf*hourly*SAL.otTier1Rate;
-  const otPay2=otHalf*hourly*SAL.otTier2Rate;
-  const otPay=otPay1+otPay2;
-  // 免稅 46h 切點
+  // 前後段加班時數
+  const totalFront=Math.max(0,pp.wd*dailyFront-frontDed-tyFront);
+  const totalBack=Math.max(0,pp.wd*dailyBack-backDed-tyBack);
+  const otH=totalFront+totalBack;
+  const otPay=totalFront*hourly*SAL.otTier1Rate+totalBack*hourly*SAL.otTier2Rate;
+  // 免稅 46h 切點（按金額比例）
   let otTaxFree=otPay,otTaxable=0;
   if(otH>SAL.otTaxFreeH){
     const r=SAL.otTaxFreeH/otH;
@@ -639,7 +663,7 @@ function calcSalaryEst(y,m){
   const net=income-deduction;
   return{
     hourly,baseSum,nightCount,sickH,otH,otPay,otTaxFree,otTaxable,nightPay,sickDed,
-    income,deduction,fixedDed,net
+    income,deduction,fixedDed,net,totalFront,totalBack
   };
 }
 
