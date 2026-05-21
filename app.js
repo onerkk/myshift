@@ -95,7 +95,7 @@ let _loading=false;
 function cloudSave(force){
   if(!fbUser||(!force&&_loading))return Promise.resolve();
   return fsEnqueue(async()=>{
-    const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",displayName:fbUser.displayName||"",email:fbUser.email||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};
+    const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",displayName:fbUser.displayName||"",email:fbUser.email||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),tyd:JSON.stringify(TYD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};
     if(JSON.stringify(NOTES)==='{}')delete payload.notes;
     await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true});
   },"cloudSave");
@@ -118,6 +118,12 @@ function cloudLoad(){
       try{
         AL=JSON.parse(typeof d.al==='string'?d.al:JSON.stringify(d.al));
         ALD=d.ald?JSON.parse(typeof d.ald==='string'?d.ald:JSON.stringify(d.ald)):{};
+      }catch(e){}
+    }
+    if(d.tyd){
+      try{
+        TYD=JSON.parse(typeof d.tyd==='string'?d.tyd:JSON.stringify(d.tyd));
+        localStorage.setItem("sb_tyd",JSON.stringify(TYD));
       }catch(e){}
     }
     if(d.notes){
@@ -312,7 +318,7 @@ zh:{app:"我的班表",sub:"My Shift",desc:"選擇輪班制度，三步自動排
   早:"早班",晚:"晚班",中:"中班",休:"休假",workD:"上班",
   reqH:"應上班",totalH:"總工時",otH:"加班",alRem:"特休剩餘",
   rem:"🔔 本月提醒",mark:"標記事項",alarm:"⏰ 設鬧鐘",done:"完成",
-  meeting:"班股會議",health:"體檢","class":"上課",biztrip:"公出",pay:"發薪日",annualL:"特休",custom:"自訂備註",
+  meeting:"班股會議",health:"體檢","class":"上課",biztrip:"公出",pay:"發薪日",annualL:"特休",custom:"自訂備註",typhoon:"颱風假",
   alPick:"使用特休時數",hr:"小時",alSetup:"🌴 特休設定（選填）",alTotal:"總時數",alUsed:"已使用",alSkip:"可跳過",
   instT:"安裝到主畫面",instS:"一鍵安裝",instSi:"Safari→分享→加入主畫面",instB:"安裝",
   aSet:"✅ 鬧鐘：#m#/#d# 07:00\n⚠️ 需保持瀏覽器開啟",aNow:"✅ 已提醒！",aBlock:"通知被封鎖",aNoPerm:"需開啟通知",aNo:"不支援通知",sRem:"班表提醒",
@@ -325,7 +331,7 @@ id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis seta
   早:"Pagi",晚:"Malam",中:"Siang",休:"Libur",workD:"Kerja",
   reqH:"Jam Wajib",totalH:"Total",otH:"Lembur",alRem:"Sisa Cuti",
   rem:"🔔 Pengingat",mark:"Tandai",alarm:"⏰ Alarm",done:"Selesai",
-  meeting:"Rapat",health:"Kesehatan","class":"Kelas",biztrip:"Dinas",pay:"Gajian",annualL:"Cuti",custom:"Catatan",
+  meeting:"Rapat",health:"Kesehatan","class":"Kelas",biztrip:"Dinas",pay:"Gajian",annualL:"Cuti",custom:"Catatan",typhoon:"Libur Topan",
   alPick:"Jam cuti",hr:"jam",alSetup:"🌴 Cuti (opsional)",alTotal:"Total jam",alUsed:"Sudah pakai",alSkip:"Bisa dilewati",
   instT:"Pasang di HP",instS:"Satu klik",instSi:"Safari→Bagikan→Layar Utama",instB:"Pasang",
   aSet:"✅ Alarm: #m#/#d# 07:00",aNow:"✅ Terkirim!",aBlock:"Diblokir",aNoPerm:"Perlu izin",aNo:"Tidak mendukung",sRem:"Pengingat",
@@ -398,8 +404,8 @@ const TW_OFF_Y={
 const TW_OFF_DEFAULT=new Set(["01-01","02-28","04-04","04-05","05-01","09-25","09-28","10-10","10-25","12-25"]);
 function isTWOff(y,m,d){const s=TW_OFF_Y[y]||TW_OFF_DEFAULT;return s.has(hk(m,d))}
 function getPayDay(y,m,base){let d=new Date(y,m-1,base);for(let i=0;i<10;i++){const dw=d.getDay();if(dw!==0&&dw!==6&&!isTWOff(d.getFullYear(),d.getMonth()+1,d.getDate()))break;d.setDate(d.getDate()-1)}return d.getDate()}
-const EI=["meeting","health","class","biztrip","pay","annualL","custom"];
-const EE={meeting:"📋",health:"🏥","class":"📚",biztrip:"🚗",pay:"💰",annualL:"🌴",custom:"📝"};
+const EI=["meeting","health","class","biztrip","pay","annualL","custom","typhoon"];
+const EE={meeting:"📋",health:"🏥","class":"📚",biztrip:"🚗",pay:"💰",annualL:"🌴",custom:"📝",typhoon:"🌀"};
 const NOW=new Date(),TY=NOW.getFullYear(),TM=NOW.getMonth()+1,TD=NOW.getDate(),TR=new Date(TY,TM-1,TD);
 const EPOCH=new Date(2024,0,1);
 const EPOCH_UTC=Date.UTC(2024,0,1);
@@ -474,6 +480,8 @@ let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb
 function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}_scheduleCloudSave()}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
 let ALD={};try{ALD=JSON.parse(localStorage.getItem("sb_ald"))||JSON.parse(gCk("sb_ald"))||{}}catch(e){}
+let TYD={};try{TYD=JSON.parse(localStorage.getItem("sb_tyd"))||JSON.parse(gCk("sb_tyd"))||{}}catch(e){}
+function sTYD(){const d=JSON.stringify(TYD);try{localStorage.setItem("sb_tyd",d)}catch(e){}try{sCk("sb_tyd",d,3650)}catch(e){}_scheduleCloudSave()}
 let AL_RESET_TS={};try{AL_RESET_TS=JSON.parse(localStorage.getItem("sb_al_reset"))||{}}catch(e){}
 let NOTES={};try{NOTES=JSON.parse(localStorage.getItem("sb_notes"))||JSON.parse(gCk("sb_notes"))||{}}catch(e){}
 
@@ -531,7 +539,7 @@ function calcOT(y,m,wd,sh){const dm=dim(y,m);let wdays=0;for(let d=1;d<=dm;d++){
 function calcPayPeriod(y,m){
   const pm=m===1?12:m-1,py=m===1?y-1:y;
   const sd=new Date(py,pm-1,26),ed=new Date(y,m-1,25);
-  let wd=0,tH=0,leaveH=0,otDeductTotal=0;
+  let wd=0,tH=0,leaveH=0,otDeductTotal=0,typhoonH=0,typhoonOtDed=0;
   for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
     const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate();
     const s=gs(cy,cm,cd);
@@ -546,9 +554,12 @@ function calcPayPeriod(y,m){
         otDeductTotal+=(hrs/8)*deductPer8;
       }
     });
+    // 颱風假時數（同 otDeduct=4 邏輯，跟特休一樣的加班扣減比例）
+    const tyHours=TYD[ek(cy,cm,cd)]||0;
+    if(tyHours&&s&&s!=="休"){typhoonH+=tyHours;typhoonOtDed+=(tyHours/8)*4}
   }
-  const r=rot();if(!r)return{sd,ed,wd,tH:0,oH:0,rH:0,sh:12,leaveH:0,otDeductTotal:0};
-  const sh=r.h;tH=wd*sh;
+  const r=rot();if(!r)return{sd,ed,wd,tH:0,oH:0,rH:0,sh:12,leaveH:0,otDeductTotal:0,typhoonH:0};
+  const sh=r.h;tH=Math.max(0,wd*sh-typhoonH);
   let wdays=0,hwd=0;
   for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
     const dw=dt.getDay(),cm=dt.getMonth()+1,cd=dt.getDate();
@@ -556,9 +567,9 @@ function calcPayPeriod(y,m){
     if(dw>=1&&dw<=5&&isTWOff(dt.getFullYear(),cm,cd))hwd++;
   }
   const rH=(wdays-hwd)*8;
-  const rawOH=sh===12?wd*4:Math.max(0,tH-rH);
-  const oH=Math.max(0,rawOH-otDeductTotal);
-  return{sd,ed,wd,tH,oH,rH,sh,leaveH,otDeductTotal};
+  const rawOH=sh===12?wd*4:Math.max(0,wd*sh-rH);
+  const oH=Math.max(0,rawOH-otDeductTotal-typhoonOtDed);
+  return{sd,ed,wd,tH,oH,rH,sh,leaveH,otDeductTotal,typhoonH};
 }
 function payCardHtml(y,m){
   const pp=calcPayPeriod(y,m);
@@ -574,7 +585,7 @@ function payCardHtml(y,m){
     <div class="pay-grid">
       <div class="pay-stat"><div class="pay-stat-val">${pp.wd}</div><div class="pay-stat-lbl">${isZh?"出勤日":"Hari Kerja"}</div></div>
       <div class="pay-stat"><div class="pay-stat-val">${pp.tH}h</div><div class="pay-stat-lbl">${isZh?"總工時":"Total Jam"}</div></div>
-      <div class="pay-stat"><div class="pay-stat-val ot-val">${pp.oH}h</div><div class="pay-stat-lbl">${isZh?"加班":"Lembur"}${pp.otDeductTotal?`<br><span style="color:var(--red);font-size:8px">-${pp.otDeductTotal}h ${isZh?"扣除":"potong"}</span>`:""}</div></div>
+      <div class="pay-stat"><div class="pay-stat-val ot-val">${pp.oH}h</div><div class="pay-stat-lbl">${isZh?"加班":"Lembur"}${pp.otDeductTotal?`<br><span style="color:var(--red);font-size:8px">-${pp.otDeductTotal}h ${isZh?"扣除":"potong"}</span>`:""}${pp.typhoonH?`<br><span style="color:#0288d1;font-size:8px">🌀 -${pp.typhoonH}h</span>`:""}</div></div>
     </div>
     <div class="pay-dates">
       <div class="pay-date-item"><span class="pay-date-icon">💰</span><span>${pay5}</span></div>
@@ -825,7 +836,7 @@ function rCal(){
   if(adParts.length)holH+=`<div class="hol-strip" style="background:rgba(198,40,40,.06);border-left-color:var(--red);color:var(--red)">📢 ${adParts.join("　")}</div>`;
   if(lvParts.length)holH+=`<div class="hol-strip" style="background:var(--amber-l);border-left-color:var(--amber);color:#b36b00;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px">📋 ${lvParts.map(p=>`<span style="white-space:nowrap">${p}</span>`).join("")}</div>`;
   const rems=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const evs=EVS[ek(y,m,d)];if(evs&&evs.length){const s=gs(y,m,d),dw=new Date(y,m-1,d).getDay();evs.forEach(eid=>rems.push({d,dw,shift:sf(s),eid}))}}
-  let remH="";if(rems.length){remH=`<div class="rem-sec"><div class="rem-title">${t("rem")}</div><div class="rem-list">${rems.map(r=>{const nm=r.eid==="custom"&&NOTES[ek(y,m,r.d)]?esc(NOTES[ek(y,m,r.d)]):en(r.eid);return`<div class="rem-item" data-a="open" data-d="${r.d}"><div class="rem-date"><div class="d">${r.d}</div><div class="w">${WK[r.dw]}</div></div><div class="rem-info"><div class="rem-name">${nm}</div><div class="rem-shift">${r.shift}</div></div><div style="font-size:16px">${EE[r.eid]||"📌"}</div></div>`}).join("")}</div></div>`}
+  let remH="";if(rems.length){remH=`<div class="rem-sec"><div class="rem-title">${t("rem")}</div><div class="rem-list">${rems.map(r=>{const nm=r.eid==="custom"&&NOTES[ek(y,m,r.d)]?esc(NOTES[ek(y,m,r.d)]):r.eid==="typhoon"&&TYD[ek(y,m,r.d)]?`${en(r.eid)} ${TYD[ek(y,m,r.d)]}h`:en(r.eid);return`<div class="rem-item" data-a="open" data-d="${r.d}"><div class="rem-date"><div class="d">${r.d}</div><div class="w">${WK[r.dw]}</div></div><div class="rem-info"><div class="rem-name">${nm}</div><div class="rem-shift">${r.shift}</div></div><div style="font-size:16px">${EE[r.eid]||"📌"}</div></div>`}).join("")}</div></div>`}
   let chips=Object.entries(st).map(([s,n])=>`<div class="dash-item"><div class="dash-val ${SC[s]}">${n}</div><div class="dash-lbl">${sf(s)}</div></div>`).join("");
   chips+=`<div class="dash-item"><div class="dash-val w">${wk}</div><div class="dash-lbl">${t("workD")}</div></div>`;
   const hH="";
@@ -927,8 +938,10 @@ function rMod(){
   let alP="";if(hasAL){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayAL?' selected':''}>${h} ${t("hr")}</option>`}alP=`<div class="al-pick"><label>🌴 ${t("alPick")} (${t("alRem")}: ${alRem()}${t("hr")})</label><select id="alSel" data-a="alh">${opts}</select></div>`}
   const hasCust=ev.includes("custom");const custTxt=NOTES[ek(y,m,d)]||"";
   let custP="";if(hasCust){custP=`<div class="al-pick" style="border-color:var(--pri)"><label>📝 ${lang==="zh"?"備註內容":"Isi catatan"}</label><input type="text" id="custIn" value="${esc(custTxt)}" placeholder="${lang==="zh"?"輸入備註...":"Tulis catatan..."}" maxlength="50" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:4px" oninput="NOTES['${ek(y,m,d)}']=this.value;sNotes()"></div>`}
+  const hasTy=ev.includes("typhoon");const dayTy=TYD[ek(y,m,d)]||0;
+  let tyP="";if(hasTy){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayTy?' selected':''}>${h} ${t("hr")}</option>`}tyP=`<div class="al-pick" style="border-color:#0288d1;background:rgba(2,136,209,.05)"><label style="color:#01579b">🌀 ${lang==="zh"?"颱風假時數":"Jam Libur Topan"}</label><select id="tySel" data-a="tyh" style="margin-top:4px">${opts}</select><div style="font-size:10px;color:var(--tx3);margin-top:4px;line-height:1.4">${lang==="zh"?"依公告自行換算：整日停班=12h、下午停班=6h 等。會自動扣減當月應出勤與加班時數。":"Sesuai pengumuman: seharian=12h, sore=6h, dll."}</div></div>`}
   return`<div class="modal-bg" data-a="close"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
-  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${custP}
+  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${tyP}${custP}
   <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
 
 function fbBarHtml(){
@@ -1259,8 +1272,9 @@ function handle(e){
     case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);_scheduleCloudSave();break;
     case "lid":lang="id";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);_scheduleCloudSave();break;
     case "lang":lang=lang==="zh"?"id":"zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);_scheduleCloudSave();break;
-    case "tev":{const{y,m,d}=S.modal;const k=ek(y,m,d),eid=el.dataset.eid;if(!EVS[k])EVS[k]=[];const i=EVS[k].indexOf(eid);if(i>=0){EVS[k].splice(i,1);if(eid==="annualL")delete ALD[k];if(eid==="custom"){delete NOTES[k];sNotes()}}else{EVS[k].push(eid);if(eid==="annualL"&&!ALD[k])ALD[k]=4}if(!EVS[k].length)delete EVS[k];sEv();sAL();break}
+    case "tev":{const{y,m,d}=S.modal;const k=ek(y,m,d),eid=el.dataset.eid;if(!EVS[k])EVS[k]=[];const i=EVS[k].indexOf(eid);if(i>=0){EVS[k].splice(i,1);if(eid==="annualL")delete ALD[k];if(eid==="typhoon"){delete TYD[k];sTYD()}if(eid==="custom"){delete NOTES[k];sNotes()}}else{EVS[k].push(eid);if(eid==="annualL"&&!ALD[k])ALD[k]=4;if(eid==="typhoon"&&!TYD[k]){TYD[k]=12;sTYD()}}if(!EVS[k].length)delete EVS[k];sEv();sAL();break}
     case "alh":{const{y,m,d}=S.modal;const sel=document.getElementById("alSel");if(sel)ALD[ek(y,m,d)]=parseFloat(sel.value);sAL();return}
+    case "tyh":{const{y,m,d}=S.modal;const sel=document.getElementById("tySel");if(sel)TYD[ek(y,m,d)]=parseFloat(sel.value);sTYD();return}
     case "inst":if(DP){DP.prompt();DP.userChoice.then(()=>{DP=null;render()})}break;
     case "hideI":S.instH=true;break;
     case "alEdit":{
