@@ -304,6 +304,7 @@ const IMG={icon:"./images/icon.png",early:"./images/early.png",night:"./images/n
 
 const SI={"早":IMG.early,"晚":IMG.night,"中":IMG.mid,"休":IMG.off};
 const SC={"早":"e","晚":"n","中":"m","休":"o"};
+const SE={"早":"🌅","晚":"🌙","中":"☀️","休":"🏠"};
 const L={
 zh:{app:"我的班表",sub:"My Shift",desc:"選擇輪班制度，三步自動排整年",s12:"12小時制",s8:"8小時制",cyc:"天循環",
   today:"今天",reset:"重設",help:"說明",lang:"ID",work:"上班",off:"休假",
@@ -316,7 +317,7 @@ zh:{app:"我的班表",sub:"My Shift",desc:"選擇輪班制度，三步自動排
   instT:"安裝到主畫面",instS:"一鍵安裝",instSi:"Safari→分享→加入主畫面",instB:"安裝",
   aSet:"✅ 鬧鐘：#m#/#d# 07:00\n⚠️ 需保持瀏覽器開啟",aNow:"✅ 已提醒！",aBlock:"通知被封鎖",aNoPerm:"需開啟通知",aNo:"不支援通知",sRem:"班表提醒",
   helpT:"📖 使用說明",
-  h:["初始設定|首次使用回答三個問題（上班或休假→班別→第幾天），系統自動排出整年班表。若管理員已在後台鎖定你的輪班規則，只需設定今天是哪一班即可。","查看班表|左右箭頭切換月份，點「今天」立刻回到本月。每日格子以顏色區分：藍色＝早班、紫色＝晚班、黃色＝中班、灰色＝休假。點擊任一日期可查看詳情。","請假系統|點擊日期後可新增請假：選擇假別（事假、病假等，由管理員在後台設定）及時數，按確認送出。同單位同事可看到當天請假人數，管理員可查看詳細姓名與假別。已請的假可隨時取消。","標記事項|每日可標記：📚上課、🚗公出、💰發薪日、🌴特休，還可新增自訂文字備註。管理員可額外設定📋班股會議與🏥體檢日期，設定後全體使用者可見。","特休管理|在設定頁面輸入年度特休總時數與已使用時數（0.5小時為單位）。日曆上勾選特休的日期會自動扣除並計算剩餘時數，方便掌握特休額度。","統計功能|點擊「統計」按鈕查看年度出勤統計：各班別天數、加班時數、請假時數等。12小時制每日4小時加班；8小時制超出部分計為加班。國定假日出勤自動扣除。","天氣與降雨提醒|自動偵測位置顯示7日天氣預報，點選可看逐時詳情（溫度、降雨機率、風速、濕度）。上班日出門時段若降雨≥40%自動提醒帶雨具。搭配四季動態效果（春花蝶舞、夏夜螢火、秋楓飄落、冬霜結晶）與環境音效。","潮汐預報|自動偵測位置，顯示最近海岸測站的7日潮汐（滿潮/乾潮時間與潮位）。點選可查看當日逐時詳細資料，資料來源為中央氣象署。","雲端同步|登入 Google 帳號後，班表設定、標記事項、請假紀錄、備註全部自動同步至雲端。更換手機或清除資料後重新登入即可完整恢復，無需備份碼。","單位與輪班管理|管理員可在後台建立單位與多種輪班規則（如四休二、兩早兩晚循環等），並鎖定使用者的單位和輪班類型。鎖定後使用者無法自行更改，確保全員資料一致。","薪資日提醒|每月5日發放薪資（💰），每月20日發放績效獎金（🏆）。遇國定假日或週末自動提前至前一個工作日，日曆上直接標示實際發放日期。","節慶與假日|自動顯示台灣國定假日（含補假）與印尼節慶，假日以紅色頂部標線標示。語言隨中文/印尼文切換自動翻譯。","安裝到桌面|底部安裝按鈕可將 App 加到手機桌面，如同原生 App 全螢幕使用。右上角可切換中文/印尼文。iOS 請用 Safari 開啟後「分享→加入主畫面」。","分享班表|點擊「分享」按鈕可產生當月班表圖片，包含班別、假日、標記等完整資訊，方便傳送給同事或家人。"],
+  h:["初始設定|首次使用回答三個問題（上班或休假→班別→第幾天），系統自動排出整年班表。若管理員已在後台鎖定你的輪班規則，只需設定今天是哪一班即可。","查看班表|左右箭頭切換月份，點「今天」立刻回到本月。每日格子以顏色區分：藍色＝早班、紫色＝晚班、黃色＝中班、灰色＝休假。點擊任一日期可查看詳情。","請假系統|點擊日期後可新增請假：選擇假別（事假、病假等，由管理員在後台設定）及時數，按確認送出。同單位同事可看到當天請假人數，管理員可查看詳細姓名與假別。已請的假可隨時取消。","標記事項|每日可標記：📚上課、🚗公出、💰發薪日、🌴特休，還可新增自訂文字備註。管理員可額外設定📋班股會議與🏥體檢日期，設定後全體使用者可見。","特休管理|在設定頁面輸入年度特休總時數與已使用時數（0.5小時為單位）。日曆上勾選特休的日期會自動扣除並計算剩餘時數，方便掌握特休額度。","統計功能|點擊「統計」按鈕查看年度出勤統計：各班別天數、加班時數、請假時數等。12小時制每日4小時加班；8小時制超出部分計為加班。國定假日出勤自動扣除。","天氣與降雨提醒|自動偵測位置顯示7日天氣預報，點選可看逐時詳情（溫度、降雨機率、風速、濕度）。上班日出門時段若降雨≥40%自動提醒帶雨具。搭配四季動態效果（春花蝶舞、夏夜螢火、秋楓飄落、冬霜結晶）與環境音效。","潮汐預報|自動偵測位置，顯示最近海岸測站的7日潮汐（滿潮/乾潮時間與潮位）。點選可查看當日逐時詳細資料，資料來源為中央氣象署。","雲端同步|登入 Google 帳號後，班表設定、標記事項、請假紀錄、備註全部自動同步至雲端。更換手機或清除資料後重新登入即可完整恢復，無需備份碼。","單位與輪班管理|管理員可在後台建立單位與多種輪班規則（如四休二、兩早兩晚循環等），並鎖定使用者的單位和輪班類型。鎖定後使用者無法自行更改，確保全員資料一致。","薪資日提醒|每月5日發放薪資（💰），每月20日發放績效獎金（🏆）。遇國定假日或週末自動提前至前一個工作日，日曆上直接標示實際發放日期。","節慶與假日|自動顯示台灣國定假日（含補假）與印尼節慶，假日以紅色頂部標線標示。語言隨中文/印尼文切換自動翻譯。","安裝到桌面|底部安裝按鈕可將 App 加到手機桌面，如同原生 App 全螢幕使用。右上角可切換中文/印尼文。iOS 請用 Safari 開啟後「分享→加入主畫面」。","分享班表|點擊「分享」按鈕可產生當月班表圖片，包含班別、假日、標記等完整資訊，方便傳送給同事或家人。","桌面今日捷徑|想不開 app 一眼看今天什麼班？在瀏覽器網址列把 ?w=1 加在網址結尾（例：…/myshift/?w=1），打開後選「加入主畫面」，命名為「今日班別」。從此桌面上會多一個專屬捷徑，點開就是巨型今日班別顯示，完全離線、秒開。"],
   wk:["日","一","二","三","四","五","六"]},
 id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis setahun",s12:"12 jam",s8:"8 jam",cyc:"hari",
   today:"Hari ini",reset:"Reset",help:"Info",lang:"ZH",work:"Kerja",off:"Libur",
@@ -329,7 +330,7 @@ id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis seta
   instT:"Pasang di HP",instS:"Satu klik",instSi:"Safari→Bagikan→Layar Utama",instB:"Pasang",
   aSet:"✅ Alarm: #m#/#d# 07:00",aNow:"✅ Terkirim!",aBlock:"Diblokir",aNoPerm:"Perlu izin",aNo:"Tidak mendukung",sRem:"Pengingat",
   helpT:"📖 Panduan",
-  h:["Pengaturan Awal|Jawab 3 pertanyaan (kerja/libur → shift → hari ke-berapa), jadwal setahun otomatis dibuat. Jika admin sudah mengunci aturan shift Anda, cukup pilih hari ini shift apa.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, ketuk 'Hari ini' untuk kembali. Warna: biru=pagi, ungu=malam, kuning=siang, abu=libur. Ketuk tanggal untuk detail.","Sistem Cuti|Ketuk tanggal lalu tambah cuti: pilih jenis (izin, sakit, dll diatur admin) dan jam, lalu konfirmasi. Rekan satu unit bisa lihat jumlah cuti hari itu. Admin bisa lihat nama dan detail. Cuti bisa dibatalkan kapan saja.","Tandai Acara|Tandai harian: 📚Kelas, 🚗Dinas, 💰Gajian, 🌴Cuti, catatan teks. Admin bisa set 📋Rapat & 🏥Kesehatan untuk semua user.","Kelola Cuti Tahunan|Atur total jam cuti dan jam terpakai (per 0.5 jam). Tanggal yang ditandai cuti otomatis dikurangi dan sisa dihitung.","Statistik|Ketuk 'Stat' untuk lihat statistik tahunan: jumlah hari per shift, jam lembur, jam cuti. 12 jam: 4 jam lembur/hari. 8 jam: kelebihan dihitung lembur. Libur nasional otomatis dikurangi.","Cuaca & Peringatan Hujan|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Ketuk untuk detail per jam (suhu, hujan, angin, kelembaban). Peringatan bawa payung jika hujan ≥40%. Efek visual 4 musim (bunga, kunang-kunang, daun maple, kristal es) dan suara ambient.","Pasang Surut|Deteksi lokasi otomatis, tampilkan pasang surut 7 hari dari stasiun pantai terdekat. Ketuk untuk detail harian. Sumber: CWA Taiwan.","Sinkronisasi Cloud|Login Google, semua pengaturan, catatan, cuti otomatis tersimpan di cloud. Ganti HP atau hapus data, login lagi untuk restore lengkap tanpa kode backup.","Unit & Aturan Shift|Admin bisa buat unit dan berbagai aturan shift (4 kerja 2 libur, 2 pagi 2 malam, dll) di panel admin. Bisa mengunci unit dan shift user agar tidak bisa diubah sendiri.","Pengingat Gaji|Gaji tanggal 5 (💰), bonus tanggal 20 (🏆). Jika jatuh di hari libur/weekend, dimajukan ke hari kerja sebelumnya. Ditandai langsung di kalender.","Hari Libur|Hari libur Taiwan (termasuk pengganti) & Indonesia ditampilkan dengan garis merah di atas. Terjemahan otomatis sesuai bahasa 中/ID.","Install ke Layar|Tombol install di bawah untuk tambah App ke layar HP seperti app asli. Ganti bahasa 中/ID di kanan atas. iOS: buka di Safari → Share → Add to Home Screen.","Bagikan Jadwal|Ketuk 'Share' untuk buat gambar jadwal bulan ini lengkap dengan shift, libur, dan catatan. Mudah dikirim ke teman atau keluarga."],
+  h:["Pengaturan Awal|Jawab 3 pertanyaan (kerja/libur → shift → hari ke-berapa), jadwal setahun otomatis dibuat. Jika admin sudah mengunci aturan shift Anda, cukup pilih hari ini shift apa.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, ketuk 'Hari ini' untuk kembali. Warna: biru=pagi, ungu=malam, kuning=siang, abu=libur. Ketuk tanggal untuk detail.","Sistem Cuti|Ketuk tanggal lalu tambah cuti: pilih jenis (izin, sakit, dll diatur admin) dan jam, lalu konfirmasi. Rekan satu unit bisa lihat jumlah cuti hari itu. Admin bisa lihat nama dan detail. Cuti bisa dibatalkan kapan saja.","Tandai Acara|Tandai harian: 📚Kelas, 🚗Dinas, 💰Gajian, 🌴Cuti, catatan teks. Admin bisa set 📋Rapat & 🏥Kesehatan untuk semua user.","Kelola Cuti Tahunan|Atur total jam cuti dan jam terpakai (per 0.5 jam). Tanggal yang ditandai cuti otomatis dikurangi dan sisa dihitung.","Statistik|Ketuk 'Stat' untuk lihat statistik tahunan: jumlah hari per shift, jam lembur, jam cuti. 12 jam: 4 jam lembur/hari. 8 jam: kelebihan dihitung lembur. Libur nasional otomatis dikurangi.","Cuaca & Peringatan Hujan|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Ketuk untuk detail per jam (suhu, hujan, angin, kelembaban). Peringatan bawa payung jika hujan ≥40%. Efek visual 4 musim (bunga, kunang-kunang, daun maple, kristal es) dan suara ambient.","Pasang Surut|Deteksi lokasi otomatis, tampilkan pasang surut 7 hari dari stasiun pantai terdekat. Ketuk untuk detail harian. Sumber: CWA Taiwan.","Sinkronisasi Cloud|Login Google, semua pengaturan, catatan, cuti otomatis tersimpan di cloud. Ganti HP atau hapus data, login lagi untuk restore lengkap tanpa kode backup.","Unit & Aturan Shift|Admin bisa buat unit dan berbagai aturan shift (4 kerja 2 libur, 2 pagi 2 malam, dll) di panel admin. Bisa mengunci unit dan shift user agar tidak bisa diubah sendiri.","Pengingat Gaji|Gaji tanggal 5 (💰), bonus tanggal 20 (🏆). Jika jatuh di hari libur/weekend, dimajukan ke hari kerja sebelumnya. Ditandai langsung di kalender.","Hari Libur|Hari libur Taiwan (termasuk pengganti) & Indonesia ditampilkan dengan garis merah di atas. Terjemahan otomatis sesuai bahasa 中/ID.","Install ke Layar|Tombol install di bawah untuk tambah App ke layar HP seperti app asli. Ganti bahasa 中/ID di kanan atas. iOS: buka di Safari → Share → Add to Home Screen.","Bagikan Jadwal|Ketuk 'Share' untuk buat gambar jadwal bulan ini lengkap dengan shift, libur, dan catatan. Mudah dikirim ke teman atau keluarga.","Pintasan Hari Ini|Mau lihat shift hari ini tanpa buka app? Di browser, tambahkan ?w=1 di akhir URL (misalnya: …/myshift/?w=1), lalu pilih 'Add to Home Screen', beri nama 'Shift Hari Ini'. Akan ada pintasan baru di layar HP — buka langsung shift hari ini ukuran besar, offline, instan."],
   wk:["Min","Sen","Sel","Rab","Kam","Jum","Sab"]}
 };
 let RN={zh:{"4on2off":"做4休2","2on2off":"做2休2"},id:{"4on2off":"4K 2L","2on2off":"2K 2L"}};
@@ -468,13 +469,26 @@ function saveAppConfig(){
     ts:firebase.firestore.FieldValue.serverTimestamp()
   },{merge:true}),"saveCfg").catch(e=>console.log("saveCfg err",e));
 }
-let S={step:"type",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false,unit:"",lockedUnit:"",lockedRt:""};
+let S={step:"type",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false,unit:"",lockedUnit:"",lockedRt:"",showSal:false};
 let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb_ev"))||{}}catch(e){}
 function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}_scheduleCloudSave()}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
 let ALD={};try{ALD=JSON.parse(localStorage.getItem("sb_ald"))||JSON.parse(gCk("sb_ald"))||{}}catch(e){}
 let AL_RESET_TS={};try{AL_RESET_TS=JSON.parse(localStorage.getItem("sb_al_reset"))||{}}catch(e){}
 let NOTES={};try{NOTES=JSON.parse(localStorage.getItem("sb_notes"))||JSON.parse(gCk("sb_notes"))||{}}catch(e){}
+
+// ═══════════════════════════════════════════════════════════════
+// 薪資模組（純本地儲存，不雲端同步）
+// ═══════════════════════════════════════════════════════════════
+const SAL_DEFAULT={
+  base:0,meal:0,transport:0,position:0,night:0,
+  union:0,welfare:0,laborIns:0,healthIns:0,otherDed:0,
+  otTier1Rate:1.34,otTier2Rate:1.67,otTaxFreeH:46,sickRate:0.5,
+  enabled:false
+};
+let SAL={};
+try{const s=localStorage.getItem("sb_sal");SAL=Object.assign({},SAL_DEFAULT,s?JSON.parse(s):{})}catch(e){SAL=Object.assign({},SAL_DEFAULT)}
+function sSAL(){try{localStorage.setItem("sb_sal",JSON.stringify(SAL))}catch(e){}}
 function sNotes(){const d=JSON.stringify(NOTES);try{localStorage.setItem("sb_notes",d)}catch(e){}try{sCk("sb_notes",d,3650)}catch(e){}_scheduleCloudSave()}
 function alYear(y,m,d){return(m>12||(m===12&&d>=26))?y:y-1}
 function curALY(){return alYear(TY,TM,TD)}
@@ -568,6 +582,159 @@ function payCardHtml(y,m){
     </div>
   </div>`;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 薪資預估計算（用 SAL 設定 + calcPayPeriod 資料）
+// 公式：時薪=(本俸+伙食+交通+崗位)/240
+//       加班費=oH/2 × 時薪 × 前段倍率 + oH/2 × 時薪 × 後段倍率
+//       免稅切點 = otTaxFreeH (預設 46h)
+//       夜點費 = 期間晚班數 × 每次夜點費
+//       病假扣薪 = 病假時數 × 時薪 × 病假倍率(預設 0.5 半薪)
+// ═══════════════════════════════════════════════════════════════
+function calcSalaryEst(y,m){
+  if(!SAL.enabled||!SAL.base)return null;
+  const pp=calcPayPeriod(y,m);
+  if(!pp||!rot())return null;
+  const baseSum=SAL.base+SAL.meal+SAL.transport+SAL.position;
+  const hourly=baseSum/240;
+  // 走訪期間統計晚班數與病假時數
+  let nightCount=0,sickH=0;
+  for(let dt=new Date(pp.sd);dt<=pp.ed;dt.setDate(dt.getDate()+1)){
+    const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate();
+    const s=gs(cy,cm,cd);
+    if(s==="晚")nightCount++;
+    const dayLeaves=getLeaves(ek(cy,cm,cd));
+    dayLeaves.forEach(l=>{
+      if(l.uid===(fbUser&&fbUser.uid)&&l.leaveType==="sick")sickH+=l.hours||0;
+    });
+  }
+  const otH=pp.oH;
+  // 加班費分段：oH 對半拆，前半 ×1.34、後半 ×1.67
+  const otHalf=otH/2;
+  const otPay1=otHalf*hourly*SAL.otTier1Rate;
+  const otPay2=otHalf*hourly*SAL.otTier2Rate;
+  const otPay=otPay1+otPay2;
+  // 免稅 46h 切點
+  let otTaxFree=otPay,otTaxable=0;
+  if(otH>SAL.otTaxFreeH){
+    const r=SAL.otTaxFreeH/otH;
+    otTaxFree=otPay*r;otTaxable=otPay-otTaxFree;
+  }
+  const nightPay=nightCount*SAL.night;
+  const sickDed=Math.round(sickH*hourly*SAL.sickRate);
+  const income=Math.round(baseSum+otPay+nightPay);
+  const fixedDed=SAL.union+SAL.welfare+SAL.laborIns+SAL.healthIns+SAL.otherDed;
+  const deduction=fixedDed+sickDed;
+  const net=income-deduction;
+  return{
+    hourly,baseSum,nightCount,sickH,otH,otPay,otTaxFree,otTaxable,nightPay,sickDed,
+    income,deduction,fixedDed,net
+  };
+}
+
+function salaryEstHtml(y,m){
+  if(!rot())return"";
+  const isZh=lang==="zh";
+  // 未設定 → 顯示 CTA
+  if(!SAL.enabled||!SAL.base){
+    return`<div class="sal-card fi" data-a="salOpen" style="cursor:pointer;background:linear-gradient(135deg,#fff8e1,#fff3e0);border:1.5px solid #ffb300;border-radius:12px;padding:14px;margin:0 0 6px;text-align:center">
+      <div style="font-size:13px;font-weight:700;color:#e65100;margin-bottom:4px">💰 ${isZh?"設定薪資 預估每月實領":"Atur gaji untuk estimasi"}</div>
+      <div style="font-size:11px;color:#995500">${isZh?"輸入薪資條欄位，自動估算實領金額":"Masukkan slip gaji, hitung otomatis"}</div>
+    </div>`;
+  }
+  const est=calcSalaryEst(y,m);
+  if(!est)return"";
+  const fmt=n=>"$"+Math.round(n).toLocaleString();
+  return`<div class="sal-card fi" style="background:#fff;border:1.5px solid #00897b;border-radius:12px;padding:14px;margin:0 0 6px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:#00695c">💰 ${isZh?"薪資預估":"Estimasi Gaji"}</div>
+      <button data-a="salOpen" style="background:transparent;border:none;font-size:14px;cursor:pointer;color:#00897b;padding:4px 6px">⚙️</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px dashed #e0e0e0">
+      <span style="font-size:12px;color:var(--tx2)">${isZh?"應領":"Pendapatan"}</span>
+      <span style="font-size:14px;font-weight:600;color:#1b5e20">${fmt(est.income)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px dashed #e0e0e0">
+      <span style="font-size:12px;color:var(--tx2)">${isZh?"應扣":"Potongan"}</span>
+      <span style="font-size:14px;font-weight:600;color:#b71c1c">${fmt(est.deduction)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 0 4px">
+      <span style="font-size:13px;font-weight:700;color:var(--tx)">${isZh?"預估實領":"Estimasi Bersih"}</span>
+      <span style="font-size:22px;font-weight:900;color:#00695c;letter-spacing:1px">${fmt(est.net)}</span>
+    </div>
+    <div style="font-size:10px;color:var(--tx3);text-align:right;margin-top:4px">${isZh?`時薪 $${est.hourly.toFixed(2)} · 加班 ${est.otH}h · 晚班 ${est.nightCount} 次`:`Per jam $${est.hourly.toFixed(2)}`}</div>
+    <details style="margin-top:10px;border-top:1px solid #eee;padding-top:8px">
+      <summary style="font-size:11px;color:var(--tx3);cursor:pointer;outline:none">${isZh?"明細拆解 ›":"Detail ›"}</summary>
+      <div style="font-size:11px;color:var(--tx2);margin-top:8px;line-height:1.8">
+        <div style="color:#00695c;font-weight:700;margin-bottom:2px">${isZh?"應領":"Pendapatan"}</div>
+        <div style="display:flex;justify-content:space-between"><span>　${isZh?"職能俸":"Pokok"}</span><span>${fmt(SAL.base)}</span></div>
+        ${SAL.meal?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"伙食津貼":"Makan"}</span><span>${fmt(SAL.meal)}</span></div>`:""}
+        ${SAL.transport?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"交通津貼":"Transport"}</span><span>${fmt(SAL.transport)}</span></div>`:""}
+        ${SAL.position?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"崗位津貼":"Posisi"}</span><span>${fmt(SAL.position)}</span></div>`:""}
+        ${est.otTaxFree>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"免稅加班費":"Lembur Bebas Pajak"}</span><span>${fmt(est.otTaxFree)}</span></div>`:""}
+        ${est.otTaxable>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"應稅加班費":"Lembur Pajak"}</span><span>${fmt(est.otTaxable)}</span></div>`:""}
+        ${est.nightPay>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"夜點費":"Tunjangan Malam"} (${est.nightCount}×)</span><span>${fmt(est.nightPay)}</span></div>`:""}
+        <div style="color:#b71c1c;font-weight:700;margin-top:6px;margin-bottom:2px">${isZh?"應扣":"Potongan"}</div>
+        ${SAL.union?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"工會會費":"Iuran Serikat"}</span><span>-${fmt(SAL.union)}</span></div>`:""}
+        ${SAL.welfare?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"福利金":"Kesejahteraan"}</span><span>-${fmt(SAL.welfare)}</span></div>`:""}
+        ${SAL.laborIns?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"勞保自付":"BPJS Tenaga Kerja"}</span><span>-${fmt(SAL.laborIns)}</span></div>`:""}
+        ${SAL.healthIns?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"健保自付":"BPJS Kesehatan"}</span><span>-${fmt(SAL.healthIns)}</span></div>`:""}
+        ${SAL.otherDed?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"其他固定扣款":"Potongan Lain"}</span><span>-${fmt(SAL.otherDed)}</span></div>`:""}
+        ${est.sickDed>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"病假扣薪":"Potongan Sakit"} (${est.sickH}h)</span><span>-${fmt(est.sickDed)}</span></div>`:""}
+      </div>
+    </details>
+    <div style="font-size:9px;color:var(--tx3);text-align:center;margin-top:8px;padding-top:6px;border-top:1px dashed #eee">⚠️ ${isZh?"僅供估算參考，實際以公司薪資條為準":"Estimasi saja, ikuti slip resmi"}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 薪資設定 Modal
+// ═══════════════════════════════════════════════════════════════
+function rSalary(){
+  const isZh=lang==="zh";
+  const num=(id,label,val,placeholder)=>`<div style="margin-bottom:10px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">${label}</label><input type="number" id="${id}" value="${val||""}" placeholder="${placeholder||"0"}" inputmode="numeric" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff"></div>`;
+  return`<div class="modal-bg" data-a="salClose"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()" style="max-width:480px"><div class="modal-handle"></div>
+    <div class="modal-title">💰 ${isZh?"薪資設定":"Atur Gaji"}</div>
+    <div style="background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:10px;margin:10px 0;font-size:11px;color:#e65100;line-height:1.6">
+      ⚠️ ${isZh?"資料僅儲存於本機，不上傳雲端。清除瀏覽器資料會遺失，建議拍照備份。":"Data hanya di HP, tidak ke cloud. Backup foto disarankan."}
+    </div>
+
+    <div style="background:rgba(0,150,136,.05);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:#00695c;margin-bottom:10px">📈 ${isZh?"應領項目":"Pendapatan"}</div>
+      ${num("sal_base",isZh?"職能俸（月薪本俸）":"Gaji Pokok",SAL.base,"34190")}
+      ${num("sal_meal",isZh?"伙食津貼":"Tunjangan Makan",SAL.meal,"3000")}
+      ${num("sal_transport",isZh?"交通津貼":"Transport",SAL.transport,"1000")}
+      ${num("sal_position",isZh?"崗位津貼":"Tunjangan Posisi",SAL.position,"500")}
+      ${num("sal_night",isZh?"夜點費（每次晚班）":"Tunjangan Malam / shift",SAL.night,"489")}
+    </div>
+
+    <div style="background:rgba(198,40,40,.04);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:#b71c1c;margin-bottom:10px">📉 ${isZh?"應扣項目（每月固定）":"Potongan Tetap"}</div>
+      ${num("sal_union",isZh?"工會會費":"Iuran Serikat",SAL.union,"85")}
+      ${num("sal_welfare",isZh?"福利金":"Kesejahteraan",SAL.welfare,"173")}
+      ${num("sal_laborIns",isZh?"勞保自付":"BPJS TK",SAL.laborIns,"1145")}
+      ${num("sal_healthIns",isZh?"健保自付":"BPJS Kes",SAL.healthIns,"1129")}
+      ${num("sal_otherDed",isZh?"其他固定扣款（員工信託等）":"Potongan Lain",SAL.otherDed,"3033")}
+    </div>
+
+    <div style="background:rgba(63,81,181,.04);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:#283593;margin-bottom:10px">⚙️ ${isZh?"加班費規則（勞基法預設）":"Aturan Lembur"}</div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"前 2h 倍率":"2h Awal x"}</label><input type="number" id="sal_otTier1Rate" value="${SAL.otTier1Rate}" step="0.01" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"後段倍率":"Sisa x"}</label><input type="number" id="sal_otTier2Rate" value="${SAL.otTier2Rate}" step="0.01" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"免稅 h":"Bebas Pjk h"}</label><input type="number" id="sal_otTaxFreeH" value="${SAL.otTaxFreeH}" inputmode="numeric" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"病假倍率":"Sakit x"}</label><input type="number" id="sal_sickRate" value="${SAL.sickRate}" step="0.1" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button data-a="salReset" style="flex:1;background:#fff;border:1px solid #ddd;color:var(--tx2);padding:12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">${isZh?"清除全部":"Reset"}</button>
+      <button data-a="salSave" style="flex:2;background:#00897b;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isZh?"💾 儲存並啟用預估":"💾 Simpan"}</button>
+    </div>
+    <div style="height:20px"></div>
+  </div></div>`;
+}
+
 setTimeout(()=>{const sp=document.getElementById("splash");if(sp)sp.remove()},2600);
 
 let _renderRAF=null;
@@ -578,6 +745,15 @@ function render(){
 function _doRender(){
   _renderRAF=null;
   const a=document.getElementById("app");
+  // ═══ WIDGET MODE：URL ?w=1 → 只渲染巨型今日顯示 ═══
+  // 不等 Firebase，直接從 localStorage 讀本地班別設定渲染
+  if(location.search.indexOf("w=1")>=0){
+    try{a.innerHTML=rWidget()}catch(err){a.innerHTML=`<div style="padding:30px;color:#c62828;font-size:13px">Widget error: ${esc(err&&err.message||"unknown")}</div>`}
+    // 隱藏其他 layer（modal/help/stats）
+    const mr=document.getElementById("mr");if(mr)mr.innerHTML="";
+    document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
+    return;
+  }
   if(!fbAuthReady||_cloudLoading){
     a.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--tx3);font-size:13px">⏳ ${lang==="zh"?"載入中...":"Loading..."}</div>`;
     return;
@@ -586,7 +762,7 @@ function _doRender(){
     if(S.step==="type")a.innerHTML=rType();
     else if(S.step==="wiz")a.innerHTML=rWiz();
     else a.innerHTML=rCal();
-    document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():"";
+    document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():S.showSal?rSalary():"";
     document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
     if(document.getElementById("leaveTypeSel"))try{updateLeaveHours()}catch(e){}
   }catch(err){
@@ -639,7 +815,7 @@ function rCal(){
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
   const pd5=getPayDay(y,m,5),pd20=getPayDay(y,m,20);
   for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(y,m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||isTWOff(y,m,d)),isPay=(d===pd5||d===pd20);
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${td?'<span class="td">TODAY</span>':''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
+    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${SE[s]||""}${sf(s)}</span>${td?'<span class="td">TODAY</span>':''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(y,m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<div class="hol-strip">🎌 ${mh.join("　")}</div>`:"";
@@ -666,13 +842,78 @@ function rCal(){
     if(payDay5<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay5=getPayDay(ny,nm,5)+dim(TY,TM)-TD}
     if(payDay20<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay20=getPayDay(ny,nm,20)+dim(TY,TM)-TD}
     const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
-    todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
+    todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span style="font-size:18px;margin-right:2px">${SE[ts]||""}</span><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
   return`<div class="top" style="flex-wrap:wrap"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div><div style="width:100%;font-size:11px;color:rgba(255,255,255,.7);padding:2px 0 0 44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}</div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
-  <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
+  <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${salaryEstHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
   <button class="sfx-btn" data-a="sfx">${WxSfx.isMuted()?'🔇':'🔊'}</button>
   <div style="height:${showI?'80':'12'}px"></div>${instH}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WIDGET MODE — 用 URL 參數 ?w=1 開啟，顯示巨型今日班別
+// 使用方式：把 https://你的網址/?w=1 加入主畫面，當成第二個捷徑
+// 完全離線運作，不需登入也能看（只要本地已設定過班別）
+// ═══════════════════════════════════════════════════════════════
+function rWidget(){
+  const s=gs(TY,TM,TD);
+  // 顏色對應（與月曆同色系）
+  const bg={"早":"#b3e5fc","晚":"#d1c4e9","中":"#ffe0b2","休":"#e0e0e0"};
+  const tx={"早":"#01579b","晚":"#311b92","中":"#e65100","休":"#424242"};
+  // 若未設定班別 → 引導回主 app
+  if(!s){
+    return`<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;background:#f5f5f5;text-align:center">
+      <div style="font-size:60px;margin-bottom:20px">⚙️</div>
+      <div style="font-size:18px;font-weight:700;color:#333;margin-bottom:10px">${lang==="zh"?"尚未設定班別":"Belum atur shift"}</div>
+      <div style="font-size:13px;color:#666;margin-bottom:30px;line-height:1.6">${lang==="zh"?"請先到主畫面完成輪班規則設定":"Buka aplikasi utama untuk atur shift dulu"}</div>
+      <a href="./" style="background:#00897b;color:#fff;padding:14px 32px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none">${lang==="zh"?"開啟主畫面":"Buka Aplikasi"}</a>
+    </div>`;
+  }
+  const WK=t("wk"),dw=new Date(TY,TM-1,TD).getDay();
+  const dateStr=lang==="zh"?`${TY}年${TM}月${TD}日 週${WK[dw]}`:`${WK[dw]}, ${TD}/${TM}/${TY}`;
+  // 明天班別預覽
+  const tom=new Date(TY,TM-1,TD+1),ts=gs(tom.getFullYear(),tom.getMonth()+1,tom.getDate());
+  const tomLabel=ts?(SE[ts]||"")+sf(ts):"";
+  // 距下次休假天數
+  let nextOff="";
+  if(s!=="休"){
+    for(let dd=1;dd<=30;dd++){
+      const fd=new Date(TY,TM-1,TD+dd);
+      if(gs(fd.getFullYear(),fd.getMonth()+1,fd.getDate())==="休"){
+        nextOff=lang==="zh"?`再 ${dd} 天放假`:`${dd} hari lagi libur`;break;
+      }
+    }
+  }else{
+    // 今天休假 → 算連續休假還剩幾天
+    let streak=1;
+    for(let dd=1;dd<=14;dd++){
+      const fd=new Date(TY,TM-1,TD+dd);
+      if(gs(fd.getFullYear(),fd.getMonth()+1,fd.getDate())==="休")streak++;else break;
+    }
+    nextOff=streak>1?(lang==="zh"?`連休 ${streak} 天`:`Libur ${streak} hari`):(lang==="zh"?"今天休假":"Hari ini libur");
+  }
+  // 發薪/獎金倒數
+  const pd5=getPayDay(TY,TM,5),pd20=getPayDay(TY,TM,20);
+  let payD5=pd5-TD,payD20=pd20-TD;
+  if(payD5<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payD5=getPayDay(ny,nm,5)+dim(TY,TM)-TD}
+  if(payD20<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payD20=getPayDay(ny,nm,20)+dim(TY,TM)-TD}
+  const payTxt=payD5<=7?`💰 ${payD5===0?(lang==="zh"?"今天發薪":"Gajian"):(payD5+(lang==="zh"?" 天後發薪":" hari lagi gaji"))}`:payD20<=7?`🏆 ${payD20===0?(lang==="zh"?"今天績效":"Bonus"):(payD20+(lang==="zh"?" 天後績效":" hari lagi bonus"))}`:"";
+  // 節日提醒
+  const hol=gh(TY,TM,TD);
+  return`<div style="min-height:100vh;display:flex;flex-direction:column;background:${bg[s]||'#f5f5f5'};color:${tx[s]||'#333'};padding:0;position:fixed;inset:0;overflow:auto">
+    <div style="text-align:right;padding:12px 16px"><a href="./" style="color:${tx[s]};opacity:.6;font-size:12px;text-decoration:none;background:rgba(255,255,255,.5);padding:6px 12px;border-radius:14px">${lang==="zh"?"完整版 ›":"Full ›"}</a></div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center">
+      <div style="font-size:14px;font-weight:600;opacity:.7;margin-bottom:8px">${dateStr}</div>
+      ${hol?`<div style="font-size:12px;font-weight:700;color:#c62828;background:rgba(255,255,255,.6);padding:4px 12px;border-radius:12px;margin-bottom:18px">🎌 ${hol}</div>`:'<div style="height:18px"></div>'}
+      <div style="font-size:120px;line-height:1;margin-bottom:10px">${SE[s]||""}</div>
+      <div style="font-size:64px;font-weight:900;letter-spacing:6px;line-height:1">${sf(s)}</div>
+      ${nextOff?`<div style="font-size:15px;font-weight:600;opacity:.75;margin-top:24px">${nextOff}</div>`:""}
+      ${tomLabel?`<div style="font-size:13px;opacity:.65;margin-top:6px">${lang==="zh"?"明天":"Besok"}：${tomLabel}</div>`:""}
+      ${payTxt?`<div style="font-size:14px;font-weight:700;margin-top:18px;background:rgba(255,255,255,.6);padding:6px 14px;border-radius:14px">${payTxt}</div>`:""}
+    </div>
+    <div style="text-align:center;padding:16px;font-size:10px;opacity:.4">${lang==="zh"?"我的班表 · 今日顯示":"My Shift · Today"}</div>
+  </div>`;
 }
 
 function rMod(){
@@ -686,7 +927,7 @@ function rMod(){
   const hasCust=ev.includes("custom");const custTxt=NOTES[ek(y,m,d)]||"";
   let custP="";if(hasCust){custP=`<div class="al-pick" style="border-color:var(--pri)"><label>📝 ${lang==="zh"?"備註內容":"Isi catatan"}</label><input type="text" id="custIn" value="${esc(custTxt)}" placeholder="${lang==="zh"?"輸入備註...":"Tulis catatan..."}" maxlength="50" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:4px" oninput="NOTES['${ek(y,m,d)}']=this.value;sNotes()"></div>`}
   return`<div class="modal-bg" data-a="close"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
-  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${custP}
+  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><span style="font-size:22px;margin-right:2px">${SE[s]||""}</span><div class="modal-shift-name">${sf(s)}</div></div>${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${custP}
   <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
 
 function fbBarHtml(){
@@ -997,6 +1238,21 @@ function handle(e){
     case "share":shareCalendar();return;
     case "stats":S.showStats=true;S.statsYr=TY;break;
     case "closeStats":S.showStats=false;break;
+
+    case "salOpen":S.showSal=true;break;
+    case "salClose":S.showSal=false;break;
+    case "salReset":{
+      if(!confirm(lang==="zh"?"確定清除所有薪資設定？此動作無法復原。":"Hapus semua data gaji?"))return;
+      SAL=Object.assign({},SAL_DEFAULT);sSAL();S.showSal=false;break;
+    }
+    case "salSave":{
+      const g=id=>{const el=document.getElementById(id);return el?parseFloat(el.value)||0:0};
+      SAL.base=g("sal_base");SAL.meal=g("sal_meal");SAL.transport=g("sal_transport");SAL.position=g("sal_position");SAL.night=g("sal_night");
+      SAL.union=g("sal_union");SAL.welfare=g("sal_welfare");SAL.laborIns=g("sal_laborIns");SAL.healthIns=g("sal_healthIns");SAL.otherDed=g("sal_otherDed");
+      SAL.otTier1Rate=g("sal_otTier1Rate")||1.34;SAL.otTier2Rate=g("sal_otTier2Rate")||1.67;SAL.otTaxFreeH=g("sal_otTaxFreeH")||46;SAL.sickRate=g("sal_sickRate")||0;
+      if(!SAL.base){alert(lang==="zh"?"職能俸為必填欄位":"Gaji pokok wajib diisi");return}
+      SAL.enabled=true;sSAL();S.showSal=false;break;
+    }
 
     case "closeH":S.showH=false;break;
     case "lzh":lang="zh";try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650);_scheduleCloudSave();break;
