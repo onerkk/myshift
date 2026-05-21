@@ -692,29 +692,30 @@ function salaryEstHtml(y,m){
 // ═══════════════════════════════════════════════════════════════
 function rSalary(){
   const isZh=lang==="zh";
-  const num=(id,label,val,placeholder)=>`<div style="margin-bottom:10px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">${label}</label><input type="number" id="${id}" value="${val||""}" placeholder="${placeholder||"0"}" inputmode="numeric" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff"></div>`;
+  // 欄位 helper：placeholder 留空，避免誤判為已填值；可選 hint 顯示在欄位下方
+  const num=(id,label,val,hint)=>`<div style="margin-bottom:10px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">${label}</label><input type="number" id="${id}" value="${val||""}" inputmode="numeric" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff">${hint?`<div style="font-size:10px;color:var(--tx3);margin-top:3px;line-height:1.4">${hint}</div>`:""}</div>`;
   return`<div class="modal-bg" data-a="salClose"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()" style="max-width:480px"><div class="modal-handle"></div>
     <div class="modal-title">💰 ${isZh?"薪資設定":"Atur Gaji"}</div>
     <div style="background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:10px;margin:10px 0;font-size:11px;color:#e65100;line-height:1.6">
-      ⚠️ ${isZh?"資料僅儲存於本機，不上傳雲端。清除瀏覽器資料會遺失，建議拍照備份。":"Data hanya di HP, tidak ke cloud. Backup foto disarankan."}
+      ⚠️ ${isZh?"資料僅儲存於本機，不上傳雲端。清除瀏覽器資料會遺失，建議拍照備份。對照薪資條填入即可，未填的欄位視為 0。":"Data hanya di HP, tidak ke cloud."}
     </div>
 
     <div style="background:rgba(0,150,136,.05);border-radius:10px;padding:12px;margin-bottom:12px">
       <div style="font-size:13px;font-weight:700;color:#00695c;margin-bottom:10px">📈 ${isZh?"應領項目":"Pendapatan"}</div>
-      ${num("sal_base",isZh?"職能俸（月薪本俸）":"Gaji Pokok",SAL.base,"34190")}
-      ${num("sal_meal",isZh?"伙食津貼":"Tunjangan Makan",SAL.meal,"3000")}
-      ${num("sal_transport",isZh?"交通津貼":"Transport",SAL.transport,"1000")}
-      ${num("sal_position",isZh?"崗位津貼":"Tunjangan Posisi",SAL.position,"500")}
-      ${num("sal_night",isZh?"夜點費（每次晚班）":"Tunjangan Malam / shift",SAL.night,"489")}
+      ${num("sal_base",isZh?"職能俸（月薪本俸）":"Gaji Pokok",SAL.base,isZh?"必填。對照薪資條上「職能俸」或「本薪」欄位":"Wajib")}
+      ${num("sal_meal",isZh?"伙食津貼":"Tunjangan Makan",SAL.meal)}
+      ${num("sal_transport",isZh?"交通津貼":"Transport",SAL.transport)}
+      ${num("sal_position",isZh?"崗位津貼":"Tunjangan Posisi",SAL.position)}
+      ${num("sal_night",isZh?"夜點費（每次晚班的單價）":"Tunjangan Malam / shift",SAL.night,isZh?"會自動 × 當月晚班次數。算法：薪資條夜點費總額 ÷ 該月晚班天數":"")}
     </div>
 
     <div style="background:rgba(198,40,40,.04);border-radius:10px;padding:12px;margin-bottom:12px">
       <div style="font-size:13px;font-weight:700;color:#b71c1c;margin-bottom:10px">📉 ${isZh?"應扣項目（每月固定）":"Potongan Tetap"}</div>
-      ${num("sal_union",isZh?"工會會費":"Iuran Serikat",SAL.union,"85")}
-      ${num("sal_welfare",isZh?"福利金":"Kesejahteraan",SAL.welfare,"173")}
-      ${num("sal_laborIns",isZh?"勞保自付":"BPJS TK",SAL.laborIns,"1145")}
-      ${num("sal_healthIns",isZh?"健保自付":"BPJS Kes",SAL.healthIns,"1129")}
-      ${num("sal_otherDed",isZh?"其他固定扣款（員工信託等）":"Potongan Lain",SAL.otherDed,"3033")}
+      ${num("sal_union",isZh?"工會會費":"Iuran Serikat",SAL.union)}
+      ${num("sal_welfare",isZh?"福利金":"Kesejahteraan",SAL.welfare)}
+      ${num("sal_laborIns",isZh?"勞保自付":"BPJS TK",SAL.laborIns)}
+      ${num("sal_healthIns",isZh?"健保自付":"BPJS Kes",SAL.healthIns)}
+      ${num("sal_otherDed",isZh?"其他固定扣款":"Potongan Lain",SAL.otherDed,isZh?"員工持股信託、自願提繳勞退等每月固定金額扣款":"")}
     </div>
 
     <div style="background:rgba(63,81,181,.04);border-radius:10px;padding:12px;margin-bottom:12px">
@@ -815,7 +816,7 @@ function rCal(){
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
   const pd5=getPayDay(y,m,5),pd20=getPayDay(y,m,20);
   for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(y,m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||isTWOff(y,m,d)),isPay=(d===pd5||d===pd20);
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${SE[s]||""}${sf(s)}</span>${td?'<span class="td">TODAY</span>':''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
+    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${td?'<span class="td">TODAY</span>':''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(y,m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<div class="hol-strip">🎌 ${mh.join("　")}</div>`:"";
@@ -842,7 +843,7 @@ function rCal(){
     if(payDay5<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay5=getPayDay(ny,nm,5)+dim(TY,TM)-TD}
     if(payDay20<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay20=getPayDay(ny,nm,20)+dim(TY,TM)-TD}
     const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
-    todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span style="font-size:18px;margin-right:2px">${SE[ts]||""}</span><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
+    todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
   return`<div class="top" style="flex-wrap:wrap"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div><div style="width:100%;font-size:11px;color:rgba(255,255,255,.7);padding:2px 0 0 44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}</div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
@@ -927,7 +928,7 @@ function rMod(){
   const hasCust=ev.includes("custom");const custTxt=NOTES[ek(y,m,d)]||"";
   let custP="";if(hasCust){custP=`<div class="al-pick" style="border-color:var(--pri)"><label>📝 ${lang==="zh"?"備註內容":"Isi catatan"}</label><input type="text" id="custIn" value="${esc(custTxt)}" placeholder="${lang==="zh"?"輸入備註...":"Tulis catatan..."}" maxlength="50" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:4px" oninput="NOTES['${ek(y,m,d)}']=this.value;sNotes()"></div>`}
   return`<div class="modal-bg" data-a="close"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
-  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><span style="font-size:22px;margin-right:2px">${SE[s]||""}</span><div class="modal-shift-name">${sf(s)}</div></div>${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${custP}
+  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${custP}
   <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
 
 function fbBarHtml(){
