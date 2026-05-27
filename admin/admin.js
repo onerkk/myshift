@@ -584,15 +584,13 @@ function wxAlertsTabHtml(){
 
     <h2 style="margin-top:18px">🌐 CWA 官方資料（颱風 + 地震）</h2>
     <div style="padding:10px;background:#1a2533;border-radius:6px;margin-bottom:12px;font-size:11px;color:#aaa;line-height:1.6">
-      目前狀態：${workerStatus}<br>
-      免費設定方法（一次設定，同時取得颱風與地震資料）：<br>
-      1. 到 <strong style="color:#fff">opendata.cwa.gov.tw</strong> 註冊會員（免費）拿 API key<br>
-      2. Cloudflare 部署 Worker（程式碼在 cwa-data-worker.js）<br>
-      3. 把 worker URL 填入下方
+      目前狀態：<span style="color:#27ae60;font-weight:600">✓ 已寫死於程式碼（cwa-data.onerkk.workers.dev）</span><br>
+      Worker URL 直接寫死在 app.js / sw.js 中，後台這個輸入框已失效（保留僅供參考）。<br>
+      若要更換 Worker，請直接修改程式碼。
     </div>
-    <div class="row" style="padding:10px 12px;flex-direction:column;align-items:stretch">
-      <div style="font-size:12px;color:#aaa;margin-bottom:6px">Worker URL</div>
-      <input type="text" id="wx_cwaWorkerUrl" value="${esc(tyUrl)}" placeholder="https://cwa-data.xxx.workers.dev" onchange="wxSetStr('cwaWorkerUrl',this.value)" style="width:100%;padding:8px 10px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:12px;font-family:inherit;box-sizing:border-box">
+    <div class="row" style="padding:10px 12px;flex-direction:column;align-items:stretch;opacity:0.5">
+      <div style="font-size:12px;color:#aaa;margin-bottom:6px">Worker URL（已停用）</div>
+      <input type="text" id="wx_cwaWorkerUrl" value="https://cwa-data.onerkk.workers.dev" disabled style="width:100%;padding:8px 10px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:12px;font-family:inherit;box-sizing:border-box">
     </div>
 
     <h2 style="margin-top:18px">🌀 颱風警報參數</h2>
