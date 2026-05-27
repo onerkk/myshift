@@ -418,7 +418,59 @@ let lang="zh";try{lang=localStorage.getItem("sb_l")||gCk("sb_l")||"zh"}catch(e){
 function t(k){return (L[lang]&&L[lang][k])||L.zh[k]||k}
 function sf(s){return t(s)}
 // ═══ ADMIN CONFIG (loaded from Firestore) ═══
+// wxAlerts: 即時天氣警報設定 — 後台可開關每種警報、調整閾值
+// 資料源：Open-Meteo（每 30 分鐘自動更新，覆蓋 7 日 × 24 小時）
+// 注意：此處的颱風判定為「跡象推算」而非官方警報，若需 CWA 官方颱風警報請另接 API
 let APP_CFG={admins:[],visualFx:{enabled:true},
+  wxAlerts:{
+    master:true,        // 警報系統總開關（前台橫幅）
+    typhoon:true,       // 颱風（CWA 官方優先；無 worker 退回 Open-Meteo 推算跡象）
+    storm:true,         // 雷雨
+    heavyRain:true,     // 豪雨/暴雨（未來 6h 任一小時 ≥ heavyRainProb）
+    rain:true,          // 一般降雨警告（未來 3h 任一小時 ≥ rainProb）
+    strongWind:true,    // 強風
+    heat:true,          // 高溫
+    cold:true,          // 低溫
+    fog:false,          // 濃霧（預設關閉，避免太頻繁）
+    earthquake:true,    // 地震警報（需 CWA worker）
+    // 閾值（可在後台調整）
+    rainProb:60,
+    heavyRainProb:80,
+    windThreshold:50,
+    typhoonWind:62,
+    heatThreshold:36,
+    coldThreshold:10,
+    // ── CWA 統合 worker（颱風 + 地震）──
+    cwaWorkerUrl:"",            // 例 https://cwa-data.xxx.workers.dev
+    typhoonWorkerUrl:"",        // 舊欄位（向後相容；讀取時若 cwaWorkerUrl 為空則用此）
+    typhoonAlertDistanceKm:800,
+    typhoonMinIntensity:'td',
+    typhoonAlertOnNotice:true,
+    // ── 地震警報門檻 ──
+    earthquakeMinMagnitude:4.0,   // 規模門檻（M）
+    earthquakeMinIntensity:3,     // 最大震度門檻（級）— 規模或震度任一達標就警報
+    earthquakeMaxDistanceKm:0,    // 距用戶距離限制（km），0 = 不限
+    earthquakeMaxAgeMinutes:120,  // 只警報此分鐘內的地震，避免久前的
+    // ── 系統通知 ──
+    notifyEnabled:true,
+    notifyTyphoon:true,
+    notifyStorm:true,
+    notifyHeavyRain:true,
+    notifyRain:false,
+    notifyStrongWind:true,
+    notifyHeat:false,
+    notifyCold:false,
+    notifyFog:false,
+    notifyEarthquake:true,       // 地震系統通知（預設 ON）
+    cooldownHours:3,
+    quietStart:22,
+    quietEnd:7,
+    quietIgnoreCritical:true,
+    // ── 偵測時段 ──
+    timeWindows:{
+      rain:[],heavyRain:[],strongWind:[],heat:[],cold:[],fog:[]
+    }
+  },
   units:["冷抽二股A板","冷抽二股B板","冷抽二股C板","冷抽一股A板","冷抽一股B板","冷抽一股C板","熱處理A板","熱處理B板","品管","其他"],
   rotations:[
     {id:"4on2off",name:"做4休2",nameId:"4K 2L",hours:12,cycle:["早","早","早","早","休","休","晚","晚","晚","晚","休","休"]},
@@ -438,6 +490,56 @@ let APP_CFG={admins:[],visualFx:{enabled:true},
 };
 const UNITS_DEFAULT=APP_CFG.units.slice();
 try{window.APP_CFG=APP_CFG}catch(e){}
+
+// ═══════════════════════════════════════════════════════════════
+// 用戶個人設定（存 localStorage，不雲端同步以省流量）
+// 分層權限：管理員設定 = 上限；用戶可在上限內進一步關閉
+// ═══════════════════════════════════════════════════════════════
+const USER_PREFS_DEFAULTS={
+  wxMaster:true,
+  wxNotify:true,
+  wxItems:{
+    typhoon:true,storm:true,heavyRain:true,rain:true,
+    strongWind:true,heat:true,cold:true,fog:true,earthquake:true
+  },
+  wxNotifyItems:{
+    typhoon:true,storm:true,heavyRain:true,rain:true,
+    strongWind:true,heat:true,cold:true,fog:true,earthquake:true
+  },
+  visualFx:true
+};
+let USER_PREFS=Object.assign({},USER_PREFS_DEFAULTS,{wxItems:Object.assign({},USER_PREFS_DEFAULTS.wxItems),wxNotifyItems:Object.assign({},USER_PREFS_DEFAULTS.wxNotifyItems)});
+try{
+  const raw=localStorage.getItem('_userPrefs');
+  if(raw){
+    const p=JSON.parse(raw);
+    if(typeof p==='object'){
+      // 淺合併 + items 深合併
+      if(typeof p.wxMaster==='boolean')USER_PREFS.wxMaster=p.wxMaster;
+      if(typeof p.wxNotify==='boolean')USER_PREFS.wxNotify=p.wxNotify;
+      if(typeof p.visualFx==='boolean')USER_PREFS.visualFx=p.visualFx;
+      if(p.wxItems&&typeof p.wxItems==='object')Object.assign(USER_PREFS.wxItems,p.wxItems);
+      if(p.wxNotifyItems&&typeof p.wxNotifyItems==='object')Object.assign(USER_PREFS.wxNotifyItems,p.wxNotifyItems);
+    }
+  }
+}catch(e){}
+function saveUserPrefs(){
+  try{localStorage.setItem('_userPrefs',JSON.stringify(USER_PREFS))}catch(e){}
+}
+function setUserPref(key,val){
+  if(key.indexOf('.')>=0){
+    const [g,k]=key.split('.');
+    if(USER_PREFS[g]&&typeof USER_PREFS[g]==='object'){USER_PREFS[g][k]=val}
+  }else{USER_PREFS[key]=val}
+  saveUserPrefs();
+  // 立即應用副作用
+  applyVisualFxSetting();
+  // 警報相關變更時，重評估通知（若有新警報且原本被自己關掉，可能要立刻推；若關掉了，不會誤推）
+  try{checkAndNotifyAlerts()}catch(e){}
+  render();
+}
+try{window.USER_PREFS=USER_PREFS;window.setUserPref=setUserPref}catch(e){}
+
 function getUnits(){return APP_CFG.units}
 function getLeaveTypes(){return APP_CFG.leaveTypes}
 function getLT(id){return APP_CFG.leaveTypes.find(t=>t.id===id)}
@@ -451,14 +553,32 @@ function loadAppConfig(){
       if(d.admins)APP_CFG.admins=d.admins;
       if(d.rotations&&d.rotations.length)APP_CFG.rotations=d.rotations;
       if(d.visualFx&&typeof d.visualFx.enabled==='boolean') APP_CFG.visualFx.enabled=d.visualFx.enabled;
+      // wxAlerts: 合併讀取（保留預設值，後台可單獨覆寫部分欄位）
+      if(d.wxAlerts&&typeof d.wxAlerts==='object'){
+        for(const k in d.wxAlerts){
+          if(d.wxAlerts[k]===undefined||d.wxAlerts[k]===null) continue;
+          if(k==='timeWindows'&&typeof d.wxAlerts[k]==='object'){
+            // 深層合併時段
+            APP_CFG.wxAlerts.timeWindows=APP_CFG.wxAlerts.timeWindows||{};
+            for(const aid in d.wxAlerts.timeWindows){
+              if(Array.isArray(d.wxAlerts.timeWindows[aid])) APP_CFG.wxAlerts.timeWindows[aid]=d.wxAlerts.timeWindows[aid];
+            }
+          }else{
+            APP_CFG.wxAlerts[k]=d.wxAlerts[k];
+          }
+        }
+      }
       rebuildR();
       applyVisualFxSetting();
     }
   },"loadAppConfig").catch(e=>console.log("loadCfg err",e));
 }
 // 全域 FX 開關：套用設定（影響 canvas 顯示 + 聲音）
+// 最終開啟條件 = 管理員允許 AND 用戶啟用
 function applyVisualFxSetting(){
-  const on=APP_CFG.visualFx&&APP_CFG.visualFx.enabled!==false;
+  const adminOn=APP_CFG.visualFx&&APP_CFG.visualFx.enabled!==false;
+  const userOn=USER_PREFS&&USER_PREFS.visualFx!==false;
+  const on=adminOn&&userOn;
   try{
     const cv=document.getElementById('wxCanvas');
     if(cv) cv.style.display=on?'':'none';
@@ -472,6 +592,7 @@ function saveAppConfig(){
   return fsEnqueue(()=>fbDb.collection("config").doc("app").set({
     units:APP_CFG.units,leaveTypes:APP_CFG.leaveTypes,admins:APP_CFG.admins||[],rotations:APP_CFG.rotations||[],
     visualFx:APP_CFG.visualFx||{enabled:true},
+    wxAlerts:APP_CFG.wxAlerts||{master:true},
     ts:firebase.firestore.FieldValue.serverTimestamp()
   },{merge:true}),"saveCfg").catch(e=>console.log("saveCfg err",e));
 }
@@ -884,7 +1005,7 @@ function rCal(){
   return`<div class="top" style="flex-wrap:wrap"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div><div style="width:100%;font-size:11px;color:rgba(255,255,255,.7);padding:2px 0 0 44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}</div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
-  <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${salaryEstHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
+  <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${salaryEstHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
   <button class="sfx-btn" data-a="sfx">${WxSfx.isMuted()?'🔇':'🔊'}</button>
   <div style="height:${showI?'80':'12'}px"></div>${instH}`;
 }
@@ -1388,6 +1509,12 @@ async function loadWx(retries){
         try{localStorage.setItem('_wxPos',JSON.stringify({lat,lon}))}catch(e){}
       }catch(e){lat="23.32";lon="120.27"}
     }
+    // 把位置交給 Service Worker（背景同步抓天氣時要用）
+    try{
+      if(navigator.serviceWorker&&navigator.serviceWorker.controller){
+        navigator.serviceWorker.controller.postMessage({type:'WX_POS',lat:parseFloat(lat),lon:parseFloat(lon)});
+      }
+    }catch(e){}
     const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability,temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&timezone=auto&forecast_days=7`;
     const resp=await Promise.race([fetch(url),new Promise((_,r)=>setTimeout(()=>r('timeout'),10000))]);
     if(!resp.ok)throw new Error('API '+resp.status);
@@ -1421,10 +1548,725 @@ async function loadWx(retries){
     let curPrec=0,curWind=0;
     if(wxData.hTime){const n=new Date();const nh=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0")+"T"+String(n.getHours()).padStart(2,"0");const hi=wxData.hTime.findIndex(t=>t.startsWith(nh));if(hi>=0){curPrec=wxData.hPrec?wxData.hPrec[hi]||0:0;curWind=wxData.hWind?wxData.hWind[hi]||0:0}}
     WxFx.update(wxData.code,wxData.temp,curPrec,curWind);
+    // 觸發系統通知檢查（已授權才會推送）
+    try{checkAndNotifyAlerts()}catch(e){console.log('notify check err',e)}
   }else WxFx.update(null,0,0,0);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// CWA 資料載入（颱風 + 地震，透過用戶部署的 Cloudflare Worker 代理）
+// 若 worker URL 未設定，typhoonData 與 earthquakeData 保持 null
+// ═══════════════════════════════════════════════════════════════
+let typhoonData=null,typhoonErr=false;
+let earthquakeData=null,earthquakeErr=false;
+
+function _getCwaWorkerUrl(){
+  const cfg=APP_CFG.wxAlerts||{};
+  // 優先用新欄位 cwaWorkerUrl，向後相容讀 typhoonWorkerUrl
+  return (cfg.cwaWorkerUrl&&/^https?:\/\//.test(cfg.cwaWorkerUrl))?cfg.cwaWorkerUrl
+    :(cfg.typhoonWorkerUrl&&/^https?:\/\//.test(cfg.typhoonWorkerUrl))?cfg.typhoonWorkerUrl
+    :'';
+}
+
+async function loadCwaData(){
+  const url=_getCwaWorkerUrl();
+  if(!url){typhoonData=null;earthquakeData=null;return}
+  // cache-first
+  try{
+    const c=JSON.parse(localStorage.getItem('_cwaCache'));
+    if(c&&c.ts&&(Date.now()-c.ts)<5*60*1000&&c.d){
+      typhoonData=c.d;
+      earthquakeData=c.d;
+      render();
+    }
+  }catch(e){}
+  try{
+    const resp=await Promise.race([fetch(url),new Promise((_,r)=>setTimeout(()=>r('timeout'),10000))]);
+    if(!resp.ok)throw new Error('cwa api '+resp.status);
+    const data=await resp.json();
+    if(data&&data.ok){
+      typhoonData=data;earthquakeData=data;
+      typhoonErr=false;earthquakeErr=false;
+      try{localStorage.setItem('_cwaCache',JSON.stringify({ts:Date.now(),d:data}))}catch(e){}
+      render();
+      try{checkAndNotifyAlerts()}catch(e){}
+    }
+  }catch(e){typhoonErr=true;earthquakeErr=true;console.log('loadCwaData err',e)}
+}
+// 向後相容 — loadTyphoon 仍可呼叫
+function loadTyphoon(){return loadCwaData()}
+try{window.loadCwaData=loadCwaData;window.loadTyphoon=loadTyphoon}catch(e){}
+
 const SHIFT_HR={"早":[6,7,8],"中":[13,14,15],"晚":[18,19,20]};
+
+// ═══ 即時天氣警報引擎 ═══
+// 回傳警報陣列，依嚴重度排序（嚴重在前）
+// 每個警報 = {id, level: 'danger'|'warn'|'info', icon, title, detail}
+// 時段判定：警報是否在偵測時段內（空陣列 = 全天）
+// 颱風、雷雨 不受時段限制（生命安全優先）
+function isInDetectionWindow(alertId){
+  if(alertId==='typhoon'||alertId==='storm') return true;
+  const cfg=APP_CFG.wxAlerts||{};
+  const tw=(cfg.timeWindows&&cfg.timeWindows[alertId])||[];
+  if(!tw.length) return true;
+  const now=new Date();
+  const cur=now.getHours()*60+now.getMinutes();
+  for(const w of tw){
+    if(!w||!w.start||!w.end) continue;
+    const [sh,sm]=String(w.start).split(':').map(Number);
+    const [eh,em]=String(w.end).split(':').map(Number);
+    if(isNaN(sh)||isNaN(eh)) continue;
+    const s=sh*60+(sm||0),e=eh*60+(em||0);
+    if(s<=e){
+      if(cur>=s&&cur<=e) return true;
+    }else{
+      // 跨午夜（例：22:00-06:00）
+      if(cur>=s||cur<=e) return true;
+    }
+  }
+  return false;
+}
+
+// 颱風強度等級對應（與 worker 同步）
+const TYPHOON_INTENSITY_ORDER={td:0,mild:1,moderate:2,severe:3};
+
+// 評估 CWA 官方颱風警報
+function evaluateTyphoonCWA(cfg,isZh){
+  if(!typhoonData||!typhoonData.active||!typhoonData.typhoons||!typhoonData.typhoons.length) return null;
+  const tys=typhoonData.typhoons;
+  const minIntKey=cfg.typhoonMinIntensity||'td';
+  const minIntOrder=TYPHOON_INTENSITY_ORDER[minIntKey]||0;
+  const distLim=cfg.typhoonAlertDistanceKm||800;
+  const alertOnNotice=cfg.typhoonAlertOnNotice!==false;
+  const hasOfficialAlert=typhoonData.seaAlert||typhoonData.landAlert;
+  // 過濾出符合條件的颱風
+  const matched=[];
+  for(const t of tys){
+    const intOk=(TYPHOON_INTENSITY_ORDER[t.intensityId]||0)>=minIntOrder;
+    if(!intOk) continue;
+    const distOk=t.distanceKm<=distLim || t.minForecastDistKm<=distLim;
+    // 官方有發警報 → 一律觸發；否則看距離
+    if(alertOnNotice&&hasOfficialAlert){matched.push(t);continue}
+    if(distOk) matched.push(t);
+  }
+  if(!matched.length) return null;
+  // 取最強或最近的颱風為代表
+  matched.sort((a,b)=>{
+    const ord=(TYPHOON_INTENSITY_ORDER[b.intensityId]||0)-(TYPHOON_INTENSITY_ORDER[a.intensityId]||0);
+    if(ord!==0) return ord;
+    return a.distanceKm-b.distanceKm;
+  });
+  const t=matched[0];
+  // 文字組裝
+  let title,detail,level='danger';
+  if(typhoonData.landAlert){
+    title=isZh?`🌀 颱風陸上警報 — ${t.nameZh||t.name}`:`🌀 Typhoon Land Warning — ${t.name}`;
+  }else if(typhoonData.seaAlert){
+    title=isZh?`🌀 颱風海上警報 — ${t.nameZh||t.name}`:`🌀 Typhoon Sea Warning — ${t.name}`;
+  }else{
+    title=isZh?`🌀 ${t.intensityShort||t.intensity} ${t.nameZh||t.name}`:`🌀 ${t.intensityShort||t.intensity} ${t.name}`;
+  }
+  const parts=[];
+  parts.push(isZh?`強度：${t.intensity}（最大風速 ${t.maxWindKmh} km/h）`:`Intensity: ${t.intensity}`);
+  if(t.distanceKm){
+    parts.push(isZh?`距${t.nearestPoint||'台灣'} ${t.distanceKm} km`:`Distance ${t.distanceKm} km from Taiwan`);
+  }
+  if(t.movingDirection&&t.movingSpeedKmh){
+    parts.push(isZh?`向${t.movingDirection}移動 ${t.movingSpeedKmh} km/h`:`Moving ${t.movingDirection} ${t.movingSpeedKmh} km/h`);
+  }
+  if(t.approaching){
+    parts.push(isZh?`⚠ 預測接近至 ${t.minForecastDistKm} km`:`⚠ Approaching to ${t.minForecastDistKm} km`);
+  }
+  if(typhoonData.affectedAreas&&typhoonData.affectedAreas.length){
+    parts.push(isZh?`警戒區：${typhoonData.affectedAreas.slice(0,5).join('、')}`:`Areas: ${typhoonData.affectedAreas.slice(0,5).join(', ')}`);
+  }
+  detail=parts.join('；');
+  return {id:'typhoon',level:level,icon:'🌀',title:title,detail:detail};
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 地震警報判定
+// 邏輯：抓最新地震 → 比規模/震度門檻 → 比距離 → 比時間（多久內）
+// 去重：用 EarthquakeNo 比對 localStorage，同筆地震不重複推
+// ═══════════════════════════════════════════════════════════════
+function evaluateEarthquake(cfg,isZh){
+  if(!earthquakeData||!earthquakeData.earthquakeActive||!earthquakeData.earthquakes||!earthquakeData.earthquakes.length) return null;
+  const eqs=earthquakeData.earthquakes;
+  const minMag=parseFloat(cfg.earthquakeMinMagnitude)||4.0;
+  const minInt=parseFloat(cfg.earthquakeMinIntensity)||3;
+  const maxDist=parseFloat(cfg.earthquakeMaxDistanceKm)||0; // 0 = 不限
+  const maxAge=parseInt(cfg.earthquakeMaxAgeMinutes)||120;
+  // 用戶位置（從 wxData 取，定位過才有）
+  const myLat=wxData&&wxData.lat?parseFloat(wxData.lat):null;
+  const myLon=wxData&&wxData.lon?parseFloat(wxData.lon):null;
+  const now=Date.now();
+
+  // 從最新筆開始找符合的
+  for(const eq of eqs){
+    // 時效：太久前的地震不警報（避免老資料）
+    if(maxAge>0&&eq.originTime){
+      const eqTime=new Date(eq.originTime.replace(' ','T')+'+08:00').getTime();
+      if(isNaN(eqTime)) continue;
+      const ageMin=(now-eqTime)/60000;
+      if(ageMin>maxAge) continue;
+    }
+    // 規模 OR 震度 達標
+    const magOk=eq.magnitude>=minMag;
+    const intOk=eq.maxIntensity>=minInt;
+    if(!magOk&&!intOk) continue;
+    // 距離限制（若有設）
+    let myDist=null;
+    if(myLat!==null&&myLon!==null&&!isNaN(myLat)&&!isNaN(myLon)){
+      const R=6371,toRad=d=>d*Math.PI/180;
+      const dLat=toRad(eq.lat-myLat),dLon=toRad(eq.lon-myLon);
+      const a=Math.sin(dLat/2)**2+Math.cos(toRad(myLat))*Math.cos(toRad(eq.lat))*Math.sin(dLon/2)**2;
+      myDist=Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
+    }
+    if(maxDist>0&&myDist!==null&&myDist>maxDist) continue;
+
+    // 組裝警報
+    const title=isZh
+      ?`🌍 地震速報 — M${eq.magnitude.toFixed(1)} ${eq.location.replace(/^[^（(]*[（(]/,'').replace(/[）)].*$/,'')||eq.maxIntensityArea||'台灣'}`
+      :`🌍 Earthquake M${eq.magnitude.toFixed(1)}`;
+    const parts=[];
+    if(eq.location) parts.push(isZh?`震央：${eq.location}`:`Epicenter: ${eq.location}`);
+    parts.push(isZh?`規模 ${eq.magnitude.toFixed(1)}，深度 ${eq.focalDepth.toFixed(1)} km`:`M${eq.magnitude.toFixed(1)}, depth ${eq.focalDepth.toFixed(1)} km`);
+    if(eq.maxIntensityLabel&&eq.maxIntensityArea){
+      parts.push(isZh?`最大震度 ${eq.maxIntensityLabel} 於 ${eq.maxIntensityArea}`:`Max intensity ${eq.maxIntensityLabel} at ${eq.maxIntensityArea}`);
+    }
+    if(myDist!==null){
+      parts.push(isZh?`距您約 ${myDist} km`:`~${myDist} km from you`);
+    }
+    if(eq.originTime){
+      const t=eq.originTime.slice(11,16);
+      const eqTime=new Date(eq.originTime.replace(' ','T')+'+08:00').getTime();
+      const ago=Math.round((now-eqTime)/60000);
+      parts.push(isZh?`發生於 ${t}（${ago} 分鐘前）`:`At ${t} (${ago} min ago)`);
+    }
+    return {
+      id:'earthquake',
+      level:eq.maxIntensity>=5?'danger':'warn',
+      icon:'🌍',
+      title:title,
+      detail:parts.join('；'),
+      eqNo:eq.no   // 用於去重
+    };
+  }
+  return null;
+}
+
+function evaluateWxAlerts(){
+  const out=[];
+  if(!wxData) return out;
+  const cfg=APP_CFG.wxAlerts||{};
+  if(cfg.master===false) return out;
+  // 用戶層：總開關
+  const up=USER_PREFS||{};
+  if(up.wxMaster===false) return out;
+  const userItems=up.wxItems||{};
+  const isZh=lang==="zh";
+
+  // ═══ 1. 颱風（優先用 CWA 官方；若無 typhoonData 退回 Open-Meteo 推算）═══
+  if(cfg.typhoon!==false && userItems.typhoon!==false){
+    const cwaAlert=evaluateTyphoonCWA(cfg,isZh);
+    if(cwaAlert){
+      out.push(cwaAlert);
+    }
+  }
+
+  // ═══ 1.5 地震警報（CWA 官方資料）═══
+  if(cfg.earthquake!==false && userItems.earthquake!==false){
+    const eqAlert=evaluateEarthquake(cfg,isZh);
+    if(eqAlert){
+      out.push(eqAlert);
+    }
+  }
+
+  // 找出當前小時 index
+  const n=new Date();
+  const nh=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0")+"T"+String(n.getHours()).padStart(2,"0");
+  const hi=wxData.hTime?wxData.hTime.findIndex(s=>s.startsWith(nh)):-1;
+
+  const curCode=wxData.code||0;
+  const curTemp=wxData.temp||0;
+  const curWind=(hi>=0&&wxData.hWind)?(wxData.hWind[hi]||0):0;
+  const curPrec=(hi>=0&&wxData.hPrec)?(wxData.hPrec[hi]||0):0;
+
+  // 計算未來 N 小時降雨機率最大值與時間
+  function maxRain(hours){
+    if(hi<0||!wxData.hPrec) return {mx:0,at:null};
+    let mx=0,at=null;
+    for(let k=hi;k<Math.min(hi+hours,wxData.hPrec.length);k++){
+      if(wxData.hPrec[k]>mx){mx=wxData.hPrec[k];at=wxData.hTime[k]}
+    }
+    return {mx,at};
+  }
+  // 計算未來 N 小時最大風速
+  function maxWind(hours){
+    if(hi<0||!wxData.hWind) return {mx:0,at:null};
+    let mx=0,at=null;
+    for(let k=hi;k<Math.min(hi+hours,wxData.hWind.length);k++){
+      if(wxData.hWind[k]>mx){mx=wxData.hWind[k];at=wxData.hTime[k]}
+    }
+    return {mx,at};
+  }
+  function hourLabel(iso){
+    if(!iso) return "";
+    const t=iso.slice(11,16);
+    const dpart=iso.slice(0,10);
+    const today=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;
+    if(dpart===today) return t;
+    const dt=new Date(iso);
+    return (isZh?`${dt.getMonth()+1}/${dt.getDate()} `:`${dt.getMonth()+1}/${dt.getDate()} `)+t;
+  }
+
+  // 1. 颱風跡象（Open-Meteo 推算）— 僅在「沒有 CWA 官方資料時」才用作備援
+  // 若上方 evaluateTyphoonCWA 已加入 typhoon，這裡會跳過
+  const cwaHas=out.some(a=>a.id==='typhoon');
+  if(!cwaHas && cfg.typhoon!==false && userItems.typhoon!==false){
+    const wTh=cfg.typhoonWind||62;
+    const isStormCode=(curCode===95||curCode===96||curCode===99);
+    const r6=maxRain(6),w6=maxWind(6);
+    if((curWind>=wTh||w6.mx>=wTh) && (isStormCode||r6.mx>=80)){
+      out.push({
+        id:"typhoon",level:"danger",icon:"🌀",
+        title:isZh?"颱風跡象警報":"Peringatan Topan",
+        detail:isZh?`風速最高 ${Math.round(Math.max(curWind,w6.mx))} km/h，伴隨${isStormCode?"雷暴":"豪雨"}，密切注意官方公告（推算）`
+          :`Angin maks ${Math.round(Math.max(curWind,w6.mx))} km/jam, disertai ${isStormCode?"badai":"hujan deras"}, pantau pengumuman resmi`
+      });
+    }
+  }
+  // 2. 雷雨
+  if(cfg.storm!==false && userItems.storm!==false && (curCode===95||curCode===96||curCode===99)){
+    out.push({
+      id:"storm",level:"danger",icon:"⛈",
+      title:isZh?"雷雨警報":"Peringatan Badai",
+      detail:isZh?"目前有雷雨，避免戶外、遠離高處與電器":"Badai aktif, hindari luar ruangan dan peralatan listrik"
+    });
+  }
+  // 3. 豪雨（未來 6h 任一小時 ≥ heavyRainProb）
+  if(cfg.heavyRain!==false && userItems.heavyRain!==false && isInDetectionWindow('heavyRain')){
+    const th=cfg.heavyRainProb||80;
+    const r=maxRain(6);
+    if(r.mx>=th){
+      out.push({
+        id:"heavyRain",level:"danger",icon:"🌧",
+        title:isZh?"豪雨警報":"Peringatan Hujan Lebat",
+        detail:isZh?`${hourLabel(r.at)} 降雨機率 ${r.mx}%，注意低窪積水`
+          :`Pukul ${hourLabel(r.at)} prob hujan ${r.mx}%, waspada banjir`
+      });
+    }
+  }
+  // 4. 一般降雨（未來 3h）— 若豪雨已觸發則跳過避免重複
+  if(cfg.rain!==false && userItems.rain!==false && isInDetectionWindow('rain') && !out.some(a=>a.id==="heavyRain"||a.id==="storm"||a.id==="typhoon")){
+    const th=cfg.rainProb||60;
+    const r=maxRain(3);
+    if(r.mx>=th){
+      out.push({
+        id:"rain",level:"warn",icon:"🌂",
+        title:isZh?"降雨提醒":"Peringatan Hujan",
+        detail:isZh?`${hourLabel(r.at)} 降雨機率 ${r.mx}%，建議攜帶雨具`
+          :`Pukul ${hourLabel(r.at)} prob hujan ${r.mx}%, bawa payung`
+      });
+    }
+  }
+  // 5. 強風（單獨成立，颱風已含則跳過）
+  if(cfg.strongWind!==false && userItems.strongWind!==false && isInDetectionWindow('strongWind') && !out.some(a=>a.id==="typhoon")){
+    const wTh=cfg.windThreshold||50;
+    const w3=maxWind(3);
+    const mxW=Math.max(curWind,w3.mx);
+    if(mxW>=wTh){
+      out.push({
+        id:"strongWind",level:"warn",icon:"💨",
+        title:isZh?"強風警報":"Peringatan Angin Kencang",
+        detail:isZh?`風速 ${Math.round(mxW)} km/h，騎車注意、固定戶外物品`
+          :`Angin ${Math.round(mxW)} km/jam, hati-hati berkendara`
+      });
+    }
+  }
+  // 6. 高溫
+  if(cfg.heat!==false && userItems.heat!==false && isInDetectionWindow('heat')){
+    const th=cfg.heatThreshold||36;
+    if(curTemp>=th){
+      out.push({
+        id:"heat",level:"warn",icon:"🥵",
+        title:isZh?"高溫警報":"Peringatan Panas",
+        detail:isZh?`目前 ${curTemp}°C，多補水、避免長時間戶外曝曬`
+          :`Suhu ${curTemp}°C, minum banyak, hindari panas`
+      });
+    }
+  }
+  // 7. 低溫
+  if(cfg.cold!==false && userItems.cold!==false && isInDetectionWindow('cold')){
+    const th=cfg.coldThreshold||10;
+    if(curTemp<=th){
+      out.push({
+        id:"cold",level:"warn",icon:"🥶",
+        title:isZh?"低溫警報":"Peringatan Dingin",
+        detail:isZh?`目前 ${curTemp}°C，注意保暖、長者與心血管族群留意`
+          :`Suhu ${curTemp}°C, jaga kehangatan`
+      });
+    }
+  }
+  // 8. 濃霧
+  if(cfg.fog!==false && userItems.fog!==false && isInDetectionWindow('fog') && (curCode===45||curCode===48)){
+    out.push({
+      id:"fog",level:"info",icon:"🌫",
+      title:isZh?"濃霧提醒":"Peringatan Kabut",
+      detail:isZh?"能見度差，行車開大燈、保持車距":"Visibilitas rendah, nyalakan lampu, jaga jarak"
+    });
+  }
+  return out;
+}
+
+// ═══ 警報橫幅 HTML ═══
+// 一次性注入脈動動畫 CSS
+(function(){
+  if(document.getElementById('_wxAlertCss'))return;
+  const s=document.createElement('style');s.id='_wxAlertCss';
+  s.textContent='@keyframes wxAlertPulse{0%,100%{box-shadow:0 0 0 0 rgba(198,40,40,0.4)}50%{box-shadow:0 0 0 4px rgba(198,40,40,0)}}.wx-alert-pulse{animation:wxAlertPulse 1.8s ease-in-out infinite}.wx-alert{transition:transform .15s}.wx-alert:active{transform:scale(.98)}';
+  if(document.head)document.head.appendChild(s);
+  else document.addEventListener('DOMContentLoaded',()=>document.head.appendChild(s));
+})();
+function wxAlertHtml(){
+  if(!wxData||S.step!=="cal") return "";
+  const alerts=evaluateWxAlerts();
+  if(!alerts.length) return "";
+  const isZh=lang==="zh";
+  // 顏色映射
+  const styleOf={
+    danger:{bg:"linear-gradient(90deg,#ffebee,#ffcdd2)",bc:"#c62828",tc:"#b71c1c",pulse:true},
+    warn:  {bg:"linear-gradient(90deg,#fff8e1,#ffe082)",bc:"#f57f17",tc:"#bf360c",pulse:false},
+    info:  {bg:"#e3f2fd",bc:"#1976d2",tc:"#0d47a1",pulse:false}
+  };
+  const items=alerts.map(a=>{
+    const s=styleOf[a.level]||styleOf.warn;
+    return `<div class="wx-alert ${s.pulse?'wx-alert-pulse':''}" style="background:${s.bg};border-left:4px solid ${s.bc};color:${s.tc};padding:8px 12px;margin:4px 0;border-radius:6px;font-size:11px;line-height:1.5;display:flex;gap:8px;align-items:flex-start">
+      <div style="font-size:18px;flex-shrink:0;line-height:1">${a.icon}</div>
+      <div style="flex:1"><div style="font-weight:700;font-size:12px">${a.title}</div><div style="margin-top:2px;opacity:0.9">${a.detail}</div></div>
+    </div>`;
+  }).join("");
+  // 標題列
+  const head=`<div style="font-size:10px;color:var(--tx3);margin:6px 0 2px;display:flex;align-items:center;gap:4px"><span>🚨</span><span>${isZh?"即時天氣警報":"Peringatan Cuaca"}</span></div>`;
+  return head+items;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 系統通知（手機推播）引擎
+// 開 app 時、回到 app 時、Android 背景同步喚醒 SW 時都會檢查
+// 注意：iOS 必須先把 PWA 加到主畫面（Safari 16.4+）才能收到
+// ═══════════════════════════════════════════════════════════════
+const ALERT_LEVEL_CRITICAL=new Set(["typhoon","storm","heavyRain","earthquake"]);
+
+function notifyKeyForAlert(id){
+  return ({typhoon:"notifyTyphoon",storm:"notifyStorm",heavyRain:"notifyHeavyRain",
+    rain:"notifyRain",strongWind:"notifyStrongWind",heat:"notifyHeat",cold:"notifyCold",fog:"notifyFog",
+    earthquake:"notifyEarthquake"})[id];
+}
+
+function isInQuietHours(){
+  const cfg=APP_CFG.wxAlerts||{};
+  const qs=cfg.quietStart;const qe=cfg.quietEnd;
+  if(qs===undefined||qe===undefined||qs===qe) return false;
+  const h=new Date().getHours();
+  if(qs<qe) return h>=qs&&h<qe;            // 例：8-18
+  return h>=qs||h<qe;                        // 例：22-7（跨午夜）
+}
+
+function getNotifyState(){
+  try{return JSON.parse(localStorage.getItem('_wxNotifyState'))||{}}catch(e){return {}}
+}
+function setNotifyState(s){
+  try{localStorage.setItem('_wxNotifyState',JSON.stringify(s))}catch(e){}
+}
+
+// 過濾出「現在應該推送系統通知」的警報
+function filterAlertsForNotify(alerts){
+  const cfg=APP_CFG.wxAlerts||{};
+  if(cfg.notifyEnabled===false) return [];
+  if(cfg.master===false) return [];
+  // 用戶層
+  const up=USER_PREFS||{};
+  if(up.wxNotify===false) return [];
+  if(up.wxMaster===false) return [];
+  const userNotifyItems=up.wxNotifyItems||{};
+  const inQuiet=isInQuietHours();
+  const cooldownMs=(cfg.cooldownHours||3)*3600*1000;
+  const now=Date.now();
+  const st=getNotifyState();
+  const out=[];
+  for(const a of alerts){
+    const key=notifyKeyForAlert(a.id);
+    if(!key) continue;
+    if(cfg[key]===false) continue;           // 管理員：此警報的推送已關閉
+    if(userNotifyItems[a.id]===false) continue; // 用戶：此警報的推送已關閉
+    // 靜音時段：嚴重警報可越過
+    if(inQuiet){
+      if(!cfg.quietIgnoreCritical) continue;
+      if(!ALERT_LEVEL_CRITICAL.has(a.id)) continue;
+    }
+    // 地震去重：用 EarthquakeNo（瞬發事件，不能用時間冷卻）
+    if(a.id==='earthquake'&&a.eqNo){
+      const eqState=st._eqLastNo||'';
+      if(eqState===a.eqNo) continue; // 已通知過這筆
+      st._eqLastNo=a.eqNo;
+      out.push(a);
+      continue;
+    }
+    // 其他警報：冷卻時間
+    const last=st[a.id]||0;
+    if(now-last<cooldownMs) continue;
+    out.push(a);
+  }
+  return out;
+}
+
+// 通知權限狀態
+function getNotifyPermission(){
+  if(typeof Notification==='undefined') return 'unsupported';
+  return Notification.permission; // 'granted' | 'denied' | 'default'
+}
+
+// 請求權限（必須在 user gesture 內呼叫）
+async function requestNotifyPermission(){
+  if(typeof Notification==='undefined'){
+    alert(lang==='zh'?'此裝置不支援通知（iOS 請先「加入主畫面」並使用 Safari 16.4+）':'Device not supported');
+    return 'unsupported';
+  }
+  // iOS 提示：必須加到主畫面
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  const standalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
+  if(isIOS&&!standalone){
+    alert(lang==='zh'?'iOS 必須先把 App 加入主畫面才能啟用通知：\nSafari → 分享 → 加入主畫面\n然後從主畫面開啟':'iOS: add to home screen first');
+    return 'need-install';
+  }
+  try{
+    const p=await Notification.requestPermission();
+    if(p==='granted'){
+      // 註冊 periodic background sync（Android Chrome 才有用，iOS 不支援）
+      tryRegisterPeriodicSync();
+      // 立即檢查一次
+      checkAndNotifyAlerts();
+    }
+    render();
+    return p;
+  }catch(e){return 'error'}
+}
+
+// 嘗試註冊 periodic sync（讓 SW 在背景定期被喚醒）
+async function tryRegisterPeriodicSync(){
+  if(!('serviceWorker' in navigator)) return;
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    if('periodicSync' in reg){
+      const status=await navigator.permissions.query({name:'periodic-background-sync'});
+      if(status.state==='granted'){
+        await reg.periodicSync.register('wx-alert-check',{minInterval:3600*1000}); // 1 小時
+      }
+    }
+  }catch(e){console.log('periodicSync register err',e)}
+}
+
+// 主檢查函式 — 比對警報、過濾、推送
+async function checkAndNotifyAlerts(){
+  try{
+    if(typeof Notification==='undefined') return;
+    if(Notification.permission!=='granted') return;
+    if(!wxData) return;
+    const alerts=evaluateWxAlerts();
+    if(!alerts.length) return;
+    const toPush=filterAlertsForNotify(alerts);
+    if(!toPush.length) return;
+    // 取得 SW
+    let reg=null;
+    if('serviceWorker' in navigator){
+      try{reg=await navigator.serviceWorker.ready}catch(e){}
+    }
+    const st=getNotifyState();
+    const now=Date.now();
+    for(const a of toPush){
+      const title=a.icon+' '+a.title;
+      const body=a.detail;
+      const opts={
+        body:body,
+        icon:'./admin/icon-192.png',
+        badge:'./admin/icon-192.png',
+        tag:'wx-'+a.id,                 // 同 tag 自動覆蓋舊通知
+        renotify:true,
+        requireInteraction:ALERT_LEVEL_CRITICAL.has(a.id), // 嚴重警報需手動關閉
+        data:{type:'wx-alert',id:a.id,ts:now},
+        vibrate:ALERT_LEVEL_CRITICAL.has(a.id)?[200,100,200,100,200]:[200]
+      };
+      try{
+        if(reg&&reg.showNotification){
+          await reg.showNotification(title,opts);
+        }else{
+          new Notification(title,opts);
+        }
+        st[a.id]=now;
+      }catch(e){console.log('notify err',e)}
+    }
+    setNotifyState(st);
+  }catch(e){console.log('checkAndNotifyAlerts err',e)}
+}
+
+// 在前台顯示「啟用通知」提示卡（若未授權）
+function notifyCtaHtml(){
+  if(typeof Notification==='undefined') return "";
+  if(S.step!=="cal") return "";
+  const cfg=APP_CFG.wxAlerts||{};
+  if(cfg.master===false||cfg.notifyEnabled===false) return "";
+  // 用戶層：自己關掉就不提示
+  const up=USER_PREFS||{};
+  if(up.wxMaster===false||up.wxNotify===false) return "";
+  // 已決定要做（granted/denied）就不再提示
+  const p=Notification.permission;
+  if(p==='granted') return "";
+  // 使用者過去 7 天內手動關掉提示就不再顯示
+  let dismissed=0;
+  try{dismissed=parseInt(localStorage.getItem('_wxNotifyCtaDismiss'))||0}catch(e){}
+  if(dismissed&&(Date.now()-dismissed)<7*24*3600*1000) return "";
+  const isZh=lang==='zh';
+  const text=p==='denied'
+    ? (isZh?'通知已被瀏覽器封鎖，請到系統設定開啟':'Notification blocked, enable in system settings')
+    : (isZh?'啟用系統通知，颱風/豪雨/強風時手機會主動跳警報':'Enable system notifications for severe weather');
+  const btn=p==='denied'
+    ? ''
+    : `<button onclick="requestNotifyPermission();event.stopPropagation()" style="background:#fff;color:#00695c;border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;margin-top:6px">${isZh?'啟用通知':'Enable'}</button>`;
+  return `<div onclick="(function(){try{localStorage.setItem('_wxNotifyCtaDismiss',Date.now())}catch(e){};render()})()" style="margin:6px 0;padding:10px 12px;background:linear-gradient(135deg,#00897b,#00695c);color:#fff;border-radius:8px;font-size:11px;line-height:1.5;cursor:pointer">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div style="flex:1"><div style="font-weight:700;font-size:12px">🔔 ${isZh?'即時天氣推播':'Weather Push'}</div><div style="margin-top:2px;opacity:0.92">${text}</div>${btn}</div>
+      <div style="font-size:14px;opacity:0.7;flex-shrink:0">✕</div>
+    </div></div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 用戶個人設定面板（前台 modal）
+// 入口：天氣卡右上 ⚙️
+// ═══════════════════════════════════════════════════════════════
+let showUserPrefs=false;
+function openUserPrefs(){showUserPrefs=true;render()}
+function closeUserPrefs(){showUserPrefs=false;render()}
+try{window.openUserPrefs=openUserPrefs;window.closeUserPrefs=closeUserPrefs}catch(e){}
+
+// 警報項目定義（與後台一致）
+const _USR_ALERTS=[
+  {id:'earthquake',icon:'🌍',titleZh:'地震警報',titleId:'Gempa Bumi'},
+  {id:'typhoon',icon:'🌀',titleZh:'颱風',titleId:'Topan'},
+  {id:'storm',icon:'⛈',titleZh:'雷雨',titleId:'Badai'},
+  {id:'heavyRain',icon:'🌧',titleZh:'豪雨',titleId:'Hujan Lebat'},
+  {id:'rain',icon:'🌂',titleZh:'一般降雨',titleId:'Hujan'},
+  {id:'strongWind',icon:'💨',titleZh:'強風',titleId:'Angin Kencang'},
+  {id:'heat',icon:'🥵',titleZh:'高溫',titleId:'Panas'},
+  {id:'cold',icon:'🥶',titleZh:'低溫',titleId:'Dingin'},
+  {id:'fog',icon:'🌫',titleZh:'濃霧',titleId:'Kabut'}
+];
+
+function _miniSwitch(checked,onclickStr,disabled){
+  const dis=disabled?'opacity:0.4;pointer-events:none':'';
+  const bg=checked?'#00897b':'#ccc';
+  const left=checked?'21px':'3px';
+  return `<span onclick="${onclickStr}" style="display:inline-block;position:relative;width:42px;height:24px;background:${bg};border-radius:12px;cursor:pointer;transition:.2s;flex-shrink:0;${dis}"><span style="position:absolute;width:18px;height:18px;left:${left};top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span></span>`;
+}
+
+function userPrefsModalHtml(){
+  if(!showUserPrefs) return "";
+  const isZh=lang==='zh';
+  const up=USER_PREFS;
+  const cfg=APP_CFG.wxAlerts||{};
+  const adminVisualOn=APP_CFG.visualFx&&APP_CFG.visualFx.enabled!==false;
+  const adminWxOn=cfg.master!==false;
+  const adminNotifyOn=cfg.notifyEnabled!==false;
+
+  // 警報項目區塊
+  const alertRows=_USR_ALERTS.map(a=>{
+    const adminItemOn=cfg[a.id]!==false;
+    const adminNotifyKey=({typhoon:'notifyTyphoon',storm:'notifyStorm',heavyRain:'notifyHeavyRain',rain:'notifyRain',strongWind:'notifyStrongWind',heat:'notifyHeat',cold:'notifyCold',fog:'notifyFog',earthquake:'notifyEarthquake'})[a.id];
+    const adminNotifyItemOn=cfg[adminNotifyKey]!==false;
+    const userItemOn=(up.wxItems&&up.wxItems[a.id]!==false);
+    const userNotifyOn=(up.wxNotifyItems&&up.wxNotifyItems[a.id]!==false);
+    // 管理員關掉的話，顯示但灰掉
+    const adminBlocked=!adminItemOn;
+    const adminNotifyBlocked=!adminNotifyItemOn;
+    const title=isZh?a.titleZh:a.titleId;
+    return `<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:20px;width:28px;text-align:center;flex-shrink:0">${a.icon}</div>
+        <div style="flex:1;font-size:13px;font-weight:600">${title}</div>
+      </div>
+      <div style="display:flex;gap:20px;margin-top:8px;padding-left:38px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;color:${adminBlocked?'#bbb':'#666'}">${isZh?'顯示警報':'Tampilkan'}</span>${_miniSwitch(userItemOn&&!adminBlocked,"setUserPref('wxItems."+a.id+"',!USER_PREFS.wxItems."+a.id+")",adminBlocked)}</div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;color:${adminNotifyBlocked?'#bbb':'#666'}">${isZh?'推播通知':'Notifikasi'}</span>${_miniSwitch(userNotifyOn&&!adminNotifyBlocked,"setUserPref('wxNotifyItems."+a.id+"',!USER_PREFS.wxNotifyItems."+a.id+")",adminNotifyBlocked)}</div>
+      </div>
+      ${(adminBlocked||adminNotifyBlocked)?`<div style="padding-left:38px;margin-top:4px;font-size:9px;color:#bf6c00">⚠ ${isZh?'管理員已停用此項，無法在用戶端開啟':'Admin disabled'}</div>`:''}
+    </div>`;
+  }).join('');
+
+  // 動畫區塊
+  const userVisualOn=up.visualFx!==false;
+  const visualBlocked=!adminVisualOn;
+  const visualSection=`<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
+    <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:20px;width:28px;text-align:center">🎨</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600">${isZh?'天氣動畫與音效':'Animasi & Suara'}</div><div style="font-size:10px;color:#888;margin-top:2px">${isZh?'雨、雪、雲、螢火蟲、蝴蝶、鳥鳴、蟲鳴...':'Hujan, salju, awan, kupu-kupu...'}</div></div>
+      </div>
+      ${_miniSwitch(userVisualOn&&!visualBlocked,"setUserPref('visualFx',!USER_PREFS.visualFx)",visualBlocked)}
+    </div>
+    ${visualBlocked?`<div style="margin-top:4px;padding-left:38px;font-size:9px;color:#bf6c00">⚠ ${isZh?'管理員已停用動畫，無法在用戶端開啟':'Admin disabled animations'}</div>`:`<div style="margin-top:4px;padding-left:38px;font-size:9px;color:#888">${isZh?'關閉可省電、減輕效能負擔':'Disable to save battery'}</div>`}
+  </div>`;
+
+  // 通知權限狀態
+  const permState=getNotifyPermission();
+  let permTip='';
+  if(permState==='granted'){
+    permTip=`<div style="padding:8px 10px;background:#e8f5e9;border-radius:6px;font-size:10px;color:#2e7d32;margin-bottom:10px">✅ ${isZh?'系統通知已授權':'Notification allowed'}</div>`;
+  }else if(permState==='denied'){
+    permTip=`<div style="padding:8px 10px;background:#ffebee;border-radius:6px;font-size:10px;color:#c62828;margin-bottom:10px">🚫 ${isZh?'通知被瀏覽器封鎖，請到手機系統設定開啟':'Notification blocked, enable in system settings'}</div>`;
+  }else if(permState==='unsupported'){
+    permTip=`<div style="padding:8px 10px;background:#fff8e1;border-radius:6px;font-size:10px;color:#bf6c00;margin-bottom:10px">⚠ ${isZh?'此裝置不支援通知（iOS 請先「加入主畫面」並使用 Safari 16.4+）':'Device not supported'}</div>`;
+  }else{
+    permTip=`<div style="padding:8px 10px;background:#e3f2fd;border-radius:6px;font-size:10px;color:#1565c0;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px"><span>🔔 ${isZh?'尚未授權通知，點右側按鈕啟用':'Tap to enable'}</span><button onclick="requestNotifyPermission()" style="background:#1565c0;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer">${isZh?'啟用':'Enable'}</button></div>`;
+  }
+
+  // 總開關
+  const masterRow=`<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
+    <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px;flex:1">
+        <div style="font-size:20px;width:28px;text-align:center">🚨</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600">${isZh?'天氣警報（前台橫幅）':'Banner Alert'}</div></div>
+      </div>
+      ${_miniSwitch(up.wxMaster!==false&&adminWxOn,"setUserPref('wxMaster',!USER_PREFS.wxMaster)",!adminWxOn)}
+    </div>
+    ${!adminWxOn?`<div style="margin-top:4px;padding-left:38px;font-size:9px;color:#bf6c00">⚠ ${isZh?'管理員已停用警報系統':'Admin disabled'}</div>`:''}
+  </div>
+  <div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
+    <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px;flex:1">
+        <div style="font-size:20px;width:28px;text-align:center">📱</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600">${isZh?'手機系統通知':'Push Notification'}</div></div>
+      </div>
+      ${_miniSwitch(up.wxNotify!==false&&adminNotifyOn,"setUserPref('wxNotify',!USER_PREFS.wxNotify)",!adminNotifyOn)}
+    </div>
+    ${!adminNotifyOn?`<div style="margin-top:4px;padding-left:38px;font-size:9px;color:#bf6c00">⚠ ${isZh?'管理員已停用推播':'Admin disabled'}</div>`:''}
+  </div>`;
+
+  return `<div class="modal-bg" onclick="closeUserPrefs()">
+    <div class="modal-sheet help-sheet" onclick="event.stopPropagation()" style="max-width:480px">
+      <div class="modal-handle"></div>
+      <div class="modal-title">⚙️ ${isZh?'個人設定':'Pengaturan'}</div>
+      ${permTip}
+      <div style="font-size:10px;color:#999;margin:8px 0 4px;font-weight:700;letter-spacing:.5px">${isZh?'總開關':'MASTER'}</div>
+      <div style="background:#f8f9fa;border-radius:8px;padding:0 12px">${masterRow}</div>
+      <div style="font-size:10px;color:#999;margin:14px 0 4px;font-weight:700;letter-spacing:.5px">${isZh?'各警報項目':'EACH ALERT'}</div>
+      <div style="background:#f8f9fa;border-radius:8px;padding:0 12px">${alertRows}</div>
+      <div style="font-size:10px;color:#999;margin:14px 0 4px;font-weight:700;letter-spacing:.5px">${isZh?'外觀':'APPEARANCE'}</div>
+      <div style="background:#f8f9fa;border-radius:8px;padding:0 12px">${visualSection}</div>
+      <button class="modal-done" onclick="closeUserPrefs()" style="margin-top:14px">${t('done')}</button>
+    </div>
+  </div>`;
+}
+
 function rainWarnHtml(){
   if(!wxData||!wxData.hPrec||S.step!=="cal")return"";
   const sh=gs(TY,TM,TD);if(!sh||sh==="休")return"";
@@ -1445,10 +2287,30 @@ function wxHtml(){
   const d=wxData,wk=t("wk"),desc=lang==="zh"?WXZ:WXD;
   const fc=d.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();
     return`<div class="wx-day${i===0?' today':''}"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div class="wx-day-icon">${WXI[f.code]||"🌡"}</div><div class="wx-day-hi">${f.hi}°</div><div class="wx-day-lo">${f.lo}°</div></div>`}).join("");
-  return`<div class="wx-card fi" onclick="showWxDetail()" style="cursor:pointer"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"7日天氣預報 ▸":"Prakiraan 7 Hari ▸"}</div></div><div class="wx-fc">${fc}</div></div>${tideHtml()}`}
+  return`<div class="wx-card fi" style="cursor:pointer;position:relative"><button onclick="openUserPrefs();event.stopPropagation()" title="${lang==='zh'?'個人設定':'Settings'}" style="position:absolute;top:8px;right:8px;width:32px;height:32px;background:rgba(255,255,255,0.85);border:none;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.1)">⚙️</button><div onclick="showWxDetail()"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"7日天氣預報 ▸":"Prakiraan 7 Hari ▸"}</div></div><div class="wx-fc">${fc}</div></div></div>${tideHtml()}${userPrefsModalHtml()}`}
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 loadWx();
-setInterval(()=>{loadWx()},1800000);
+// 等 loadAppConfig 載入完才知道有沒有 typhoon worker URL
+setTimeout(()=>{try{loadTyphoon()}catch(e){}},3000);
+setInterval(()=>{loadWx();try{loadTyphoon()}catch(e){}},1800000);
+// 回到 app（從背景切回前景）時，若距上次 >10 分鐘就重新載入天氣＋檢查警報
+let _lastWxCheck=Date.now();
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) return;
+  const now=Date.now();
+  if(now-_lastWxCheck>600000){ // 10 分鐘
+    _lastWxCheck=now;
+    loadWx();
+    try{loadTyphoon()}catch(e){}
+  }else{
+    // 短時間切回不重抓 API，但仍跑一次通知檢查（設定可能在他處改）
+    try{checkAndNotifyAlerts()}catch(e){}
+  }
+});
+// 啟動時若已授權通知，順便嘗試註冊背景同步
+if(typeof Notification!=='undefined'&&Notification.permission==='granted'){
+  setTimeout(()=>{try{tryRegisterPeriodicSync()}catch(e){}},2000);
+}
 loadAdminEv();
 
 
@@ -2316,9 +3178,11 @@ const WxFx = (function(){
   // ═══ MAIN LOOP ═══
   function loop(){
     raf=requestAnimationFrame(loop);
-    // 全域 FX 停用 → 完全不畫
+    // 全域 FX 停用（管理員或用戶任一關閉） → 完全不畫
     try{
-      if(window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false){
+      const adminOff=window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false;
+      const userOff=window.USER_PREFS&&window.USER_PREFS.visualFx===false;
+      if(adminOff||userOff){
         ctx.clearRect(0,0,_w,_h);
         return;
       }
@@ -3338,9 +4202,11 @@ const WxSfx = (function(){
   try{muted=localStorage.getItem("sb_sfx")!=="on"}catch(e){}
   
   function initAudio(){
-    // 全域 FX 停用時，拒絕啟動音訊
+    // 全域 FX 停用時（管理員或用戶任一關閉），拒絕啟動音訊
     try{
-      if(window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false) return false;
+      const adminOff=window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false;
+      const userOff=window.USER_PREFS&&window.USER_PREFS.visualFx===false;
+      if(adminOff||userOff) return false;
     }catch(e){}
     if(_initialized) return true;
     try{
@@ -3521,9 +4387,11 @@ const WxSfx = (function(){
   }
   
   function toggle(){
-    // 全域 FX 停用時，無法解除靜音
+    // 全域 FX 停用時（管理員或用戶任一關閉），無法解除靜音
     try{
-      if(window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false){
+      const adminOff=window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false;
+      const userOff=window.USER_PREFS&&window.USER_PREFS.visualFx===false;
+      if(adminOff||userOff){
         muted=true;
         if(masterGain) masterGain.gain.value=0;
         render();
