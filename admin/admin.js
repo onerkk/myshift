@@ -12,7 +12,28 @@ const SUPER_ADMINS=["onerkk@gmail.com","asus0814999@gmail.com"];
 let user=null;
 let authReady=false;
 let activeTab="units";
-let CFG={units:[],rotations:[],leaveTypes:[],admins:[],visualFx:{enabled:true}};
+let CFG={units:[],rotations:[],leaveTypes:[],admins:[],visualFx:{enabled:true},wxAlerts:{}};
+const WX_ALERTS_DEFAULTS={
+  master:true,
+  typhoon:true,storm:true,heavyRain:true,rain:true,strongWind:true,heat:true,cold:true,fog:false,
+  earthquake:true,
+  rainProb:60,heavyRainProb:80,windThreshold:50,typhoonWind:62,heatThreshold:36,coldThreshold:10,
+  cwaWorkerUrl:"",
+  typhoonWorkerUrl:"",
+  typhoonAlertDistanceKm:800,
+  typhoonMinIntensity:'td',
+  typhoonAlertOnNotice:true,
+  earthquakeMinMagnitude:4.0,
+  earthquakeMinIntensity:3,
+  earthquakeMaxDistanceKm:0,
+  earthquakeMaxAgeMinutes:120,
+  notifyEnabled:true,
+  notifyTyphoon:true,notifyStorm:true,notifyHeavyRain:true,notifyRain:false,
+  notifyStrongWind:true,notifyHeat:false,notifyCold:false,notifyFog:false,
+  notifyEarthquake:true,
+  cooldownHours:3,quietStart:22,quietEnd:7,quietIgnoreCritical:true,
+  timeWindows:{rain:[],heavyRain:[],strongWind:[],heat:[],cold:[],fog:[]}
+};
 let USERS=[];
 let expandedUserId=null;
 let userSearch="";
@@ -64,6 +85,20 @@ async function loadAll(){
       CFG.leaveTypes=d.leaveTypes||[];
       CFG.admins=d.admins||[];
       CFG.visualFx=d.visualFx&&typeof d.visualFx.enabled==='boolean'?d.visualFx:{enabled:true};
+      // 深層處理 wxAlerts（timeWindows 是巢狀物件）
+      CFG.wxAlerts=JSON.parse(JSON.stringify(WX_ALERTS_DEFAULTS));
+      if(d.wxAlerts&&typeof d.wxAlerts==='object'){
+        for(const k in d.wxAlerts){
+          if(d.wxAlerts[k]===undefined||d.wxAlerts[k]===null) continue;
+          if(k==='timeWindows'&&typeof d.wxAlerts[k]==='object'){
+            for(const aid in d.wxAlerts.timeWindows){
+              if(Array.isArray(d.wxAlerts.timeWindows[aid])) CFG.wxAlerts.timeWindows[aid]=d.wxAlerts.timeWindows[aid];
+            }
+          }else{
+            CFG.wxAlerts[k]=d.wxAlerts[k];
+          }
+        }
+      }
     }
     if(isAdmin()){
       const snap=await fbDb.collection("users").get();
@@ -86,6 +121,7 @@ async function saveCfg(silent){
     await fbDb.collection("config").doc("app").set({
       units:CFG.units,rotations:CFG.rotations,leaveTypes:CFG.leaveTypes,admins:CFG.admins,
       visualFx:CFG.visualFx||{enabled:true},
+      wxAlerts:CFG.wxAlerts||WX_ALERTS_DEFAULTS,
       ts:firebase.firestore.FieldValue.serverTimestamp()
     },{merge:true});
     if(!silent)toast("已儲存","ok");
@@ -133,7 +169,8 @@ function tabsHtml(){
     {id:"leaveTypes",label:"📋 假別"},
     {id:"admins",label:"👑 管理員"},
     {id:"users",label:"👥 使用者"},
-    {id:"appearance",label:"🎨 外觀"}
+    {id:"appearance",label:"🎨 外觀"},
+    {id:"wxAlerts",label:"🚨 天氣警報"}
   ];
   return `<div class="tabs">${tabs.map(t=>`<button class="tab ${activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`).join("")}</div>`;
 }
@@ -148,6 +185,7 @@ function tabBodyHtml(){
     case"admins":return adminsTabHtml();
     case"users":return usersTabHtml();
     case"appearance":return appearanceTabHtml();
+    case"wxAlerts":return wxAlertsTabHtml();
   }
   return"";
 }
@@ -406,6 +444,304 @@ async function toggleVisualFx(){
 }
 
 // ═══════════════════════════════════════════════════════════════
+// TAB: 天氣警報設定
+// ═══════════════════════════════════════════════════════════════
+const WX_ALERT_DEFS=[
+  {id:'earthquake',icon:'🌍',title:'地震警報',desc:'CWA 官方資料；需部署 worker',critical:true,supportWindow:false},
+  {id:'typhoon',icon:'🌀',title:'颱風警報',desc:'有 worker → CWA 官方；無 worker → Open-Meteo 推算',thr:[{key:'typhoonWind',label:'推算風速門檻',unit:'km/h',min:40,max:150,step:5}],critical:true,supportWindow:false},
+  {id:'storm',icon:'⛈',title:'雷雨警報',desc:'天氣代碼 95/96/99（雷暴）',critical:true,supportWindow:false},
+  {id:'heavyRain',icon:'🌧',title:'豪雨警報',desc:'未來 6 小時任一小時降雨機率 ≥ 門檻',thr:[{key:'heavyRainProb',label:'降雨機率',unit:'%',min:50,max:100,step:5}],critical:true,supportWindow:true},
+  {id:'rain',icon:'🌂',title:'一般降雨提醒',desc:'未來 3 小時降雨機率 ≥ 門檻（豪雨已觸發時自動跳過）',thr:[{key:'rainProb',label:'降雨機率',unit:'%',min:10,max:100,step:5}],supportWindow:true},
+  {id:'strongWind',icon:'💨',title:'強風警報',desc:'當前或未來 3 小時風速 ≥ 門檻',thr:[{key:'windThreshold',label:'風速門檻',unit:'km/h',min:20,max:100,step:5}],supportWindow:true},
+  {id:'heat',icon:'🥵',title:'高溫警報',desc:'當前溫度 ≥ 門檻',thr:[{key:'heatThreshold',label:'溫度門檻',unit:'°C',min:28,max:45,step:1}],supportWindow:true},
+  {id:'cold',icon:'🥶',title:'低溫警報',desc:'當前溫度 ≤ 門檻',thr:[{key:'coldThreshold',label:'溫度門檻',unit:'°C',min:-5,max:20,step:1}],supportWindow:true},
+  {id:'fog',icon:'🌫',title:'濃霧提醒',desc:'天氣代碼 45/48（霧）',supportWindow:true}
+];
+
+function _wxNotifyKey(id){return 'notify'+id.charAt(0).toUpperCase()+id.slice(1)}
+function _wxA(){if(!CFG.wxAlerts)CFG.wxAlerts=Object.assign({},WX_ALERTS_DEFAULTS);return CFG.wxAlerts}
+
+function _wxSwitchHtml(checked,onclickStr){
+  const bg=checked?'#27ae60':'#7a8a99';
+  const left=checked?'24px':'3px';
+  return `<span onclick="${onclickStr}" style="display:inline-block;position:relative;width:48px;height:26px;background:${bg};border-radius:13px;cursor:pointer;transition:.2s;flex-shrink:0"><span style="position:absolute;width:20px;height:20px;left:${left};top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span></span>`;
+}
+
+function wxAlertsTabHtml(){
+  const c=_wxA();
+  const masterOn=c.master!==false;
+  const notifyOn=c.notifyEnabled!==false;
+  const tw=c.timeWindows||{};
+
+  // 警報項目
+  const alertItems=WX_ALERT_DEFS.map(a=>{
+    const itemOn=c[a.id]!==false;
+    const notifyKey=_wxNotifyKey(a.id);
+    const itemNotifyOn=c[notifyKey]!==false;
+    const thrHtml=a.thr?a.thr.map(t=>{
+      const val=c[t.key]!==undefined?c[t.key]:WX_ALERTS_DEFAULTS[t.key];
+      return `<div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:#aaa">${t.label}</span><input type="number" id="wx_${t.key}" value="${val}" min="${t.min}" max="${t.max}" step="${t.step}" onchange="wxSetThr('${t.key}',this.value)" style="width:64px;padding:5px 8px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:12px;text-align:right"><span style="font-size:10px;color:#aaa">${t.unit}</span></div>`;
+    }).join(''):'';
+
+    // 時段管理（僅 supportWindow 警報）
+    let windowHtml='';
+    if(a.supportWindow){
+      const windows=Array.isArray(tw[a.id])?tw[a.id]:[];
+      const winRows=windows.length?windows.map((w,wi)=>`<div style="display:flex;gap:4px;align-items:center;background:#1a2533;padding:4px 8px;border-radius:4px;margin:2px 0">
+        <input type="time" value="${w.start||'07:00'}" onchange="wxUpdWindow('${a.id}',${wi},'start',this.value)" style="padding:3px 6px;border:1px solid #3a4a5f;border-radius:3px;background:#0f1925;color:#fff;font-size:11px;font-family:inherit">
+        <span style="color:#888;font-size:11px">→</span>
+        <input type="time" value="${w.end||'08:00'}" onchange="wxUpdWindow('${a.id}',${wi},'end',this.value)" style="padding:3px 6px;border:1px solid #3a4a5f;border-radius:3px;background:#0f1925;color:#fff;font-size:11px;font-family:inherit">
+        <button onclick="wxDelWindow('${a.id}',${wi})" style="background:#5c2c2c;color:#fff;border:none;padding:3px 8px;border-radius:3px;font-size:10px;cursor:pointer">✕</button>
+      </div>`).join(''):'<div style="font-size:10px;color:#7a8a99;font-style:italic;padding:4px 0">未設定 = 全天偵測</div>';
+      windowHtml=`<div style="margin-top:8px;padding:8px 10px;background:#0d1925;border-radius:6px;border-left:3px solid #3949ab">
+        <div style="font-size:10px;color:#aaa;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
+          <span>⏰ 偵測時段（多時段任一成立就觸發）</span>
+          <button onclick="wxAddWindow('${a.id}')" style="background:#3949ab;color:#fff;border:none;padding:3px 10px;border-radius:3px;font-size:10px;font-weight:600;cursor:pointer">+ 新增時段</button>
+        </div>
+        ${winRows}
+      </div>`;
+    }
+
+    return `<div class="row" style="flex-direction:column;align-items:stretch;padding:10px 12px">
+      <div style="display:flex;align-items:center;gap:10px;width:100%">
+        <div style="font-size:22px;width:30px;text-align:center">${a.icon}</div>
+        <div class="info" style="flex:1">
+          <div class="name">${a.title}</div>
+          <div class="sub">${a.desc}</div>
+        </div>
+        ${_wxSwitchHtml(itemOn,"wxToggle('"+a.id+"')")}
+      </div>
+      <div style="display:flex;gap:14px;margin-top:8px;padding-left:40px;flex-wrap:wrap;align-items:center">
+        ${thrHtml}
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+          <span style="font-size:11px;color:${itemNotifyOn?'#27ae60':'#aaa'}">${itemNotifyOn?'🔔':'🔕'} 系統通知</span>
+          ${_wxSwitchHtml(itemNotifyOn,"wxToggleNotify('"+a.id+"')")}
+        </div>
+      </div>
+      ${windowHtml}
+    </div>`;
+  }).join("");
+
+  // 通知行為設定
+  const cdHours=c.cooldownHours!==undefined?c.cooldownHours:3;
+  const qic=c.quietIgnoreCritical!==false;
+  const hourOpts=Array.from({length:24},(_,h)=>`<option value="${h}">${String(h).padStart(2,'0')}:00</option>`).join('');
+
+  // CWA 官方資料設定（颱風 + 地震共用一個 worker）
+  const tyUrl=c.cwaWorkerUrl||c.typhoonWorkerUrl||'';
+  const tyDist=c.typhoonAlertDistanceKm!==undefined?c.typhoonAlertDistanceKm:800;
+  const tyMinInt=c.typhoonMinIntensity||'td';
+  const tyOnNotice=c.typhoonAlertOnNotice!==false;
+  const intensityOpts=[
+    {v:'td',l:'熱帶性低氣壓 (TD)'},
+    {v:'mild',l:'輕度颱風 (≥17.2 m/s)'},
+    {v:'moderate',l:'中度颱風 (≥32.7 m/s)'},
+    {v:'severe',l:'強烈颱風 (≥51 m/s)'}
+  ].map(o=>`<option value="${o.v}"${o.v===tyMinInt?' selected':''}>${o.l}</option>`).join('');
+  const workerStatus=tyUrl
+    ?'<span style="color:#27ae60;font-weight:600">✓ 已設定（使用 CWA 官方資料：颱風 + 地震）</span>'
+    :'<span style="color:#e67e22;font-weight:600">⚠ 未設定（颱風用 Open-Meteo 推算；地震無資料）</span>';
+
+  // 地震設定
+  const eqMinMag=c.earthquakeMinMagnitude!==undefined?c.earthquakeMinMagnitude:4.0;
+  const eqMinInt=c.earthquakeMinIntensity!==undefined?c.earthquakeMinIntensity:3;
+  const eqMaxDist=c.earthquakeMaxDistanceKm!==undefined?c.earthquakeMaxDistanceKm:0;
+  const eqMaxAge=c.earthquakeMaxAgeMinutes!==undefined?c.earthquakeMaxAgeMinutes:120;
+
+  return `<div class="card">
+    <h2>🚨 即時天氣警報</h2>
+    <div style="color:#aaa;font-size:12px;line-height:1.6;margin-bottom:14px">
+      偵測：颱風、雷雨、豪雨、強風、高/低溫、濃霧。<br>
+      此處設定為「全局上限」，用戶端可進一步在自己 app 內關閉。
+    </div>
+
+    <div class="row" style="padding:12px;background:linear-gradient(135deg,#0d6b5e,#0a4d44);border-radius:8px;margin-bottom:8px">
+      <div class="info">
+        <div class="name" style="color:#fff">⚡ 警報系統總開關</div>
+        <div class="sub" style="color:rgba(255,255,255,.85)">關閉後所有警報不顯示也不通知</div>
+      </div>
+      ${_wxSwitchHtml(masterOn,"wxToggleMaster()")}
+    </div>
+    <div class="row" style="padding:12px;background:linear-gradient(135deg,#283593,#1a237e);border-radius:8px;margin-bottom:14px">
+      <div class="info">
+        <div class="name" style="color:#fff">🔔 系統通知總開關</div>
+        <div class="sub" style="color:rgba(255,255,255,.85)">關閉後不會跳手機通知，但前台仍顯示警報橫幅</div>
+      </div>
+      ${_wxSwitchHtml(notifyOn,"wxToggleNotifyMaster()")}
+    </div>
+
+    <h2 style="margin-top:18px">🌐 CWA 官方資料（颱風 + 地震）</h2>
+    <div style="padding:10px;background:#1a2533;border-radius:6px;margin-bottom:12px;font-size:11px;color:#aaa;line-height:1.6">
+      目前狀態：${workerStatus}<br>
+      免費設定方法（一次設定，同時取得颱風與地震資料）：<br>
+      1. 到 <strong style="color:#fff">opendata.cwa.gov.tw</strong> 註冊會員（免費）拿 API key<br>
+      2. Cloudflare 部署 Worker（程式碼在 cwa-data-worker.js）<br>
+      3. 把 worker URL 填入下方
+    </div>
+    <div class="row" style="padding:10px 12px;flex-direction:column;align-items:stretch">
+      <div style="font-size:12px;color:#aaa;margin-bottom:6px">Worker URL</div>
+      <input type="text" id="wx_cwaWorkerUrl" value="${esc(tyUrl)}" placeholder="https://cwa-data.xxx.workers.dev" onchange="wxSetStr('cwaWorkerUrl',this.value)" style="width:100%;padding:8px 10px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:12px;font-family:inherit;box-sizing:border-box">
+    </div>
+
+    <h2 style="margin-top:18px">🌀 颱風警報參數</h2>
+    <div class="row" style="padding:10px 12px">
+      <div class="info">
+        <div class="name">距台灣警報門檻</div>
+        <div class="sub">颱風中心或預測路徑進入此距離內才觸發警報</div>
+      </div>
+      <input type="number" id="wx_typhoonAlertDistanceKm" value="${tyDist}" min="100" max="2000" step="50" onchange="wxSetThr('typhoonAlertDistanceKm',this.value)" style="width:80px;padding:6px 10px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:13px;text-align:right">
+      <span style="font-size:11px;color:#aaa;margin-left:6px">km</span>
+    </div>
+    <div class="row" style="padding:10px 12px">
+      <div class="info">
+        <div class="name">最低強度門檻</div>
+        <div class="sub">低於此強度的熱帶系統不觸發警報</div>
+      </div>
+      <select id="wx_typhoonMinIntensity" onchange="wxSetStr('typhoonMinIntensity',this.value)" style="padding:6px 8px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:12px">${intensityOpts}</select>
+    </div>
+    <div class="row" style="padding:10px 12px">
+      <div class="info">
+        <div class="name">官方發布警報時忽略距離</div>
+        <div class="sub">CWA 發布海/陸警時一律觸發，不受距離與強度限制</div>
+      </div>
+      ${_wxSwitchHtml(tyOnNotice,"wxToggleNoticeOverride()")}
+    </div>
+
+    <h2 style="margin-top:18px">🌍 地震警報參數</h2>
+    <div style="padding:10px;background:#1a2533;border-radius:6px;margin-bottom:12px;font-size:11px;color:#aaa;line-height:1.6">
+      規模或震度任一達標即觸發（OR 邏輯）。同一筆地震不會重複推播。<br>
+      <strong style="color:#fff">CWA 震度標準</strong>：1-2 微震、3 弱震、4 中震、5弱/5強 強震、6弱/6強 烈震、7 劇震
+    </div>
+    <div class="row" style="padding:10px 12px">
+      <div class="info">
+        <div class="name">最低規模門檻 (M)</div>
+        <div class="sub">里氏規模達此值即觸發</div>
+      </div>
+      <input type="number" id="wx_earthquakeMinMagnitude" value="${eqMinMag}" min="3" max="9" step="0.1" onchange="wxSetThr('earthquakeMinMagnitude',this.value)" style="width:80px;padding:6px 10px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:13px;text-align:right">
+      <span style="font-size:11px;color:#aaa;margin-left:6px">M</span>
+    </div>
+    <div class="row" style="padding:10px 12px">
+      <div class="info">
+        <div class="name">最低震度門檻</div>
+        <div class="sub">任一縣市達此震度即觸發（CWA 推播多用震度 ≥ 3）</div>
+      </div>
+      <input type="number" id="wx_earthquakeMinIntensity" value="${eqMinInt}" min="1" max="7" step="1" onchange="wxSetThr('earthquakeMinIntensity',this.value)" style="width:80px;padding:6px 10px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:13px;text-align:right">
+      <span style="font-size:11px;color:#aaa;margin-left:6px">級</span>
+    </div>
+    <div class="row" style="padding:10px 12px">
+      <div class="info">
+        <div class="name">距用戶距離限制</div>
+        <div class="sub">震央距用戶超過此距離不警報，0 = 不限</div>
+      </div>
+      <input type="number" id="wx_earthquakeMaxDistanceKm" value="${eqMaxDist}" min="0" max="1000" step="50" onchange="wxSetThr('earthquakeMaxDistanceKm',this.value)" style="width:80px;padding:6px 10px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:13px;text-align:right">
+      <span style="font-size:11px;color:#aaa;margin-left:6px">km</span>
+    </div>
+    <div class="row" style="padding:10px 12px">
+      <div class="info">
+        <div class="name">時效（多久內的地震才警報）</div>
+        <div class="sub">超過此分鐘數的地震視為「舊資料」不警報</div>
+      </div>
+      <input type="number" id="wx_earthquakeMaxAgeMinutes" value="${eqMaxAge}" min="10" max="1440" step="10" onchange="wxSetThr('earthquakeMaxAgeMinutes',this.value)" style="width:80px;padding:6px 10px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:13px;text-align:right">
+      <span style="font-size:11px;color:#aaa;margin-left:6px">分鐘</span>
+    </div>
+
+    <h2 style="margin-top:18px">⚙️ 警報項目（每項可獨立調整閾值、時段、推播）</h2>
+    ${alertItems}
+
+    <h2 style="margin-top:18px">🌙 通知行為</h2>
+    <div class="row" style="padding:10px 12px">
+      <div class="info">
+        <div class="name">同警報冷卻時間</div>
+        <div class="sub">同一警報在此時間內不重複通知</div>
+      </div>
+      <input type="number" id="wx_cd" value="${cdHours}" min="1" max="24" step="1" onchange="wxSetThr('cooldownHours',this.value)" style="width:64px;padding:6px 10px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:13px;text-align:right">
+      <span style="font-size:11px;color:#aaa;margin-left:6px">小時</span>
+    </div>
+    <div class="row" style="padding:10px 12px">
+      <div class="info">
+        <div class="name">靜音時段</div>
+        <div class="sub">此時段不發送通知（嚴重警報除外）</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <select id="wx_qs" onchange="wxSetThr('quietStart',this.value)" style="padding:6px 8px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:12px">${hourOpts}</select>
+        <span style="color:#aaa">→</span>
+        <select id="wx_qe" onchange="wxSetThr('quietEnd',this.value)" style="padding:6px 8px;border:1px solid #4a5a6f;border-radius:4px;background:#2a3a4f;color:#fff;font-size:12px">${hourOpts}</select>
+      </div>
+    </div>
+    <div class="row" style="padding:10px 12px">
+      <div class="info">
+        <div class="name">嚴重警報忽略靜音</div>
+        <div class="sub">颱風 / 雷雨 / 豪雨 在靜音時段也會通知</div>
+      </div>
+      ${_wxSwitchHtml(qic,"wxToggleQuietCritical()")}
+    </div>
+
+    <div style="margin-top:14px;padding:10px;background:#1a2533;border-radius:6px;font-size:11px;color:#aaa;line-height:1.6">
+      💡 <strong style="color:#fff">提示</strong>：iOS 用戶必須先把 App「加入主畫面」並從主畫面開啟才能收到通知。<br>
+      🆓 <strong style="color:#fff">免費保證</strong>：所有 API 與服務皆免費（Open-Meteo / CWA / Cloudflare Worker 免費額度 / Firestore 既有額度）。
+    </div>
+    <button class="btn red" onclick="wxResetDefaults()" style="margin-top:14px">恢復預設</button>
+  </div>`;
+}
+
+// 設定完即時存（debounce）
+let _wxSaveTimer=null;
+function _wxScheduleSave(){
+  if(_wxSaveTimer)clearTimeout(_wxSaveTimer);
+  _wxSaveTimer=setTimeout(()=>{_wxSaveTimer=null;saveCfg(true);},400);
+}
+
+async function wxToggleMaster(){_wxA().master=!(_wxA().master!==false);await saveCfg(true);render()}
+async function wxToggleNotifyMaster(){_wxA().notifyEnabled=!(_wxA().notifyEnabled!==false);await saveCfg(true);render()}
+async function wxToggle(id){const c=_wxA();c[id]=!(c[id]!==false);await saveCfg(true);render()}
+async function wxToggleNotify(id){const c=_wxA();const k=_wxNotifyKey(id);c[k]=!(c[k]!==false);await saveCfg(true);render()}
+async function wxToggleQuietCritical(){_wxA().quietIgnoreCritical=!(_wxA().quietIgnoreCritical!==false);await saveCfg(true);render()}
+async function wxToggleNoticeOverride(){_wxA().typhoonAlertOnNotice=!(_wxA().typhoonAlertOnNotice!==false);await saveCfg(true);render()}
+function wxSetThr(key,val){
+  const c=_wxA();
+  const v=parseFloat(val);
+  if(!isNaN(v)) c[key]=v;
+  _wxScheduleSave();
+}
+function wxSetStr(key,val){
+  _wxA()[key]=String(val||'').trim();
+  _wxScheduleSave();
+}
+// 時段管理
+async function wxAddWindow(alertId){
+  const c=_wxA();
+  if(!c.timeWindows) c.timeWindows={};
+  if(!Array.isArray(c.timeWindows[alertId])) c.timeWindows[alertId]=[];
+  c.timeWindows[alertId].push({start:'07:00',end:'08:00'});
+  await saveCfg(true);
+  render();
+}
+async function wxDelWindow(alertId,idx){
+  const c=_wxA();
+  if(!c.timeWindows||!Array.isArray(c.timeWindows[alertId])) return;
+  c.timeWindows[alertId].splice(idx,1);
+  await saveCfg(true);
+  render();
+}
+function wxUpdWindow(alertId,idx,field,val){
+  const c=_wxA();
+  if(!c.timeWindows||!Array.isArray(c.timeWindows[alertId])) return;
+  if(!c.timeWindows[alertId][idx]) return;
+  c.timeWindows[alertId][idx][field]=val;
+  _wxScheduleSave();
+}
+async function wxResetDefaults(){
+  if(!confirm('確定恢復所有天氣警報設定為預設值？'))return;
+  // 深拷貝預設（避免 timeWindows 物件共享）
+  CFG.wxAlerts=JSON.parse(JSON.stringify(WX_ALERTS_DEFAULTS));
+  await saveCfg();
+  render();
+}
+
+// 因為 select 預設值需要在 render 後設定，這裡延遲設定
+// （bind 函式會在每次 render 後執行）
+
+// ═══════════════════════════════════════════════════════════════
 // TAB 5: 使用者管理
 // ═══════════════════════════════════════════════════════════════
 function usersTabHtml(){
@@ -527,7 +863,15 @@ async function deleteUser(id){
 
 // ═══ event binding ═══
 function bind(){
-  // 未來如需額外事件可加在這
+  // 天氣警報 tab：select 元素的預設值要在 DOM 渲染後才能設定
+  if(activeTab==='wxAlerts'){
+    try{
+      const c=CFG.wxAlerts||{};
+      const qs=$("wx_qs"),qe=$("wx_qe");
+      if(qs) qs.value=c.quietStart!==undefined?c.quietStart:22;
+      if(qe) qe.value=c.quietEnd!==undefined?c.quietEnd:7;
+    }catch(e){}
+  }
 }
 
 // ═══ 註冊 service worker (PWA) ═══
