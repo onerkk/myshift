@@ -1560,12 +1560,14 @@ async function loadWx(retries){
 let typhoonData=null,typhoonErr=false;
 let earthquakeData=null,earthquakeErr=false;
 
+// CWA Worker URL — 已寫死，永遠使用此 worker
+// 若要更換 worker，直接修改下方常數即可
+const CWA_WORKER_URL='https://cwa-data.onerkk.workers.dev';
+
 function _getCwaWorkerUrl(){
-  const cfg=APP_CFG.wxAlerts||{};
-  // 優先用新欄位 cwaWorkerUrl，向後相容讀 typhoonWorkerUrl
-  return (cfg.cwaWorkerUrl&&/^https?:\/\//.test(cfg.cwaWorkerUrl))?cfg.cwaWorkerUrl
-    :(cfg.typhoonWorkerUrl&&/^https?:\/\//.test(cfg.typhoonWorkerUrl))?cfg.typhoonWorkerUrl
-    :'';
+  // 寫死版本：永遠使用 CWA_WORKER_URL
+  // 後台設定的 cwaWorkerUrl / typhoonWorkerUrl 已忽略
+  return CWA_WORKER_URL;
 }
 
 async function loadCwaData(){

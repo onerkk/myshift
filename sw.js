@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v179';
+const CACHE_NAME = 'myshift-v180';
 
 self.addEventListener('install', event => {
   // 新 SW 等使用者下次開啟 app 才接管，避免操作中被打斷
@@ -334,10 +334,9 @@ async function swBackgroundCheck() {
     let wx = null;
     try { wx = await swFetchWeather(pos.lat, pos.lon); } catch (e) {}
 
-    // 抓 CWA 資料（颱風 + 地震，向後相容讀 cwaWorkerUrl / typhoonWorkerUrl）
+    // 抓 CWA 資料（颱風 + 地震）— Worker URL 已寫死
     let cwaData = null;
-    const cwaUrl = (cfg.cwaWorkerUrl && /^https?:\/\//.test(cfg.cwaWorkerUrl)) ? cfg.cwaWorkerUrl
-      : (cfg.typhoonWorkerUrl && /^https?:\/\//.test(cfg.typhoonWorkerUrl)) ? cfg.typhoonWorkerUrl : '';
+    const cwaUrl = 'https://cwa-data.onerkk.workers.dev';
     if (cwaUrl) {
       try {
         const resp = await fetch(cwaUrl);
