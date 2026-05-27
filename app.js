@@ -1515,7 +1515,7 @@ async function loadWx(retries){
         navigator.serviceWorker.controller.postMessage({type:'WX_POS',lat:parseFloat(lat),lon:parseFloat(lon)});
       }
     }catch(e){}
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability,temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&timezone=auto&forecast_days=7`;
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability,temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&timezone=auto&forecast_days=7&cell_selection=nearest`;
     const resp=await Promise.race([fetch(url),new Promise((_,r)=>setTimeout(()=>r('timeout'),10000))]);
     if(!resp.ok)throw new Error('API '+resp.status);
     const data=await resp.json();
@@ -2150,23 +2150,25 @@ function closeUserPrefs(){showUserPrefs=false;render()}
 try{window.openUserPrefs=openUserPrefs;window.closeUserPrefs=closeUserPrefs}catch(e){}
 
 // 警報項目定義（與後台一致）
+// 各警報項目的視覺主題色（同時用於開關 ON 顏色與圖示底色）
 const _USR_ALERTS=[
-  {id:'earthquake',icon:'🌍',titleZh:'地震警報',titleId:'Gempa Bumi'},
-  {id:'typhoon',icon:'🌀',titleZh:'颱風',titleId:'Topan'},
-  {id:'storm',icon:'⛈',titleZh:'雷雨',titleId:'Badai'},
-  {id:'heavyRain',icon:'🌧',titleZh:'豪雨',titleId:'Hujan Lebat'},
-  {id:'rain',icon:'🌂',titleZh:'一般降雨',titleId:'Hujan'},
-  {id:'strongWind',icon:'💨',titleZh:'強風',titleId:'Angin Kencang'},
-  {id:'heat',icon:'🥵',titleZh:'高溫',titleId:'Panas'},
-  {id:'cold',icon:'🥶',titleZh:'低溫',titleId:'Dingin'},
-  {id:'fog',icon:'🌫',titleZh:'濃霧',titleId:'Kabut'}
+  {id:'earthquake',icon:'🌍',titleZh:'地震警報',titleId:'Gempa Bumi',color:'#c0392b',bgTint:'rgba(192,57,43,0.12)'},
+  {id:'typhoon',icon:'🌀',titleZh:'颱風',titleId:'Topan',color:'#8e44ad',bgTint:'rgba(142,68,173,0.12)'},
+  {id:'storm',icon:'⛈',titleZh:'雷雨',titleId:'Badai',color:'#e67e22',bgTint:'rgba(230,126,34,0.12)'},
+  {id:'heavyRain',icon:'🌧',titleZh:'豪雨',titleId:'Hujan Lebat',color:'#2980b9',bgTint:'rgba(41,128,185,0.12)'},
+  {id:'rain',icon:'🌂',titleZh:'一般降雨',titleId:'Hujan',color:'#3498db',bgTint:'rgba(52,152,219,0.12)'},
+  {id:'strongWind',icon:'💨',titleZh:'強風',titleId:'Angin Kencang',color:'#16a085',bgTint:'rgba(22,160,133,0.12)'},
+  {id:'heat',icon:'🥵',titleZh:'高溫',titleId:'Panas',color:'#d35400',bgTint:'rgba(211,84,0,0.12)'},
+  {id:'cold',icon:'🥶',titleZh:'低溫',titleId:'Dingin',color:'#1abc9c',bgTint:'rgba(26,188,156,0.12)'},
+  {id:'fog',icon:'🌫',titleZh:'濃霧',titleId:'Kabut',color:'#7f8c8d',bgTint:'rgba(127,140,141,0.12)'}
 ];
 
-function _miniSwitch(checked,onclickStr,disabled){
-  const dis=disabled?'opacity:0.4;pointer-events:none':'';
-  const bg=checked?'#00897b':'#ccc';
+// 暗色模式友善的迷你開關 — 可選自訂 ON 顏色
+function _miniSwitch(checked,onclickStr,disabled,onColor){
+  const dis=disabled?'opacity:0.35;pointer-events:none':'';
+  const bg=checked?(onColor||'#00897b'):'var(--tx3)';
   const left=checked?'21px':'3px';
-  return `<span onclick="${onclickStr}" style="display:inline-block;position:relative;width:42px;height:24px;background:${bg};border-radius:12px;cursor:pointer;transition:.2s;flex-shrink:0;${dis}"><span style="position:absolute;width:18px;height:18px;left:${left};top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span></span>`;
+  return `<span onclick="${onclickStr}" style="display:inline-block;position:relative;width:42px;height:24px;background:${bg};border-radius:12px;cursor:pointer;transition:.2s;flex-shrink:0;border:1px solid rgba(0,0,0,0.1);${dis}"><span style="position:absolute;width:18px;height:18px;left:${left};top:2px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.35)"></span></span>`;
 }
 
 function userPrefsModalHtml(){
@@ -2178,7 +2180,7 @@ function userPrefsModalHtml(){
   const adminWxOn=cfg.master!==false;
   const adminNotifyOn=cfg.notifyEnabled!==false;
 
-  // ── 目前狀況診斷區 ──
+  // ── 目前狀況診斷區（暗色模式友善）──
   let statusHtml='';
   if(wxData){
     const curT=wxData.temp;
@@ -2186,7 +2188,6 @@ function userPrefsModalHtml(){
     const coldTh=cfg.coldThreshold||10;
     const heatDiff=heatTh-curT;
     const coldDiff=curT-coldTh;
-    // 取目前小時降雨
     let curPrec=0;
     if(wxData.hTime&&wxData.hPrec){
       const n=new Date();
@@ -2196,104 +2197,109 @@ function userPrefsModalHtml(){
     }
     const evaluated=(typeof evaluateWxAlerts==='function')?evaluateWxAlerts():[];
     const activeCount=evaluated.length;
-    statusHtml=`<div style="padding:10px 12px;background:linear-gradient(135deg,#eef5ff,#dceaff);border-radius:8px;margin-bottom:10px;font-size:11px;line-height:1.6;color:#1a3a6f">
-      <div style="font-weight:700;font-size:12px;margin-bottom:4px">${isZh?'📊 目前狀況':'Status'}</div>
-      <div>${isZh?'目前溫度':'Temp'}：<strong>${curT}°C</strong>　${isZh?'目前降雨機率':'Rain'}：<strong>${curPrec}%</strong></div>
-      <div style="margin-top:2px;color:#5a6a7f">${isZh?`高溫門檻 ${heatTh}°C（${heatDiff>0?'再 '+heatDiff+'°C 觸發':'已達標'}）　低溫門檻 ${coldTh}°C（${coldDiff>0?'再 '+coldDiff+'°C 觸發':'已達標'}）`:`Heat threshold ${heatTh}°C, Cold ${coldTh}°C`}</div>
-      <div style="margin-top:4px;color:${activeCount>0?'#c62828':'#2e7d32'};font-weight:600">${activeCount>0?(isZh?`🚨 目前有 ${activeCount} 個警報觸發中`:`${activeCount} active`):(isZh?'✅ 目前無警報觸發（所有條件都未達門檻）':'No active alerts')}</div>
+    statusHtml=`<div style="padding:12px;background:var(--card);border:1px solid rgba(127,140,141,0.25);border-left:4px solid #3498db;border-radius:8px;margin-bottom:10px;font-size:11px;line-height:1.6;color:var(--tx)">
+      <div style="font-weight:700;font-size:12px;margin-bottom:6px;color:var(--tx)">📊 ${isZh?'目前狀況':'Status'}</div>
+      <div style="color:var(--tx)">${isZh?'目前溫度':'Temp'}：<strong style="color:#ff6b35;font-size:14px">${curT}°C</strong>　${isZh?'降雨機率':'Rain'}：<strong style="color:#3498db;font-size:14px">${curPrec}%</strong></div>
+      <div style="margin-top:4px;color:var(--tx2);font-size:10px">${isZh?`🥵 高溫門檻 ${heatTh}°C ${heatDiff>0?'(再 '+heatDiff+'°C 觸發)':'✓ 已達標'}　🥶 低溫門檻 ${coldTh}°C ${coldDiff>0?'(再 '+coldDiff+'°C 觸發)':'✓ 已達標'}`:`Heat ${heatTh}°C, Cold ${coldTh}°C`}</div>
+      <div style="margin-top:6px;padding:5px 10px;background:${activeCount>0?'rgba(192,57,43,0.15)':'rgba(39,174,96,0.15)'};border-radius:5px;color:${activeCount>0?'#e74c3c':'#27ae60'};font-weight:700;font-size:11px;display:inline-block">${activeCount>0?(isZh?`🚨 ${activeCount} 個警報觸發中`:`${activeCount} active`):(isZh?'✅ 目前無警報':'No alerts')}</div>
     </div>`;
   }
 
-  // ── 通知測試按鈕 ──
+  // ── 動作按鈕（重抓 + 測試通知）──
   const permState=getNotifyPermission();
-  const testBtnHtml=permState==='granted'?`<button onclick="testNotification()" style="background:#3949ab;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;width:100%;margin-bottom:10px">🔔 ${isZh?'發送測試通知（確認手機能收到）':'Send test notification'}</button>`:'';
+  const btnStyle='border:none;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:transform .15s';
+  const testBtnHtml=permState==='granted'?`<div style="display:flex;gap:8px;margin-bottom:14px">
+    <button onclick="forceReloadWx()" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform=''" style="flex:1;background:linear-gradient(135deg,#16a085,#0d6b5e);${btnStyle}">🔄 ${isZh?'重新抓取':'Reload'}</button>
+    <button onclick="testNotification()" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform=''" style="flex:1;background:linear-gradient(135deg,#3949ab,#1a237e);${btnStyle}">🔔 ${isZh?'測試通知':'Test'}</button>
+  </div>`:`<button onclick="forceReloadWx()" style="background:linear-gradient(135deg,#16a085,#0d6b5e);${btnStyle};width:100%;margin-bottom:14px">🔄 ${isZh?'立即重新抓天氣':'Reload weather'}</button>`;
 
-  // 警報項目區塊
-  const alertRows=_USR_ALERTS.map(a=>{
+  // ── 各警報項目（每項有自己的色彩主題）──
+  const alertRows=_USR_ALERTS.map((a,idx)=>{
     const adminItemOn=cfg[a.id]!==false;
     const adminNotifyKey=({typhoon:'notifyTyphoon',storm:'notifyStorm',heavyRain:'notifyHeavyRain',rain:'notifyRain',strongWind:'notifyStrongWind',heat:'notifyHeat',cold:'notifyCold',fog:'notifyFog',earthquake:'notifyEarthquake'})[a.id];
     const adminNotifyItemOn=cfg[adminNotifyKey]!==false;
     const userItemOn=(up.wxItems&&up.wxItems[a.id]!==false);
     const userNotifyOn=(up.wxNotifyItems&&up.wxNotifyItems[a.id]!==false);
-    // 管理員關掉的話，顯示但灰掉
     const adminBlocked=!adminItemOn;
     const adminNotifyBlocked=!adminNotifyItemOn;
     const title=isZh?a.titleZh:a.titleId;
-    return `<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="font-size:20px;width:28px;text-align:center;flex-shrink:0">${a.icon}</div>
-        <div style="flex:1;font-size:13px;font-weight:600">${title}</div>
+    const isLast=idx===_USR_ALERTS.length-1;
+    return `<div style="padding:12px;background:${a.bgTint};border-radius:8px;margin-bottom:${isLast?'0':'6px'};border-left:4px solid ${a.color}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="font-size:22px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:${a.color};border-radius:50%;flex-shrink:0">${a.icon}</div>
+        <div style="flex:1;font-size:14px;font-weight:700;color:var(--tx)">${title}</div>
       </div>
-      <div style="display:flex;gap:20px;margin-top:8px;padding-left:38px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;color:${adminBlocked?'#bbb':'#666'}">${isZh?'顯示警報':'Tampilkan'}</span>${_miniSwitch(userItemOn&&!adminBlocked,"setUserPref('wxItems."+a.id+"',!USER_PREFS.wxItems."+a.id+")",adminBlocked)}</div>
-        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;color:${adminNotifyBlocked?'#bbb':'#666'}">${isZh?'推播通知':'Notifikasi'}</span>${_miniSwitch(userNotifyOn&&!adminNotifyBlocked,"setUserPref('wxNotifyItems."+a.id+"',!USER_PREFS.wxNotifyItems."+a.id+")",adminNotifyBlocked)}</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;padding-left:42px">
+        <div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:${adminBlocked?'var(--tx3)':'var(--tx2)'};font-weight:600">${isZh?'橫幅':'Banner'}</span>${_miniSwitch(userItemOn&&!adminBlocked,"setUserPref('wxItems."+a.id+"',!USER_PREFS.wxItems."+a.id+")",adminBlocked,a.color)}</div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:${adminNotifyBlocked?'var(--tx3)':'var(--tx2)'};font-weight:600">${isZh?'通知':'Push'}</span>${_miniSwitch(userNotifyOn&&!adminNotifyBlocked,"setUserPref('wxNotifyItems."+a.id+"',!USER_PREFS.wxNotifyItems."+a.id+")",adminNotifyBlocked,a.color)}</div>
       </div>
-      ${(adminBlocked||adminNotifyBlocked)?`<div style="padding-left:38px;margin-top:4px;font-size:9px;color:#bf6c00">⚠ ${isZh?'管理員已停用此項，無法在用戶端開啟':'Admin disabled'}</div>`:''}
+      ${(adminBlocked||adminNotifyBlocked)?`<div style="padding-left:42px;margin-top:6px;font-size:10px;color:var(--amber);font-weight:600">⚠ ${isZh?'管理員已停用此項':'Admin disabled'}</div>`:''}
     </div>`;
   }).join('');
 
-  // 動畫區塊
+  // ── 動畫區塊 ──
   const userVisualOn=up.visualFx!==false;
   const visualBlocked=!adminVisualOn;
-  const visualSection=`<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
+  const visualSection=`<div style="padding:12px;background:rgba(155,89,182,0.12);border-radius:8px;border-left:4px solid #9b59b6">
     <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="font-size:20px;width:28px;text-align:center">🎨</div>
-        <div style="flex:1"><div style="font-size:13px;font-weight:600">${isZh?'天氣動畫與音效':'Animasi & Suara'}</div><div style="font-size:10px;color:#888;margin-top:2px">${isZh?'雨、雪、雲、螢火蟲、蝴蝶、鳥鳴、蟲鳴...':'Hujan, salju, awan, kupu-kupu...'}</div></div>
+      <div style="display:flex;align-items:center;gap:10px;flex:1">
+        <div style="font-size:22px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:#9b59b6;border-radius:50%;flex-shrink:0">🎨</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--tx)">${isZh?'天氣動畫與音效':'Animasi & Suara'}</div><div style="font-size:10px;color:var(--tx2);margin-top:2px;line-height:1.4">${isZh?'雨、雪、雲、螢火蟲、蝴蝶、鳥鳴...':'Hujan, salju, awan, kupu-kupu...'}</div></div>
       </div>
-      ${_miniSwitch(userVisualOn&&!visualBlocked,"setUserPref('visualFx',!USER_PREFS.visualFx)",visualBlocked)}
+      ${_miniSwitch(userVisualOn&&!visualBlocked,"setUserPref('visualFx',!USER_PREFS.visualFx)",visualBlocked,'#9b59b6')}
     </div>
-    ${visualBlocked?`<div style="margin-top:4px;padding-left:38px;font-size:9px;color:#bf6c00">⚠ ${isZh?'管理員已停用動畫，無法在用戶端開啟':'Admin disabled animations'}</div>`:`<div style="margin-top:4px;padding-left:38px;font-size:9px;color:#888">${isZh?'關閉可省電、減輕效能負擔':'Disable to save battery'}</div>`}
+    ${visualBlocked?`<div style="margin-top:6px;padding-left:42px;font-size:10px;color:var(--amber);font-weight:600">⚠ ${isZh?'管理員已停用動畫':'Admin disabled'}</div>`:`<div style="margin-top:4px;padding-left:42px;font-size:10px;color:var(--tx3)">${isZh?'關閉可省電':'Save battery'}</div>`}
   </div>`;
 
-  // 通知權限狀態
+  // ── 通知權限狀態 ──
   let permTip='';
   if(permState==='granted'){
-    permTip=`<div style="padding:8px 10px;background:#e8f5e9;border-radius:6px;font-size:10px;color:#2e7d32;margin-bottom:10px">✅ ${isZh?'系統通知已授權':'Notification allowed'}</div>`;
+    permTip=`<div style="padding:10px 12px;background:rgba(39,174,96,0.15);border:1px solid rgba(39,174,96,0.4);border-radius:8px;font-size:11px;color:#27ae60;margin-bottom:10px;font-weight:600">✅ ${isZh?'系統通知已授權':'Notification allowed'}</div>`;
   }else if(permState==='denied'){
-    permTip=`<div style="padding:8px 10px;background:#ffebee;border-radius:6px;font-size:10px;color:#c62828;margin-bottom:10px">🚫 ${isZh?'通知被瀏覽器封鎖，請到手機系統設定開啟':'Notification blocked, enable in system settings'}</div>`;
+    permTip=`<div style="padding:10px 12px;background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.4);border-radius:8px;font-size:11px;color:#e74c3c;margin-bottom:10px;font-weight:600;line-height:1.5">🚫 ${isZh?'通知被瀏覽器封鎖，請到手機系統設定開啟':'Notification blocked'}</div>`;
   }else if(permState==='unsupported'){
-    permTip=`<div style="padding:8px 10px;background:#fff8e1;border-radius:6px;font-size:10px;color:#bf6c00;margin-bottom:10px">⚠ ${isZh?'此裝置不支援通知（iOS 請先「加入主畫面」並使用 Safari 16.4+）':'Device not supported'}</div>`;
+    permTip=`<div style="padding:10px 12px;background:rgba(243,156,18,0.15);border:1px solid rgba(243,156,18,0.4);border-radius:8px;font-size:11px;color:#e67e22;margin-bottom:10px;font-weight:600;line-height:1.5">⚠ ${isZh?'此裝置不支援通知':'Device not supported'}</div>`;
   }else{
-    permTip=`<div style="padding:8px 10px;background:#e3f2fd;border-radius:6px;font-size:10px;color:#1565c0;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px"><span>🔔 ${isZh?'尚未授權通知，點右側按鈕啟用':'Tap to enable'}</span><button onclick="requestNotifyPermission()" style="background:#1565c0;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer">${isZh?'啟用':'Enable'}</button></div>`;
+    permTip=`<div style="padding:10px 12px;background:rgba(52,152,219,0.15);border:1px solid rgba(52,152,219,0.4);border-radius:8px;font-size:11px;color:#3498db;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;line-height:1.4"><span>🔔 ${isZh?'尚未授權通知':'Tap to enable'}</span><button onclick="requestNotifyPermission()" style="background:#3498db;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">${isZh?'啟用':'Enable'}</button></div>`;
   }
 
-  // 總開關
-  const masterRow=`<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
-    <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:10px;flex:1">
-        <div style="font-size:20px;width:28px;text-align:center">🚨</div>
-        <div style="flex:1"><div style="font-size:13px;font-weight:600">${isZh?'天氣警報（前台橫幅）':'Banner Alert'}</div></div>
+  // ── 總開關（兩個並排）──
+  const masterRow=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div style="padding:12px;background:linear-gradient(135deg,#c0392b,#922b21);border-radius:8px;color:#fff;${!adminWxOn?'opacity:0.4':''}">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <div style="font-size:18px">🚨</div>
+        <div style="font-size:11px;font-weight:700;line-height:1.2">${isZh?'警報橫幅':'Banner'}</div>
       </div>
-      ${_miniSwitch(up.wxMaster!==false&&adminWxOn,"setUserPref('wxMaster',!USER_PREFS.wxMaster)",!adminWxOn)}
+      <div style="display:flex;justify-content:flex-end">${_miniSwitch(up.wxMaster!==false&&adminWxOn,"setUserPref('wxMaster',!USER_PREFS.wxMaster)",!adminWxOn,'#fff')}</div>
+      ${!adminWxOn?`<div style="margin-top:4px;font-size:9px;font-weight:600;opacity:0.9">⚠ ${isZh?'管理員停用':'Admin off'}</div>`:''}
     </div>
-    ${!adminWxOn?`<div style="margin-top:4px;padding-left:38px;font-size:9px;color:#bf6c00">⚠ ${isZh?'管理員已停用警報系統':'Admin disabled'}</div>`:''}
-  </div>
-  <div style="padding:10px 0;border-bottom:1px solid #f0f0f0">
-    <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:10px;flex:1">
-        <div style="font-size:20px;width:28px;text-align:center">📱</div>
-        <div style="flex:1"><div style="font-size:13px;font-weight:600">${isZh?'手機系統通知':'Push Notification'}</div></div>
+    <div style="padding:12px;background:linear-gradient(135deg,#2980b9,#1f5d8a);border-radius:8px;color:#fff;${!adminNotifyOn?'opacity:0.4':''}">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <div style="font-size:18px">📱</div>
+        <div style="font-size:11px;font-weight:700;line-height:1.2">${isZh?'手機通知':'Push'}</div>
       </div>
-      ${_miniSwitch(up.wxNotify!==false&&adminNotifyOn,"setUserPref('wxNotify',!USER_PREFS.wxNotify)",!adminNotifyOn)}
+      <div style="display:flex;justify-content:flex-end">${_miniSwitch(up.wxNotify!==false&&adminNotifyOn,"setUserPref('wxNotify',!USER_PREFS.wxNotify)",!adminNotifyOn,'#fff')}</div>
+      ${!adminNotifyOn?`<div style="margin-top:4px;font-size:9px;font-weight:600;opacity:0.9">⚠ ${isZh?'管理員停用':'Admin off'}</div>`:''}
     </div>
-    ${!adminNotifyOn?`<div style="margin-top:4px;padding-left:38px;font-size:9px;color:#bf6c00">⚠ ${isZh?'管理員已停用推播':'Admin disabled'}</div>`:''}
   </div>`;
+
+  // ── 區塊標題樣式 ──
+  const sectionTitleStyle='font-size:11px;color:var(--tx2);margin:14px 4px 8px;font-weight:800;letter-spacing:.8px;display:flex;align-items:center;gap:6px';
 
   return `<div class="modal-bg" onclick="closeUserPrefs()">
     <div class="modal-sheet help-sheet" onclick="event.stopPropagation()" style="max-width:480px">
       <div class="modal-handle"></div>
-      <div class="modal-title">⚙️ ${isZh?'個人設定':'Pengaturan'}</div>
+      <div class="modal-title" style="margin-bottom:14px">⚙️ ${isZh?'個人設定':'Pengaturan'}</div>
       ${permTip}
       ${statusHtml}
       ${testBtnHtml}
-      <div style="font-size:10px;color:#999;margin:8px 0 4px;font-weight:700;letter-spacing:.5px">${isZh?'總開關':'MASTER'}</div>
-      <div style="background:#f8f9fa;border-radius:8px;padding:0 12px">${masterRow}</div>
-      <div style="font-size:10px;color:#999;margin:14px 0 4px;font-weight:700;letter-spacing:.5px">${isZh?'各警報項目':'EACH ALERT'}</div>
-      <div style="background:#f8f9fa;border-radius:8px;padding:0 12px">${alertRows}</div>
-      <div style="font-size:10px;color:#999;margin:14px 0 4px;font-weight:700;letter-spacing:.5px">${isZh?'外觀':'APPEARANCE'}</div>
-      <div style="background:#f8f9fa;border-radius:8px;padding:0 12px">${visualSection}</div>
-      <button class="modal-done" onclick="closeUserPrefs()" style="margin-top:14px">${t('done')}</button>
+      <div style="${sectionTitleStyle}">⚡ ${isZh?'總開關':'MASTER'}</div>
+      ${masterRow}
+      <div style="${sectionTitleStyle}">🔔 ${isZh?'各警報項目':'EACH ALERT'}</div>
+      ${alertRows}
+      <div style="${sectionTitleStyle}">🎨 ${isZh?'外觀':'APPEARANCE'}</div>
+      ${visualSection}
+      <button class="modal-done" onclick="closeUserPrefs()" style="margin-top:18px">${t('done')}</button>
     </div>
   </div>`;
 }
@@ -2320,7 +2326,33 @@ async function testNotification(){
     else{new Notification(title,opts)}
   }catch(e){alert((lang==='zh'?'發送失敗：':'Failed: ')+e.message)}
 }
-try{window.testNotification=testNotification}catch(e){}
+
+// 強制重新抓天氣（用戶從設定面板呼叫）
+// 清掉快取後重抓 → 取得最新資料 → 重新評估警報
+async function forceReloadWx(){
+  try{
+    // 清掉位置與天氣快取（重新定位 + 重新抓 API）
+    try{localStorage.removeItem('_wxCache')}catch(e){}
+    try{localStorage.removeItem('_typhoonCache')}catch(e){}
+    try{localStorage.removeItem('_cwaCache')}catch(e){}
+    // 也清警報冷卻狀態，這樣即使在冷卻期內也能立刻推（除了地震去重）
+    try{
+      const st=JSON.parse(localStorage.getItem('_wxNotifyState'))||{};
+      // 保留地震 EarthquakeNo 去重，其他冷卻清零
+      const eq=st._eqLastNo;
+      localStorage.setItem('_wxNotifyState',JSON.stringify(eq?{_eqLastNo:eq}:{}));
+    }catch(e){}
+    wxData=null;wxErr=false;
+    typhoonData=null;earthquakeData=null;
+    render();
+    await loadWx();
+    try{await loadCwaData()}catch(e){}
+    alert(lang==='zh'?'已重新抓取最新資料':'Reloaded');
+  }catch(e){
+    alert((lang==='zh'?'重新抓取失敗：':'Reload failed: ')+e.message);
+  }
+}
+try{window.testNotification=testNotification;window.forceReloadWx=forceReloadWx}catch(e){}
 
 function rainWarnHtml(){
   if(!wxData||!wxData.hPrec||S.step!=="cal")return"";
@@ -2348,6 +2380,14 @@ loadWx();
 // 等 loadAppConfig 載入完才知道有沒有 typhoon worker URL
 setTimeout(()=>{try{loadTyphoon()}catch(e){}},3000);
 setInterval(()=>{loadWx();try{loadTyphoon()}catch(e){}},1800000);
+// app 開著時，每 5 分鐘額外做一次警報判定（不重新抓 API，只用既有資料）
+// 這樣後台改設定後，前台不用等 30 分鐘也能感受到變化
+setInterval(()=>{
+  if(document.hidden) return;
+  try{checkAndNotifyAlerts()}catch(e){}
+  // 同時觸發重新渲染，讓 wxAlertHtml 即時反映設定變更
+  try{if(typeof render==='function') render()}catch(e){}
+},300000);
 // 回到 app（從背景切回前景）時，若距上次 >10 分鐘就重新載入天氣＋檢查警報
 let _lastWxCheck=Date.now();
 document.addEventListener('visibilitychange',()=>{
