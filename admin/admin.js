@@ -487,16 +487,28 @@ function wxAlertsTabHtml(){
     let windowHtml='';
     if(a.supportWindow){
       const windows=Array.isArray(tw[a.id])?tw[a.id]:[];
-      const winRows=windows.length?windows.map((w,wi)=>`<div style="display:flex;gap:4px;align-items:center;background:#1a2533;padding:4px 8px;border-radius:4px;margin:2px 0">
-        <input type="time" value="${w.start||'07:00'}" onchange="wxUpdWindow('${a.id}',${wi},'start',this.value)" style="padding:3px 6px;border:1px solid #3a4a5f;border-radius:3px;background:#0f1925;color:#fff;font-size:11px;font-family:inherit">
-        <span style="color:#888;font-size:11px">→</span>
-        <input type="time" value="${w.end||'08:00'}" onchange="wxUpdWindow('${a.id}',${wi},'end',this.value)" style="padding:3px 6px;border:1px solid #3a4a5f;border-radius:3px;background:#0f1925;color:#fff;font-size:11px;font-family:inherit">
-        <button onclick="wxDelWindow('${a.id}',${wi})" style="background:#5c2c2c;color:#fff;border:none;padding:3px 8px;border-radius:3px;font-size:10px;cursor:pointer">✕</button>
-      </div>`).join(''):'<div style="font-size:10px;color:#7a8a99;font-style:italic;padding:4px 0">未設定 = 全天偵測</div>';
+      // 強制 24 小時制：用兩個 select（小時 0-23 + 分鐘 0-55，5 分鐘一格）
+      function _hOpts(sel){let o='';for(let h=0;h<24;h++){const v=String(h).padStart(2,'0');o+=`<option value="${v}"${sel===v?' selected':''}>${v}</option>`}return o}
+      function _mOpts(sel){let o='';for(let m=0;m<60;m+=5){const v=String(m).padStart(2,'0');o+=`<option value="${v}"${sel===v?' selected':''}>${v}</option>`}return o}
+      const winRows=windows.length?windows.map((w,wi)=>{
+        const [sh,sm]=String(w.start||'07:00').split(':');
+        const [eh,em]=String(w.end||'08:00').split(':');
+        const ssStyle='padding:5px 6px;border:1px solid #3a4a5f;border-radius:3px;background:#0f1925;color:#fff;font-size:13px;font-family:inherit';
+        return `<div style="display:flex;gap:3px;align-items:center;background:#1a2533;padding:6px 8px;border-radius:4px;margin:3px 0;flex-wrap:wrap">
+          <select onchange="wxUpdWindowPart('${a.id}',${wi},'start','h',this.value)" style="${ssStyle}">${_hOpts(sh)}</select>
+          <span style="color:#fff;font-weight:700">:</span>
+          <select onchange="wxUpdWindowPart('${a.id}',${wi},'start','m',this.value)" style="${ssStyle}">${_mOpts(sm||'00')}</select>
+          <span style="color:#888;margin:0 4px">→</span>
+          <select onchange="wxUpdWindowPart('${a.id}',${wi},'end','h',this.value)" style="${ssStyle}">${_hOpts(eh)}</select>
+          <span style="color:#fff;font-weight:700">:</span>
+          <select onchange="wxUpdWindowPart('${a.id}',${wi},'end','m',this.value)" style="${ssStyle}">${_mOpts(em||'00')}</select>
+          <button onclick="wxDelWindow('${a.id}',${wi})" style="background:#5c2c2c;color:#fff;border:none;padding:5px 10px;border-radius:3px;font-size:11px;cursor:pointer;margin-left:auto">✕</button>
+        </div>`;
+      }).join(''):'<div style="font-size:10px;color:#7a8a99;font-style:italic;padding:4px 0">未設定 = 全天偵測</div>';
       windowHtml=`<div style="margin-top:8px;padding:8px 10px;background:#0d1925;border-radius:6px;border-left:3px solid #3949ab">
-        <div style="font-size:10px;color:#aaa;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
-          <span>⏰ 偵測時段（多時段任一成立就觸發）</span>
-          <button onclick="wxAddWindow('${a.id}')" style="background:#3949ab;color:#fff;border:none;padding:3px 10px;border-radius:3px;font-size:10px;font-weight:600;cursor:pointer">+ 新增時段</button>
+        <div style="font-size:10px;color:#aaa;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+          <span>⏰ 偵測時段（24h 制，多時段任一成立就觸發）</span>
+          <button onclick="wxAddWindow('${a.id}')" style="background:#3949ab;color:#fff;border:none;padding:4px 12px;border-radius:3px;font-size:11px;font-weight:600;cursor:pointer">+ 新增時段</button>
         </div>
         ${winRows}
       </div>`;
@@ -728,6 +740,18 @@ function wxUpdWindow(alertId,idx,field,val){
   if(!c.timeWindows||!Array.isArray(c.timeWindows[alertId])) return;
   if(!c.timeWindows[alertId][idx]) return;
   c.timeWindows[alertId][idx][field]=val;
+  _wxScheduleSave();
+}
+// 24h select 版：分別更新「小時」或「分鐘」
+function wxUpdWindowPart(alertId,idx,field,part,val){
+  const c=_wxA();
+  if(!c.timeWindows||!Array.isArray(c.timeWindows[alertId])) return;
+  const w=c.timeWindows[alertId][idx];
+  if(!w) return;
+  const cur=String(w[field]||'00:00');
+  const [h,m]=cur.split(':');
+  const newVal=part==='h'?(val+':'+(m||'00')):((h||'00')+':'+val);
+  w[field]=newVal;
   _wxScheduleSave();
 }
 async function wxResetDefaults(){
