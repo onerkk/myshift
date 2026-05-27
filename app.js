@@ -2178,6 +2178,36 @@ function userPrefsModalHtml(){
   const adminWxOn=cfg.master!==false;
   const adminNotifyOn=cfg.notifyEnabled!==false;
 
+  // ── 目前狀況診斷區 ──
+  let statusHtml='';
+  if(wxData){
+    const curT=wxData.temp;
+    const heatTh=cfg.heatThreshold||36;
+    const coldTh=cfg.coldThreshold||10;
+    const heatDiff=heatTh-curT;
+    const coldDiff=curT-coldTh;
+    // 取目前小時降雨
+    let curPrec=0;
+    if(wxData.hTime&&wxData.hPrec){
+      const n=new Date();
+      const nh=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0")+"T"+String(n.getHours()).padStart(2,"0");
+      const hi=wxData.hTime.findIndex(s=>s.startsWith(nh));
+      if(hi>=0) curPrec=wxData.hPrec[hi]||0;
+    }
+    const evaluated=(typeof evaluateWxAlerts==='function')?evaluateWxAlerts():[];
+    const activeCount=evaluated.length;
+    statusHtml=`<div style="padding:10px 12px;background:linear-gradient(135deg,#eef5ff,#dceaff);border-radius:8px;margin-bottom:10px;font-size:11px;line-height:1.6;color:#1a3a6f">
+      <div style="font-weight:700;font-size:12px;margin-bottom:4px">${isZh?'📊 目前狀況':'Status'}</div>
+      <div>${isZh?'目前溫度':'Temp'}：<strong>${curT}°C</strong>　${isZh?'目前降雨機率':'Rain'}：<strong>${curPrec}%</strong></div>
+      <div style="margin-top:2px;color:#5a6a7f">${isZh?`高溫門檻 ${heatTh}°C（${heatDiff>0?'再 '+heatDiff+'°C 觸發':'已達標'}）　低溫門檻 ${coldTh}°C（${coldDiff>0?'再 '+coldDiff+'°C 觸發':'已達標'}）`:`Heat threshold ${heatTh}°C, Cold ${coldTh}°C`}</div>
+      <div style="margin-top:4px;color:${activeCount>0?'#c62828':'#2e7d32'};font-weight:600">${activeCount>0?(isZh?`🚨 目前有 ${activeCount} 個警報觸發中`:`${activeCount} active`):(isZh?'✅ 目前無警報觸發（所有條件都未達門檻）':'No active alerts')}</div>
+    </div>`;
+  }
+
+  // ── 通知測試按鈕 ──
+  const permState=getNotifyPermission();
+  const testBtnHtml=permState==='granted'?`<button onclick="testNotification()" style="background:#3949ab;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;width:100%;margin-bottom:10px">🔔 ${isZh?'發送測試通知（確認手機能收到）':'Send test notification'}</button>`:'';
+
   // 警報項目區塊
   const alertRows=_USR_ALERTS.map(a=>{
     const adminItemOn=cfg[a.id]!==false;
@@ -2217,7 +2247,6 @@ function userPrefsModalHtml(){
   </div>`;
 
   // 通知權限狀態
-  const permState=getNotifyPermission();
   let permTip='';
   if(permState==='granted'){
     permTip=`<div style="padding:8px 10px;background:#e8f5e9;border-radius:6px;font-size:10px;color:#2e7d32;margin-bottom:10px">✅ ${isZh?'系統通知已授權':'Notification allowed'}</div>`;
@@ -2256,6 +2285,8 @@ function userPrefsModalHtml(){
       <div class="modal-handle"></div>
       <div class="modal-title">⚙️ ${isZh?'個人設定':'Pengaturan'}</div>
       ${permTip}
+      ${statusHtml}
+      ${testBtnHtml}
       <div style="font-size:10px;color:#999;margin:8px 0 4px;font-weight:700;letter-spacing:.5px">${isZh?'總開關':'MASTER'}</div>
       <div style="background:#f8f9fa;border-radius:8px;padding:0 12px">${masterRow}</div>
       <div style="font-size:10px;color:#999;margin:14px 0 4px;font-weight:700;letter-spacing:.5px">${isZh?'各警報項目':'EACH ALERT'}</div>
@@ -2266,6 +2297,30 @@ function userPrefsModalHtml(){
     </div>
   </div>`;
 }
+
+// 測試通知（用戶從前台設定面板呼叫）
+async function testNotification(){
+  if(typeof Notification==='undefined'){alert(lang==='zh'?'此裝置不支援通知':'Not supported');return}
+  if(Notification.permission!=='granted'){alert(lang==='zh'?'尚未授權通知':'Permission denied');return}
+  try{
+    let reg=null;
+    if('serviceWorker' in navigator){
+      try{reg=await navigator.serviceWorker.ready}catch(e){}
+    }
+    const title=lang==='zh'?'🔔 測試通知':'🔔 Test';
+    const opts={
+      body:lang==='zh'?'這是測試通知。如果你看到這個，表示通知系統正常運作。':'Test notification works',
+      icon:'./admin/icon-192.png',
+      badge:'./admin/icon-192.png',
+      tag:'wx-test',
+      requireInteraction:false,
+      vibrate:[200,100,200]
+    };
+    if(reg&&reg.showNotification){await reg.showNotification(title,opts)}
+    else{new Notification(title,opts)}
+  }catch(e){alert((lang==='zh'?'發送失敗：':'Failed: ')+e.message)}
+}
+try{window.testNotification=testNotification}catch(e){}
 
 function rainWarnHtml(){
   if(!wxData||!wxData.hPrec||S.step!=="cal")return"";
