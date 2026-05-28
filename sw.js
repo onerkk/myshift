@@ -1,8 +1,8 @@
-const CACHE_NAME = 'myshift-v182';
+const CACHE_NAME = 'myshift-v183';
 
 self.addEventListener('install', event => {
-  // 新 SW 等使用者下次開啟 app 才接管，避免操作中被打斷
-  // 若需要立即更新，可透過 postMessage('SKIP_WAITING') 主動觸發
+  // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
+  self.skipWaiting();
 });
 
 self.addEventListener('message', event => {
@@ -21,6 +21,11 @@ self.addEventListener('activate', event => {
           .map(name => caches.delete(name))
       );
     }).then(() => self.clients.claim())
+     .then(() => self.clients.matchAll({ type: 'window' }))
+     .then(clients => {
+       // 新 SW 接管後，通知所有打開的頁面 reload，讓使用者立刻拿到新版 app.js
+       clients.forEach(c => { try { c.postMessage({ type: 'SW_UPDATED', version: CACHE_NAME }); } catch (e) {} });
+     })
   );
 });
 
@@ -29,8 +34,13 @@ self.addEventListener('fetch', event => {
   url.search = '';
   const cacheKey = url.toString();
 
+  // 對 app 核心檔（.js / .html / .css）強制 bypass HTTP cache，避免 GitHub Pages 10 分鐘 cache 鎖住舊版
+  const path = url.pathname;
+  const isCore = /\.(?:js|html|css)$/i.test(path) || path.endsWith('/') || path.endsWith('/myshift') || path.endsWith('/myshift/');
+  const fetchOpts = isCore ? { cache: 'no-store' } : undefined;
+
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, fetchOpts)
       .then(response => {
         if (!response || response.status !== 200) return response;
         const clone = response.clone();

@@ -285,6 +285,126 @@ function myLeave(date){return getLeaves(date).filter(l=>l.uid===(fbUser&&fbUser.
 const ADMIN_EMAILS=["onerkk@gmail.com","asus0814999@gmail.com"];
 const ADMIN_EV=["meeting","health"];
 function isAdmin(){if(!fbUser)return false;if(ADMIN_EMAILS.includes(fbUser.email))return true;return APP_CFG.admins&&APP_CFG.admins.some(a=>a.email===fbUser.email)}
+
+// ═══ 請假總覽（管理員前台快速查看）═══
+let LEAVES_OV_DATA=[];
+let leavesOvYM="";
+let leavesOvLoading=false;
+let leavesOvUnitF="";
+let leavesOvTypeF="";
+let leavesOvSearch="";
+function loadLeavesOvData(ym){
+  if(!isAdmin())return;
+  leavesOvLoading=true;
+  if(S.showLeavesOv)render();
+  fbDb.collection("leaves").where("ym","==",ym).get().then(snap=>{
+    LEAVES_OV_DATA=[];
+    snap.forEach(d=>{
+      const v=d.data();
+      if(v.uid&&v.uid.startsWith("admin_"))return;
+      LEAVES_OV_DATA.push(Object.assign({docId:d.id},v));
+    });
+    LEAVES_OV_DATA.sort((a,b)=>{
+      const c=(a.date||"").localeCompare(b.date||"");
+      if(c!==0)return c;
+      const ta=a.ts&&a.ts.seconds||0,tb=b.ts&&b.ts.seconds||0;
+      return ta-tb;
+    });
+  }).catch(e=>{
+    LEAVES_OV_DATA=[];
+    console.log("loadLeavesOvData err",e);
+  }).then(()=>{
+    leavesOvLoading=false;
+    if(S.showLeavesOv)render();
+  });
+}
+function changeLeavesOvMonth(delta){
+  const[y,m]=leavesOvYM.split("-").map(Number);
+  const d=new Date(y,m-1+delta,1);
+  leavesOvYM=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+  loadLeavesOvData(leavesOvYM);
+}
+function setLeavesOvUnitF(v){leavesOvUnitF=v;render()}
+function setLeavesOvTypeF(v){leavesOvTypeF=v;render()}
+function setLeavesOvSearch(v){
+  leavesOvSearch=v;
+  const list=document.getElementById("leavesOvListBody");
+  if(list)_renderLeavesOvList(list);
+}
+function _renderLeavesOvList(container){
+  const isZh=lang==="zh";
+  let filtered=LEAVES_OV_DATA.slice();
+  if(leavesOvUnitF)filtered=filtered.filter(l=>(l.unit||"")===leavesOvUnitF);
+  if(leavesOvTypeF)filtered=filtered.filter(l=>(l.leaveType||"")===leavesOvTypeF);
+  if(leavesOvSearch){
+    const q=leavesOvSearch.toLowerCase();
+    filtered=filtered.filter(l=>(l.name||"").toLowerCase().includes(q)||(l.reason||"").toLowerCase().includes(q));
+  }
+  if(!filtered.length){
+    container.innerHTML='<div style="text-align:center;padding:24px;color:var(--tx3);font-size:12px">'+(isZh?"本月沒有符合條件的請假紀錄":"Tidak ada cuti bulan ini")+'</div>';
+    return;
+  }
+  const byDate={};
+  filtered.forEach(l=>{const d=l.date||"";if(!byDate[d])byDate[d]=[];byDate[d].push(l)});
+  const dates=Object.keys(byDate).sort();
+  const today=(new Date()).toISOString().slice(0,10);
+  const wkZh=["日","一","二","三","四","五","六"];
+  const wkId=["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
+  const wk=isZh?wkZh:wkId;
+  const lts=getLeaveTypes();
+  let html="";
+  dates.forEach(d=>{
+    const dayObj=new Date(d+"T00:00:00");
+    const wkS=wk[dayObj.getDay()];
+    const isToday=d===today;
+    const isFuture=d>today;
+    const dateBg=isToday?'#1565c0':(isFuture?'#2e7d32':'#666');
+    const totalHrs=byDate[d].reduce((s,l)=>s+(l.hours||0),0);
+    html+='<div style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:'+dateBg+';border-radius:6px;color:#fff;margin-bottom:6px"><span style="font-size:13px;font-weight:800">'+d.slice(5)+' ('+wkS+')'+(isToday?(isZh?" 今天":" Hari ini"):"")+'</span><span style="font-size:11px;opacity:0.85">'+byDate[d].length+(isZh?" 人 · 共 ":" org · ")+totalHrs+'h</span></div>';
+    byDate[d].forEach(l=>{
+      const lt=lts.find(x=>x.id===l.leaveType);
+      const ltName=lt?(isZh?lt.name:(lt.nameId||lt.name)):(l.leaveType||(isZh?"未知":"?"));
+      const color=lt&&lt.color||'#888';
+      let timeStr="";
+      if(l.ts&&l.ts.seconds){
+        const dt=new Date(l.ts.seconds*1000);
+        timeStr=(dt.getMonth()+1)+"/"+dt.getDate()+" "+String(dt.getHours()).padStart(2,"0")+":"+String(dt.getMinutes()).padStart(2,"0");
+      }
+      const reasonRow=l.reason?'<div style="margin-top:5px;padding:6px 8px;background:rgba(33,150,243,0.12);border-left:3px solid #2196f3;border-radius:4px;font-size:12px;color:#1565c0">💬 '+esc(l.reason)+'</div>':'';
+      html+='<div style="background:rgba(0,0,0,0.04);border-radius:6px;padding:8px 10px;margin-bottom:5px;border-left:4px solid '+esc(color)+'"><div style="display:flex;justify-content:space-between;align-items:start;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--tx)">'+esc(l.name||(isZh?"未知":"?"))+' <span style="font-size:11px;font-weight:500;color:var(--tx3)">'+esc(l.unit||(isZh?"無單位":"-"))+'</span></div><div style="font-size:12px;color:var(--tx2);margin-top:2px"><span style="color:'+esc(color)+';font-weight:600">'+esc(ltName)+'</span> · '+(l.hours||0)+'h'+(timeStr?' · <span style="color:var(--tx3)">'+(isZh?"提交於 ":"")+timeStr+'</span>':'')+'</div></div></div>'+reasonRow+'</div>';
+    });
+    html+='</div>';
+  });
+  container.innerHTML=html;
+}
+function rLeavesOv(){
+  const isZh=lang==="zh";
+  if(!leavesOvYM){
+    const now=new Date();
+    leavesOvYM=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+    setTimeout(()=>loadLeavesOvData(leavesOvYM),0);
+  }
+  const realCount=LEAVES_OV_DATA.length;
+  const byType={},byUnit={};
+  LEAVES_OV_DATA.forEach(l=>{byType[l.leaveType]=(byType[l.leaveType]||0)+1;byUnit[l.unit||'(無)']=(byUnit[l.unit||'(無)']||0)+1});
+  const totalHrs=LEAVES_OV_DATA.reduce((s,l)=>s+(l.hours||0),0);
+  const reasonCount=LEAVES_OV_DATA.filter(l=>l.reason).length;
+  const units=getUnits();
+  const lts=getLeaveTypes();
+  const unitOpts='<option value="">'+(isZh?"所有單位":"Semua Unit")+'</option>'+units.map(u=>'<option value="'+esc(u)+'"'+(leavesOvUnitF===u?' selected':'')+'>'+esc(u)+(byUnit[u]?' ('+byUnit[u]+')':'')+'</option>').join("");
+  const typeOpts='<option value="">'+(isZh?"所有假別":"Semua Jenis")+'</option>'+lts.map(lt=>'<option value="'+esc(lt.id)+'"'+(leavesOvTypeF===lt.id?' selected':'')+'>'+esc(isZh?lt.name:(lt.nameId||lt.name))+(byType[lt.id]?' ('+byType[lt.id]+')':'')+'</option>').join("");
+  const[y,m]=leavesOvYM.split("-");
+  const monthLabel=isZh?(y+" 年 "+parseInt(m)+" 月"):(parseInt(m)+"/"+y);
+  return '<div class="modal-bg" data-a="closeLeavesOv"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap"><div style="font-size:16px;font-weight:900">📅 '+(isZh?"請假總覽":"Ringkasan Cuti")+'</div><div style="display:flex;align-items:center;gap:4px"><button onclick="changeLeavesOvMonth(-1)" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">◀</button><span style="font-size:13px;font-weight:700;min-width:90px;text-align:center">'+monthLabel+'</span><button onclick="changeLeavesOvMonth(1)" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">▶</button><button onclick="loadLeavesOvData(leavesOvYM)" title="'+(isZh?"重新載入":"Reload")+'" style="width:28px;height:28px;border-radius:6px;background:var(--pri);color:#fff;border:none;font-size:12px;cursor:pointer;margin-left:2px">🔄</button></div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px"><div style="background:#1565c0;padding:10px;border-radius:6px;text-align:center;color:#fff"><div style="font-size:20px;font-weight:900">'+realCount+'</div><div style="font-size:10px;opacity:0.9">'+(isZh?"總筆數":"Total")+'</div></div><div style="background:#2e7d32;padding:10px;border-radius:6px;text-align:center;color:#fff"><div style="font-size:20px;font-weight:900">'+totalHrs+'h</div><div style="font-size:10px;opacity:0.9">'+(isZh?"總時數":"Jam")+'</div></div><div style="background:#6a1b9a;padding:10px;border-radius:6px;text-align:center;color:#fff"><div style="font-size:20px;font-weight:900">'+reasonCount+'</div><div style="font-size:10px;opacity:0.9">'+(isZh?"有填原因":"Beralasan")+'</div></div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px"><select onchange="setLeavesOvUnitF(this.value)" style="padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:var(--card);color:var(--tx)">'+unitOpts+'</select><select onchange="setLeavesOvTypeF(this.value)" style="padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:var(--card);color:var(--tx)">'+typeOpts+'</select></div>'
+    +'<input placeholder="🔍 '+(isZh?"搜尋姓名或原因...":"Cari nama/alasan...")+'" value="'+esc(leavesOvSearch)+'" oninput="setLeavesOvSearch(this.value)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:10px;box-sizing:border-box;background:var(--card);color:var(--tx)">'
+    +'<div id="leavesOvListBody">'+(leavesOvLoading?'<div style="text-align:center;padding:24px;color:var(--tx3);font-size:12px">'+(isZh?"載入中...":"Loading...")+'</div>':(LEAVES_OV_DATA.length?'':'<div style="text-align:center;padding:24px;color:var(--tx3);font-size:12px">'+(isZh?"本月尚無請假紀錄":"Belum ada cuti")+'</div>'))+'</div>'
+    +'<div style="color:var(--tx3);font-size:10px;margin-top:12px;line-height:1.5;padding:8px;background:rgba(33,150,243,0.08);border-radius:6px;border-left:3px solid #2196f3">🔒 '+(isZh?"此頁面僅管理員可見。員工只能看到當天請假人數（無姓名無原因）。":"Hanya admin yang dapat melihat halaman ini.")+'</div>'
+    +'<button class="modal-done" data-a="closeLeavesOv" style="margin-top:12px">'+t("done")+'</button></div></div>';
+}
+
 let adminEvCache={};
 function loadAdminEv(){
   return fsEnqueue(async()=>{
@@ -599,7 +719,7 @@ function saveAppConfig(){
     ts:firebase.firestore.FieldValue.serverTimestamp()
   },{merge:true}),"saveCfg").catch(e=>console.log("saveCfg err",e));
 }
-let S={step:"type",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false,unit:"",lockedUnit:"",lockedRt:"",showSal:false};
+let S={step:"type",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false,unit:"",lockedUnit:"",lockedRt:"",showSal:false,showLeavesOv:false};
 let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb_ev"))||{}}catch(e){}
 function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}_scheduleCloudSave()}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
@@ -924,7 +1044,7 @@ function _doRender(){
     if(S.step==="type")a.innerHTML=rType();
     else if(S.step==="wiz")a.innerHTML=rWiz();
     else a.innerHTML=rCal();
-    document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():S.showSal?rSalary():"";
+    document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():S.showSal?rSalary():S.showLeavesOv?rLeavesOv():"";
     document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
     if(document.getElementById("leaveTypeSel"))try{updateLeaveHours()}catch(e){}
   }catch(err){
@@ -1005,7 +1125,7 @@ function rCal(){
     if(payDay20<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay20=getPayDay(ny,nm,20)+dim(TY,TM)-TD}
     const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
     todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
-  return`<div class="top" style="flex-wrap:wrap"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div><div style="width:100%;font-size:11px;color:rgba(255,255,255,.7);padding:2px 0 0 44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}</div></div>
+  return`<div class="top" style="flex-wrap:wrap"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button>${isAdmin()?`<button class="top-btn" data-a="leavesOv" style="background:rgba(255,167,38,.95);color:#fff;font-weight:700" title="${lang==="zh"?"請假總覽（管理員）":"Cuti (Admin)"}">📅${lang==="zh"?"請假":"Cuti"}</button>`:''}<span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div><div style="width:100%;font-size:11px;color:rgba(255,255,255,.7);padding:2px 0 0 44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}</div></div>
   <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
   <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${salaryEstHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
@@ -1410,6 +1530,14 @@ function handle(e){
     case "share":shareCalendar();return;
     case "stats":S.showStats=true;S.statsYr=TY;break;
     case "closeStats":S.showStats=false;break;
+    case "leavesOv":{
+      if(!isAdmin()){alert(lang==="zh"?"僅管理員可見":"Admin only");break}
+      S.showLeavesOv=true;
+      if(!leavesOvYM){const now=new Date();leavesOvYM=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");}
+      loadLeavesOvData(leavesOvYM);
+      break;
+    }
+    case "closeLeavesOv":S.showLeavesOv=false;break;
 
     case "salOpen":S.showSal=true;break;
     case "salClose":S.showSal=false;break;
@@ -1467,7 +1595,7 @@ try{render();}catch(e){document.getElementById("app").innerHTML="<div style='pad
   let sx=0,sy=0,swiping=false;
   document.addEventListener("touchstart",e=>{
     try{
-      if(S.step!=="cal"||S.modal||S.showH||wxDetailShow||tideDetailShow)return;
+      if(S.step!=="cal"||S.modal||S.showH||S.showStats||S.showSal||S.showLeavesOv||wxDetailShow||tideDetailShow)return;
       if(!e.touches||!e.touches[0])return;
       sx=e.touches[0].clientX;sy=e.touches[0].clientY;swiping=true;
     }catch(err){swiping=false}
