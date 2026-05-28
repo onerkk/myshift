@@ -378,6 +378,7 @@ function _renderLeavesOvList(container){
   container.innerHTML=html;
 }
 function rLeavesOv(){
+  if(!isAdmin())return "";
   const isZh=lang==="zh";
   if(!leavesOvYM){
     const now=new Date();
@@ -1044,11 +1045,11 @@ function _doRender(){
     if(S.step==="type")a.innerHTML=rType();
     else if(S.step==="wiz")a.innerHTML=rWiz();
     else a.innerHTML=rCal();
-    document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():S.showSal?rSalary():S.showLeavesOv?rLeavesOv():"";
+    document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():S.showSal?rSalary():(S.showLeavesOv&&isAdmin())?rLeavesOv():"";
     document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
     if(document.getElementById("leaveTypeSel"))try{updateLeaveHours()}catch(e){}
     // 請假總覽 modal：渲染列表內容（rLeavesOv 只生成空 container，列表內容需在這裡填入）
-    if(S.showLeavesOv&&!leavesOvLoading){
+    if(S.showLeavesOv&&isAdmin()&&!leavesOvLoading){
       const list=document.getElementById("leavesOvListBody");
       if(list&&LEAVES_OV_DATA.length)_renderLeavesOvList(list);
     }
