@@ -38,6 +38,14 @@ let USERS=[];
 let expandedUserId=null;
 let userSearch="";
 
+// ═══ 請假總覽 ═══
+let LEAVES_DATA=[];
+let leavesYM="";
+let leavesUnitFilter="";
+let leavesLoading=false;
+let leavesTypeFilter="";
+let leavesNameSearch="";
+
 // ═══ utility ═══
 function $(id){return document.getElementById(id)}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
@@ -139,7 +147,7 @@ function render(){
     app.innerHTML=`<div class="login-box"><h1>⛔ 權限不足</h1><p>您的帳號（${esc(user.email)}）不是管理員</p><button class="btn gray" onclick="logout()">登出</button></div>`;
     return;
   }
-  app.innerHTML=headerHtml()+tabsHtml()+tabBodyHtml()+`<div class="footer">MyShift Admin v2</div>`;
+  app.innerHTML=headerHtml()+tabsHtml()+tabBodyHtml()+`<div class="footer">MyShift Admin v3</div>`;
   bind();
 }
 
@@ -167,6 +175,7 @@ function tabsHtml(){
     {id:"units",label:"🏭 單位"},
     {id:"rotations",label:"🔄 輪班規則"},
     {id:"leaveTypes",label:"📋 假別"},
+    {id:"leaves",label:"📅 請假總覽"},
     {id:"admins",label:"👑 管理員"},
     {id:"users",label:"👥 使用者"},
     {id:"appearance",label:"🎨 外觀"},
@@ -175,13 +184,14 @@ function tabsHtml(){
   return `<div class="tabs">${tabs.map(t=>`<button class="tab ${activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`).join("")}</div>`;
 }
 
-function setTab(t){activeTab=t;expandedUserId=null;userSearch="";render()}
+function setTab(t){activeTab=t;expandedUserId=null;userSearch="";render();if(t==='leaves'&&!leavesYM){const now=new Date();leavesYM=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");loadLeavesData(leavesYM)}}
 
 function tabBodyHtml(){
   switch(activeTab){
     case"units":return unitsTabHtml();
     case"rotations":return rotationsTabHtml();
     case"leaveTypes":return leaveTypesTabHtml();
+    case"leaves":return leavesTabHtml();
     case"admins":return adminsTabHtml();
     case"users":return usersTabHtml();
     case"appearance":return appearanceTabHtml();
@@ -359,7 +369,157 @@ async function delLT(i){
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TAB 4: 管理員
+// TAB 4: 請假總覽（管理員可看到所有單位的請假紀錄含原因）
+// ═══════════════════════════════════════════════════════════════
+async function loadLeavesData(ym){
+  leavesLoading=true;
+  if(activeTab==='leaves')render();
+  try{
+    const snap=await fbDb.collection("leaves").where("ym","==",ym).get();
+    LEAVES_DATA=[];
+    snap.forEach(d=>{
+      const v=d.data();
+      if(v.uid&&v.uid.startsWith("admin_"))return;
+      LEAVES_DATA.push({docId:d.id,...v});
+    });
+    LEAVES_DATA.sort((a,b)=>{
+      const c=(a.date||"").localeCompare(b.date||"");
+      if(c!==0)return c;
+      const ta=a.ts&&a.ts.seconds||0,tb=b.ts&&b.ts.seconds||0;
+      return ta-tb;
+    });
+  }catch(e){
+    toast("載入請假失敗: "+e.message,"err");
+  }
+  leavesLoading=false;
+  if(activeTab==='leaves')render();
+}
+
+function changeLeavesMonth(delta){
+  const[y,m]=leavesYM.split("-").map(Number);
+  const d=new Date(y,m-1+delta,1);
+  leavesYM=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+  loadLeavesData(leavesYM);
+}
+
+function setLeavesUnitFilter(v){leavesUnitFilter=v;render()}
+function setLeavesTypeFilter(v){leavesTypeFilter=v;render()}
+function setLeavesNameSearch(v){leavesNameSearch=v;const list=$("leavesListBody");if(list){_renderLeavesList(list)}}
+
+function _renderLeavesList(container){
+  let filtered=LEAVES_DATA.slice();
+  if(leavesUnitFilter)filtered=filtered.filter(l=>(l.unit||"")===leavesUnitFilter);
+  if(leavesTypeFilter)filtered=filtered.filter(l=>(l.leaveType||"")===leavesTypeFilter);
+  if(leavesNameSearch){
+    const q=leavesNameSearch.toLowerCase();
+    filtered=filtered.filter(l=>(l.name||"").toLowerCase().includes(q)||(l.reason||"").toLowerCase().includes(q));
+  }
+  if(!filtered.length){
+    container.innerHTML='<div class="empty">本月沒有符合條件的請假紀錄</div>';
+    return;
+  }
+  // 按日期分組
+  const byDate={};
+  filtered.forEach(l=>{const d=l.date||"";if(!byDate[d])byDate[d]=[];byDate[d].push(l)});
+  const dates=Object.keys(byDate).sort();
+  const today=(new Date()).toISOString().slice(0,10);
+  let html="";
+  dates.forEach(d=>{
+    const dayObj=new Date(d+"T00:00:00");
+    const wk=["日","一","二","三","四","五","六"][dayObj.getDay()];
+    const isToday=d===today;
+    const isFuture=d>today;
+    const dateBg=isToday?'#1565c0':(isFuture?'#2e7d32':'#555');
+    const totalHrs=byDate[d].reduce((s,l)=>s+(l.hours||0),0);
+    html+=`<div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${dateBg};border-radius:6px;color:#fff;margin-bottom:6px">
+        <span style="font-size:14px;font-weight:800">${d.slice(5)} (${wk})${isToday?' 今天':''}</span>
+        <span style="font-size:11px;opacity:0.85">${byDate[d].length} 人 · 共 ${totalHrs}h</span>
+      </div>`;
+    byDate[d].forEach(l=>{
+      const lt=CFG.leaveTypes.find(x=>x.id===l.leaveType);
+      const ltName=lt?lt.name:(l.leaveType||"未知");
+      const color=lt?lt.color:'#888';
+      let timeStr="";
+      if(l.ts&&l.ts.seconds){
+        const dt=new Date(l.ts.seconds*1000);
+        timeStr=`${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`;
+      }
+      const reasonRow=l.reason?`<div style="margin-top:5px;padding:6px 8px;background:rgba(33,150,243,0.12);border-left:3px solid #2196f3;border-radius:4px;font-size:12px;color:#bbdefb">💬 ${esc(l.reason)}</div>`:'';
+      html+=`<div style="background:#1e2530;border-radius:6px;padding:8px 10px;margin-bottom:5px;border-left:4px solid ${esc(color)}">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#fff">${esc(l.name||"未知")} <span style="font-size:11px;font-weight:500;color:#aaa">${esc(l.unit||"無單位")}</span></div>
+            <div style="font-size:12px;color:#ccc;margin-top:2px"><span style="color:${esc(color)};font-weight:600">${esc(ltName)}</span> · ${l.hours||0}h${timeStr?' · <span style="color:#888">提交於 '+timeStr+'</span>':''}</div>
+          </div>
+        </div>
+        ${reasonRow}
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+  container.innerHTML=html;
+}
+
+function leavesTabHtml(){
+  if(!leavesYM){
+    const now=new Date();
+    leavesYM=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+    setTimeout(()=>loadLeavesData(leavesYM),0);
+  }
+  const realCount=LEAVES_DATA.length;
+  // 統計各假別、各單位人數
+  const byType={},byUnit={};
+  LEAVES_DATA.forEach(l=>{byType[l.leaveType]=(byType[l.leaveType]||0)+1;byUnit[l.unit||'(無)']=(byUnit[l.unit||'(無)']||0)+1});
+  const totalHrs=LEAVES_DATA.reduce((s,l)=>s+(l.hours||0),0);
+  const reasonCount=LEAVES_DATA.filter(l=>l.reason).length;
+  
+  const unitOpts=`<option value="">所有單位</option>`+CFG.units.map(u=>`<option value="${esc(u)}"${leavesUnitFilter===u?' selected':''}>${esc(u)} ${byUnit[u]?'('+byUnit[u]+')':''}</option>`).join("");
+  const typeOpts=`<option value="">所有假別</option>`+CFG.leaveTypes.map(lt=>`<option value="${esc(lt.id)}"${leavesTypeFilter===lt.id?' selected':''}>${esc(lt.name)} ${byType[lt.id]?'('+byType[lt.id]+')':''}</option>`).join("");
+  
+  const[y,m]=leavesYM.split("-");
+  const monthLabel=`${y} 年 ${parseInt(m)} 月`;
+  
+  return `<div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <h2 style="margin:0">📅 請假總覽</h2>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="btn gray sm" onclick="changeLeavesMonth(-1)">◀</button>
+        <span style="font-size:14px;font-weight:700;min-width:96px;text-align:center">${monthLabel}</span>
+        <button class="btn gray sm" onclick="changeLeavesMonth(1)">▶</button>
+        <button class="btn sm" onclick="loadLeavesData(leavesYM)" title="重新載入" style="margin-left:4px">🔄</button>
+      </div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
+      <div style="background:#1565c0;padding:10px;border-radius:6px;text-align:center;color:#fff">
+        <div style="font-size:20px;font-weight:900">${realCount}</div><div style="font-size:10px;opacity:0.9">總筆數</div>
+      </div>
+      <div style="background:#2e7d32;padding:10px;border-radius:6px;text-align:center;color:#fff">
+        <div style="font-size:20px;font-weight:900">${totalHrs}h</div><div style="font-size:10px;opacity:0.9">總時數</div>
+      </div>
+      <div style="background:#6a1b9a;padding:10px;border-radius:6px;text-align:center;color:#fff">
+        <div style="font-size:20px;font-weight:900">${reasonCount}</div><div style="font-size:10px;opacity:0.9">有填原因</div>
+      </div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+      <select class="inp" onchange="setLeavesUnitFilter(this.value)">${unitOpts}</select>
+      <select class="inp" onchange="setLeavesTypeFilter(this.value)">${typeOpts}</select>
+    </div>
+    <input class="inp" placeholder="🔍 搜尋姓名或原因..." value="${esc(leavesNameSearch)}" oninput="setLeavesNameSearch(this.value)" style="margin-bottom:12px">
+    
+    <div id="leavesListBody">${leavesLoading?'<div class="empty">載入中...</div>':(LEAVES_DATA.length?'':'<div class="empty">本月尚無請假紀錄</div>')}</div>
+    
+    <div style="color:#666;font-size:10px;margin-top:14px;line-height:1.6;padding:8px;background:rgba(33,150,243,0.08);border-radius:6px;border-left:3px solid #2196f3">
+      🔒 此頁面僅管理員可見。員工只能看到當天請假人數（無姓名無原因）。<br>
+      💬 請假原因為員工選填，最多 50 字。
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 5: 管理員
 // ═══════════════════════════════════════════════════════════════
 function adminsTabHtml(){
   const superList=SUPER_ADMINS.map(e=>`<div class="row">
@@ -893,6 +1053,11 @@ function bind(){
       if(qs) qs.value=c.quietStart!==undefined?c.quietStart:22;
       if(qe) qe.value=c.quietEnd!==undefined?c.quietEnd:7;
     }catch(e){}
+  }
+  // 請假總覽 tab：渲染列表內容
+  if(activeTab==='leaves'&&!leavesLoading){
+    const list=$("leavesListBody");
+    if(list&&LEAVES_DATA.length)_renderLeavesList(list);
   }
 }
 
