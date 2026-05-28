@@ -1047,6 +1047,11 @@ function _doRender(){
     document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():S.showSal?rSalary():S.showLeavesOv?rLeavesOv():"";
     document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
     if(document.getElementById("leaveTypeSel"))try{updateLeaveHours()}catch(e){}
+    // 請假總覽 modal：渲染列表內容（rLeavesOv 只生成空 container，列表內容需在這裡填入）
+    if(S.showLeavesOv&&!leavesOvLoading){
+      const list=document.getElementById("leavesOvListBody");
+      if(list&&LEAVES_OV_DATA.length)_renderLeavesOvList(list);
+    }
   }catch(err){
     console.log("render err",err);
     a.innerHTML=`<div style="padding:30px;color:#e74c3c;font-size:13px;line-height:1.6">
