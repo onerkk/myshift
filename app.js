@@ -1646,12 +1646,12 @@ async function loadWx(retries){
   // ── Then try fresh data from API ──
   try{
     let lat,lon;
-    try{const c=JSON.parse(localStorage.getItem('_wxPos'));if(c&&c.lat&&c.lon){lat=c.lat;lon=c.lon}}catch(e){}
+    try{const c=JSON.parse(localStorage.getItem('_wxPos'));if(c&&c.lat&&c.lon&&c.ts&&(Date.now()-c.ts)<6*3600000){lat=c.lat;lon=c.lon}}catch(e){}
     if(!lat){
       try{
-        const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:8000,maximumAge:3600000})});
+        const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:8000,maximumAge:600000})});
         lat=pos.coords.latitude.toFixed(2);lon=pos.coords.longitude.toFixed(2);
-        try{localStorage.setItem('_wxPos',JSON.stringify({lat,lon}))}catch(e){}
+        try{localStorage.setItem('_wxPos',JSON.stringify({lat,lon,ts:Date.now()}))}catch(e){}
       }catch(e){lat="23.32";lon="120.27"}
     }
     // 把位置交給 Service Worker（背景同步抓天氣時要用）
@@ -2349,6 +2349,7 @@ function userPrefsModalHtml(){
       <div style="color:var(--tx)">${isZh?'目前溫度':'Temp'}：<strong style="color:#ff6b35;font-size:14px">${curT}°C</strong>　${isZh?'降雨機率':'Rain'}：<strong style="color:#3498db;font-size:14px">${curPrec}%</strong></div>
       <div style="margin-top:4px;color:var(--tx2);font-size:10px">${isZh?`🥵 高溫門檻 ${heatTh}°C ${heatDiff>0?'(再 '+heatDiff+'°C 觸發)':'✓ 已達標'}　🥶 低溫門檻 ${coldTh}°C ${coldDiff>0?'(再 '+coldDiff+'°C 觸發)':'✓ 已達標'}`:`Heat ${heatTh}°C, Cold ${coldTh}°C`}</div>
       <div style="margin-top:6px;padding:5px 10px;background:${activeCount>0?'rgba(192,57,43,0.15)':'rgba(39,174,96,0.15)'};border-radius:5px;color:${activeCount>0?'#e74c3c':'#27ae60'};font-weight:700;font-size:11px;display:inline-block">${activeCount>0?(isZh?`🚨 ${activeCount} 個警報觸發中`:`${activeCount} active`):(isZh?'✅ 目前無警報':'No alerts')}</div>
+      ${wxData&&wxData.lat?`<div style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(127,140,141,0.25);color:var(--tx3);font-size:10px">📍 ${isZh?'目前定位':'Location'}：${wxData.lat}, ${wxData.lon}${wxData._cached?(isZh?'　(快取)':' (cached)'):''}　${isZh?'若與實際位置不符，按下方「重新抓取」重新定位':'Tap Reload if location is wrong'}</div>`:''}
     </div>`;
   }
 
@@ -2479,6 +2480,7 @@ async function testNotification(){
 async function forceReloadWx(){
   try{
     // 清掉位置與天氣快取（重新定位 + 重新抓 API）
+    try{localStorage.removeItem('_wxPos')}catch(e){}
     try{localStorage.removeItem('_wxCache')}catch(e){}
     try{localStorage.removeItem('_typhoonCache')}catch(e){}
     try{localStorage.removeItem('_cwaCache')}catch(e){}
