@@ -61,7 +61,23 @@ function _scheduleCloudSave(){
 }
 
 let _initDone=false;let _cloudLoading=false;
-function _doAuthInit(){if(_initDone)return;_initDone=true;_cloudLoading=true;render();loadAppConfig().then(()=>{cloudLoad().then(()=>{_cloudLoading=false;render();loadLeaves();loadAdminEv();syncALYearLeaves()}).catch(()=>{_cloudLoading=false;render()})})}
+function _doAuthInit(){if(_initDone)return;_initDone=true;_cloudLoading=true;render();loadAppConfig().then(()=>{cloudLoad().then(()=>{_cloudLoading=false;render();loadLeaves();loadAdminEv();syncALYearLeaves();_autoLocateOnLogin()}).catch(()=>{_cloudLoading=false;render();_autoLocateOnLogin()})})}
+// 登入後自動定位：權限已授予就重抓最新位置，確保天氣對應實際所在地
+function _autoLocateOnLogin(){
+  try{
+    if(navigator.permissions&&navigator.permissions.query){
+      navigator.permissions.query({name:'geolocation'}).then(ps=>{
+        // 已授權 → 清掉可能過期的位置快取，強制用當下 GPS 重抓一次
+        if(ps.state==='granted'){
+          try{localStorage.removeItem('_wxPos')}catch(e){}
+          loadWx();
+        }
+        // 權限變動時（使用者後來才允許）自動重抓
+        ps.onchange=function(){if(this.state==='granted'){try{localStorage.removeItem('_wxPos')}catch(e){}loadWx()}};
+      }).catch(()=>{});
+    }
+  }catch(e){}
+}
 function syncALYearLeaves(){
   if(!fbUser)return Promise.resolve();
   return fsEnqueue(async()=>{
@@ -1629,6 +1645,46 @@ const WXI={0:"☀️",1:"🌤",2:"⛅",3:"☁️",45:"🌫",48:"🌫",51:"🌦",
 const WXZ={0:"晴天",1:"大致晴",2:"局部多雲",3:"多雲",45:"霧",48:"霧",51:"小雨",53:"中雨",55:"大雨",61:"小雨",63:"中雨",65:"大雨",71:"小雪",73:"中雪",75:"大雪",80:"陣雨",81:"陣雨",82:"暴雨",95:"雷雨"};
 const WXD={0:"Cerah",1:"Cerah",2:"Berawan",3:"Mendung",45:"Kabut",48:"Kabut",51:"Gerimis",53:"Hujan",55:"Hujan Lebat",61:"Hujan",63:"Hujan",65:"Hujan Lebat",71:"Salju",80:"Hujan",81:"Hujan",82:"Badai",95:"Petir"};
 let tideData=null,tideErr=false;
+// ── 定位狀態（給 UI 顯示用）──
+let geoState={status:'unknown',code:null,msg:'',source:''}; // status: unknown|locating|ok|fallback|denied
+// ── 官方標準定位：Permissions API 查狀態 → getCurrentPosition → 完整錯誤碼處理 ──
+// 回傳 {lat,lon,fresh} 或 null（失敗）
+async function getGeoPosition(){
+  if(!('geolocation' in navigator)){geoState={status:'fallback',code:null,msg:'此裝置不支援定位',source:'unsupported'};return null}
+  // 先用 Permissions API 查權限狀態（MDN: 2022 起全瀏覽器支援），避免盲目觸發 timeout
+  let permState='prompt';
+  try{
+    if(navigator.permissions&&navigator.permissions.query){
+      const ps=await navigator.permissions.query({name:'geolocation'});
+      permState=ps.state; // granted | denied | prompt
+    }
+  }catch(e){}
+  if(permState==='denied'){geoState={status:'denied',code:1,msg:lang==='zh'?'定位權限被拒絕':'Location denied',source:'permission'};return null}
+  geoState={status:'locating',code:null,msg:'',source:''};
+  try{
+    const pos=await new Promise((ok,no)=>{
+      // granted 時可給較長 timeout 取高精度；prompt 時 timeout 短一點避免使用者放置不理卡住
+      navigator.geolocation.getCurrentPosition(ok,no,{
+        enableHighAccuracy:false,
+        timeout:permState==='granted'?15000:12000,
+        maximumAge:600000
+      });
+    });
+    const lat=pos.coords.latitude.toFixed(2),lon=pos.coords.longitude.toFixed(2);
+    geoState={status:'ok',code:null,msg:'',source:'gps'};
+    return {lat,lon,fresh:true};
+  }catch(err){
+    // 官方錯誤碼：1=PERMISSION_DENIED 2=POSITION_UNAVAILABLE 3=TIMEOUT
+    const code=err&&err.code;
+    let msg='';
+    if(code===1)msg=lang==='zh'?'定位權限被拒絕':'Location denied';
+    else if(code===2)msg=lang==='zh'?'目前無法取得位置':'Position unavailable';
+    else if(code===3)msg=lang==='zh'?'定位逾時':'Location timeout';
+    else msg=lang==='zh'?'定位失敗':'Location failed';
+    geoState={status:code===1?'denied':'fallback',code:code,msg:msg,source:'error'};
+    return null;
+  }
+}
 async function loadWx(retries){
   retries=retries||0;
   // ── Cache-first: show cached data immediately ──
@@ -1646,13 +1702,19 @@ async function loadWx(retries){
   // ── Then try fresh data from API ──
   try{
     let lat,lon;
-    try{const c=JSON.parse(localStorage.getItem('_wxPos'));if(c&&c.lat&&c.lon&&c.ts&&(Date.now()-c.ts)<6*3600000){lat=c.lat;lon=c.lon}}catch(e){}
+    // 1) 6 小時內的有效快取位置優先（省電、不重複問權限）
+    try{const c=JSON.parse(localStorage.getItem('_wxPos'));if(c&&c.lat&&c.lon&&c.ts&&(Date.now()-c.ts)<6*3600000){lat=c.lat;lon=c.lon;if(geoState.status==='unknown')geoState={status:'ok',code:null,msg:'',source:'cache'}}}catch(e){}
+    // 2) 無有效快取 → 用官方標準定位
     if(!lat){
-      try{
-        const pos=await new Promise((ok,no)=>{navigator.geolocation.getCurrentPosition(ok,no,{timeout:8000,maximumAge:600000})});
-        lat=pos.coords.latitude.toFixed(2);lon=pos.coords.longitude.toFixed(2);
+      const g=await getGeoPosition();
+      if(g){
+        lat=g.lat;lon=g.lon;
         try{localStorage.setItem('_wxPos',JSON.stringify({lat,lon,ts:Date.now()}))}catch(e){}
-      }catch(e){lat="23.32";lon="120.27"}
+      }else{
+        // 定位失敗 → 用最後一次已知位置（即使超過 6 小時），完全沒有才用台灣中心點 fallback
+        try{const c=JSON.parse(localStorage.getItem('_wxPos'));if(c&&c.lat&&c.lon){lat=c.lat;lon=c.lon}}catch(e){}
+        if(!lat){lat="23.97";lon="120.97"}  // 台灣地理中心（南投），非特定漁港，避免誤導
+      }
     }
     // 把位置交給 Service Worker（背景同步抓天氣時要用）
     try{
@@ -2349,7 +2411,17 @@ function userPrefsModalHtml(){
       <div style="color:var(--tx)">${isZh?'目前溫度':'Temp'}：<strong style="color:#ff6b35;font-size:14px">${curT}°C</strong>　${isZh?'降雨機率':'Rain'}：<strong style="color:#3498db;font-size:14px">${curPrec}%</strong></div>
       <div style="margin-top:4px;color:var(--tx2);font-size:10px">${isZh?`🥵 高溫門檻 ${heatTh}°C ${heatDiff>0?'(再 '+heatDiff+'°C 觸發)':'✓ 已達標'}　🥶 低溫門檻 ${coldTh}°C ${coldDiff>0?'(再 '+coldDiff+'°C 觸發)':'✓ 已達標'}`:`Heat ${heatTh}°C, Cold ${coldTh}°C`}</div>
       <div style="margin-top:6px;padding:5px 10px;background:${activeCount>0?'rgba(192,57,43,0.15)':'rgba(39,174,96,0.15)'};border-radius:5px;color:${activeCount>0?'#e74c3c':'#27ae60'};font-weight:700;font-size:11px;display:inline-block">${activeCount>0?(isZh?`🚨 ${activeCount} 個警報觸發中`:`${activeCount} active`):(isZh?'✅ 目前無警報':'No alerts')}</div>
-      ${wxData&&wxData.lat?`<div style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(127,140,141,0.25);color:var(--tx3);font-size:10px">📍 ${isZh?'目前定位':'Location'}：${wxData.lat}, ${wxData.lon}${wxData._cached?(isZh?'　(快取)':' (cached)'):''}　${isZh?'若與實際位置不符，按下方「重新抓取」重新定位':'Tap Reload if location is wrong'}</div>`:''}
+      ${(()=>{
+        if(!wxData)return'';
+        const st=geoState.status;
+        let icon='📍',extra='';
+        if(st==='ok'&&geoState.source==='gps'){icon='✅';extra=isZh?'（GPS 即時定位）':'(GPS)';}
+        else if(st==='ok'&&geoState.source==='cache'){icon='📍';extra=isZh?'（使用記錄位置）':'(cached)';}
+        else if(st==='denied'){icon='🚫';extra=isZh?'　定位權限被拒，請到手機設定→瀏覽器/APP→允許位置，再按「重新抓取」':' Location denied — enable in settings';}
+        else if(st==='fallback'){icon='⚠️';extra='　'+(geoState.msg||'')+(isZh?'，顯示為預設位置，按「重新抓取」重試':'');}
+        else if(st==='locating'){icon='🔄';extra=isZh?'定位中...':'Locating...';}
+        return`<div style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(127,140,141,0.25);color:var(--tx3);font-size:10px">${icon} ${isZh?'目前定位':'Location'}：${wxData.lat}, ${wxData.lon}${extra}</div>`;
+      })()}
     </div>`;
   }
 
@@ -2492,11 +2564,16 @@ async function forceReloadWx(){
       localStorage.setItem('_wxNotifyState',JSON.stringify(eq?{_eqLastNo:eq}:{}));
     }catch(e){}
     wxData=null;wxErr=false;
+    geoState={status:'locating',code:null,msg:'',source:''};
     typhoonData=null;earthquakeData=null;
     render();
     await loadWx();
     try{await loadCwaData()}catch(e){}
-    alert(lang==='zh'?'已重新抓取最新資料':'Reloaded');
+    // 依定位結果回報，讓使用者知道有沒有抓到真實位置
+    if(geoState.status==='ok'&&geoState.source==='gps')alert(lang==='zh'?'✅ 已定位並抓取最新天氣':'Located & reloaded');
+    else if(geoState.status==='denied')alert(lang==='zh'?'⚠️ 定位權限被拒絕\n請到手機「設定→應用程式/瀏覽器→權限→位置」開啟，再試一次':'Location permission denied');
+    else if(geoState.status==='fallback')alert((lang==='zh'?'⚠️ 定位失敗：':'Location failed: ')+(geoState.msg||'')+(lang==='zh'?'\n已顯示預設位置天氣':''));
+    else alert(lang==='zh'?'已重新抓取最新資料':'Reloaded');
   }catch(e){
     alert((lang==='zh'?'重新抓取失敗：':'Reload failed: ')+e.message);
   }
