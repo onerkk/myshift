@@ -111,8 +111,9 @@ let _loading=false;
 function cloudSave(force){
   if(!fbUser||(!force&&_loading))return Promise.resolve();
   return fsEnqueue(async()=>{
-    const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",displayName:fbUser.displayName||"",email:fbUser.email||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),tyd:JSON.stringify(TYD),notes:JSON.stringify(NOTES),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};
+    const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",displayName:fbUser.displayName||"",email:fbUser.email||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),tyd:JSON.stringify(TYD),notes:JSON.stringify(NOTES),shiftov:JSON.stringify(SHIFT_OV),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};
     if(JSON.stringify(NOTES)==='{}')delete payload.notes;
+    if(JSON.stringify(SHIFT_OV)==='{}')delete payload.shiftov;
     await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true});
   },"cloudSave");
 }
@@ -147,6 +148,14 @@ function cloudLoad(){
         const raw=d.notes;
         const _n=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});
         if(Object.keys(_n).length)NOTES=_n;
+      }catch(e){}
+    }
+    if(d.shiftov){
+      try{
+        const raw=d.shiftov;
+        const _o=typeof raw==='string'?JSON.parse(raw):(typeof raw==='object'?raw:{});
+        SHIFT_OV=_o||{};
+        localStorage.setItem("sb_shiftov",JSON.stringify(SHIFT_OV));
       }catch(e){}
     }
     if(d.lockedUnit){S.unit=d.lockedUnit;S.lockedUnit=d.lockedUnit}
@@ -760,6 +769,20 @@ const SAL_DEFAULT={
 };
 let SAL={};
 try{const s=localStorage.getItem("sb_sal");SAL=Object.assign({},SAL_DEFAULT,s?JSON.parse(s):{})}catch(e){SAL=Object.assign({},SAL_DEFAULT)}
+
+// ═══ 班別覆寫（調班）═══
+// 排班是公式算出來的，調班＝針對特定某天「覆寫」成別的班別，不影響其他天
+// 格式：{ "2026-06-15":"晚", "2026-06-20":"休" }，值為 早/中/晚/休
+let SHIFT_OV={};
+try{SHIFT_OV=JSON.parse(localStorage.getItem("sb_shiftov"))||JSON.parse(gCk("sb_shiftov"))||{}}catch(e){SHIFT_OV={}}
+function sShiftOv(){const d=JSON.stringify(SHIFT_OV);try{localStorage.setItem("sb_shiftov",d)}catch(e){}try{sCk("sb_shiftov",d,3650)}catch(e){}_scheduleCloudSave()}
+// 設定/清除某天的調班
+function setShiftOv(y,m,d,val){
+  const k=ek(y,m,d);
+  if(val===null||val===undefined||val===""){delete SHIFT_OV[k]}
+  else{SHIFT_OV[k]=val}
+  sShiftOv();
+}
 // 本機立即存（離線快取）+ 雲端同步（換機/清資料可復原）
 function sSAL(){
   try{localStorage.setItem("sb_sal",JSON.stringify(SAL))}catch(e){}
@@ -812,7 +835,14 @@ function rot(){return S.rt?R[S.rt]:null}
 function cyc(){return rot()?rot().c:[]}
 function dim(y,m){return new Date(y,m,0).getDate()}
 function fdw(y,m){return new Date(y,m-1,1).getDay()}
-function gs(y,m,d){const c=cyc();if(!c.length||S.pos===null)return null;let p=(S.pos+dayOff(y,m,d))%c.length;if(p<0)p+=c.length;return c[p]}
+function gs(y,m,d){
+  // 調班覆寫優先：使用者手動改過的某天，直接回傳覆寫值
+  const ov=SHIFT_OV[ek(y,m,d)];
+  if(ov)return ov;
+  const c=cyc();if(!c.length||S.pos===null)return null;let p=(S.pos+dayOff(y,m,d))%c.length;if(p<0)p+=c.length;return c[p];
+}
+// 取得某天「公式原本」的班別（不看覆寫），用於調班 UI 顯示原班
+function gsOrig(y,m,d){const c=cyc();if(!c.length||S.pos===null)return null;let p=(S.pos+dayOff(y,m,d))%c.length;if(p<0)p+=c.length;return c[p]}
 function ek(y,m,d){return`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function hk(m,d){return`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function gh(y,m,d){const h=getHOL(y,m,d);if(!h)return null;return h[lang]||null}
@@ -1139,8 +1169,8 @@ function rCal(){
   const WK=t("wk");
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
   const pd5=getPayDay(y,m,5),pd20=getPayDay(y,m,20);
-  for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(y,m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||isTWOff(y,m,d)),isPay=(d===pd5||d===pd20);
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${td?'<span class="td">TODAY</span>':''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
+  for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(y,m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||isTWOff(y,m,d)),isPay=(d===pd5||d===pd20),isAdj=!!SHIFT_OV[ek(y,m,d)];
+    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${isAdj?'<span style="position:absolute;top:1px;right:2px;font-size:9px;line-height:1" title="已調班">🔄</span>':''}${td?'<span class="td">TODAY</span>':''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(y,m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<div class="hol-strip">🎌 ${mh.join("　")}</div>`:"";
@@ -1254,8 +1284,38 @@ function rMod(){
   const hasTy=ev.includes("typhoon");const dayTy=TYD[ek(y,m,d)]||0;
   let tyP="";if(hasTy){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayTy?' selected':''}>${h} ${t("hr")}</option>`}tyP=`<div class="al-pick" style="border-color:#0288d1;background:rgba(2,136,209,.05)"><label style="color:#01579b">🌀 ${lang==="zh"?"颱風假時數":"Jam Libur Topan"}</label><select id="tySel" data-a="tyh" style="margin-top:4px">${opts}</select><div style="font-size:10px;color:var(--tx3);margin-top:4px;line-height:1.4">${lang==="zh"?"依公告自行換算：整日停班=12h、下午停班=6h 等。會自動扣減當月應出勤與加班時數。":"Sesuai pengumuman: seharian=12h, sore=6h, dll."}</div></div>`}
   return`<div class="modal-bg" data-a="close"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
-  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${tyP}${custP}
+  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${shiftAdjHtml(y,m,d)}${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${tyP}${custP}
   <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
+
+// ═══ 調班 UI ═══
+function shiftAdjHtml(y,m,d){
+  const isZh=lang==="zh";
+  const key=ek(y,m,d);
+  const orig=gsOrig(y,m,d);         // 公式原本的班
+  const isOv=!!SHIFT_OV[key];        // 是否已調班
+  const cur=SHIFT_OV[key]||orig;     // 目前顯示的班
+  if(orig===null)return"";           // 還沒設定班表時不顯示
+  const opts=[["早",isZh?"早班":"Pagi"],["中",isZh?"中班":"Siang"],["晚",isZh?"晚班":"Malam"],["休",isZh?"休假":"Libur"]];
+  const btns=opts.map(([v,label])=>{
+    const on=cur===v;
+    return`<button onclick="doShiftAdj('${key}','${v}')" style="flex:1;padding:8px 4px;border-radius:6px;border:1.5px solid ${on?'var(--pri)':'#ddd'};background:${on?'var(--pri)':'var(--card)'};color:${on?'#fff':'var(--tx)'};font-size:12px;font-weight:${on?'700':'500'};cursor:pointer">${label}</button>`;
+  }).join("");
+  const origLabel={"早":isZh?"早班":"Pagi","中":isZh?"中班":"Siang","晚":isZh?"晚班":"Malam","休":isZh?"休假":"Libur"}[orig]||orig;
+  return`<div class="al-pick" style="border-color:#f57c00;background:rgba(245,124,0,.05)">
+    <label style="color:#e65100">🔄 ${isZh?"調班（特殊狀況改這天班別）":"Ubah Shift Hari Ini"}</label>
+    <div style="display:flex;gap:4px;margin-top:6px">${btns}</div>
+    ${isOv?`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px"><span style="font-size:10px;color:var(--tx3)">${isZh?"原班表為「"+origLabel+"」":"Asli: "+origLabel}</span><button onclick="doShiftAdj('${key}','')" style="background:var(--tx3);color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:10px;cursor:pointer">${isZh?"↩ 還原原班":"↩ Reset"}</button></div>`:`<div style="font-size:10px;color:var(--tx3);margin-top:6px">${isZh?"點上方按鈕即可把這天改成其他班別，只影響這一天。會自動重算工時與薪資。":"Klik untuk ubah shift hari ini saja."}</div>`}
+  </div>`;
+}
+// 執行調班：覆寫某天班別並重新渲染
+function doShiftAdj(key,val){
+  const[y,m,d]=key.split("-").map(Number);
+  // 若改成的班別 = 公式原本的班，視為還原（不留覆寫，保持資料乾淨）
+  const orig=gsOrig(y,m,d);
+  if(val&&val===orig){delete SHIFT_OV[key];sShiftOv()}
+  else{setShiftOv(y,m,d,val)}
+  render();
+}
 
 function fbBarHtml(){
   if(!firebase||!fbAuth)return"";
