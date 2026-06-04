@@ -774,6 +774,8 @@ let NOTES={};try{NOTES=JSON.parse(localStorage.getItem("sb_notes"))||JSON.parse(
 const SAL_DEFAULT={
   base:0,meal:0,transport:0,position:0,night:0,proposal:0,
   union:0,welfare:0,laborIns:0,healthIns:0,otherDed:0,
+  // 勞退：自願提繳是員工扣款；公司提繳只顯示，不扣實領。基準請填薪資條「月提繳工資/勞退提繳工資」。
+  laborPensionWage:0,laborPensionSelfRate:0,laborPensionEmployerRate:6,
   // 華新薪資條回推：加班倍率需用 4/3、5/3；免稅切點約 46.67h 才能對上 64h→11285/4192。
   otTier1Rate:4/3,otTier2Rate:5/3,otTaxFreeH:46.6666667,sickRate:0.5,
   enabled:false
@@ -786,6 +788,9 @@ function normalizeSal(){
   if(SAL.otTier2Rate>2.30&&SAL.otTier2Rate<2.90)SAL.otTier2Rate=5/3;
   if(SAL.otTier2Rate>1.60&&SAL.otTier2Rate<1.75)SAL.otTier2Rate=5/3;
   if(!SAL.otTaxFreeH||Math.abs(SAL.otTaxFreeH-46)<0.01)SAL.otTaxFreeH=46.6666667;
+  if(SAL.laborPensionEmployerRate===undefined)SAL.laborPensionEmployerRate=6;
+  if(SAL.laborPensionSelfRate===undefined)SAL.laborPensionSelfRate=0;
+  if(SAL.laborPensionWage===undefined)SAL.laborPensionWage=0;
 }
 normalizeSal();
 
@@ -1003,12 +1008,18 @@ function calcSalaryEst(y,m){
   const nightPay=nightCount*SAL.night;
   const proposal=SAL.proposal||0;
   const sickDed=Math.round(sickH*hourly*SAL.sickRate);
+  const pensionWage=SAL.laborPensionWage||0;
+  const pensionSelfRate=SAL.laborPensionSelfRate||0;
+  const pensionEmployerRate=(SAL.laborPensionEmployerRate===undefined?6:SAL.laborPensionEmployerRate)||0;
+  const laborPensionSelf=Math.round(pensionWage*pensionSelfRate/100);
+  const laborPensionEmployer=Math.round(pensionWage*pensionEmployerRate/100);
   const income=Math.round(baseSum+proposal+otPay+nightPay);
   const fixedDed=SAL.union+SAL.welfare+SAL.laborIns+SAL.healthIns+SAL.otherDed;
-  const deduction=fixedDed+sickDed;
+  const deduction=fixedDed+sickDed+laborPensionSelf;
   const net=income-deduction;
   return{
     hourly,baseSum,proposal,nightCount,sickH,otH,otPay,rawOtPay,otTaxFree,otTaxable,nightPay,sickDed,
+    pensionWage,pensionSelfRate,pensionEmployerRate,laborPensionSelf,laborPensionEmployer,
     income,deduction,fixedDed,net,totalFront,totalBack
   };
 }
@@ -1061,8 +1072,10 @@ function salaryEstHtml(y,m){
         ${SAL.welfare?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"福利金":"Kesejahteraan"}</span><span>-${fmt(SAL.welfare)}</span></div>`:""}
         ${SAL.laborIns?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"勞保自付":"BPJS Tenaga Kerja"}</span><span>-${fmt(SAL.laborIns)}</span></div>`:""}
         ${SAL.healthIns?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"健保自付":"BPJS Kesehatan"}</span><span>-${fmt(SAL.healthIns)}</span></div>`:""}
+        ${est.laborPensionSelf?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"勞退自提":"Pensiun sukarela"} (${est.pensionSelfRate}%)</span><span>-${fmt(est.laborPensionSelf)}</span></div>`:""}
         ${SAL.otherDed?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"其他固定扣款":"Potongan Lain"}</span><span>-${fmt(SAL.otherDed)}</span></div>`:""}
         ${est.sickDed>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"病假扣薪":"Potongan Sakit"} (${est.sickH}h)</span><span>-${fmt(est.sickDed)}</span></div>`:""}
+        ${est.laborPensionEmployer?`<div style="display:flex;justify-content:space-between;color:#2e7d32;margin-top:6px;border-top:1px dashed rgba(46,125,50,.25);padding-top:5px"><span>　${isZh?"公司勞退提撥(不扣實領)":"Pensiun perusahaan"} (${est.pensionEmployerRate}%)</span><span>+${fmt(est.laborPensionEmployer)}</span></div>`:""}
       </div>
     </details>
     <div style="font-size:9px;color:var(--tx3);text-align:center;margin-top:8px;padding-top:6px;border-top:1px dashed #eee">⚠️ ${isZh?"僅供估算參考，實際以公司薪資條為準":"Estimasi saja, ikuti slip resmi"}</div>
@@ -1100,7 +1113,17 @@ function rSalary(){
       ${num("sal_welfare",isZh?"福利金":"Kesejahteraan",SAL.welfare,null,"173")}
       ${num("sal_laborIns",isZh?"勞保自付":"BPJS TK",SAL.laborIns,null,"1145")}
       ${num("sal_healthIns",isZh?"健保自付":"BPJS Kes",SAL.healthIns,null,"1129")}
-      ${num("sal_otherDed",isZh?"其他固定扣款":"Potongan Lain",SAL.otherDed,isZh?"只填薪資條上未列出的固定扣款；本期若只有工會/福利金/勞健保/病假，這欄請填 0":"","3033")}
+      ${num("sal_otherDed",isZh?"其他固定扣款":"Potongan Lain",SAL.otherDed,isZh?"只填薪資條上未列出的固定扣款；勞退請改用下方百分比欄位，不要填在這裡。":"","0")}
+    </div>
+
+    <div style="background:rgba(46,125,50,.05);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:#2e7d32;margin-bottom:10px">🌱 ${isZh?"勞退提繳(固定百分比)":"Pensiun tenaga kerja"}</div>
+      ${num("sal_laborPensionWage",isZh?"勞退月提繳工資":"Upah pensiun bulanan",SAL.laborPensionWage,isZh?"填薪資條/勞保局級距的月提繳工資。例：公司提撥 4,368 ÷ 6% = 72,800。":"Isi basis kontribusi pensiun","72800")}
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"自提率%（扣實領）":"Rate sendiri %"}</label><input type="number" id="sal_laborPensionSelfRate" value="${SAL.laborPensionSelfRate||0}" step="0.1" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"公司提撥率%（不扣）":"Rate perusahaan %"}</label><input type="number" id="sal_laborPensionEmployerRate" value="${SAL.laborPensionEmployerRate===undefined?6:SAL.laborPensionEmployerRate}" step="0.1" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+      </div>
+      <div style="font-size:10px;color:var(--tx3);margin-top:6px;line-height:1.5">${isZh?"公司提撥只顯示在明細，不會扣你的實領。若薪資條顯示個人提撥 0，自提率請填 0。":"Kontribusi perusahaan hanya ditampilkan, tidak mengurangi gaji bersih."}</div>
     </div>
 
     <div style="background:rgba(63,81,181,.04);border-radius:10px;padding:12px;margin-bottom:12px">
@@ -1688,6 +1711,7 @@ function handle(e){
       const g=id=>{const el=document.getElementById(id);return el?parseFloat(el.value)||0:0};
       SAL.base=g("sal_base");SAL.meal=g("sal_meal");SAL.transport=g("sal_transport");SAL.position=g("sal_position");SAL.night=g("sal_night");SAL.proposal=g("sal_proposal");
       SAL.union=g("sal_union");SAL.welfare=g("sal_welfare");SAL.laborIns=g("sal_laborIns");SAL.healthIns=g("sal_healthIns");SAL.otherDed=g("sal_otherDed");
+      SAL.laborPensionWage=g("sal_laborPensionWage");SAL.laborPensionSelfRate=g("sal_laborPensionSelfRate");SAL.laborPensionEmployerRate=g("sal_laborPensionEmployerRate");
       SAL.otTier1Rate=g("sal_otTier1Rate")||4/3;SAL.otTier2Rate=g("sal_otTier2Rate")||5/3;SAL.otTaxFreeH=g("sal_otTaxFreeH")||46.6666667;SAL.sickRate=g("sal_sickRate")||0;
       if(!SAL.base){alert(lang==="zh"?"職能俸為必填欄位":"Gaji pokok wajib diisi");return}
       SAL.enabled=true;sSAL();S.showSal=false;break;

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v193-salary-logic2';
+const CACHE_NAME = 'myshift-v194-salary-pension-logic2';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
