@@ -1729,7 +1729,7 @@ let tideData=null,tideErr=false;
 // ── 定位狀態（給 UI 顯示用）──
 let geoState={status:'unknown',code:null,msg:'',source:'',accuracy:null,ts:0}; // status: unknown|locating|ok|fallback|denied
 const WX_POS_MAX_AGE_MS=30*60*1000;   // 位置快取最多 30 分鐘；避免人在移動後仍抓舊格點
-const WX_CACHE_MAX_AGE_MS=60*60*1000;  // 天氣快取最多 60 分鐘；超過不再先顯示，避免舊預報誤導
+const WX_CACHE_MAX_AGE_MS=20*60*1000;  // 天氣快取最多 20 分鐘；app 開著時會盡量取新資料，舊資料避免誤導
 const WX_API_TIMEOUT_MS=12000;
 
 // ── 官方標準定位：Permissions API 查狀態 → getCurrentPosition → 完整錯誤碼處理 ──
@@ -1885,6 +1885,7 @@ async function loadWx(arg,retries){
     const hi=_wxHourIndex();
     if(hi>=0){curPrec=wxData.hPrec?wxData.hPrec[hi]||0:0;curWind=wxData.hWind?wxData.hWind[hi]||0:0}
     WxFx.update(wxData.code,wxData.temp,curPrec,curWind);
+    try{loadCwaData({force:false})}catch(e){}
     try{checkAndNotifyAlerts()}catch(e){console.log('notify check err',e)}
   }else WxFx.update(null,0,0,0);
 }
@@ -1906,20 +1907,32 @@ function _getCwaWorkerUrl(){
   return CWA_WORKER_URL;
 }
 
-async function loadCwaData(){
+async function loadCwaData(arg){
+  const force=!!(arg&&arg.force);
   const url=_getCwaWorkerUrl();
   if(!url){typhoonData=null;earthquakeData=null;return}
-  // cache-first
+  // CWA 官方警特報/雨量站以 2 分鐘為前端快取上限；重新抓取時完全跳過快取
+  if(!force){
+    try{
+      const c=JSON.parse(localStorage.getItem('_cwaCache'));
+      if(c&&c.ts&&(Date.now()-c.ts)<2*60*1000&&c.d){
+        typhoonData=c.d;
+        earthquakeData=c.d;
+        render();
+      }
+    }catch(e){}
+  }
   try{
-    const c=JSON.parse(localStorage.getItem('_cwaCache'));
-    if(c&&c.ts&&(Date.now()-c.ts)<5*60*1000&&c.d){
-      typhoonData=c.d;
-      earthquakeData=c.d;
-      render();
+    const req=new URL(url);
+    // 目前先鎖定使用者實際需求：臺南市鹽水區；lat/lon 由定位提供時用於最近雨量站
+    req.searchParams.set('county','臺南市');
+    req.searchParams.set('town','鹽水區');
+    if(wxData&&wxData.lat&&wxData.lon){
+      req.searchParams.set('lat',wxData.lat);
+      req.searchParams.set('lon',wxData.lon);
     }
-  }catch(e){}
-  try{
-    const resp=await Promise.race([fetch(url,{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),10000))]);
+    req.searchParams.set('_',String(Date.now()));
+    const resp=await Promise.race([fetch(req.toString(),{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),10000))]);
     if(!resp.ok)throw new Error('cwa api '+resp.status);
     const data=await resp.json();
     if(data&&data.ok){
@@ -2122,50 +2135,115 @@ function _cwaAreaMatches(text){
   const areaKeys=['臺南','台南','鹽水','新營','柳營','嘉義','高雄','雲林','全臺','全台','臺灣','台灣','南部'];
   return areaKeys.some(k=>text.indexOf(k)>=0) || !/[縣市區鄉鎮]/.test(text);
 }
+function _limitText(t,n){
+  t=String(t||'').replace(/\s+/g,' ').replace(/[｜]{2,}/g,'｜').trim();
+  return t.length>n?t.slice(0,n)+'…':t;
+}
+function _fmtTimeShort(t){
+  if(!t)return'';
+  try{
+    const d=new Date(String(t).replace(' ','T'));
+    if(!isNaN(d.getTime()))return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }catch(e){}
+  return String(t).slice(0,16);
+}
+function _alertIdFromText(text){
+  text=String(text||'');
+  if(/颱風/.test(text))return'typhoon';
+  if(/豪雨|大雨|豪大雨|短延時強降雨/.test(text))return'heavyRain';
+  if(/大雷雨|雷雨|雷擊/.test(text))return'storm';
+  if(/強風|平均風|陣風/.test(text))return'strongWind';
+  if(/高溫|橙色燈號|紅色燈號/.test(text))return'heat';
+  if(/低溫|寒流/.test(text))return'cold';
+  if(/濃霧|能見度/.test(text))return'fog';
+  return'weather';
+}
+function _alertIcon(id){return({typhoon:'🌀',heavyRain:'🌧',storm:'⛈',strongWind:'💨',heat:'🥵',cold:'🥶',fog:'🌫',weather:'⚠️'})[id]||'⚠️'}
+function _alertTitle(id,isZh){return({
+  heavyRain:isZh?'中央氣象署豪大雨特報':'CWA Rain Advisory',
+  storm:isZh?'中央氣象署雷雨特報':'CWA Thunderstorm Advisory',
+  strongWind:isZh?'中央氣象署強風特報':'CWA Strong Wind Advisory',
+  heat:isZh?'中央氣象署高溫資訊':'CWA Heat Advisory',
+  cold:isZh?'中央氣象署低溫特報':'CWA Cold Advisory',
+  fog:isZh?'中央氣象署濃霧特報':'CWA Fog Advisory',
+  typhoon:isZh?'中央氣象署颱風警報':'CWA Typhoon Warning',
+  weather:isZh?'中央氣象署天氣警特報':'CWA Weather Advisory'
+})[id]|| (isZh?'中央氣象署天氣警特報':'CWA Weather Advisory')}
+function _alertLevel(id,a){
+  const text=String((a&&a.event||'')+' '+(a&&a.title||'')+' '+(a&&a.description||''));
+  if(id==='typhoon'||id==='storm')return'danger';
+  if(id==='heavyRain')return /豪雨|豪大雨|短延時強降雨/.test(text)?'danger':'warn';
+  if(id==='strongWind'||id==='heat'||id==='cold')return'warn';
+  return'info';
+}
+function _areasShort(areas){
+  areas=Array.isArray(areas)?areas.filter(Boolean):[];
+  return areas.length?areas.slice(0,5).join('、')+(areas.length>5?'等':''):'';
+}
 function evaluateCwaWeatherWarnings(cfg,isZh){
   const data=typhoonData||earthquakeData;
   if(!data)return[];
+  const raw=(data.officialAlerts||data.weatherWarnings||[]).filter(a=>a&&a.matchedArea!==false);
+  const out=[];
+  const seen=new Set();
+  if(raw.length){
+    raw.forEach(a=>{
+      const id=a.id||_alertIdFromText((a.event||'')+' '+(a.title||'')+' '+(a.headline||'')+' '+(a.description||''));
+      if(id==='weather')return;
+      if(cfg[id]===false)return;
+      const key=id+'|'+(a.event||a.title||'')+'|'+(Array.isArray(a.areas)?a.areas.join(','):'');
+      if(seen.has(key))return;seen.add(key);
+      const area=_areasShort(a.areas);
+      const time=[_fmtTimeShort(a.effective),_fmtTimeShort(a.expires)].filter(Boolean).join('～');
+      let detail='';
+      if(area)detail+=(isZh?'影響區域：':'Areas: ')+area;
+      if(time)detail+=(detail?'｜':'')+(isZh?'有效：':'Valid: ')+time;
+      const desc=_limitText(a.description||a.headline||'',130);
+      if(desc)detail+=(detail?'｜':'')+desc;
+      if(!detail)detail=isZh?'中央氣象署官方警特報生效中':'CWA official alert is active';
+      out.push({id,level:_alertLevel(id,a),icon:a.icon||_alertIcon(id),official:true,critical:(id==='typhoon'||id==='storm'||(id==='heavyRain'&&_alertLevel(id,a)==='danger')),
+        title:_alertTitle(id,isZh),detail});
+    });
+    return out;
+  }
+  // 舊 worker 或未知結構 fallback：仍可讀文字，但限制長度避免警報卡爆版
   const bag=[];_pickCwaText(data,0,bag);
   if(!bag.length)return[];
   const text=[...new Set(bag)].join('｜');
-  const out=[];
-  const areaOk=_cwaAreaMatches(text);
-  if(!areaOk)return out;
-  function detailFor(kind){
-    const hits=bag.filter(t=>t.indexOf(kind)>=0||t.indexOf('特報')>=0||t.indexOf('警報')>=0).slice(0,4);
-    return hits.length?hits.join('；'):(isZh?'中央氣象署官方警特報生效中':'CWA official alert is active');
-  }
-  if(cfg.heavyRain!==false&&_cwaTextIncludesAny(text,['豪雨','大雨','豪大雨','短延時強降雨'])){
-    out.push({id:'heavyRain',level:'danger',icon:'🌧',official:true,critical:true,
-      title:isZh?'中央氣象署豪大雨特報':'CWA Heavy Rain Advisory',
-      detail:detailFor('雨')});
-  }
-  if(cfg.storm!==false&&_cwaTextIncludesAny(text,['大雷雨','雷雨','雷擊'])){
-    out.push({id:'storm',level:'danger',icon:'⛈',official:true,critical:true,
-      title:isZh?'中央氣象署雷雨特報':'CWA Thunderstorm Advisory',
-      detail:detailFor('雷')});
-  }
-  if(cfg.strongWind!==false&&_cwaTextIncludesAny(text,['陸上強風','強風','平均風','陣風'])){
-    out.push({id:'strongWind',level:'warn',icon:'💨',official:true,
-      title:isZh?'中央氣象署強風特報':'CWA Strong Wind Advisory',
-      detail:detailFor('風')});
-  }
-  if(cfg.heat!==false&&_cwaTextIncludesAny(text,['高溫','橙色燈號','紅色燈號'])){
-    out.push({id:'heat',level:'warn',icon:'🥵',official:true,
-      title:isZh?'中央氣象署高溫資訊':'CWA Heat Advisory',
-      detail:detailFor('高溫')});
-  }
-  if(cfg.cold!==false&&_cwaTextIncludesAny(text,['低溫','寒流'])){
-    out.push({id:'cold',level:'warn',icon:'🥶',official:true,
-      title:isZh?'中央氣象署低溫特報':'CWA Cold Advisory',
-      detail:detailFor('低溫')});
-  }
-  if(cfg.fog!==false&&_cwaTextIncludesAny(text,['濃霧','能見度'])){
-    out.push({id:'fog',level:'info',icon:'🌫',official:true,
-      title:isZh?'中央氣象署濃霧特報':'CWA Fog Advisory',
-      detail:detailFor('霧')});
-  }
+  if(!_cwaAreaMatches(text))return[];
+  function detailFor(kind){return _limitText((bag.filter(t=>t.indexOf(kind)>=0||t.indexOf('特報')>=0||t.indexOf('警報')>=0).slice(0,3).join('；')),170)|| (isZh?'中央氣象署官方警特報生效中':'CWA official alert is active')}
+  if(cfg.heavyRain!==false&&_cwaTextIncludesAny(text,['豪雨','大雨','豪大雨','短延時強降雨']))out.push({id:'heavyRain',level:'danger',icon:'🌧',official:true,critical:true,title:_alertTitle('heavyRain',isZh),detail:detailFor('雨')});
+  if(cfg.storm!==false&&_cwaTextIncludesAny(text,['大雷雨','雷雨','雷擊']))out.push({id:'storm',level:'danger',icon:'⛈',official:true,critical:true,title:_alertTitle('storm',isZh),detail:detailFor('雷')});
+  if(cfg.strongWind!==false&&_cwaTextIncludesAny(text,['陸上強風','強風','平均風','陣風']))out.push({id:'strongWind',level:'warn',icon:'💨',official:true,title:_alertTitle('strongWind',isZh),detail:detailFor('風')});
+  if(cfg.heat!==false&&_cwaTextIncludesAny(text,['高溫','橙色燈號','紅色燈號']))out.push({id:'heat',level:'warn',icon:'🥵',official:true,title:_alertTitle('heat',isZh),detail:detailFor('高溫')});
+  if(cfg.cold!==false&&_cwaTextIncludesAny(text,['低溫','寒流']))out.push({id:'cold',level:'warn',icon:'🥶',official:true,title:_alertTitle('cold',isZh),detail:detailFor('低溫')});
+  if(cfg.fog!==false&&_cwaTextIncludesAny(text,['濃霧','能見度']))out.push({id:'fog',level:'info',icon:'🌫',official:true,title:_alertTitle('fog',isZh),detail:detailFor('霧')});
   return out;
+}
+
+function _numRain(v){v=parseFloat(v);return Number.isFinite(v)&&v>=0?v:null}
+function _rainMm(v){v=_numRain(v);return v===null?'--':(v>=10?v.toFixed(1):v.toFixed(1))}
+function _rainObs(){return typhoonData&&typhoonData.rainObservation?typhoonData.rainObservation:null}
+function _rainObservationAlert(cfg,userItems,isZh){
+  const ro=_rainObs();if(!ro)return null;
+  const r10=_numRain(ro.rain10Min??ro.precipitation),r1=_numRain(ro.rain1h),r3=_numRain(ro.rain3h),r24=_numRain(ro.rain24h);
+  const station=ro.stationName||'雨量站';
+  const dist=Number.isFinite(parseFloat(ro.distanceKm))?`${ro.distanceKm}km`:'';
+  const base=`${station}${dist?' '+dist:''}｜10分鐘 ${_rainMm(r10)}mm｜1小時 ${_rainMm(r1)}mm｜3小時 ${_rainMm(r3)}mm｜24小時 ${_rainMm(r24)}mm`;
+  // CWA 雨量分級：大雨 40mm/h 或 80mm/24h；豪雨 100mm/3h 或 200mm/24h
+  if((r3!==null&&r3>=100)||(r24!==null&&r24>=200)){
+    if(cfg.heavyRain===false||userItems.heavyRain===false)return null;
+    return {id:'heavyRain',level:'danger',icon:'🌧',realtimeObs:true,critical:true,title:isZh?'附近雨量站已達豪雨標準':'Nearby station reached heavy-rain threshold',detail:base};
+  }
+  if((r1!==null&&r1>=40)||(r24!==null&&r24>=80)){
+    if(cfg.heavyRain===false||userItems.heavyRain===false)return null;
+    return {id:'heavyRain',level:'warn',icon:'🌧',realtimeObs:true,title:isZh?'附近雨量站已達大雨標準':'Nearby station reached rain-advisory threshold',detail:base};
+  }
+  if((r10!==null&&r10>0)||(r1!==null&&r1>0)){
+    if(cfg.rain===false||userItems.rain===false)return null;
+    return {id:'rain',level:'info',icon:'🌂',realtimeObs:true,title:isZh?'附近雨量站正在下雨':'Nearby rain station reports rain',detail:base};
+  }
+  return null;
 }
 
 function evaluateWxAlerts(){
@@ -2198,6 +2276,10 @@ function evaluateWxAlerts(){
   // ═══ 1.6 CWA 官方天氣警特報（豪大雨/大雷雨/強風/高低溫/濃霧）═══
   const cwaWeatherAlerts=evaluateCwaWeatherWarnings(cfg,isZh).filter(a=>userItems[a.id]!==false);
   cwaWeatherAlerts.forEach(a=>{if(!out.some(x=>x.id===a.id))out.push(a)});
+
+  // ═══ 1.7 CWA 雨量觀測站即時雨量：能即時看到就即時顯示（10 分鐘更新資料）═══
+  const roAlert=_rainObservationAlert(cfg,userItems,isZh);
+  if(roAlert&&!out.some(x=>x.id===roAlert.id||x.id==='storm'||x.id==='typhoon'))out.push(roAlert);
 
   // 找出當前小時 index
   const n=new Date();
@@ -2370,9 +2452,11 @@ function wxAlertHtml(){
   };
   const items=alerts.map(a=>{
     const s=styleOf[a.level]||styleOf.warn;
+    const detail=esc(_limitText(a.detail||'',220));
+    const badge=a.official?(isZh?'官方':'Official'):(a.realtimeObs?(isZh?'雨量站':'Station'):(a.modelOnly?(isZh?'模型':'Model'):''));
     return `<div class="wx-alert ${s.pulse?'wx-alert-pulse':''}" style="background:${s.bg};border-left:4px solid ${s.bc};color:${s.tc};padding:8px 12px;margin:4px 0;border-radius:6px;font-size:11px;line-height:1.5;display:flex;gap:8px;align-items:flex-start">
       <div style="font-size:18px;flex-shrink:0;line-height:1">${a.icon}</div>
-      <div style="flex:1"><div style="font-weight:700;font-size:12px">${a.title}</div><div style="margin-top:2px;opacity:0.9">${a.detail}</div></div>
+      <div style="flex:1;min-width:0"><div style="font-weight:800;font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span>${esc(a.title)}</span>${badge?`<span style="font-size:9px;border:1px solid currentColor;border-radius:999px;padding:0 5px;opacity:.75">${badge}</span>`:''}</div><div style="margin-top:2px;opacity:0.92;word-break:break-word">${detail}</div></div>
     </div>`;
   }).join("");
   // 標題列
@@ -2789,7 +2873,7 @@ async function forceReloadWx(){
     typhoonData=null;earthquakeData=null;
     render();
     await loadWx({force:true});
-    try{await loadCwaData()}catch(e){}
+    try{await loadCwaData({force:true})}catch(e){}
     // 依定位結果回報，讓使用者知道有沒有抓到真實位置
     if(geoState.status==='ok'&&(geoState.source==='gps'||geoState.source==='gps-force'))alert(lang==='zh'?'✅ 已高精度定位並抓取最新天氣':'Located & reloaded');
     else if(geoState.status==='denied')alert(lang==='zh'?'⚠️ 定位權限被拒絕\n請到手機「設定→應用程式/瀏覽器→權限→位置」開啟，再試一次':'Location permission denied');
@@ -2801,6 +2885,24 @@ async function forceReloadWx(){
 }
 try{window.testNotification=testNotification;window.forceReloadWx=forceReloadWx}catch(e){}
 
+
+function rainObsHtml(){
+  const ro=_rainObs();
+  if(!ro)return'';
+  const isZh=lang==='zh';
+  const r10=_numRain(ro.rain10Min??ro.precipitation),r1=_numRain(ro.rain1h),r3=_numRain(ro.rain3h),r24=_numRain(ro.rain24h);
+  const raining=(r10!==null&&r10>0)||(r1!==null&&r1>0);
+  const station=esc(ro.stationName||'雨量站');
+  const town=esc([ro.countyName,ro.townName].filter(Boolean).join(''));
+  const dist=Number.isFinite(parseFloat(ro.distanceKm))?`${ro.distanceKm}km`:'';
+  const obs=ro.obsTime?`｜${isZh?'觀測':'Obs'} ${esc(_fmtTimeShort(ro.obsTime))}`:'';
+  const bg=raining?'rgba(41,128,185,0.10)':'rgba(127,140,141,0.08)';
+  const bc=raining?'#2980b9':'#95a5a6';
+  return `<div style="margin:6px 0 8px;padding:7px 9px;background:${bg};border-left:3px solid ${bc};border-radius:6px;font-size:10px;line-height:1.55;color:var(--tx2)">
+    <b>${raining?'🌧':'☔'} ${isZh?'即時雨量站':'Live rain station'}</b>：${station}${town?`（${town}）`:''}${dist?` ${dist}`:''}<br>
+    10m ${_rainMm(r10)}mm｜1h ${_rainMm(r1)}mm｜3h ${_rainMm(r3)}mm｜24h ${_rainMm(r24)}mm${obs}
+  </div>`;
+}
 function rainWarnHtml(){
   if(!wxData||!wxData.hPrec||S.step!=="cal")return"";
   const sh=gs(TY,TM,TD);if(!sh||sh==="休")return"";
@@ -2821,12 +2923,13 @@ function wxHtml(){
   const d=wxData,wk=t("wk"),desc=lang==="zh"?WXZ:WXD;
   const fc=d.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();
     return`<div class="wx-day${i===0?' today':''}"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div class="wx-day-icon">${WXI[f.code]||"🌡"}</div><div class="wx-day-hi">${f.hi}°</div><div class="wx-day-lo">${f.lo}°</div></div>`}).join("");
-  return`<div class="wx-card fi" style="cursor:pointer;position:relative"><button onclick="openUserPrefs();event.stopPropagation()" title="${lang==='zh'?'個人設定':'Settings'}" style="position:absolute;top:8px;right:8px;width:32px;height:32px;background:rgba(255,255,255,0.85);border:none;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.1)">⚙️</button><div onclick="showWxDetail()"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"}${d._cacheAgeMin?" "+d._cacheAgeMin+"m":""})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"7日天氣預報 ▸":"Prakiraan 7 Hari ▸"}${d.updatedAt?`<br><span style="font-size:9px;color:var(--tx3)">${lang==="zh"?"更新":"Updated"} ${new Date(d.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>`:""}</div></div><div class="wx-fc">${fc}</div></div></div>${tideHtml()}${userPrefsModalHtml()}`}
+  return`<div class="wx-card fi" style="cursor:pointer;position:relative"><button onclick="openUserPrefs();event.stopPropagation()" title="${lang==='zh'?'個人設定':'Settings'}" style="position:absolute;top:8px;right:8px;width:32px;height:32px;background:rgba(255,255,255,0.85);border:none;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.1)">⚙️</button><div onclick="showWxDetail()"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"}${d._cacheAgeMin?" "+d._cacheAgeMin+"m":""})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"即時雨量＋7日預報 ▸":"Live rain + 7-day forecast ▸"}${d.updatedAt?`<br><span style="font-size:9px;color:var(--tx3)">${lang==="zh"?"預報更新":"Forecast"} ${new Date(d.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>`:""}</div></div>${rainObsHtml()}<div class="wx-fc">${fc}</div></div></div>${tideHtml()}${userPrefsModalHtml()}`}
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 loadWx();
 // 等 loadAppConfig 載入完才知道有沒有 typhoon worker URL
 setTimeout(()=>{try{loadTyphoon()}catch(e){}},3000);
-setInterval(()=>{loadWx();try{loadTyphoon()}catch(e){}},1800000);
+setInterval(()=>{if(!document.hidden)loadWx();},900000);
+setInterval(()=>{if(!document.hidden)try{loadCwaData()}catch(e){}},120000);
 // app 開著時，每 5 分鐘額外做一次警報判定（不重新抓 API，只用既有資料）
 // 這樣後台改設定後，前台不用等 30 分鐘也能感受到變化
 setInterval(()=>{
@@ -2843,7 +2946,7 @@ document.addEventListener('visibilitychange',()=>{
   if(now-_lastWxCheck>600000){ // 10 分鐘
     _lastWxCheck=now;
     loadWx();
-    try{loadTyphoon()}catch(e){}
+    try{loadCwaData({force:true})}catch(e){}
   }else{
     // 短時間切回不重抓 API，但仍跑一次通知檢查（設定可能在他處改）
     try{checkAndNotifyAlerts()}catch(e){}
