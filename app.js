@@ -263,6 +263,7 @@ function addLeave(date,leaveTypeId,hours,reason){
   });
 }
 function _isAnnualLT(id){const lt=getLT(id);return id==="annual"||(lt&&(lt.name==="特休"||lt.nameId==="Cuti Tahunan"))}
+function _isSickLT(id){const lt=getLT(id)||{};const txt=String((id||"")+" "+(lt.name||"")+" "+(lt.nameId||"")).toLowerCase();return txt.includes("sick")||txt.includes("病假")||txt.includes("sakit")}
 function removeLeave(date,leaveTypeId){
   if(!fbUser)return Promise.resolve();
   // 樂觀 UI：先從本地 cache 移除
@@ -779,6 +780,14 @@ const SAL_DEFAULT={
 };
 let SAL={};
 try{const s=localStorage.getItem("sb_sal");SAL=Object.assign({},SAL_DEFAULT,s?JSON.parse(s):{})}catch(e){SAL=Object.assign({},SAL_DEFAULT)}
+function normalizeSal(){
+  // 使用者常把「後 2h 合計 2.66」填成「每小時 2.66」。本 App 欄位是每小時倍率；薪資條實際回推為 5/3。
+  if(SAL.otTier1Rate>1.30&&SAL.otTier1Rate<1.36)SAL.otTier1Rate=4/3;
+  if(SAL.otTier2Rate>2.30&&SAL.otTier2Rate<2.90)SAL.otTier2Rate=5/3;
+  if(SAL.otTier2Rate>1.60&&SAL.otTier2Rate<1.75)SAL.otTier2Rate=5/3;
+  if(!SAL.otTaxFreeH||Math.abs(SAL.otTaxFreeH-46)<0.01)SAL.otTaxFreeH=46.6666667;
+}
+normalizeSal();
 
 // ═══ 班別覆寫（調班）═══
 // 排班是公式算出來的，調班＝針對特定某天「覆寫」成別的班別，不影響其他天
@@ -808,6 +817,7 @@ function cloudLoadSal(d){
     const cloud=typeof d.sal==='string'?JSON.parse(d.sal):d.sal;
     if(cloud&&typeof cloud==='object'){
       SAL=Object.assign({},SAL_DEFAULT,cloud);
+      normalizeSal();
       try{localStorage.setItem("sb_sal",JSON.stringify(SAL))}catch(e){}
     }
   }catch(e){console.log("cloudLoadSal err",e)}
@@ -952,7 +962,7 @@ function calcSalaryEst(y,m){
       if(l.uid===(fbUser&&fbUser.uid)){
         const hrs=l.hours||0;
         dayLeaveH+=hrs;
-        if(l.leaveType==="sick")sickH+=hrs;
+        if(_isSickLT(l.leaveType))sickH+=hrs;
         const lt=getLT(l.leaveType);
         const dp8=lt&&lt.otDeduct!==undefined?lt.otDeduct:4;
         const totalDed=(hrs/8)*dp8;
@@ -967,10 +977,9 @@ function calcSalaryEst(y,m){
       const tyDed=(tyHours/sh)*dailyOT;
       tyFront+=tyDed/2;tyBack+=tyDed/2;
     }
-    // 夜點費只算實際出勤晚班；整日請假/整日颱風假不算夜點。
-    const fullRegularLeave=dayLeaveH>=Math.min(8,sh);
-    const fullTyphoon=tyHours>=sh;
-    if(s==="晚"&&!fullRegularLeave&&!fullTyphoon)nightCount++;
+    // 薪資條回推：夜點費以薪資區間內「排到晚班」計算。
+    // 2026/05 薪資條夜點費 5868 = 489 × 12，不能因特休/病假直接排除晚班。
+    if(s==="晚")nightCount++;
   }
   // 前後段加班時數
   const totalFront=Math.max(0,pp.wd*dailyFront-frontDed-tyFront);
@@ -1091,14 +1100,14 @@ function rSalary(){
       ${num("sal_welfare",isZh?"福利金":"Kesejahteraan",SAL.welfare,null,"173")}
       ${num("sal_laborIns",isZh?"勞保自付":"BPJS TK",SAL.laborIns,null,"1145")}
       ${num("sal_healthIns",isZh?"健保自付":"BPJS Kes",SAL.healthIns,null,"1129")}
-      ${num("sal_otherDed",isZh?"其他固定扣款":"Potongan Lain",SAL.otherDed,isZh?"員工持股信託、自願提繳勞退等每月固定金額扣款":"","3033")}
+      ${num("sal_otherDed",isZh?"其他固定扣款":"Potongan Lain",SAL.otherDed,isZh?"只填薪資條上未列出的固定扣款；本期若只有工會/福利金/勞健保/病假，這欄請填 0":"","3033")}
     </div>
 
     <div style="background:rgba(63,81,181,.04);border-radius:10px;padding:12px;margin-bottom:12px">
       <div style="font-size:13px;font-weight:700;color:#283593;margin-bottom:10px">⚙️ ${isZh?"加班費規則(勞基法預設)":"Aturan Lembur"}</div>
       <div style="display:flex;gap:8px">
-        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"前 2h 倍率":"2h Awal x"}</label><input type="number" id="sal_otTier1Rate" value="${SAL.otTier1Rate}" step="0.000001" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
-        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"後段倍率":"Sisa x"}</label><input type="number" id="sal_otTier2Rate" value="${SAL.otTier2Rate}" step="0.000001" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"前段每小時倍率":"2h Awal / jam"}</label><input type="number" id="sal_otTier1Rate" value="${SAL.otTier1Rate}" step="0.000001" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"後段每小時倍率":"Sisa / jam"}</label><input type="number" id="sal_otTier2Rate" value="${SAL.otTier2Rate}" step="0.000001" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
         <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"免稅 h":"Bebas Pjk h"}</label><input type="number" id="sal_otTaxFreeH" value="${SAL.otTaxFreeH}" inputmode="numeric" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
         <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"病假倍率":"Sakit x"}</label><input type="number" id="sal_sickRate" value="${SAL.sickRate}" step="0.1" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
       </div>
