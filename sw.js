@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v189';
+const CACHE_NAME = 'myshift-v190-official-weather';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -9,7 +9,7 @@ self.addEventListener('message', event => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
   // app 端寫入最後位置給 SW 用（背景同步抓天氣用）
   if (event.data && event.data.type === 'WX_POS' && event.data.lat && event.data.lon) {
-    swPutWxCache('lastPos', { lat: event.data.lat, lon: event.data.lon });
+    swPutWxCache('lastPos', { lat: event.data.lat, lon: event.data.lon, accuracy: event.data.accuracy || null, ts: event.data.ts || Date.now() });
   }
 });
 
@@ -182,10 +182,46 @@ async function swFetchAlertConfig() {
 }
 
 async function swFetchWeather(lat, lon) {
-  const u = `${OPEN_METEO_URL}?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&hourly=precipitation_probability,temperature_2m,weather_code,wind_speed_10m&timezone=auto&forecast_days=2`;
+  const u = `${OPEN_METEO_URL}?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,precipitation&hourly=precipitation_probability,precipitation,rain,showers,temperature_2m,weather_code,wind_speed_10m&timezone=auto&forecast_days=2&cell_selection=nearest`;
   const resp = await fetch(u);
   if (!resp.ok) throw new Error('wx api ' + resp.status);
   return await resp.json();
+}
+
+
+function swTextIncludesAny(text, arr) { return arr.some(k => text.indexOf(k) >= 0); }
+function swPickCwaText(v, depth, bag) {
+  if (!v || depth > 6 || bag.length > 120) return;
+  if (typeof v === 'string') { const t = v.trim(); if (t && t.length < 600) bag.push(t); return; }
+  if (Array.isArray(v)) { for (const x of v) swPickCwaText(x, depth + 1, bag); return; }
+  if (typeof v === 'object') {
+    const prefer = ['title','headline','event','phenomena','significance','description','desc','content','contentText','text','areaDesc','instruction','senderName','effective','expires','area','areas','locationName','county','town'];
+    for (const k of prefer) if (v[k] !== undefined) swPickCwaText(v[k], depth + 1, bag);
+    let n = 0;
+    for (const k in v) { if (n++ > 40) break; if (prefer.includes(k)) continue; swPickCwaText(v[k], depth + 1, bag); }
+  }
+}
+function swEvaluateCwaWeatherWarnings(cwaData, cfg) {
+  const out = [];
+  if (!cwaData) return out;
+  const bag = [];
+  swPickCwaText(cwaData, 0, bag);
+  if (!bag.length) return out;
+  const text = [...new Set(bag)].join('｜');
+  const areaKeys = ['臺南','台南','鹽水','新營','柳營','嘉義','高雄','雲林','全臺','全台','臺灣','台灣','南部'];
+  const areaOk = areaKeys.some(k => text.indexOf(k) >= 0) || !/[縣市區鄉鎮]/.test(text);
+  if (!areaOk) return out;
+  const detail = kind => {
+    const hits = bag.filter(t => t.indexOf(kind) >= 0 || t.indexOf('特報') >= 0 || t.indexOf('警報') >= 0).slice(0, 3);
+    return hits.length ? hits.join('；') : '中央氣象署官方警特報生效中';
+  };
+  if (cfg.heavyRain !== false && swTextIncludesAny(text, ['豪雨','大雨','豪大雨','短延時強降雨'])) out.push({ id: 'heavyRain', icon: '🌧', title: '中央氣象署豪大雨特報', body: detail('雨'), critical: true, official: true });
+  if (cfg.storm !== false && swTextIncludesAny(text, ['大雷雨','雷雨','雷擊'])) out.push({ id: 'storm', icon: '⛈', title: '中央氣象署雷雨特報', body: detail('雷'), critical: true, official: true });
+  if (cfg.strongWind !== false && swTextIncludesAny(text, ['陸上強風','強風','平均風','陣風'])) out.push({ id: 'strongWind', icon: '💨', title: '中央氣象署強風特報', body: detail('風'), critical: false, official: true });
+  if (cfg.heat !== false && swTextIncludesAny(text, ['高溫','橙色燈號','紅色燈號'])) out.push({ id: 'heat', icon: '🥵', title: '中央氣象署高溫資訊', body: detail('高溫'), critical: false, official: true });
+  if (cfg.cold !== false && swTextIncludesAny(text, ['低溫','寒流'])) out.push({ id: 'cold', icon: '🥶', title: '中央氣象署低溫特報', body: detail('低溫'), critical: false, official: true });
+  if (cfg.fog !== false && swTextIncludesAny(text, ['濃霧','能見度'])) out.push({ id: 'fog', icon: '🌫', title: '中央氣象署濃霧特報', body: detail('霧'), critical: false, official: true });
+  return out;
 }
 
 // SW 端的警報判斷（簡化版，與 app.js evaluateWxAlerts 邏輯一致）
@@ -223,6 +259,9 @@ function swEvaluate(wxData, cfg, cwaData) {
     }
   }
 
+  const cwaAlerts = swEvaluateCwaWeatherWarnings(cwaData, cfg);
+  for (const a of cwaAlerts) if (!out.some(x => x.id === a.id)) out.push(a);
+
   if (!wxData) return out;
   const n = new Date();
   const nh = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0') + 'T' + String(n.getHours()).padStart(2, '0');
@@ -230,6 +269,7 @@ function swEvaluate(wxData, cfg, cwaData) {
   const curCode = wxData.current ? wxData.current.weather_code : 0;
   const curTemp = wxData.current ? Math.round(wxData.current.temperature_2m) : 0;
   const hPrec = (wxData.hourly && wxData.hourly.precipitation_probability) || [];
+  const hRain = (wxData.hourly && wxData.hourly.precipitation) || [];
   const hWind = (wxData.hourly && wxData.hourly.wind_speed_10m) || [];
   const curWind = hi >= 0 ? (hWind[hi] || 0) : 0;
 
@@ -238,6 +278,15 @@ function swEvaluate(wxData, cfg, cwaData) {
     let mx = 0;
     for (let k = hi; k < Math.min(hi + hours, hPrec.length); k++) {
       if (hPrec[k] > mx) mx = hPrec[k];
+    }
+    return mx;
+  }
+  function maxPrecipMm(hours) {
+    if (hi < 0) return 0;
+    let mx = 0;
+    for (let k = hi; k < Math.min(hi + hours, hRain.length); k++) {
+      const v = parseFloat(hRain[k]) || 0;
+      if (v > mx) mx = v;
     }
     return mx;
   }
@@ -283,16 +332,16 @@ function swEvaluate(wxData, cfg, cwaData) {
     const w6 = maxWind(6), r6 = maxRain(6);
     const isStorm = (curCode === 95 || curCode === 96 || curCode === 99);
     if ((curWind >= wTh || w6 >= wTh) && (isStorm || r6 >= 80)) {
-      out.push({ id: 'typhoon', icon: '🌀', title: '颱風跡象警報', body: `風速最高 ${Math.round(Math.max(curWind, w6))} km/h（推算）`, critical: true });
+      out.push({ id: 'typhoon', icon: '🌀', title: '颱風跡象警報', body: `風速最高 ${Math.round(Math.max(curWind, w6))} km/h（模型推算，請以中央氣象署為準）`, critical: true });
     }
   }
   if (cfg.storm !== false && (curCode === 95 || curCode === 96 || curCode === 99)) {
     out.push({ id: 'storm', icon: '⛈', title: '雷雨警報', body: '目前有雷雨，避免戶外、遠離高處與電器', critical: true });
   }
-  if (cfg.heavyRain !== false && swInDetectionWindow('heavyRain', cfg)) {
-    const r = maxRain(6);
-    if (r >= (cfg.heavyRainProb || 80)) {
-      out.push({ id: 'heavyRain', icon: '🌧', title: '豪雨警報', body: `未來 6 小時最高降雨機率 ${r}%，注意低窪積水`, critical: true });
+  if (cfg.heavyRain !== false && swInDetectionWindow('heavyRain', cfg) && !out.some(a => a.id === 'heavyRain' || a.id === 'storm' || a.id === 'typhoon')) {
+    const r = maxRain(6), mm = maxPrecipMm(6);
+    if (r >= (cfg.heavyRainProb || 80) || mm >= 10) {
+      out.push({ id: 'heavyRain', icon: '🌧', title: '高降雨機率提醒', body: `未來 6 小時最高降雨機率 ${r}%${mm ? `，預估雨量 ${mm.toFixed(1)} mm/h` : ''}；模型提醒，非中央氣象署豪雨特報`, critical: false, modelOnly: true });
     }
   }
   if (cfg.rain !== false && swInDetectionWindow('rain', cfg) && !out.some(a => a.id === 'heavyRain' || a.id === 'storm' || a.id === 'typhoon')) {
@@ -301,20 +350,20 @@ function swEvaluate(wxData, cfg, cwaData) {
       out.push({ id: 'rain', icon: '🌂', title: '降雨提醒', body: `未來 3 小時降雨機率 ${r}%，建議攜帶雨具`, critical: false });
     }
   }
-  if (cfg.strongWind !== false && swInDetectionWindow('strongWind', cfg) && !out.some(a => a.id === 'typhoon')) {
+  if (cfg.strongWind !== false && swInDetectionWindow('strongWind', cfg) && !out.some(a => a.id === 'typhoon' || a.id === 'strongWind')) {
     const w3 = maxWind(3);
     const mxW = Math.max(curWind, w3);
     if (mxW >= (cfg.windThreshold || 50)) {
       out.push({ id: 'strongWind', icon: '💨', title: '強風警報', body: `風速 ${Math.round(mxW)} km/h，騎車注意`, critical: false });
     }
   }
-  if (cfg.heat !== false && swInDetectionWindow('heat', cfg) && curTemp >= (cfg.heatThreshold || 36)) {
+  if (cfg.heat !== false && swInDetectionWindow('heat', cfg) && !out.some(a => a.id === 'heat') && curTemp >= (cfg.heatThreshold || 36)) {
     out.push({ id: 'heat', icon: '🥵', title: '高溫警報', body: `目前 ${curTemp}°C，多補水`, critical: false });
   }
-  if (cfg.cold !== false && swInDetectionWindow('cold', cfg) && curTemp <= (cfg.coldThreshold || 10)) {
+  if (cfg.cold !== false && swInDetectionWindow('cold', cfg) && !out.some(a => a.id === 'cold') && curTemp <= (cfg.coldThreshold || 10)) {
     out.push({ id: 'cold', icon: '🥶', title: '低溫警報', body: `目前 ${curTemp}°C，注意保暖`, critical: false });
   }
-  if (cfg.fog === true && swInDetectionWindow('fog', cfg) && (curCode === 45 || curCode === 48)) {
+  if (cfg.fog === true && swInDetectionWindow('fog', cfg) && !out.some(a => a.id === 'fog') && (curCode === 45 || curCode === 48)) {
     out.push({ id: 'fog', icon: '🌫', title: '濃霧提醒', body: '能見度差，行車開大燈', critical: false });
   }
   return out;
@@ -349,7 +398,7 @@ async function swBackgroundCheck() {
     const cwaUrl = 'https://cwa-data.onerkk.workers.dev';
     if (cwaUrl) {
       try {
-        const resp = await fetch(cwaUrl);
+        const resp = await fetch(cwaUrl, { cache: 'no-store' });
         if (resp.ok) {
           const td = await resp.json();
           if (td && td.ok) cwaData = td;
