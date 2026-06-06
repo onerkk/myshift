@@ -588,7 +588,8 @@ let APP_CFG={admins:[],visualFx:{enabled:true},
     // 閾值（可在後台調整）
     rainProb:60,
     heavyRainProb:80,
-    windThreshold:50,
+    windThreshold:62,        // 強風改用「陣風」門檻；CWA 黃燈=陣風8級≈62km/h
+    windGustThreshold:62,    // 新欄位：陣風門檻，保留 windThreshold 向後相容
     typhoonWind:62,
     heatThreshold:36,
     coldThreshold:10,
@@ -703,6 +704,17 @@ function normalizePayrollLeaveTypes(){
     if(sick){sick.otDeduct=4}
   }catch(e){}
 }
+function normalizeWxAlertConfig(){
+  try{
+    const wx=APP_CFG.wxAlerts||(APP_CFG.wxAlerts={});
+    // v198：強風改採「陣風」判定。舊後台若仍存 windThreshold=50，不再用 50 當強風門檻。
+    let g=parseFloat(wx.windGustThreshold);
+    if(!Number.isFinite(g)) g=parseFloat(wx.windThreshold);
+    if(!Number.isFinite(g)||g<62) g=62;
+    wx.windGustThreshold=g;
+    wx.windThreshold=g; // 向後相容舊後台欄位，讓畫面顯示也跟著變成 62+
+  }catch(e){}
+}
 function loadAppConfig(){
   return fsEnqueue(async()=>{
     const doc=await fbDb.collection("config").doc("app").get();
@@ -729,6 +741,7 @@ function loadAppConfig(){
           }
         }
       }
+      normalizeWxAlertConfig();
       rebuildR();
       applyVisualFxSetting();
     }
@@ -1527,13 +1540,13 @@ function wxDetailHtml(){
     const i=wxData.hTime.indexOf(k);if(i<0)continue;
     const tmp=wxData.hTemp?Math.round(wxData.hTemp[i]):"--";
     const prec=wxData.hPrec?wxData.hPrec[i]+"%":"--";
-    const wind=wxData.hWind?wxData.hWind[i].toFixed(0)+"km/h":"--";
+    const wind=wxData.hGust?wxData.hGust[i].toFixed(0)+"km/h":"--";
     const hum=wxData.hHum?wxData.hHum[i]+"%":"--";
     const code=wxData.hCode?wxData.hCode[i]:0;
     rows+=`<div class="cell">${String(h).padStart(2,"0")}:00</div><div class="cell">${WXI[code]||""} ${tmp}°</div><div class="cell">${prec}</div><div class="cell">${wind}</div><div class="cell">${hum}</div>`;
   }
   const dayTabs=wxData.days.map((d,i)=>{const dt=new Date(d.date);return`<button onclick="wxDetailDay=${i};render();event.stopPropagation()" style="padding:4px 8px;border:none;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;${i===wxDetailDay?'background:var(--pri);color:#fff':'background:#eee;color:var(--tx2)'}">${i===0?(lang==="zh"?"今天":"Hari ini"):t("wk")[dt.getDay()]}</button>`}).join("");
-  return`<div class="wx-detail" onclick="closeWxDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">${lang==="zh"?"⛅ 每小時天氣":"⛅ Cuaca Per Jam"}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div class="wx-detail-grid"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"天氣":"Cuaca"}</div><div class="hdr">${lang==="zh"?"降雨":"Hujan"}</div><div class="hdr">${lang==="zh"?"風速":"Angin"}</div><div class="hdr">${lang==="zh"?"濕度":"Humid"}</div>${rows}</div><button class="modal-done" onclick="closeWxDetail()" style="margin-top:12px">${t("done")}</button></div></div>`}
+  return`<div class="wx-detail" onclick="closeWxDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">${lang==="zh"?"⛅ 每小時天氣":"⛅ Cuaca Per Jam"}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div class="wx-detail-grid"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"天氣":"Cuaca"}</div><div class="hdr">${lang==="zh"?"降雨":"Hujan"}</div><div class="hdr">${lang==="zh"?"陣風":"Gust"}</div><div class="hdr">${lang==="zh"?"濕度":"Humid"}</div>${rows}</div><button class="modal-done" onclick="closeWxDetail()" style="margin-top:12px">${t("done")}</button></div></div>`}
 
 function tideDetailHtml(){
   if(!tideDetailShow||!tideData||!tideData.tides)return"";
@@ -2035,8 +2048,8 @@ async function loadWx(arg,retries){
       }
     }catch(e){}
 
-    const hourlyVars='precipitation_probability,precipitation,rain,showers,temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m';
-    const currentVars='temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m,precipitation';
+    const hourlyVars='precipitation_probability,precipitation,rain,showers,temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m';
+    const currentVars='temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m,precipitation';
     const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=${currentVars}&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=${hourlyVars}&timezone=auto&forecast_days=7&cell_selection=nearest`;
     const resp=await Promise.race([fetch(url,{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),WX_API_TIMEOUT_MS))]);
     if(!resp.ok)throw new Error('API '+resp.status);
@@ -2045,13 +2058,14 @@ async function loadWx(arg,retries){
       temp:Math.round(data.current.temperature_2m),code:data.current.weather_code,lat:lat,lon:lon,
       source:'Open-Meteo Forecast API',updatedAt:Date.now(),locationSource:locSource,posAccuracy:posAccuracy,place:wxPlace||null,
       currentPrecip:Number(data.current.precipitation||0),
+      gust:Math.round(Number(data.current.wind_gusts_10m||data.current.wind_speed_10m||0)),
       days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])})),
       hTime:data.hourly.time,
       hPrec:data.hourly.precipitation_probability||[],      // 降雨機率：只作「提醒」，不作官方豪雨警報
       hRain:data.hourly.precipitation||[],                 // 預估逐時降水量 mm：可輔助判斷強降雨風險
       hRainOnly:data.hourly.rain||[],
       hShowers:data.hourly.showers||[],
-      hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m
+      hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hGust:data.hourly.wind_gusts_10m||data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m
     };
     wxErr=false;delete wxData._cached;delete wxData._cacheAgeMin;
     try{localStorage.setItem('_wxCache',JSON.stringify({ts:Date.now(),d:wxData}))}catch(e){}
@@ -2506,6 +2520,7 @@ function evaluateWxAlerts(){
   const curCode=wxData.code||0;
   const curTemp=wxData.temp||0;
   const curWind=(hi>=0&&wxData.hWind)?(wxData.hWind[hi]||0):0;
+  const curGust=(wxData.gust||((hi>=0&&wxData.hGust)?(wxData.hGust[hi]||0):curWind));
   const curPrec=(hi>=0&&wxData.hPrec)?(wxData.hPrec[hi]||0):0;
 
   // 計算未來 N 小時降雨機率最大值與時間
@@ -2527,12 +2542,14 @@ function evaluateWxAlerts(){
     }
     return {mx,at};
   }
-  // 計算未來 N 小時最大風速
-  function maxWind(hours){
-    if(hi<0||!wxData.hWind) return {mx:0,at:null};
+  // 計算未來 N 小時最大陣風（強風警報用）
+  function maxGust(hours){
+    const arr=wxData.hGust||wxData.hWind;
+    if(hi<0||!arr) return {mx:0,at:null};
     let mx=0,at=null;
-    for(let k=hi;k<Math.min(hi+hours,wxData.hWind.length);k++){
-      if(wxData.hWind[k]>mx){mx=wxData.hWind[k];at=wxData.hTime[k]}
+    for(let k=hi;k<Math.min(hi+hours,arr.length);k++){
+      const v=parseFloat(arr[k])||0;
+      if(v>mx){mx=v;at=wxData.hTime[k]}
     }
     return {mx,at};
   }
@@ -2552,13 +2569,13 @@ function evaluateWxAlerts(){
   if(!cwaHas && cfg.typhoon!==false && userItems.typhoon!==false){
     const wTh=cfg.typhoonWind||62;
     const isStormCode=(curCode===95||curCode===96||curCode===99);
-    const r6=maxRain(6),w6=maxWind(6);
-    if((curWind>=wTh||w6.mx>=wTh) && (isStormCode||r6.mx>=80)){
+    const r6=maxRain(6),w6=maxGust(6);
+    if((curGust>=wTh||w6.mx>=wTh) && (isStormCode||r6.mx>=80)){
       out.push({
         id:"typhoon",level:"danger",icon:"🌀",
         title:isZh?"颱風跡象警報":"Peringatan Topan",
-        detail:isZh?`風速最高 ${Math.round(Math.max(curWind,w6.mx))} km/h，伴隨${isStormCode?"雷暴":"高降雨機率"}，密切注意官方公告（推算）`
-          :`Angin maks ${Math.round(Math.max(curWind,w6.mx))} km/jam, disertai ${isStormCode?"badai":"hujan deras"}, pantau pengumuman resmi`
+        detail:isZh?`陣風最高 ${Math.round(Math.max(curGust,w6.mx))} km/h，伴隨${isStormCode?"雷暴":"高降雨機率"}，密切注意官方公告（推算）`
+          :`Gust maks ${Math.round(Math.max(curGust,w6.mx))} km/jam, disertai ${isStormCode?"badai":"hujan deras"}, pantau pengumuman resmi`
       });
     }
   }
@@ -2600,15 +2617,15 @@ function evaluateWxAlerts(){
   }
   // 5. 強風（單獨成立，颱風已含則跳過）
   if(cfg.strongWind!==false && userItems.strongWind!==false && isInDetectionWindow('strongWind') && !out.some(a=>a.id==="typhoon"||a.id==="strongWind")){
-    const wTh=cfg.windThreshold||50;
-    const w3=maxWind(3);
-    const mxW=Math.max(curWind,w3.mx);
+    const wTh=parseFloat(cfg.windGustThreshold||cfg.windThreshold)||62;
+    const w3=maxGust(3);
+    const mxW=Math.max(curGust,w3.mx);
     if(mxW>=wTh){
       out.push({
         id:"strongWind",level:"warn",icon:"💨",
         title:isZh?"強風警報":"Peringatan Angin Kencang",
-        detail:isZh?`風速 ${Math.round(mxW)} km/h，騎車注意、固定戶外物品`
-          :`Angin ${Math.round(mxW)} km/jam, hati-hati berkendara`
+        detail:isZh?`最大陣風 ${Math.round(mxW)} km/h，騎車注意、固定戶外物品`
+          :`Gust ${Math.round(mxW)} km/jam, hati-hati berkendara`
       });
     }
   }

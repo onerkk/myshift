@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v197-gps-strict-area';
+const CACHE_NAME = 'myshift-v198-gust-alerts';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -92,7 +92,7 @@ const NOTIFY_STATE_CACHE = 'wx-notify-state-v1';
 const ALERT_DEFS = {
   master: true, typhoon: true, storm: true, heavyRain: true, rain: true,
   strongWind: true, heat: true, cold: true, fog: false, earthquake: true,
-  rainProb: 60, heavyRainProb: 80, windThreshold: 50, typhoonWind: 62,
+  rainProb: 60, heavyRainProb: 80, windThreshold: 62, windGustThreshold: 62, typhoonWind: 62,
   heatThreshold: 36, coldThreshold: 10,
   cwaWorkerUrl: '', typhoonWorkerUrl: '',
   typhoonAlertDistanceKm: 800, typhoonMinIntensity: 'td', typhoonAlertOnNotice: true,
@@ -183,7 +183,7 @@ async function swFetchAlertConfig() {
 
 
 async function swFetchWeather(lat, lon) {
-  const u = `${OPEN_METEO_URL}?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,precipitation&hourly=precipitation_probability,precipitation,rain,showers,temperature_2m,weather_code,wind_speed_10m&timezone=auto&forecast_days=2&cell_selection=nearest`;
+  const u = `${OPEN_METEO_URL}?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,precipitation,wind_speed_10m,wind_gusts_10m&hourly=precipitation_probability,precipitation,rain,showers,temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m&timezone=auto&forecast_days=2&cell_selection=nearest`;
   const resp = await fetch(u);
   if (!resp.ok) throw new Error('wx api ' + resp.status);
   return await resp.json();
@@ -460,7 +460,9 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
   const hPrec = (wxData.hourly && wxData.hourly.precipitation_probability) || [];
   const hRain = (wxData.hourly && wxData.hourly.precipitation) || [];
   const hWind = (wxData.hourly && wxData.hourly.wind_speed_10m) || [];
+  const hGust = (wxData.hourly && (wxData.hourly.wind_gusts_10m || wxData.hourly.wind_speed_10m)) || [];
   const curWind = hi >= 0 ? (hWind[hi] || 0) : 0;
+  const curGust = (wxData.current && (wxData.current.wind_gusts_10m || wxData.current.wind_speed_10m)) || (hi >= 0 ? (hGust[hi] || curWind) : curWind);
 
   function maxRain(hours) {
     if (hi < 0) return 0;
@@ -479,11 +481,13 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
     }
     return mx;
   }
-  function maxWind(hours) {
+  function maxGust(hours) {
     if (hi < 0) return 0;
     let mx = 0;
-    for (let k = hi; k < Math.min(hi + hours, hWind.length); k++) {
-      if (hWind[k] > mx) mx = hWind[k];
+    const arr = hGust.length ? hGust : hWind;
+    for (let k = hi; k < Math.min(hi + hours, arr.length); k++) {
+      const v = parseFloat(arr[k]) || 0;
+      if (v > mx) mx = v;
     }
     return mx;
   }
@@ -518,10 +522,10 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
   // Open-Meteo 推算颱風（僅在 CWA 沒觸發時）
   if (!cwaUsed && cfg.typhoon !== false) {
     const wTh = cfg.typhoonWind || 62;
-    const w6 = maxWind(6), r6 = maxRain(6);
+    const w6 = maxGust(6), r6 = maxRain(6);
     const isStorm = (curCode === 95 || curCode === 96 || curCode === 99);
-    if ((curWind >= wTh || w6 >= wTh) && (isStorm || r6 >= 80)) {
-      out.push({ id: 'typhoon', icon: '🌀', title: '颱風跡象警報', body: `風速最高 ${Math.round(Math.max(curWind, w6))} km/h（模型推算，請以中央氣象署為準）`, critical: true });
+    if ((curGust >= wTh || w6 >= wTh) && (isStorm || r6 >= 80)) {
+      out.push({ id: 'typhoon', icon: '🌀', title: '颱風跡象警報', body: `陣風最高 ${Math.round(Math.max(curGust, w6))} km/h（模型推算，請以中央氣象署為準）`, critical: true });
     }
   }
   if (cfg.storm !== false && (curCode === 95 || curCode === 96 || curCode === 99)) {
@@ -540,10 +544,11 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
     }
   }
   if (cfg.strongWind !== false && swInDetectionWindow('strongWind', cfg) && !out.some(a => a.id === 'typhoon' || a.id === 'strongWind')) {
-    const w3 = maxWind(3);
-    const mxW = Math.max(curWind, w3);
-    if (mxW >= (cfg.windThreshold || 50)) {
-      out.push({ id: 'strongWind', icon: '💨', title: '強風警報', body: `風速 ${Math.round(mxW)} km/h，騎車注意`, critical: false });
+    const w3 = maxGust(3);
+    const mxW = Math.max(curGust, w3);
+    const th = Math.max(parseFloat(cfg.windGustThreshold || cfg.windThreshold) || 62, 62);
+    if (mxW >= th) {
+      out.push({ id: 'strongWind', icon: '💨', title: '強風警報', body: `最大陣風 ${Math.round(mxW)} km/h，騎車注意`, critical: false });
     }
   }
   if (cfg.heat !== false && swInDetectionWindow('heat', cfg) && !out.some(a => a.id === 'heat') && curTemp >= (cfg.heatThreshold || 36)) {
