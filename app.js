@@ -2463,6 +2463,41 @@ function _alertLevel(id,a){
   if(id==='strongWind'||id==='heat'||id==='cold')return'warn';
   return'info';
 }
+
+// v201：CWA 官方強風特報也必須通過「GPS 本地目前/未來 3 小時最大陣風 >= 後台門檻」。
+// 修正 v201 只呼叫但未定義 _strongWindGustGatePass，導致畫面渲染出錯。
+function _localMaxGustForGate(hours){
+  if(!wxData)return{mx:0,at:null,available:false};
+  const now=new Date();
+  const nh=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0")+"T"+String(now.getHours()).padStart(2,"0");
+  const times=wxData.hTime||[];
+  const hi=times.findIndex(s=>String(s).startsWith(nh));
+  const arr=(wxData.hGust&&wxData.hGust.length?wxData.hGust:wxData.hWind)||[];
+  let mx=Number.isFinite(parseFloat(wxData.gust))?parseFloat(wxData.gust):0;
+  let at=null;
+  if(hi>=0&&arr.length){
+    for(let k=hi;k<Math.min(hi+hours,arr.length);k++){
+      const v=parseFloat(arr[k])||0;
+      if(v>mx){mx=v;at=times[k]||null}
+    }
+  }
+  return{mx,at,available:!!(arr.length||mx)};
+}
+function _strongWindGustGatePass(cfg){
+  const th=parseFloat((cfg&&cfg.windGustThreshold)||(cfg&&cfg.windThreshold))||62;
+  const g=_localMaxGustForGate(3);
+  // 沒有本地 GPS 逐時陣風資料時，不讓 CWA 大範圍強風特報繞過門檻。
+  if(!g.available)return false;
+  return g.mx>=th;
+}
+function _appendGustGateDetail(detail,cfg,isZh){
+  const th=parseFloat((cfg&&cfg.windGustThreshold)||(cfg&&cfg.windThreshold))||62;
+  const g=_localMaxGustForGate(3);
+  const add=isZh
+    ?`本地最大陣風 ${Math.round(g.mx||0)} / ${Math.round(th)} km/h`
+    :`Local max gust ${Math.round(g.mx||0)} / ${Math.round(th)} km/h`;
+  return (detail?detail+'｜':'')+add;
+}
 function _areasShort(areas){
   areas=Array.isArray(areas)?areas.filter(Boolean):[];
   return areas.length?areas.slice(0,5).join('、')+(areas.length>5?'等':''):'';
@@ -2486,7 +2521,7 @@ function evaluateCwaWeatherWarnings(cfg,isZh){
       const id=a.id||_alertIdFromText((a.event||'')+' '+(a.title||'')+' '+(a.headline||'')+' '+(a.description||''));
       if(id==='weather')return;
       if(cfg[id]===false)return;
-      // v200：強風不再因「CWA官方特報」直接跳警報；仍必須符合後台設定的本地 GPS 陣風門檻。
+      // v201：強風不再因「CWA官方特報」直接跳警報；仍必須符合後台設定的本地 GPS 陣風門檻。
       if(id==='strongWind'&&!_strongWindGustGatePass(cfg))return;
       const key=id+'|'+(a.event||a.title||'')+'|'+(Array.isArray(a.areas)?a.areas.join(','):'');
       if(seen.has(key))return;seen.add(key);
