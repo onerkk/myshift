@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v195-hr-rate-logic2';
+const CACHE_NAME = 'myshift-v196-local-alerts';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -9,7 +9,14 @@ self.addEventListener('message', event => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
   // app 端寫入最後位置給 SW 用（背景同步抓天氣用）
   if (event.data && event.data.type === 'WX_POS' && event.data.lat && event.data.lon) {
-    swPutWxCache('lastPos', { lat: event.data.lat, lon: event.data.lon, accuracy: event.data.accuracy || null, ts: event.data.ts || Date.now() });
+    const area = event.data.area || {};
+    swPutWxCache('lastPos', {
+      lat: event.data.lat, lon: event.data.lon, accuracy: event.data.accuracy || null,
+      county: area.county || '臺南市', town: area.town || '鹽水區',
+      countyAliases: area.countyAliases || ['臺南市','台南市','臺南','台南'],
+      townAliases: area.townAliases || ['鹽水區','鹽水'],
+      ts: event.data.ts || Date.now()
+    });
   }
 });
 
@@ -96,7 +103,7 @@ const ALERT_DEFS = {
   heatThreshold: 36, coldThreshold: 10,
   cwaWorkerUrl: '', typhoonWorkerUrl: '',
   typhoonAlertDistanceKm: 800, typhoonMinIntensity: 'td', typhoonAlertOnNotice: true,
-  earthquakeMinMagnitude: 4.0, earthquakeMinIntensity: 3, earthquakeMaxDistanceKm: 0, earthquakeMaxAgeMinutes: 120,
+  earthquakeMinMagnitude: 4.0, earthquakeMinIntensity: 3, earthquakeMaxDistanceKm: 120, earthquakeMaxAgeMinutes: 120,
   notifyEnabled: true,
   notifyTyphoon: true, notifyStorm: true, notifyHeavyRain: true, notifyRain: false,
   notifyStrongWind: true, notifyHeat: false, notifyCold: false, notifyFog: false,
@@ -201,16 +208,77 @@ function swPickCwaText(v, depth, bag) {
     for (const k in v) { if (n++ > 40) break; if (prefer.includes(k)) continue; swPickCwaText(v[k], depth + 1, bag); }
   }
 }
-function swEvaluateCwaWeatherWarnings(cwaData, cfg) {
+function swLocalArea(pos) {
+  pos = pos || {};
+  const county = pos.county || '臺南市', town = pos.town || '鹽水區';
+  return {
+    county, town,
+    countyAliases: [...new Set([county,'臺南市','台南市','臺南','台南'].concat(pos.countyAliases || []).filter(Boolean))],
+    townAliases: [...new Set([town,'鹽水區','鹽水'].concat(pos.townAliases || []).filter(Boolean))]
+  };
+}
+function swTextMatchesLocalArea(text, pos) {
+  text = String(text || ''); if (!text) return false;
+  const a = swLocalArea(pos);
+  return a.townAliases.some(k => k && text.indexOf(k) >= 0) || a.countyAliases.some(k => k && text.indexOf(k) >= 0);
+}
+function swCollectAreaStrings(v, depth, out) {
+  if (!v || depth > 5 || out.length > 80) return;
+  if (typeof v === 'string') { const t = v.trim(); if (t) out.push(t); return; }
+  if (Array.isArray(v)) { for (const x of v) swCollectAreaStrings(x, depth + 1, out); return; }
+  if (typeof v === 'object') {
+    ['area','areas','areaDesc','affectedAreas','locationName','county','town','matchedCounty','matchedTown','areaName','name'].forEach(k => { if (v[k] !== undefined) swCollectAreaStrings(v[k], depth + 1, out); });
+  }
+}
+function swAlertAreaStrings(a) { const out = []; swCollectAreaStrings(a, 0, out); return [...new Set(out)]; }
+function swOfficialAlertMatchesLocal(a, pos) {
+  if (!a) return false;
+  if (a.matchedArea === true || a.localMatch === true || a.matchedLocal === true) return true;
+  if (a.matchedArea === false || a.localMatch === false || a.matchedLocal === false) return false;
+  const areas = swAlertAreaStrings(a);
+  if (areas.length) return areas.some(t => swTextMatchesLocalArea(t, pos));
+  const text = String((a.event || '') + ' ' + (a.title || '') + ' ' + (a.headline || '') + ' ' + (a.description || '') + ' ' + (a.content || '') + ' ' + (a.areaDesc || ''));
+  return swTextMatchesLocalArea(text, pos);
+}
+function swAlertIdFromText(text) {
+  text = String(text || '');
+  if (/颱風/.test(text)) return 'typhoon';
+  if (/豪雨|大雨|豪大雨|短延時強降雨/.test(text)) return 'heavyRain';
+  if (/大雷雨|雷雨|雷擊/.test(text)) return 'storm';
+  if (/強風|平均風|陣風/.test(text)) return 'strongWind';
+  if (/高溫|橙色燈號|紅色燈號/.test(text)) return 'heat';
+  if (/低溫|寒流/.test(text)) return 'cold';
+  if (/濃霧|能見度/.test(text)) return 'fog';
+  return 'weather';
+}
+function swAreaShort(areas) { areas = Array.isArray(areas) ? areas.filter(Boolean) : []; return areas.length ? areas.slice(0, 5).join('、') + (areas.length > 5 ? '等' : '') : ''; }
+function swLimitText(t, n) { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; }
+function swEvaluateCwaWeatherWarnings(cwaData, cfg, pos) {
   const out = [];
   if (!cwaData) return out;
+  const raw = (cwaData.officialAlerts || cwaData.weatherWarnings || []).filter(a => a && swOfficialAlertMatchesLocal(a, pos));
+  const seen = new Set();
+  if (raw.length) {
+    for (const a of raw) {
+      const id = a.id || swAlertIdFromText((a.event || '') + ' ' + (a.title || '') + ' ' + (a.headline || '') + ' ' + (a.description || ''));
+      if (id === 'weather' || cfg[id] === false) continue;
+      const key = id + '|' + (a.event || a.title || '') + '|' + (Array.isArray(a.areas) ? a.areas.join(',') : '');
+      if (seen.has(key)) continue; seen.add(key);
+      const area = swAreaShort(a.areas || swAlertAreaStrings(a));
+      const desc = swLimitText(a.description || a.headline || '', 130);
+      const body = [area ? '影響區域：' + area : '', desc].filter(Boolean).join('｜') || '中央氣象署官方警特報生效中';
+      const titleMap = { heavyRain: '中央氣象署豪大雨特報', storm: '中央氣象署雷雨特報', strongWind: '中央氣象署強風特報', heat: '中央氣象署高溫資訊', cold: '中央氣象署低溫特報', fog: '中央氣象署濃霧特報', typhoon: '中央氣象署颱風警報' };
+      const iconMap = { typhoon: '🌀', heavyRain: '🌧', storm: '⛈', strongWind: '💨', heat: '🥵', cold: '🥶', fog: '🌫' };
+      out.push({ id, icon: iconMap[id] || '⚠️', title: titleMap[id] || '中央氣象署天氣警特報', body, critical: (id === 'typhoon' || id === 'storm' || id === 'heavyRain'), official: true });
+    }
+    return out;
+  }
   const bag = [];
   swPickCwaText(cwaData, 0, bag);
   if (!bag.length) return out;
   const text = [...new Set(bag)].join('｜');
-  const areaKeys = ['臺南','台南','鹽水','新營','柳營','嘉義','高雄','雲林','全臺','全台','臺灣','台灣','南部'];
-  const areaOk = areaKeys.some(k => text.indexOf(k) >= 0) || !/[縣市區鄉鎮]/.test(text);
-  if (!areaOk) return out;
+  // 所在地嚴格模式：文字 fallback 也必須明確包含臺南／鹽水；不接受全臺、南部或無地名公告。
+  if (!swTextMatchesLocalArea(text, pos)) return out;
   const detail = kind => {
     const hits = bag.filter(t => t.indexOf(kind) >= 0 || t.indexOf('特報') >= 0 || t.indexOf('警報') >= 0).slice(0, 3);
     return hits.length ? hits.join('；') : '中央氣象署官方警特報生效中';
@@ -225,7 +293,7 @@ function swEvaluateCwaWeatherWarnings(cwaData, cfg) {
 }
 
 // SW 端的警報判斷（簡化版，與 app.js evaluateWxAlerts 邏輯一致）
-function swEvaluate(wxData, cfg, cwaData) {
+function swEvaluate(wxData, cfg, cwaData, pos) {
   const out = [];
   if (cfg.master === false) return out;
 
@@ -234,6 +302,9 @@ function swEvaluate(wxData, cfg, cwaData) {
     const minMag = parseFloat(cfg.earthquakeMinMagnitude) || 4.0;
     const minInt = parseFloat(cfg.earthquakeMinIntensity) || 3;
     const maxAge = parseInt(cfg.earthquakeMaxAgeMinutes) || 120;
+    const maxDist = (parseFloat(cfg.earthquakeMaxDistanceKm) > 0) ? parseFloat(cfg.earthquakeMaxDistanceKm) : 120;
+    const myLat = pos && pos.lat ? parseFloat(pos.lat) : null;
+    const myLon = pos && pos.lon ? parseFloat(pos.lon) : null;
     const now = Date.now();
     for (const eq of cwaData.earthquakes) {
       if (maxAge > 0 && eq.originTime) {
@@ -242,10 +313,19 @@ function swEvaluate(wxData, cfg, cwaData) {
         if ((now - eqTime) / 60000 > maxAge) continue;
       }
       if (eq.magnitude < minMag && eq.maxIntensity < minInt) continue;
+      let myDist = null;
+      if (myLat !== null && myLon !== null && !isNaN(myLat) && !isNaN(myLon)) {
+        const R = 6371, toRad = d => d * Math.PI / 180;
+        const dLat = toRad(eq.lat - myLat), dLon = toRad(eq.lon - myLon);
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(myLat)) * Math.cos(toRad(eq.lat)) * Math.sin(dLon / 2) ** 2;
+        myDist = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+      }
+      if (myDist === null || myDist > maxDist) continue;
       const parts = [];
       if (eq.location) parts.push(`震央：${eq.location}`);
       parts.push(`規模 ${eq.magnitude.toFixed(1)}，深度 ${eq.focalDepth.toFixed(1)} km`);
       if (eq.maxIntensityLabel && eq.maxIntensityArea) parts.push(`最大震度 ${eq.maxIntensityLabel} 於 ${eq.maxIntensityArea}`);
+      if (myDist !== null) parts.push(`距您約 ${myDist} km`);
       if (eq.originTime) parts.push(`發生於 ${eq.originTime.slice(11, 16)}`);
       out.push({
         id: 'earthquake',
@@ -259,7 +339,7 @@ function swEvaluate(wxData, cfg, cwaData) {
     }
   }
 
-  const cwaAlerts = swEvaluateCwaWeatherWarnings(cwaData, cfg);
+  const cwaAlerts = swEvaluateCwaWeatherWarnings(cwaData, cfg, pos);
   for (const a of cwaAlerts) if (!out.some(x => x.id === a.id)) out.push(a);
 
   if (!wxData) return out;
@@ -381,7 +461,7 @@ async function swBackgroundCheck() {
   try {
     // 取最後一次已知位置
     let pos = await swGetCache('lastPos');
-    if (!pos) pos = { lat: 23.32, lon: 120.27 }; // fallback：台南
+    if (!pos) pos = { lat: 23.32, lon: 120.27, county: '臺南市', town: '鹽水區', countyAliases: ['臺南市','台南市','臺南','台南'], townAliases: ['鹽水區','鹽水'] }; // fallback：臺南市鹽水區
     // 同步取設定（先 Firestore，失敗用 cache）
     let cfg = await swFetchAlertConfig();
     if (!cfg) cfg = (await swGetCache('wxAlerts')) || Object.assign({}, ALERT_DEFS);
@@ -398,7 +478,13 @@ async function swBackgroundCheck() {
     const cwaUrl = 'https://cwa-data.onerkk.workers.dev';
     if (cwaUrl) {
       try {
-        const resp = await fetch(cwaUrl, { cache: 'no-store' });
+        const req = new URL(cwaUrl);
+        const area = swLocalArea(pos);
+        req.searchParams.set('county', area.county);
+        req.searchParams.set('town', area.town);
+        if (pos.lat && pos.lon) { req.searchParams.set('lat', pos.lat); req.searchParams.set('lon', pos.lon); }
+        req.searchParams.set('_', String(Date.now()));
+        const resp = await fetch(req.toString(), { cache: 'no-store' });
         if (resp.ok) {
           const td = await resp.json();
           if (td && td.ok) cwaData = td;
@@ -406,7 +492,7 @@ async function swBackgroundCheck() {
       } catch (e) {}
     }
 
-    const alerts = swEvaluate(wx, cfg, cwaData);
+    const alerts = swEvaluate(wx, cfg, cwaData, pos);
     if (!alerts.length) return;
 
     const inQuiet = swInQuietHours(cfg);

@@ -601,7 +601,7 @@ let APP_CFG={admins:[],visualFx:{enabled:true},
     // ── 地震警報門檻 ──
     earthquakeMinMagnitude:4.0,   // 規模門檻（M）
     earthquakeMinIntensity:3,     // 最大震度門檻（級）— 規模或震度任一達標就警報
-    earthquakeMaxDistanceKm:0,    // 距用戶距離限制（km），0 = 不限
+    earthquakeMaxDistanceKm:120,  // 距用戶距離限制（km）；預設只顯示所在地附近地震，避免全台遠方地震洗版
     earthquakeMaxAgeMinutes:120,  // 只警報此分鐘內的地震，避免久前的
     // ── 系統通知 ──
     notifyEnabled:true,
@@ -1902,7 +1902,7 @@ async function loadWx(arg,retries){
     // 把位置交給 Service Worker（背景同步抓天氣時要用）
     try{
       if(navigator.serviceWorker&&navigator.serviceWorker.controller){
-        navigator.serviceWorker.controller.postMessage({type:'WX_POS',lat:parseFloat(lat),lon:parseFloat(lon),accuracy:posAccuracy,ts:Date.now()});
+        navigator.serviceWorker.controller.postMessage({type:'WX_POS',lat:parseFloat(lat),lon:parseFloat(lon),accuracy:posAccuracy,area:_getWxLocalArea(),ts:Date.now()});
       }
     }catch(e){}
 
@@ -1950,7 +1950,7 @@ async function loadWx(arg,retries){
     const hi=_wxHourIndex();
     if(hi>=0){curPrec=wxData.hPrec?wxData.hPrec[hi]||0:0;curWind=wxData.hWind?wxData.hWind[hi]||0:0}
     WxFx.update(wxData.code,wxData.temp,curPrec,curWind);
-    try{loadCwaData({force:false})}catch(e){}
+    try{loadCwaData({force:force})}catch(e){}
     try{checkAndNotifyAlerts()}catch(e){console.log('notify check err',e)}
   }else WxFx.update(null,0,0,0);
 }
@@ -1966,6 +1966,49 @@ let earthquakeData=null,earthquakeErr=false;
 // 若要更換 worker，直接修改下方常數即可
 const CWA_WORKER_URL='https://cwa-data.onerkk.workers.dev';
 
+// 所在地鎖定：本 App 只顯示使用者所在地相關警報；目前依使用者實際需求鎖定臺南市鹽水區。
+// 若日後要開放不同地區，可把 county/town 改成使用者設定或 reverse geocode 結果。
+const WX_LOCAL_AREA={
+  county:'臺南市', town:'鹽水區',
+  countyAliases:['臺南市','台南市','臺南','台南'],
+  townAliases:['鹽水區','鹽水']
+};
+function _getWxLocalArea(){
+  const a=WX_LOCAL_AREA||{};
+  const county=a.county||'臺南市', town=a.town||'鹽水區';
+  return {
+    county, town,
+    countyAliases:[...new Set([county,'臺南市','台南市','臺南','台南'].concat(a.countyAliases||[]).filter(Boolean))],
+    townAliases:[...new Set([town,'鹽水區','鹽水'].concat(a.townAliases||[]).filter(Boolean))]
+  };
+}
+function _wxAreaKey(){const a=_getWxLocalArea();return `${a.county}|${a.town}|${wxData&&wxData.lat||''}|${wxData&&wxData.lon||''}`;}
+function _textMatchesWxLocalArea(text){
+  text=String(text||''); if(!text)return false;
+  const a=_getWxLocalArea();
+  return a.townAliases.some(k=>k&&text.indexOf(k)>=0) || a.countyAliases.some(k=>k&&text.indexOf(k)>=0);
+}
+function _collectAreaStrings(v,depth,out){
+  if(!v||depth>5||out.length>80)return;
+  if(typeof v==='string'){const t=v.trim();if(t)out.push(t);return;}
+  if(Array.isArray(v)){v.forEach(x=>_collectAreaStrings(x,depth+1,out));return;}
+  if(typeof v==='object'){
+    ['area','areas','areaDesc','affectedAreas','locationName','county','town','matchedCounty','matchedTown','areaName','name'].forEach(k=>{if(v[k]!==undefined)_collectAreaStrings(v[k],depth+1,out)});
+  }
+}
+function _alertAreaStrings(a){const out=[];_collectAreaStrings(a,0,out);return [...new Set(out)];}
+function _officialAlertMatchesWxLocal(a){
+  if(!a)return false;
+  // worker 明確回報是否命中所在地時，以 worker 結果為準。
+  if(a.matchedArea===true||a.localMatch===true||a.matchedLocal===true)return true;
+  if(a.matchedArea===false||a.localMatch===false||a.matchedLocal===false)return false;
+  const areas=_alertAreaStrings(a);
+  if(areas.length)return areas.some(_textMatchesWxLocalArea);
+  // 沒有區域欄位時，不再接受「全臺／南部」這類大範圍文字，避免誤導成所在地警報。
+  const text=String((a.event||'')+' '+(a.title||'')+' '+(a.headline||'')+' '+(a.description||'')+' '+(a.content||'')+' '+(a.areaDesc||''));
+  return _textMatchesWxLocalArea(text);
+}
+
 function _getCwaWorkerUrl(){
   // 寫死版本：永遠使用 CWA_WORKER_URL
   // 後台設定的 cwaWorkerUrl / typhoonWorkerUrl 已忽略
@@ -1977,10 +2020,12 @@ async function loadCwaData(arg){
   const url=_getCwaWorkerUrl();
   if(!url){typhoonData=null;earthquakeData=null;return}
   // CWA 官方警特報/雨量站以 2 分鐘為前端快取上限；重新抓取時完全跳過快取
+  const area=_getWxLocalArea();
+  const areaKey=_wxAreaKey();
   if(!force){
     try{
       const c=JSON.parse(localStorage.getItem('_cwaCache'));
-      if(c&&c.ts&&(Date.now()-c.ts)<2*60*1000&&c.d){
+      if(c&&c.ts&&(Date.now()-c.ts)<2*60*1000&&c.areaKey===areaKey&&c.d){
         typhoonData=c.d;
         earthquakeData=c.d;
         render();
@@ -1989,9 +2034,9 @@ async function loadCwaData(arg){
   }
   try{
     const req=new URL(url);
-    // 目前先鎖定使用者實際需求：臺南市鹽水區；lat/lon 由定位提供時用於最近雨量站
-    req.searchParams.set('county','臺南市');
-    req.searchParams.set('town','鹽水區');
+    // 僅要求 worker 回傳所在地資料；前端仍會再做一次所在地過濾，避免大範圍警報洗版。
+    req.searchParams.set('county',area.county);
+    req.searchParams.set('town',area.town);
     if(wxData&&wxData.lat&&wxData.lon){
       req.searchParams.set('lat',wxData.lat);
       req.searchParams.set('lon',wxData.lon);
@@ -2003,7 +2048,7 @@ async function loadCwaData(arg){
     if(data&&data.ok){
       typhoonData=data;earthquakeData=data;
       typhoonErr=false;earthquakeErr=false;
-      try{localStorage.setItem('_cwaCache',JSON.stringify({ts:Date.now(),d:data}))}catch(e){}
+      try{localStorage.setItem('_cwaCache',JSON.stringify({ts:Date.now(),areaKey:areaKey,d:data}))}catch(e){}
       render();
       try{checkAndNotifyAlerts()}catch(e){}
     }
@@ -2110,7 +2155,7 @@ function evaluateEarthquake(cfg,isZh){
   const eqs=earthquakeData.earthquakes;
   const minMag=parseFloat(cfg.earthquakeMinMagnitude)||4.0;
   const minInt=parseFloat(cfg.earthquakeMinIntensity)||3;
-  const maxDist=parseFloat(cfg.earthquakeMaxDistanceKm)||0; // 0 = 不限
+  const maxDist=(parseFloat(cfg.earthquakeMaxDistanceKm)>0)?parseFloat(cfg.earthquakeMaxDistanceKm):120; // 所在地模式：未設定時預設只看 120km 內
   const maxAge=parseInt(cfg.earthquakeMaxAgeMinutes)||120;
   // 用戶位置（從 wxData 取，定位過才有）
   const myLat=wxData&&wxData.lat?parseFloat(wxData.lat):null;
@@ -2138,7 +2183,9 @@ function evaluateEarthquake(cfg,isZh){
       const a=Math.sin(dLat/2)**2+Math.cos(toRad(myLat))*Math.cos(toRad(eq.lat))*Math.sin(dLon/2)**2;
       myDist=Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
     }
-    if(maxDist>0&&myDist!==null&&myDist>maxDist) continue;
+    // 所在地模式：沒有定位距離就不顯示地震；遠於門檻也不顯示。
+    if(myDist===null) continue;
+    if(myDist>maxDist) continue;
 
     // 組裝警報
     const title=isZh
@@ -2195,10 +2242,9 @@ function _pickCwaText(v,depth,bag){
 }
 function _cwaTextIncludesAny(text,arr){return arr.some(k=>text.indexOf(k)>=0)}
 function _cwaAreaMatches(text){
-  if(!text)return true;
-  // 現階段 worker 未必回傳使用者縣市，先接受全台/臺南/台南/嘉義/高雄/雲嘉南字串；若無地名也視為全域公告。
-  const areaKeys=['臺南','台南','鹽水','新營','柳營','嘉義','高雄','雲林','全臺','全台','臺灣','台灣','南部'];
-  return areaKeys.some(k=>text.indexOf(k)>=0) || !/[縣市區鄉鎮]/.test(text);
+  // 所在地嚴格模式：官方警特報必須明確命中臺南市／鹽水區才顯示。
+  // 不再因為「全臺、南部、其他縣市」或無地名文字就顯示。
+  return _textMatchesWxLocalArea(text);
 }
 function _limitText(t,n){
   t=String(t||'').replace(/\s+/g,' ').replace(/[｜]{2,}/g,'｜').trim();
@@ -2248,7 +2294,7 @@ function _areasShort(areas){
 function evaluateCwaWeatherWarnings(cfg,isZh){
   const data=typhoonData||earthquakeData;
   if(!data)return[];
-  const raw=(data.officialAlerts||data.weatherWarnings||[]).filter(a=>a&&a.matchedArea!==false);
+  const raw=(data.officialAlerts||data.weatherWarnings||[]).filter(a=>a&&_officialAlertMatchesWxLocal(a));
   const out=[];
   const seen=new Set();
   if(raw.length){
@@ -2293,7 +2339,9 @@ function _rainObservationAlert(cfg,userItems,isZh){
   const ro=_rainObs();if(!ro)return null;
   const r10=_numRain(ro.rain10Min??ro.precipitation),r1=_numRain(ro.rain1h),r3=_numRain(ro.rain3h),r24=_numRain(ro.rain24h);
   const station=ro.stationName||'雨量站';
-  const dist=Number.isFinite(parseFloat(ro.distanceKm))?`${ro.distanceKm}km`:'';
+  const distNum=parseFloat(ro.distanceKm);
+  if(Number.isFinite(distNum)&&distNum>30)return null; // 只採附近雨量站，避免拿外縣市測站當所在地
+  const dist=Number.isFinite(distNum)?`${distNum}km`:'';
   const base=`${station}${dist?' '+dist:''}｜10分鐘 ${_rainMm(r10)}mm｜1小時 ${_rainMm(r1)}mm｜3小時 ${_rainMm(r3)}mm｜24小時 ${_rainMm(r24)}mm`;
   // CWA 雨量分級：大雨 40mm/h 或 80mm/24h；豪雨 100mm/3h 或 200mm/24h
   if((r3!==null&&r3>=100)||(r24!==null&&r24>=200)){
