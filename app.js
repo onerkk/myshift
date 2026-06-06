@@ -601,7 +601,7 @@ let APP_CFG={admins:[],visualFx:{enabled:true},
     // ── 地震警報門檻 ──
     earthquakeMinMagnitude:4.0,   // 規模門檻（M）
     earthquakeMinIntensity:3,     // 最大震度門檻（級）— 規模或震度任一達標就警報
-    earthquakeMaxDistanceKm:120,  // 距用戶距離限制（km）；預設只顯示所在地附近地震，避免全台遠方地震洗版
+    earthquakeMaxDistanceKm:120,  // GPS 距用戶距離限制（km），預設 120；不再用全台不限距離
     earthquakeMaxAgeMinutes:120,  // 只警報此分鐘內的地震，避免久前的
     // ── 系統通知 ──
     notifyEnabled:true,
@@ -1793,9 +1793,105 @@ const WXD={0:"Cerah",1:"Cerah",2:"Berawan",3:"Mendung",45:"Kabut",48:"Kabut",51:
 let tideData=null,tideErr=false;
 // ── 定位狀態（給 UI 顯示用）──
 let geoState={status:'unknown',code:null,msg:'',source:'',accuracy:null,ts:0}; // status: unknown|locating|ok|fallback|denied
+let wxPlace=null; // GPS 反查所在地：{county,town,display,source,lat,lon,ts}
 const WX_POS_MAX_AGE_MS=30*60*1000;   // 位置快取最多 30 分鐘；避免人在移動後仍抓舊格點
+const WX_PLACE_MAX_AGE_MS=30*60*1000; // 所在地反查快取最多 30 分鐘；與 GPS 位置同壽命
 const WX_CACHE_MAX_AGE_MS=20*60*1000;  // 天氣快取最多 20 分鐘；app 開著時會盡量取新資料，舊資料避免誤導
 const WX_API_TIMEOUT_MS=12000;
+const WX_REVERSE_TIMEOUT_MS=4500;
+
+function _nNum(v){v=parseFloat(v);return Number.isFinite(v)?v:null}
+function _geoDistKm(lat1,lon1,lat2,lon2){
+  lat1=_nNum(lat1);lon1=_nNum(lon1);lat2=_nNum(lat2);lon2=_nNum(lon2);
+  if(lat1===null||lon1===null||lat2===null||lon2===null)return null;
+  const R=6371,toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function _twNameVariants(s){
+  s=String(s||'').trim();
+  if(!s)return[];
+  const out=[s];
+  if(s.indexOf('臺')>=0)out.push(s.replace(/臺/g,'台'));
+  if(s.indexOf('台')>=0)out.push(s.replace(/台/g,'臺'));
+  return [...new Set(out.filter(Boolean))];
+}
+function _cleanTwAreaName(s){
+  s=String(s||'').trim();
+  if(!s)return'';
+  const map={
+    'Taipei City':'臺北市','New Taipei City':'新北市','Taoyuan City':'桃園市','Taichung City':'臺中市','Tainan City':'臺南市','Kaohsiung City':'高雄市',
+    'Keelung City':'基隆市','Hsinchu City':'新竹市','Chiayi City':'嘉義市','Hsinchu County':'新竹縣','Miaoli County':'苗栗縣','Changhua County':'彰化縣','Nantou County':'南投縣','Yunlin County':'雲林縣','Chiayi County':'嘉義縣','Pingtung County':'屏東縣','Yilan County':'宜蘭縣','Hualien County':'花蓮縣','Taitung County':'臺東縣','Penghu County':'澎湖縣','Kinmen County':'金門縣','Lienchiang County':'連江縣'
+  };
+  if(map[s])return map[s];
+  return s.replace(/^台灣省/,'').replace(/^臺灣省/,'').replace(/^Taiwan Province/i,'').trim();
+}
+function _extractGpsPlaceFromAddress(addr){
+  addr=addr||{};
+  let county=_cleanTwAreaName(addr.county||addr.city||addr.state||addr.state_district||'');
+  let town=_cleanTwAreaName(addr.city_district||addr.town||addr.suburb||addr.village||addr.municipality||addr.district||addr.quarter||'');
+  if(county&&!/[縣市]$/.test(county)&&addr.city&&/[縣市]$/.test(addr.city))county=_cleanTwAreaName(addr.city);
+  if(town===county)town='';
+  return {county,town};
+}
+async function reverseGeocodeGps(lat,lon,force){
+  lat=_nNum(lat);lon=_nNum(lon);
+  if(lat===null||lon===null)return null;
+  if(!force){
+    try{
+      const c=JSON.parse(localStorage.getItem('_wxPlace'));
+      const d=c&&_geoDistKm(lat,lon,c.lat,c.lon);
+      if(c&&c.county&&c.ts&&(Date.now()-c.ts)<WX_PLACE_MAX_AGE_MS&&d!==null&&d<2){wxPlace=c;return c}
+    }catch(e){}
+  }
+  // 完全以 GPS 經緯度反查目前行政區；反查失敗時不使用鹽水或任何固定地點頂替。
+  const url=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=18&addressdetails=1&accept-language=zh-TW`;
+  try{
+    const resp=await Promise.race([fetch(url,{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('reverse-timeout')),WX_REVERSE_TIMEOUT_MS))]);
+    if(!resp.ok)throw new Error('reverse '+resp.status);
+    const data=await resp.json();
+    const a=data&&data.address||{};
+    const place=_extractGpsPlaceFromAddress(a);
+    if(!place.county&&!place.town)return null;
+    const out={county:place.county||'',town:place.town||'',display:[place.county,place.town].filter(Boolean).join(' '),source:'gps-reverse',lat,lon,ts:Date.now()};
+    try{localStorage.setItem('_wxPlace',JSON.stringify(out))}catch(e){}
+    wxPlace=out;
+    return out;
+  }catch(e){
+    try{
+      const u2=`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&localityLanguage=zh`;
+      const r2=await Promise.race([fetch(u2,{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('reverse2-timeout')),WX_REVERSE_TIMEOUT_MS))]);
+      if(r2.ok){
+        const d2=await r2.json();
+        const county=_cleanTwAreaName(d2.principalSubdivision||d2.city||'');
+        const town=_cleanTwAreaName(d2.locality||d2.localityInfo?.administrative?.find(x=>/區|鎮|鄉|District|Township/i.test(x.description||''))?.name||'');
+        if(county||town){
+          const out={county:county||'',town:town&&town!==county?town:'',display:[county,town&&town!==county?town:''].filter(Boolean).join(' '),source:'gps-reverse-bdc',lat,lon,ts:Date.now()};
+          try{localStorage.setItem('_wxPlace',JSON.stringify(out))}catch(e2){}
+          wxPlace=out;
+          return out;
+        }
+      }
+    }catch(e2){}
+    wxPlace=null;
+    return null;
+  }
+}
+function _currentGpsPlace(){return wxPlace||(wxData&&wxData.place)||null}
+function _gpsPlaceKeys(){
+  const p=_currentGpsPlace();
+  if(!p)return[];
+  const keys=[];
+  _twNameVariants(p.county).forEach(x=>keys.push(x));
+  _twNameVariants(p.town).forEach(x=>keys.push(x));
+  if(p.county&&p.town){
+    _twNameVariants(p.county+p.town).forEach(x=>keys.push(x));
+    _twNameVariants(p.county+' '+p.town).forEach(x=>keys.push(x));
+  }
+  return [...new Set(keys.filter(Boolean))];
+}
+function _gpsPlaceText(){const p=_currentGpsPlace();return p&&p.display?p.display:''}
 
 // ── 官方標準定位：Permissions API 查狀態 → getCurrentPosition → 完整錯誤碼處理 ──
 // opts.force=true 時：強制高精度、禁止使用系統位置快取（用於「重新抓取」）
@@ -1894,15 +1990,19 @@ async function loadWx(arg,retries){
         lat=g.lat;lon=g.lon;posAccuracy=g.accuracy||null;locSource=force?'gps-force':'gps';
         try{localStorage.setItem('_wxPos',JSON.stringify({lat,lon,accuracy:posAccuracy,ts:Date.now()}))}catch(e){}
       }else{
-        // 定位失敗 → 用最後一次已知位置；完全沒有才用台灣中心點 fallback
+        // 定位失敗 → 只允許使用最後一次 GPS 已知位置；完全沒有 GPS 時不使用固定預設地點。
         try{const c=JSON.parse(localStorage.getItem('_wxPos'));if(c&&c.lat&&c.lon){lat=c.lat;lon=c.lon;posAccuracy=c.accuracy||null;locSource='last-known'}}catch(e){}
-        if(!lat){lat="23.97388";lon="120.98202";locSource='taiwan-center'}
+        if(!lat){wxErr=true;render();return}
       }
     }
-    // 把位置交給 Service Worker（背景同步抓天氣時要用）
+    // GPS → 反查目前縣市/鄉鎮；失敗時不再鎖死任何預設地點
+    const canUseGpsPlace=(locSource==='gps'||locSource==='gps-force'||locSource==='cache'||locSource==='last-known');
+    wxPlace=canUseGpsPlace?await reverseGeocodeGps(lat,lon,force):null;
+
+    // 把 GPS 位置與反查所在地交給 Service Worker（背景同步抓天氣/警報時要用）
     try{
       if(navigator.serviceWorker&&navigator.serviceWorker.controller){
-        navigator.serviceWorker.controller.postMessage({type:'WX_POS',lat:parseFloat(lat),lon:parseFloat(lon),accuracy:posAccuracy,area:_getWxLocalArea(),ts:Date.now()});
+        navigator.serviceWorker.controller.postMessage({type:'WX_POS',lat:parseFloat(lat),lon:parseFloat(lon),accuracy:posAccuracy,place:wxPlace||null,ts:Date.now()});
       }
     }catch(e){}
 
@@ -1914,7 +2014,7 @@ async function loadWx(arg,retries){
     const data=await resp.json();
     wxData={
       temp:Math.round(data.current.temperature_2m),code:data.current.weather_code,lat:lat,lon:lon,
-      source:'Open-Meteo Forecast API',updatedAt:Date.now(),locationSource:locSource,posAccuracy:posAccuracy,
+      source:'Open-Meteo Forecast API',updatedAt:Date.now(),locationSource:locSource,posAccuracy:posAccuracy,place:wxPlace||null,
       currentPrecip:Number(data.current.precipitation||0),
       days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])})),
       hTime:data.hourly.time,
@@ -1950,7 +2050,7 @@ async function loadWx(arg,retries){
     const hi=_wxHourIndex();
     if(hi>=0){curPrec=wxData.hPrec?wxData.hPrec[hi]||0:0;curWind=wxData.hWind?wxData.hWind[hi]||0:0}
     WxFx.update(wxData.code,wxData.temp,curPrec,curWind);
-    try{loadCwaData({force:force})}catch(e){}
+    try{loadCwaData({force:false})}catch(e){}
     try{checkAndNotifyAlerts()}catch(e){console.log('notify check err',e)}
   }else WxFx.update(null,0,0,0);
 }
@@ -1966,49 +2066,6 @@ let earthquakeData=null,earthquakeErr=false;
 // 若要更換 worker，直接修改下方常數即可
 const CWA_WORKER_URL='https://cwa-data.onerkk.workers.dev';
 
-// 所在地鎖定：本 App 只顯示使用者所在地相關警報；目前依使用者實際需求鎖定臺南市鹽水區。
-// 若日後要開放不同地區，可把 county/town 改成使用者設定或 reverse geocode 結果。
-const WX_LOCAL_AREA={
-  county:'臺南市', town:'鹽水區',
-  countyAliases:['臺南市','台南市','臺南','台南'],
-  townAliases:['鹽水區','鹽水']
-};
-function _getWxLocalArea(){
-  const a=WX_LOCAL_AREA||{};
-  const county=a.county||'臺南市', town=a.town||'鹽水區';
-  return {
-    county, town,
-    countyAliases:[...new Set([county,'臺南市','台南市','臺南','台南'].concat(a.countyAliases||[]).filter(Boolean))],
-    townAliases:[...new Set([town,'鹽水區','鹽水'].concat(a.townAliases||[]).filter(Boolean))]
-  };
-}
-function _wxAreaKey(){const a=_getWxLocalArea();return `${a.county}|${a.town}|${wxData&&wxData.lat||''}|${wxData&&wxData.lon||''}`;}
-function _textMatchesWxLocalArea(text){
-  text=String(text||''); if(!text)return false;
-  const a=_getWxLocalArea();
-  return a.townAliases.some(k=>k&&text.indexOf(k)>=0) || a.countyAliases.some(k=>k&&text.indexOf(k)>=0);
-}
-function _collectAreaStrings(v,depth,out){
-  if(!v||depth>5||out.length>80)return;
-  if(typeof v==='string'){const t=v.trim();if(t)out.push(t);return;}
-  if(Array.isArray(v)){v.forEach(x=>_collectAreaStrings(x,depth+1,out));return;}
-  if(typeof v==='object'){
-    ['area','areas','areaDesc','affectedAreas','locationName','county','town','matchedCounty','matchedTown','areaName','name'].forEach(k=>{if(v[k]!==undefined)_collectAreaStrings(v[k],depth+1,out)});
-  }
-}
-function _alertAreaStrings(a){const out=[];_collectAreaStrings(a,0,out);return [...new Set(out)];}
-function _officialAlertMatchesWxLocal(a){
-  if(!a)return false;
-  // worker 明確回報是否命中所在地時，以 worker 結果為準。
-  if(a.matchedArea===true||a.localMatch===true||a.matchedLocal===true)return true;
-  if(a.matchedArea===false||a.localMatch===false||a.matchedLocal===false)return false;
-  const areas=_alertAreaStrings(a);
-  if(areas.length)return areas.some(_textMatchesWxLocalArea);
-  // 沒有區域欄位時，不再接受「全臺／南部」這類大範圍文字，避免誤導成所在地警報。
-  const text=String((a.event||'')+' '+(a.title||'')+' '+(a.headline||'')+' '+(a.description||'')+' '+(a.content||'')+' '+(a.areaDesc||''));
-  return _textMatchesWxLocalArea(text);
-}
-
 function _getCwaWorkerUrl(){
   // 寫死版本：永遠使用 CWA_WORKER_URL
   // 後台設定的 cwaWorkerUrl / typhoonWorkerUrl 已忽略
@@ -2019,13 +2076,14 @@ async function loadCwaData(arg){
   const force=!!(arg&&arg.force);
   const url=_getCwaWorkerUrl();
   if(!url){typhoonData=null;earthquakeData=null;return}
-  // CWA 官方警特報/雨量站以 2 分鐘為前端快取上限；重新抓取時完全跳過快取
-  const area=_getWxLocalArea();
-  const areaKey=_wxAreaKey();
+  if(!wxData||!wxData.lat||!wxData.lon){typhoonData=null;earthquakeData=null;return}
+  const place=_currentGpsPlace();
+  const cwaKey=[String(wxData.lat),String(wxData.lon),place&&place.county||'',place&&place.town||''].join('|');
+  // CWA 官方警特報/雨量站以 2 分鐘為前端快取上限；重新抓取時完全跳過快取；快取必須符合目前 GPS 位置
   if(!force){
     try{
       const c=JSON.parse(localStorage.getItem('_cwaCache'));
-      if(c&&c.ts&&(Date.now()-c.ts)<2*60*1000&&c.areaKey===areaKey&&c.d){
+      if(c&&c.key===cwaKey&&c.ts&&(Date.now()-c.ts)<2*60*1000&&c.d){
         typhoonData=c.d;
         earthquakeData=c.d;
         render();
@@ -2034,21 +2092,22 @@ async function loadCwaData(arg){
   }
   try{
     const req=new URL(url);
-    // 僅要求 worker 回傳所在地資料；前端仍會再做一次所在地過濾，避免大範圍警報洗版。
-    req.searchParams.set('county',area.county);
-    req.searchParams.set('town',area.town);
-    if(wxData&&wxData.lat&&wxData.lon){
-      req.searchParams.set('lat',wxData.lat);
-      req.searchParams.set('lon',wxData.lon);
-    }
+    // 完全以 GPS 為來源：lat/lon 必帶；county/town 只使用 GPS 反查結果，絕不鎖死鹽水或任何固定地點。
+    req.searchParams.set('lat',wxData.lat);
+    req.searchParams.set('lon',wxData.lon);
+    req.searchParams.set('gps','1');
+    req.searchParams.set('areaMode','gps');
+    if(place&&place.county)req.searchParams.set('county',place.county);
+    if(place&&place.town)req.searchParams.set('town',place.town);
     req.searchParams.set('_',String(Date.now()));
     const resp=await Promise.race([fetch(req.toString(),{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),10000))]);
     if(!resp.ok)throw new Error('cwa api '+resp.status);
     const data=await resp.json();
     if(data&&data.ok){
+      data._gpsQuery={lat:wxData.lat,lon:wxData.lon,place:place||null,ts:Date.now()};
       typhoonData=data;earthquakeData=data;
       typhoonErr=false;earthquakeErr=false;
-      try{localStorage.setItem('_cwaCache',JSON.stringify({ts:Date.now(),areaKey:areaKey,d:data}))}catch(e){}
+      try{localStorage.setItem('_cwaCache',JSON.stringify({ts:Date.now(),key:cwaKey,place:place||null,d:data}))}catch(e){}
       render();
       try{checkAndNotifyAlerts()}catch(e){}
     }
@@ -2155,11 +2214,13 @@ function evaluateEarthquake(cfg,isZh){
   const eqs=earthquakeData.earthquakes;
   const minMag=parseFloat(cfg.earthquakeMinMagnitude)||4.0;
   const minInt=parseFloat(cfg.earthquakeMinIntensity)||3;
-  const maxDist=(parseFloat(cfg.earthquakeMaxDistanceKm)>0)?parseFloat(cfg.earthquakeMaxDistanceKm):120; // 所在地模式：未設定時預設只看 120km 內
+  const rawMaxDist=parseFloat(cfg.earthquakeMaxDistanceKm);
+  const maxDist=(Number.isFinite(rawMaxDist)&&rawMaxDist>0)?rawMaxDist:120; // 完全用 GPS 距離；後台若留 0，仍用 120km 防止全台誤報
   const maxAge=parseInt(cfg.earthquakeMaxAgeMinutes)||120;
-  // 用戶位置（從 wxData 取，定位過才有）
+  // 用戶位置（從 wxData 取，定位過才有）；沒有 GPS 就不顯示地震警報，避免全台誤報
   const myLat=wxData&&wxData.lat?parseFloat(wxData.lat):null;
   const myLon=wxData&&wxData.lon?parseFloat(wxData.lon):null;
+  if(myLat===null||myLon===null||isNaN(myLat)||isNaN(myLon))return null;
   const now=Date.now();
 
   // 從最新筆開始找符合的
@@ -2183,9 +2244,7 @@ function evaluateEarthquake(cfg,isZh){
       const a=Math.sin(dLat/2)**2+Math.cos(toRad(myLat))*Math.cos(toRad(eq.lat))*Math.sin(dLon/2)**2;
       myDist=Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
     }
-    // 所在地模式：沒有定位距離就不顯示地震；遠於門檻也不顯示。
-    if(myDist===null) continue;
-    if(myDist>maxDist) continue;
+    if(myDist===null||myDist>maxDist) continue;
 
     // 組裝警報
     const title=isZh
@@ -2242,9 +2301,20 @@ function _pickCwaText(v,depth,bag){
 }
 function _cwaTextIncludesAny(text,arr){return arr.some(k=>text.indexOf(k)>=0)}
 function _cwaAreaMatches(text){
-  // 所在地嚴格模式：官方警特報必須明確命中臺南市／鹽水區才顯示。
-  // 不再因為「全臺、南部、其他縣市」或無地名文字就顯示。
-  return _textMatchesWxLocalArea(text);
+  text=String(text||'');
+  if(!text)return false;
+  const keys=_gpsPlaceKeys();
+  if(!keys.length)return false;
+  // 只接受 GPS 反查出的目前縣市/鄉鎮；不接受「全臺/南部/台灣」這種大範圍字串當所在地。
+  return keys.some(k=>k&&text.indexOf(k)>=0);
+}
+function _officialAlertMatchesGpsPlace(a){
+  if(!a)return false;
+  if(a.matchedArea===false)return false;
+  // 若 worker 明確宣告用 GPS 命中，可接受。
+  if(a.gpsMatched===true||a.matchedBy==='gps'||a.matchMode==='gps'||a.matchSource==='gps')return true;
+  const text=[a.event,a.title,a.headline,a.description,a.areaDesc,Array.isArray(a.areas)?a.areas.join('、'):a.areas,a.county,a.town,a.locationName].filter(Boolean).join('｜');
+  return _cwaAreaMatches(text);
 }
 function _limitText(t,n){
   t=String(t||'').replace(/\s+/g,' ').replace(/[｜]{2,}/g,'｜').trim();
@@ -2294,7 +2364,7 @@ function _areasShort(areas){
 function evaluateCwaWeatherWarnings(cfg,isZh){
   const data=typhoonData||earthquakeData;
   if(!data)return[];
-  const raw=(data.officialAlerts||data.weatherWarnings||[]).filter(a=>a&&_officialAlertMatchesWxLocal(a));
+  const raw=(data.officialAlerts||data.weatherWarnings||[]).filter(a=>a&&_officialAlertMatchesGpsPlace(a));
   const out=[];
   const seen=new Set();
   if(raw.length){
@@ -2339,9 +2409,7 @@ function _rainObservationAlert(cfg,userItems,isZh){
   const ro=_rainObs();if(!ro)return null;
   const r10=_numRain(ro.rain10Min??ro.precipitation),r1=_numRain(ro.rain1h),r3=_numRain(ro.rain3h),r24=_numRain(ro.rain24h);
   const station=ro.stationName||'雨量站';
-  const distNum=parseFloat(ro.distanceKm);
-  if(Number.isFinite(distNum)&&distNum>30)return null; // 只採附近雨量站，避免拿外縣市測站當所在地
-  const dist=Number.isFinite(distNum)?`${distNum}km`:'';
+  const dist=Number.isFinite(parseFloat(ro.distanceKm))?`${ro.distanceKm}km`:'';
   const base=`${station}${dist?' '+dist:''}｜10分鐘 ${_rainMm(r10)}mm｜1小時 ${_rainMm(r1)}mm｜3小時 ${_rainMm(r3)}mm｜24小時 ${_rainMm(r24)}mm`;
   // CWA 雨量分級：大雨 40mm/h 或 80mm/24h；豪雨 100mm/3h 或 200mm/24h
   if((r3!==null&&r3>=100)||(r24!==null&&r24>=200)){
@@ -2836,9 +2904,11 @@ function userPrefsModalHtml(){
         if(st==='ok'&&(geoState.source==='gps'||geoState.source==='gps-force')){icon='✅';extra=isZh?'（GPS 即時定位'+(geoState.accuracy?'，精度約 '+geoState.accuracy+'m':'')+'）':'(GPS'+(geoState.accuracy?', ~'+geoState.accuracy+'m':'')+')';}
         else if(st==='ok'&&geoState.source==='cache'){icon='📍';extra=isZh?'（使用 30 分鐘內記錄位置）':'(cached <=30m)';}
         else if(st==='denied'){icon='🚫';extra=isZh?'　定位權限被拒，請到手機設定→瀏覽器/APP→允許位置，再按「重新抓取」':' Location denied — enable in settings';}
-        else if(st==='fallback'){icon='⚠️';extra='　'+(geoState.msg||'')+(isZh?'，顯示為預設位置，按「重新抓取」重試':'');}
+        else if(st==='fallback'){icon='⚠️';extra='　'+(geoState.msg||'')+(isZh?'，未使用固定地點，請按「重新抓取」重試':'');}
         else if(st==='locating'){icon='🔄';extra=isZh?'定位中...':'Locating...';}
-        return`<div style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(127,140,141,0.25);color:var(--tx3);font-size:10px">${icon} ${isZh?'目前定位':'Location'}：${wxData.lat}, ${wxData.lon}${extra}</div>`;
+        const placeTxt=_gpsPlaceText();
+        const placeLine=placeTxt?`｜${isZh?'所在地':'Area'}：${esc(placeTxt)}`:'';
+        return`<div style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(127,140,141,0.25);color:var(--tx3);font-size:10px">${icon} ${isZh?'目前定位':'Location'}：${wxData.lat}, ${wxData.lon}${placeLine}${extra}</div>`;
       })()}
     </div>`;
   }
@@ -2990,7 +3060,7 @@ async function forceReloadWx(){
     // 依定位結果回報，讓使用者知道有沒有抓到真實位置
     if(geoState.status==='ok'&&(geoState.source==='gps'||geoState.source==='gps-force'))alert(lang==='zh'?'✅ 已高精度定位並抓取最新天氣':'Located & reloaded');
     else if(geoState.status==='denied')alert(lang==='zh'?'⚠️ 定位權限被拒絕\n請到手機「設定→應用程式/瀏覽器→權限→位置」開啟，再試一次':'Location permission denied');
-    else if(geoState.status==='fallback')alert((lang==='zh'?'⚠️ 定位失敗：':'Location failed: ')+(geoState.msg||'')+(lang==='zh'?'\n已顯示預設位置天氣':''));
+    else if(geoState.status==='fallback')alert((lang==='zh'?'⚠️ 定位失敗：':'Location failed: ')+(geoState.msg||'')+(lang==='zh'?'\n官方所在地警特報不會用鹽水或其他固定地點代替。':''));
     else alert(lang==='zh'?'已重新抓取最新資料':'Reloaded');
   }catch(e){
     alert((lang==='zh'?'重新抓取失敗：':'Reload failed: ')+e.message);

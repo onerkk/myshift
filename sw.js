@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v196-local-alerts';
+const CACHE_NAME = 'myshift-v196-gps-alerts';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -9,14 +9,7 @@ self.addEventListener('message', event => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
   // app 端寫入最後位置給 SW 用（背景同步抓天氣用）
   if (event.data && event.data.type === 'WX_POS' && event.data.lat && event.data.lon) {
-    const area = event.data.area || {};
-    swPutWxCache('lastPos', {
-      lat: event.data.lat, lon: event.data.lon, accuracy: event.data.accuracy || null,
-      county: area.county || '臺南市', town: area.town || '鹽水區',
-      countyAliases: area.countyAliases || ['臺南市','台南市','臺南','台南'],
-      townAliases: area.townAliases || ['鹽水區','鹽水'],
-      ts: event.data.ts || Date.now()
-    });
+    swPutWxCache('lastPos', { lat: event.data.lat, lon: event.data.lon, accuracy: event.data.accuracy || null, place: event.data.place || null, ts: event.data.ts || Date.now() });
   }
 });
 
@@ -188,6 +181,7 @@ async function swFetchAlertConfig() {
   } catch (e) { return null; }
 }
 
+
 async function swFetchWeather(lat, lon) {
   const u = `${OPEN_METEO_URL}?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,precipitation&hourly=precipitation_probability,precipitation,rain,showers,temperature_2m,weather_code,wind_speed_10m&timezone=auto&forecast_days=2&cell_selection=nearest`;
   const resp = await fetch(u);
@@ -195,6 +189,107 @@ async function swFetchWeather(lat, lon) {
   return await resp.json();
 }
 
+function swNum(v) { v = parseFloat(v); return Number.isFinite(v) ? v : null; }
+function swDistKm(lat1, lon1, lat2, lon2) {
+  lat1 = swNum(lat1); lon1 = swNum(lon1); lat2 = swNum(lat2); lon2 = swNum(lon2);
+  if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) return null;
+  const R = 6371, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function swTwVariants(s) {
+  s = String(s || '').trim();
+  if (!s) return [];
+  const out = [s];
+  if (s.indexOf('臺') >= 0) out.push(s.replace(/臺/g, '台'));
+  if (s.indexOf('台') >= 0) out.push(s.replace(/台/g, '臺'));
+  return [...new Set(out.filter(Boolean))];
+}
+function swCleanAreaName(s) {
+  s = String(s || '').trim();
+  if (!s) return '';
+  const map = {
+    'Taipei City': '臺北市', 'New Taipei City': '新北市', 'Taoyuan City': '桃園市', 'Taichung City': '臺中市', 'Tainan City': '臺南市', 'Kaohsiung City': '高雄市',
+    'Keelung City': '基隆市', 'Hsinchu City': '新竹市', 'Chiayi City': '嘉義市', 'Hsinchu County': '新竹縣', 'Miaoli County': '苗栗縣', 'Changhua County': '彰化縣', 'Nantou County': '南投縣', 'Yunlin County': '雲林縣', 'Chiayi County': '嘉義縣', 'Pingtung County': '屏東縣', 'Yilan County': '宜蘭縣', 'Hualien County': '花蓮縣', 'Taitung County': '臺東縣', 'Penghu County': '澎湖縣', 'Kinmen County': '金門縣', 'Lienchiang County': '連江縣'
+  };
+  if (map[s]) return map[s];
+  return s.replace(/^台灣省/, '').replace(/^臺灣省/, '').replace(/^Taiwan Province/i, '').trim();
+}
+function swExtractPlace(addr) {
+  addr = addr || {};
+  let county = swCleanAreaName(addr.county || addr.city || addr.state || addr.state_district || '');
+  let town = swCleanAreaName(addr.city_district || addr.town || addr.suburb || addr.village || addr.municipality || addr.district || addr.quarter || '');
+  if (county && !/[縣市]$/.test(county) && addr.city && /[縣市]$/.test(addr.city)) county = swCleanAreaName(addr.city);
+  if (town === county) town = '';
+  return { county, town };
+}
+async function swReverseGeocodeGps(pos) {
+  if (!pos || !pos.lat || !pos.lon) return null;
+  if (pos.place && (pos.place.county || pos.place.town)) return pos.place;
+  const cached = await swGetCache('lastPlace');
+  const d = cached && swDistKm(pos.lat, pos.lon, cached.lat, cached.lon);
+  if (cached && cached.county && cached.ts && Date.now() - cached.ts < 30 * 60 * 1000 && d !== null && d < 2) return cached;
+  try {
+    const u = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(pos.lat)}&lon=${encodeURIComponent(pos.lon)}&zoom=18&addressdetails=1&accept-language=zh-TW`;
+    const resp = await Promise.race([fetch(u, { cache: 'no-store' }), new Promise((_, r) => setTimeout(() => r(new Error('reverse-timeout')), 4500))]);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const p = swExtractPlace(data && data.address || {});
+    if (!p.county && !p.town) return null;
+    const out = { county: p.county || '', town: p.town || '', display: [p.county, p.town].filter(Boolean).join(' '), source: 'gps-reverse', lat: pos.lat, lon: pos.lon, ts: Date.now() };
+    await swPutWxCache('lastPlace', out);
+    pos.place = out;
+    await swPutWxCache('lastPos', pos);
+    return out;
+  } catch (e) {
+    try {
+      const u2 = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(pos.lat)}&longitude=${encodeURIComponent(pos.lon)}&localityLanguage=zh`;
+      const r2 = await Promise.race([fetch(u2, { cache: 'no-store' }), new Promise((_, r) => setTimeout(() => r(new Error('reverse2-timeout')), 4500))]);
+      if (r2.ok) {
+        const d2 = await r2.json();
+        const county = swCleanAreaName(d2.principalSubdivision || d2.city || '');
+        const admin = d2.localityInfo && d2.localityInfo.administrative || [];
+        const pick = admin.find(x => /區|鎮|鄉|District|Township/i.test(x.description || ''));
+        const town = swCleanAreaName(d2.locality || (pick && pick.name) || '');
+        if (county || town) {
+          const out = { county: county || '', town: town && town !== county ? town : '', display: [county, town && town !== county ? town : ''].filter(Boolean).join(' '), source: 'gps-reverse-bdc', lat: pos.lat, lon: pos.lon, ts: Date.now() };
+          await swPutWxCache('lastPlace', out);
+          pos.place = out;
+          await swPutWxCache('lastPos', pos);
+          return out;
+        }
+      }
+    } catch (e2) {}
+    return null;
+  }
+}
+function swPlaceKeys(pos) {
+  const p = pos && pos.place;
+  if (!p) return [];
+  const keys = [];
+  swTwVariants(p.county).forEach(x => keys.push(x));
+  swTwVariants(p.town).forEach(x => keys.push(x));
+  if (p.county && p.town) {
+    swTwVariants(p.county + p.town).forEach(x => keys.push(x));
+    swTwVariants(p.county + ' ' + p.town).forEach(x => keys.push(x));
+  }
+  return [...new Set(keys.filter(Boolean))];
+}
+function swAreaMatchesGps(text, pos) {
+  text = String(text || '');
+  if (!text) return false;
+  const keys = swPlaceKeys(pos);
+  if (!keys.length) return false;
+  return keys.some(k => k && text.indexOf(k) >= 0);
+}
+function swOfficialAlertMatchesGps(a, pos) {
+  if (!a) return false;
+  if (a.matchedArea === false) return false;
+  if (a.gpsMatched === true || a.matchedBy === 'gps' || a.matchMode === 'gps' || a.matchSource === 'gps') return true;
+  const text = [a.event, a.title, a.headline, a.description, a.areaDesc, Array.isArray(a.areas) ? a.areas.join('、') : a.areas, a.county, a.town, a.locationName].filter(Boolean).join('｜');
+  return swAreaMatchesGps(text, pos);
+}
 
 function swTextIncludesAny(text, arr) { return arr.some(k => text.indexOf(k) >= 0); }
 function swPickCwaText(v, depth, bag) {
@@ -208,68 +303,39 @@ function swPickCwaText(v, depth, bag) {
     for (const k in v) { if (n++ > 40) break; if (prefer.includes(k)) continue; swPickCwaText(v[k], depth + 1, bag); }
   }
 }
-function swLocalArea(pos) {
-  pos = pos || {};
-  const county = pos.county || '臺南市', town = pos.town || '鹽水區';
-  return {
-    county, town,
-    countyAliases: [...new Set([county,'臺南市','台南市','臺南','台南'].concat(pos.countyAliases || []).filter(Boolean))],
-    townAliases: [...new Set([town,'鹽水區','鹽水'].concat(pos.townAliases || []).filter(Boolean))]
-  };
-}
-function swTextMatchesLocalArea(text, pos) {
-  text = String(text || ''); if (!text) return false;
-  const a = swLocalArea(pos);
-  return a.townAliases.some(k => k && text.indexOf(k) >= 0) || a.countyAliases.some(k => k && text.indexOf(k) >= 0);
-}
-function swCollectAreaStrings(v, depth, out) {
-  if (!v || depth > 5 || out.length > 80) return;
-  if (typeof v === 'string') { const t = v.trim(); if (t) out.push(t); return; }
-  if (Array.isArray(v)) { for (const x of v) swCollectAreaStrings(x, depth + 1, out); return; }
-  if (typeof v === 'object') {
-    ['area','areas','areaDesc','affectedAreas','locationName','county','town','matchedCounty','matchedTown','areaName','name'].forEach(k => { if (v[k] !== undefined) swCollectAreaStrings(v[k], depth + 1, out); });
-  }
-}
-function swAlertAreaStrings(a) { const out = []; swCollectAreaStrings(a, 0, out); return [...new Set(out)]; }
-function swOfficialAlertMatchesLocal(a, pos) {
-  if (!a) return false;
-  if (a.matchedArea === true || a.localMatch === true || a.matchedLocal === true) return true;
-  if (a.matchedArea === false || a.localMatch === false || a.matchedLocal === false) return false;
-  const areas = swAlertAreaStrings(a);
-  if (areas.length) return areas.some(t => swTextMatchesLocalArea(t, pos));
-  const text = String((a.event || '') + ' ' + (a.title || '') + ' ' + (a.headline || '') + ' ' + (a.description || '') + ' ' + (a.content || '') + ' ' + (a.areaDesc || ''));
-  return swTextMatchesLocalArea(text, pos);
-}
-function swAlertIdFromText(text) {
-  text = String(text || '');
-  if (/颱風/.test(text)) return 'typhoon';
-  if (/豪雨|大雨|豪大雨|短延時強降雨/.test(text)) return 'heavyRain';
-  if (/大雷雨|雷雨|雷擊/.test(text)) return 'storm';
-  if (/強風|平均風|陣風/.test(text)) return 'strongWind';
-  if (/高溫|橙色燈號|紅色燈號/.test(text)) return 'heat';
-  if (/低溫|寒流/.test(text)) return 'cold';
-  if (/濃霧|能見度/.test(text)) return 'fog';
-  return 'weather';
-}
-function swAreaShort(areas) { areas = Array.isArray(areas) ? areas.filter(Boolean) : []; return areas.length ? areas.slice(0, 5).join('、') + (areas.length > 5 ? '等' : '') : ''; }
-function swLimitText(t, n) { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; }
 function swEvaluateCwaWeatherWarnings(cwaData, cfg, pos) {
   const out = [];
   if (!cwaData) return out;
-  const raw = (cwaData.officialAlerts || cwaData.weatherWarnings || []).filter(a => a && swOfficialAlertMatchesLocal(a, pos));
-  const seen = new Set();
+  const raw = (cwaData.officialAlerts || cwaData.weatherWarnings || []).filter(a => swOfficialAlertMatchesGps(a, pos));
+  const detailFromAlert = a => {
+    const parts = [];
+    const area = Array.isArray(a.areas) ? a.areas.filter(Boolean).slice(0, 5).join('、') : (a.areas || a.areaDesc || '');
+    if (area) parts.push('影響區域：' + area);
+    const desc = String(a.description || a.headline || '').replace(/\s+/g, ' ').trim();
+    if (desc) parts.push(desc.length > 160 ? desc.slice(0, 160) + '…' : desc);
+    return parts.join('｜') || '中央氣象署官方警特報生效中';
+  };
+  const idFromText = text => {
+    text = String(text || '');
+    if (/颱風/.test(text)) return 'typhoon';
+    if (/豪雨|大雨|豪大雨|短延時強降雨/.test(text)) return 'heavyRain';
+    if (/大雷雨|雷雨|雷擊/.test(text)) return 'storm';
+    if (/強風|平均風|陣風/.test(text)) return 'strongWind';
+    if (/高溫|橙色燈號|紅色燈號/.test(text)) return 'heat';
+    if (/低溫|寒流/.test(text)) return 'cold';
+    if (/濃霧|能見度/.test(text)) return 'fog';
+    return 'weather';
+  };
+  const titleMap = { heavyRain: '中央氣象署豪大雨特報', storm: '中央氣象署雷雨特報', strongWind: '中央氣象署強風特報', heat: '中央氣象署高溫資訊', cold: '中央氣象署低溫特報', fog: '中央氣象署濃霧特報', typhoon: '中央氣象署颱風警報' };
   if (raw.length) {
+    const seen = new Set();
     for (const a of raw) {
-      const id = a.id || swAlertIdFromText((a.event || '') + ' ' + (a.title || '') + ' ' + (a.headline || '') + ' ' + (a.description || ''));
+      const id = a.id || idFromText((a.event || '') + ' ' + (a.title || '') + ' ' + (a.headline || '') + ' ' + (a.description || ''));
       if (id === 'weather' || cfg[id] === false) continue;
-      const key = id + '|' + (a.event || a.title || '') + '|' + (Array.isArray(a.areas) ? a.areas.join(',') : '');
-      if (seen.has(key)) continue; seen.add(key);
-      const area = swAreaShort(a.areas || swAlertAreaStrings(a));
-      const desc = swLimitText(a.description || a.headline || '', 130);
-      const body = [area ? '影響區域：' + area : '', desc].filter(Boolean).join('｜') || '中央氣象署官方警特報生效中';
-      const titleMap = { heavyRain: '中央氣象署豪大雨特報', storm: '中央氣象署雷雨特報', strongWind: '中央氣象署強風特報', heat: '中央氣象署高溫資訊', cold: '中央氣象署低溫特報', fog: '中央氣象署濃霧特報', typhoon: '中央氣象署颱風警報' };
-      const iconMap = { typhoon: '🌀', heavyRain: '🌧', storm: '⛈', strongWind: '💨', heat: '🥵', cold: '🥶', fog: '🌫' };
-      out.push({ id, icon: iconMap[id] || '⚠️', title: titleMap[id] || '中央氣象署天氣警特報', body, critical: (id === 'typhoon' || id === 'storm' || id === 'heavyRain'), official: true });
+      const key = id + '|' + (a.event || a.title || '') + '|' + (Array.isArray(a.areas) ? a.areas.join(',') : (a.areas || ''));
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ id, icon: ({ heavyRain: '🌧', storm: '⛈', strongWind: '💨', heat: '🥵', cold: '🥶', fog: '🌫', typhoon: '🌀' })[id] || '⚠️', title: titleMap[id] || '中央氣象署天氣警特報', body: detailFromAlert(a), critical: id === 'typhoon' || id === 'storm' || id === 'heavyRain', official: true });
     }
     return out;
   }
@@ -277,8 +343,7 @@ function swEvaluateCwaWeatherWarnings(cwaData, cfg, pos) {
   swPickCwaText(cwaData, 0, bag);
   if (!bag.length) return out;
   const text = [...new Set(bag)].join('｜');
-  // 所在地嚴格模式：文字 fallback 也必須明確包含臺南／鹽水；不接受全臺、南部或無地名公告。
-  if (!swTextMatchesLocalArea(text, pos)) return out;
+  if (!swAreaMatchesGps(text, pos)) return out;
   const detail = kind => {
     const hits = bag.filter(t => t.indexOf(kind) >= 0 || t.indexOf('特報') >= 0 || t.indexOf('警報') >= 0).slice(0, 3);
     return hits.length ? hits.join('；') : '中央氣象署官方警特報生效中';
@@ -292,6 +357,7 @@ function swEvaluateCwaWeatherWarnings(cwaData, cfg, pos) {
   return out;
 }
 
+
 // SW 端的警報判斷（簡化版，與 app.js evaluateWxAlerts 邏輯一致）
 function swEvaluate(wxData, cfg, cwaData, pos) {
   const out = [];
@@ -301,10 +367,14 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
   if (cfg.earthquake !== false && cwaData && cwaData.earthquakeActive && cwaData.earthquakes && cwaData.earthquakes.length) {
     const minMag = parseFloat(cfg.earthquakeMinMagnitude) || 4.0;
     const minInt = parseFloat(cfg.earthquakeMinIntensity) || 3;
-    const maxAge = parseInt(cfg.earthquakeMaxAgeMinutes) || 120;
-    const maxDist = (parseFloat(cfg.earthquakeMaxDistanceKm) > 0) ? parseFloat(cfg.earthquakeMaxDistanceKm) : 120;
+    const rawMaxDist = parseFloat(cfg.earthquakeMaxDistanceKm);
+    const maxDist = Number.isFinite(rawMaxDist) && rawMaxDist > 0 ? rawMaxDist : 120;
     const myLat = pos && pos.lat ? parseFloat(pos.lat) : null;
     const myLon = pos && pos.lon ? parseFloat(pos.lon) : null;
+    if (myLat === null || myLon === null || isNaN(myLat) || isNaN(myLon)) {
+      // 沒有 GPS 就不推地震，避免全台誤報
+    } else {
+    const maxAge = parseInt(cfg.earthquakeMaxAgeMinutes) || 120;
     const now = Date.now();
     for (const eq of cwaData.earthquakes) {
       if (maxAge > 0 && eq.originTime) {
@@ -313,19 +383,13 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
         if ((now - eqTime) / 60000 > maxAge) continue;
       }
       if (eq.magnitude < minMag && eq.maxIntensity < minInt) continue;
-      let myDist = null;
-      if (myLat !== null && myLon !== null && !isNaN(myLat) && !isNaN(myLon)) {
-        const R = 6371, toRad = d => d * Math.PI / 180;
-        const dLat = toRad(eq.lat - myLat), dLon = toRad(eq.lon - myLon);
-        const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(myLat)) * Math.cos(toRad(eq.lat)) * Math.sin(dLon / 2) ** 2;
-        myDist = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-      }
+      const myDist = swDistKm(myLat, myLon, eq.lat, eq.lon);
       if (myDist === null || myDist > maxDist) continue;
       const parts = [];
       if (eq.location) parts.push(`震央：${eq.location}`);
       parts.push(`規模 ${eq.magnitude.toFixed(1)}，深度 ${eq.focalDepth.toFixed(1)} km`);
       if (eq.maxIntensityLabel && eq.maxIntensityArea) parts.push(`最大震度 ${eq.maxIntensityLabel} 於 ${eq.maxIntensityArea}`);
-      if (myDist !== null) parts.push(`距您約 ${myDist} km`);
+      parts.push(`距您約 ${Math.round(myDist)} km`);
       if (eq.originTime) parts.push(`發生於 ${eq.originTime.slice(11, 16)}`);
       out.push({
         id: 'earthquake',
@@ -336,6 +400,7 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
         eqNo: eq.no
       });
       break; // 只推最新一筆
+    }
     }
   }
 
@@ -459,9 +524,10 @@ function swInQuietHours(cfg) {
 
 async function swBackgroundCheck() {
   try {
-    // 取最後一次已知位置
+    // 取最後一次已知 GPS 位置；沒有 GPS 就不做背景警報，避免固定地點誤報
     let pos = await swGetCache('lastPos');
-    if (!pos) pos = { lat: 23.32, lon: 120.27, county: '臺南市', town: '鹽水區', countyAliases: ['臺南市','台南市','臺南','台南'], townAliases: ['鹽水區','鹽水'] }; // fallback：臺南市鹽水區
+    if (!pos || !pos.lat || !pos.lon) return;
+    pos.place = pos.place || await swReverseGeocodeGps(pos);
     // 同步取設定（先 Firestore，失敗用 cache）
     let cfg = await swFetchAlertConfig();
     if (!cfg) cfg = (await swGetCache('wxAlerts')) || Object.assign({}, ALERT_DEFS);
@@ -479,10 +545,12 @@ async function swBackgroundCheck() {
     if (cwaUrl) {
       try {
         const req = new URL(cwaUrl);
-        const area = swLocalArea(pos);
-        req.searchParams.set('county', area.county);
-        req.searchParams.set('town', area.town);
-        if (pos.lat && pos.lon) { req.searchParams.set('lat', pos.lat); req.searchParams.set('lon', pos.lon); }
+        req.searchParams.set('lat', pos.lat);
+        req.searchParams.set('lon', pos.lon);
+        req.searchParams.set('gps', '1');
+        req.searchParams.set('areaMode', 'gps');
+        if (pos.place && pos.place.county) req.searchParams.set('county', pos.place.county);
+        if (pos.place && pos.place.town) req.searchParams.set('town', pos.place.town);
         req.searchParams.set('_', String(Date.now()));
         const resp = await fetch(req.toString(), { cache: 'no-store' });
         if (resp.ok) {
