@@ -2486,6 +2486,8 @@ function evaluateCwaWeatherWarnings(cfg,isZh){
       const id=a.id||_alertIdFromText((a.event||'')+' '+(a.title||'')+' '+(a.headline||'')+' '+(a.description||''));
       if(id==='weather')return;
       if(cfg[id]===false)return;
+      // v200：強風不再因「CWA官方特報」直接跳警報；仍必須符合後台設定的本地 GPS 陣風門檻。
+      if(id==='strongWind'&&!_strongWindGustGatePass(cfg))return;
       const key=id+'|'+(a.event||a.title||'')+'|'+(Array.isArray(a.areas)?a.areas.join(','):'');
       if(seen.has(key))return;seen.add(key);
       const area=_matchedAreaLabel(a);
@@ -2496,6 +2498,7 @@ function evaluateCwaWeatherWarnings(cfg,isZh){
       const desc=_limitText(a.description||a.headline||'',130);
       if(desc)detail+=(detail?'｜':'')+desc;
       if(!detail)detail=isZh?'中央氣象署官方警特報生效中':'CWA official alert is active';
+      if(id==='strongWind')detail=_appendGustGateDetail(detail,cfg,isZh);
       out.push({id,level:_alertLevel(id,a),icon:a.icon||_alertIcon(id),official:true,critical:(id==='typhoon'||id==='storm'||(id==='heavyRain'&&_alertLevel(id,a)==='danger')),
         title:_alertTitle(id,isZh),detail});
     });
@@ -2509,7 +2512,7 @@ function evaluateCwaWeatherWarnings(cfg,isZh){
   function detailFor(kind){const place=_gpsPlaceText();const hit=(bag.filter(t=>t.indexOf(kind)>=0||t.indexOf('特報')>=0||t.indexOf('警報')>=0).find(t=>_cwaAreaMatches(t))||'');const short=_limitText(hit.replace(/(臺灣|台灣|全臺|全台|北部|中部|南部|東部|離島)[；;、｜]*/g,''),110);return (place?(isZh?'GPS所在地：':'GPS area: ')+place+(short?'｜':''):'')+(short|| (isZh?'中央氣象署官方警特報生效中':'CWA official alert is active'))}
   if(cfg.heavyRain!==false&&_cwaTextIncludesAny(text,['豪雨','大雨','豪大雨','短延時強降雨']))out.push({id:'heavyRain',level:'danger',icon:'🌧',official:true,critical:true,title:_alertTitle('heavyRain',isZh),detail:detailFor('雨')});
   if(cfg.storm!==false&&_cwaTextIncludesAny(text,['大雷雨','雷雨','雷擊']))out.push({id:'storm',level:'danger',icon:'⛈',official:true,critical:true,title:_alertTitle('storm',isZh),detail:detailFor('雷')});
-  if(cfg.strongWind!==false&&_cwaTextIncludesAny(text,['陸上強風','強風','平均風','陣風']))out.push({id:'strongWind',level:'warn',icon:'💨',official:true,title:_alertTitle('strongWind',isZh),detail:detailFor('風')});
+  if(cfg.strongWind!==false&&_cwaTextIncludesAny(text,['陸上強風','強風','平均風','陣風'])&&_strongWindGustGatePass(cfg))out.push({id:'strongWind',level:'warn',icon:'💨',official:true,title:_alertTitle('strongWind',isZh),detail:_appendGustGateDetail(detailFor('風'),cfg,isZh)});
   if(cfg.heat!==false&&_cwaTextIncludesAny(text,['高溫','橙色燈號','紅色燈號']))out.push({id:'heat',level:'warn',icon:'🥵',official:true,title:_alertTitle('heat',isZh),detail:detailFor('高溫')});
   if(cfg.cold!==false&&_cwaTextIncludesAny(text,['低溫','寒流']))out.push({id:'cold',level:'warn',icon:'🥶',official:true,title:_alertTitle('cold',isZh),detail:detailFor('低溫')});
   if(cfg.fog!==false&&_cwaTextIncludesAny(text,['濃霧','能見度']))out.push({id:'fog',level:'info',icon:'🌫',official:true,title:_alertTitle('fog',isZh),detail:detailFor('霧')});

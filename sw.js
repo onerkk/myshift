@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v199-gust-admin';
+const CACHE_NAME = 'myshift-v200-gust-gated';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -457,10 +457,14 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
     }
   }
 
+  // v200：CWA 官方強風特報不能繞過後台陣風門檻。
+  // 先暫存 CWA 警特報；強風必須等取得本地 GPS 逐時陣風後再決定是否顯示。
   const cwaAlerts = swEvaluateCwaWeatherWarnings(cwaData, cfg, pos);
-  for (const a of cwaAlerts) if (!out.some(x => x.id === a.id)) out.push(a);
 
-  if (!wxData) return out;
+  if (!wxData) {
+    for (const a of cwaAlerts) if (a.id !== 'strongWind' && !out.some(x => x.id === a.id)) out.push(a);
+    return out;
+  }
   const n = new Date();
   const nh = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0') + 'T' + String(n.getHours()).padStart(2, '0');
   const hi = wxData.hourly && wxData.hourly.time ? wxData.hourly.time.findIndex(s => s.startsWith(nh)) : -1;
@@ -499,6 +503,19 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
       if (v > mx) mx = v;
     }
     return mx;
+  }
+
+  // v200：CWA 官方警特報中，只有強風要再通過「本地最大陣風 >= 後台門檻」才顯示。
+  {
+    const th = parseFloat(cfg.windGustThreshold || cfg.windThreshold) || 62;
+    const localMaxGust = Math.max(parseFloat(curGust) || 0, maxGust(3));
+    for (const a of cwaAlerts) {
+      if (a.id === 'strongWind') {
+        if (localMaxGust < th) continue;
+        a.body = (a.body || '中央氣象署官方警特報生效中') + `；本地最大陣風 ${Math.round(localMaxGust)} / ${Math.round(th)} km/h`;
+      }
+      if (!out.some(x => x.id === a.id)) out.push(a);
+    }
   }
 
   // CWA 颱風優先
