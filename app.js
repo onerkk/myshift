@@ -1817,21 +1817,45 @@ function _twNameVariants(s){
   if(s.indexOf('台')>=0)out.push(s.replace(/台/g,'臺'));
   return [...new Set(out.filter(Boolean))];
 }
+const TW_COUNTY_SET=new Set('基隆市,臺北市,台北市,新北市,桃園市,新竹市,新竹縣,苗栗縣,臺中市,台中市,彰化縣,南投縣,雲林縣,嘉義市,嘉義縣,臺南市,台南市,高雄市,屏東縣,臺東縣,台東縣,花蓮縣,宜蘭縣,澎湖縣,金門縣,連江縣'.split(','));
+function _isCountryOrBroadArea(s){
+  s=String(s||'').trim();
+  return !s||/^(臺灣|台灣|中華民國|Taiwan|Taiwan Province|Republic of China|ROC)$/i.test(s)||/^(全臺|全台|全國|北部|中部|南部|東部|離島)$/.test(s);
+}
+function _isValidTwCounty(s){
+  s=_cleanTwAreaName(s);
+  return !!s&&!_isCountryOrBroadArea(s)&&TW_COUNTY_SET.has(s);
+}
+function _isValidTwTown(s){
+  s=_cleanTwAreaName(s);
+  return !!s&&!_isCountryOrBroadArea(s)&&/[區鄉鎮市]$/.test(s)&&!TW_COUNTY_SET.has(s);
+}
+function _pickValidCounty(){
+  for(const v of arguments){const c=_cleanTwAreaName(v);if(_isValidTwCounty(c))return c}
+  return '';
+}
+function _pickValidTown(){
+  for(const v of arguments){const t=_cleanTwAreaName(v);if(_isValidTwTown(t))return t}
+  return '';
+}
 function _cleanTwAreaName(s){
   s=String(s||'').trim();
   if(!s)return'';
   const map={
     'Taipei City':'臺北市','New Taipei City':'新北市','Taoyuan City':'桃園市','Taichung City':'臺中市','Tainan City':'臺南市','Kaohsiung City':'高雄市',
-    'Keelung City':'基隆市','Hsinchu City':'新竹市','Chiayi City':'嘉義市','Hsinchu County':'新竹縣','Miaoli County':'苗栗縣','Changhua County':'彰化縣','Nantou County':'南投縣','Yunlin County':'雲林縣','Chiayi County':'嘉義縣','Pingtung County':'屏東縣','Yilan County':'宜蘭縣','Hualien County':'花蓮縣','Taitung County':'臺東縣','Penghu County':'澎湖縣','Kinmen County':'金門縣','Lienchiang County':'連江縣'
+    'Keelung City':'基隆市','Hsinchu City':'新竹市','Chiayi City':'嘉義市','Hsinchu County':'新竹縣','Miaoli County':'苗栗縣','Changhua County':'彰化縣','Nantou County':'南投縣','Yunlin County':'雲林縣','Chiayi County':'嘉義縣','Pingtung County':'屏東縣','Yilan County':'宜蘭縣','Hualien County':'花蓮縣','Taitung County':'臺東縣','Penghu County':'澎湖縣','Kinmen County':'金門縣','Lienchiang County':'連江縣',
+    'Taiwan':'','Taiwan Province':'','Republic of China':'','ROC':'','臺灣':'','台灣':'','臺灣省':'','台灣省':''
   };
-  if(map[s])return map[s];
-  return s.replace(/^台灣省/,'').replace(/^臺灣省/,'').replace(/^Taiwan Province/i,'').trim();
+  if(map[s]!==undefined)return map[s];
+  s=s.replace(/^台灣省/,'').replace(/^臺灣省/,'').replace(/^Taiwan Province/i,'').trim();
+  if(_isCountryOrBroadArea(s))return'';
+  return s;
 }
 function _extractGpsPlaceFromAddress(addr){
   addr=addr||{};
-  let county=_cleanTwAreaName(addr.county||addr.city||addr.state||addr.state_district||'');
-  let town=_cleanTwAreaName(addr.city_district||addr.town||addr.suburb||addr.village||addr.municipality||addr.district||addr.quarter||'');
-  if(county&&!/[縣市]$/.test(county)&&addr.city&&/[縣市]$/.test(addr.city))county=_cleanTwAreaName(addr.city);
+  // 嚴格只接受台灣縣市 + 鄉鎮市區；絕不把「臺灣 / 台灣 / 南部 / 全臺」當所在地。
+  const county=_pickValidCounty(addr.county,addr.city,addr.state_district,addr.state);
+  let town=_pickValidTown(addr.city_district,addr.town,addr.suburb,addr.village,addr.municipality,addr.district,addr.quarter);
   if(town===county)town='';
   return {county,town};
 }
@@ -1842,7 +1866,7 @@ async function reverseGeocodeGps(lat,lon,force){
     try{
       const c=JSON.parse(localStorage.getItem('_wxPlace'));
       const d=c&&_geoDistKm(lat,lon,c.lat,c.lon);
-      if(c&&c.county&&c.ts&&(Date.now()-c.ts)<WX_PLACE_MAX_AGE_MS&&d!==null&&d<2){wxPlace=c;return c}
+      if(c&&c.county&&c.ts&&(Date.now()-c.ts)<WX_PLACE_MAX_AGE_MS&&d!==null&&d<2&&(_isValidTwCounty(c.county)||_isValidTwTown(c.town))){wxPlace=c;return c}
     }catch(e){}
   }
   // 完全以 GPS 經緯度反查目前行政區；反查失敗時不使用鹽水或任何固定地點頂替。
@@ -1864,8 +1888,10 @@ async function reverseGeocodeGps(lat,lon,force){
       const r2=await Promise.race([fetch(u2,{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('reverse2-timeout')),WX_REVERSE_TIMEOUT_MS))]);
       if(r2.ok){
         const d2=await r2.json();
-        const county=_cleanTwAreaName(d2.principalSubdivision||d2.city||'');
-        const town=_cleanTwAreaName(d2.locality||d2.localityInfo?.administrative?.find(x=>/區|鎮|鄉|District|Township/i.test(x.description||''))?.name||'');
+        const admin=d2.localityInfo&&d2.localityInfo.administrative||[];
+        const pick=admin.find(x=>/區|鎮|鄉|District|Township/i.test(x.description||''));
+        const county=_pickValidCounty(d2.principalSubdivision,d2.city,d2.localityInfo?.administrative?.find(x=>/縣|市|County|City/i.test(x.description||''))?.name);
+        const town=_pickValidTown(d2.locality,pick&&pick.name);
         if(county||town){
           const out={county:county||'',town:town&&town!==county?town:'',display:[county,town&&town!==county?town:''].filter(Boolean).join(' '),source:'gps-reverse-bdc',lat,lon,ts:Date.now()};
           try{localStorage.setItem('_wxPlace',JSON.stringify(out))}catch(e2){}
@@ -1882,16 +1908,19 @@ function _currentGpsPlace(){return wxPlace||(wxData&&wxData.place)||null}
 function _gpsPlaceKeys(){
   const p=_currentGpsPlace();
   if(!p)return[];
+  const county=_isValidTwCounty(p.county)?_cleanTwAreaName(p.county):'';
+  const town=_isValidTwTown(p.town)?_cleanTwAreaName(p.town):'';
+  if(!county&&!town)return[];
   const keys=[];
-  _twNameVariants(p.county).forEach(x=>keys.push(x));
-  _twNameVariants(p.town).forEach(x=>keys.push(x));
-  if(p.county&&p.town){
-    _twNameVariants(p.county+p.town).forEach(x=>keys.push(x));
-    _twNameVariants(p.county+' '+p.town).forEach(x=>keys.push(x));
+  if(county)_twNameVariants(county).forEach(x=>keys.push(x));
+  if(town)_twNameVariants(town).forEach(x=>keys.push(x));
+  if(county&&town){
+    _twNameVariants(county+town).forEach(x=>keys.push(x));
+    _twNameVariants(county+' '+town).forEach(x=>keys.push(x));
   }
-  return [...new Set(keys.filter(Boolean))];
+  return [...new Set(keys.filter(k=>k&&!_isCountryOrBroadArea(k)))];
 }
-function _gpsPlaceText(){const p=_currentGpsPlace();return p&&p.display?p.display:''}
+function _gpsPlaceText(){const p=_currentGpsPlace();if(!p)return'';const county=_isValidTwCounty(p.county)?_cleanTwAreaName(p.county):'';const town=_isValidTwTown(p.town)?_cleanTwAreaName(p.town):'';return [county,town].filter(Boolean).join(' ')}
 
 // ── 官方標準定位：Permissions API 查狀態 → getCurrentPosition → 完整錯誤碼處理 ──
 // opts.force=true 時：強制高精度、禁止使用系統位置快取（用於「重新抓取」）
@@ -2311,9 +2340,8 @@ function _cwaAreaMatches(text){
 function _officialAlertMatchesGpsPlace(a){
   if(!a)return false;
   if(a.matchedArea===false)return false;
-  // 若 worker 明確宣告用 GPS 命中，可接受。
-  if(a.gpsMatched===true||a.matchedBy==='gps'||a.matchMode==='gps'||a.matchSource==='gps')return true;
-  const text=[a.event,a.title,a.headline,a.description,a.areaDesc,Array.isArray(a.areas)?a.areas.join('、'):a.areas,a.county,a.town,a.locationName].filter(Boolean).join('｜');
+  // 不再信任 worker 的 gpsMatched/matchedBy 旗標；前端一定用本機 GPS 反查出的縣市/鄉鎮再驗一次。
+  const text=[a.event,a.title,a.headline,a.description,a.areaDesc,Array.isArray(a.areas)?a.areas.join('、'):a.areas,a.county,a.town,a.locationName,a.matchedCounty,a.matchedTown,a.matchedAreaName].filter(Boolean).join('｜');
   return _cwaAreaMatches(text);
 }
 function _limitText(t,n){
@@ -2361,6 +2389,14 @@ function _areasShort(areas){
   areas=Array.isArray(areas)?areas.filter(Boolean):[];
   return areas.length?areas.slice(0,5).join('、')+(areas.length>5?'等':''):'';
 }
+function _matchedAreaLabel(a){
+  const place=_gpsPlaceText();
+  const keys=_gpsPlaceKeys();
+  const areas=Array.isArray(a&&a.areas)?a.areas.filter(Boolean):[];
+  const matched=areas.filter(x=>keys.some(k=>String(x).indexOf(k)>=0||String(k).indexOf(x)>=0));
+  if(place)return place+(matched.length&&matched[0]!==place?'（'+matched.slice(0,3).join('、')+'）':'');
+  return matched.slice(0,3).join('、');
+}
 function evaluateCwaWeatherWarnings(cfg,isZh){
   const data=typhoonData||earthquakeData;
   if(!data)return[];
@@ -2374,10 +2410,10 @@ function evaluateCwaWeatherWarnings(cfg,isZh){
       if(cfg[id]===false)return;
       const key=id+'|'+(a.event||a.title||'')+'|'+(Array.isArray(a.areas)?a.areas.join(','):'');
       if(seen.has(key))return;seen.add(key);
-      const area=_areasShort(a.areas);
+      const area=_matchedAreaLabel(a);
       const time=[_fmtTimeShort(a.effective),_fmtTimeShort(a.expires)].filter(Boolean).join('～');
       let detail='';
-      if(area)detail+=(isZh?'影響區域：':'Areas: ')+area;
+      if(area)detail+=(isZh?'GPS所在地：':'GPS area: ')+area;
       if(time)detail+=(detail?'｜':'')+(isZh?'有效：':'Valid: ')+time;
       const desc=_limitText(a.description||a.headline||'',130);
       if(desc)detail+=(detail?'｜':'')+desc;
@@ -2392,7 +2428,7 @@ function evaluateCwaWeatherWarnings(cfg,isZh){
   if(!bag.length)return[];
   const text=[...new Set(bag)].join('｜');
   if(!_cwaAreaMatches(text))return[];
-  function detailFor(kind){return _limitText((bag.filter(t=>t.indexOf(kind)>=0||t.indexOf('特報')>=0||t.indexOf('警報')>=0).slice(0,3).join('；')),170)|| (isZh?'中央氣象署官方警特報生效中':'CWA official alert is active')}
+  function detailFor(kind){const place=_gpsPlaceText();const hit=(bag.filter(t=>t.indexOf(kind)>=0||t.indexOf('特報')>=0||t.indexOf('警報')>=0).find(t=>_cwaAreaMatches(t))||'');const short=_limitText(hit.replace(/(臺灣|台灣|全臺|全台|北部|中部|南部|東部|離島)[；;、｜]*/g,''),110);return (place?(isZh?'GPS所在地：':'GPS area: ')+place+(short?'｜':''):'')+(short|| (isZh?'中央氣象署官方警特報生效中':'CWA official alert is active'))}
   if(cfg.heavyRain!==false&&_cwaTextIncludesAny(text,['豪雨','大雨','豪大雨','短延時強降雨']))out.push({id:'heavyRain',level:'danger',icon:'🌧',official:true,critical:true,title:_alertTitle('heavyRain',isZh),detail:detailFor('雨')});
   if(cfg.storm!==false&&_cwaTextIncludesAny(text,['大雷雨','雷雨','雷擊']))out.push({id:'storm',level:'danger',icon:'⛈',official:true,critical:true,title:_alertTitle('storm',isZh),detail:detailFor('雷')});
   if(cfg.strongWind!==false&&_cwaTextIncludesAny(text,['陸上強風','強風','平均風','陣風']))out.push({id:'strongWind',level:'warn',icon:'💨',official:true,title:_alertTitle('strongWind',isZh),detail:detailFor('風')});
@@ -3041,6 +3077,7 @@ async function forceReloadWx(){
   try{
     // 清掉位置與天氣快取（重新定位 + 重新抓 API）
     try{localStorage.removeItem('_wxPos')}catch(e){}
+    try{localStorage.removeItem('_wxPlace')}catch(e){}
     try{localStorage.removeItem('_wxCache')}catch(e){}
     try{localStorage.removeItem('_typhoonCache')}catch(e){}
     try{localStorage.removeItem('_cwaCache')}catch(e){}
@@ -3108,7 +3145,14 @@ function wxHtml(){
     return`<div class="wx-day${i===0?' today':''}"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div class="wx-day-icon">${WXI[f.code]||"🌡"}</div><div class="wx-day-hi">${f.hi}°</div><div class="wx-day-lo">${f.lo}°</div></div>`}).join("");
   return`<div class="wx-card fi" style="cursor:pointer;position:relative"><button onclick="openUserPrefs();event.stopPropagation()" title="${lang==='zh'?'個人設定':'Settings'}" style="position:absolute;top:8px;right:8px;width:32px;height:32px;background:rgba(255,255,255,0.85);border:none;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.1)">⚙️</button><div onclick="showWxDetail()"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"}${d._cacheAgeMin?" "+d._cacheAgeMin+"m":""})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"即時雨量＋7日預報 ▸":"Live rain + 7-day forecast ▸"}${d.updatedAt?`<br><span style="font-size:9px;color:var(--tx3)">${lang==="zh"?"預報更新":"Forecast"} ${new Date(d.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>`:""}</div></div>${rainObsHtml()}<div class="wx-fc">${fc}</div></div></div>${tideHtml()}${userPrefsModalHtml()}`}
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
-loadWx();
+try{
+  const _ver='v197-gps-strict-area';
+  if(localStorage.getItem('_myshiftWxVer')!==_ver){
+    ['_wxPlace','_cwaCache','_wxCache'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
+    localStorage.setItem('_myshiftWxVer',_ver);
+  }
+}catch(e){}
+loadWx({force:true});
 // 等 loadAppConfig 載入完才知道有沒有 typhoon worker URL
 setTimeout(()=>{try{loadTyphoon()}catch(e){}},3000);
 setInterval(()=>{if(!document.hidden)loadWx();},900000);

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v196-gps-alerts';
+const CACHE_NAME = 'myshift-v197-gps-strict-area';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -206,30 +206,54 @@ function swTwVariants(s) {
   if (s.indexOf('台') >= 0) out.push(s.replace(/台/g, '臺'));
   return [...new Set(out.filter(Boolean))];
 }
+const SW_TW_COUNTY_SET = new Set('基隆市,臺北市,台北市,新北市,桃園市,新竹市,新竹縣,苗栗縣,臺中市,台中市,彰化縣,南投縣,雲林縣,嘉義市,嘉義縣,臺南市,台南市,高雄市,屏東縣,臺東縣,台東縣,花蓮縣,宜蘭縣,澎湖縣,金門縣,連江縣'.split(','));
+function swIsBroadArea(s) {
+  s = String(s || '').trim();
+  return !s || /^(臺灣|台灣|中華民國|Taiwan|Taiwan Province|Republic of China|ROC)$/i.test(s) || /^(全臺|全台|全國|北部|中部|南部|東部|離島)$/.test(s);
+}
+function swIsValidCounty(s) {
+  s = swCleanAreaName(s);
+  return !!s && !swIsBroadArea(s) && SW_TW_COUNTY_SET.has(s);
+}
+function swIsValidTown(s) {
+  s = swCleanAreaName(s);
+  return !!s && !swIsBroadArea(s) && /[區鄉鎮市]$/.test(s) && !SW_TW_COUNTY_SET.has(s);
+}
+function swPickCounty() {
+  for (const v of arguments) { const c = swCleanAreaName(v); if (swIsValidCounty(c)) return c; }
+  return '';
+}
+function swPickTown() {
+  for (const v of arguments) { const t = swCleanAreaName(v); if (swIsValidTown(t)) return t; }
+  return '';
+}
 function swCleanAreaName(s) {
   s = String(s || '').trim();
   if (!s) return '';
   const map = {
     'Taipei City': '臺北市', 'New Taipei City': '新北市', 'Taoyuan City': '桃園市', 'Taichung City': '臺中市', 'Tainan City': '臺南市', 'Kaohsiung City': '高雄市',
-    'Keelung City': '基隆市', 'Hsinchu City': '新竹市', 'Chiayi City': '嘉義市', 'Hsinchu County': '新竹縣', 'Miaoli County': '苗栗縣', 'Changhua County': '彰化縣', 'Nantou County': '南投縣', 'Yunlin County': '雲林縣', 'Chiayi County': '嘉義縣', 'Pingtung County': '屏東縣', 'Yilan County': '宜蘭縣', 'Hualien County': '花蓮縣', 'Taitung County': '臺東縣', 'Penghu County': '澎湖縣', 'Kinmen County': '金門縣', 'Lienchiang County': '連江縣'
+    'Keelung City': '基隆市', 'Hsinchu City': '新竹市', 'Chiayi City': '嘉義市', 'Hsinchu County': '新竹縣', 'Miaoli County': '苗栗縣', 'Changhua County': '彰化縣', 'Nantou County': '南投縣', 'Yunlin County': '雲林縣', 'Chiayi County': '嘉義縣', 'Pingtung County': '屏東縣', 'Yilan County': '宜蘭縣', 'Hualien County': '花蓮縣', 'Taitung County': '臺東縣', 'Penghu County': '澎湖縣', 'Kinmen County': '金門縣', 'Lienchiang County': '連江縣',
+    'Taiwan': '', 'Taiwan Province': '', 'Republic of China': '', 'ROC': '', '臺灣': '', '台灣': '', '臺灣省': '', '台灣省': ''
   };
-  if (map[s]) return map[s];
-  return s.replace(/^台灣省/, '').replace(/^臺灣省/, '').replace(/^Taiwan Province/i, '').trim();
+  if (map[s] !== undefined) return map[s];
+  s = s.replace(/^台灣省/, '').replace(/^臺灣省/, '').replace(/^Taiwan Province/i, '').trim();
+  if (swIsBroadArea(s)) return '';
+  return s;
 }
 function swExtractPlace(addr) {
   addr = addr || {};
-  let county = swCleanAreaName(addr.county || addr.city || addr.state || addr.state_district || '');
-  let town = swCleanAreaName(addr.city_district || addr.town || addr.suburb || addr.village || addr.municipality || addr.district || addr.quarter || '');
-  if (county && !/[縣市]$/.test(county) && addr.city && /[縣市]$/.test(addr.city)) county = swCleanAreaName(addr.city);
+  const county = swPickCounty(addr.county, addr.city, addr.state_district, addr.state);
+  let town = swPickTown(addr.city_district, addr.town, addr.suburb, addr.village, addr.municipality, addr.district, addr.quarter);
   if (town === county) town = '';
   return { county, town };
 }
 async function swReverseGeocodeGps(pos) {
   if (!pos || !pos.lat || !pos.lon) return null;
-  if (pos.place && (pos.place.county || pos.place.town)) return pos.place;
+  if (pos.place && swPlaceKeys(pos).length) return pos.place;
+  if (pos.place && !swPlaceKeys(pos).length) pos.place = null;
   const cached = await swGetCache('lastPlace');
   const d = cached && swDistKm(pos.lat, pos.lon, cached.lat, cached.lon);
-  if (cached && cached.county && cached.ts && Date.now() - cached.ts < 30 * 60 * 1000 && d !== null && d < 2) return cached;
+  if (cached && cached.county && cached.ts && Date.now() - cached.ts < 30 * 60 * 1000 && d !== null && d < 2) { const tmp={place:cached}; if(swPlaceKeys(tmp).length) return cached; }
   try {
     const u = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(pos.lat)}&lon=${encodeURIComponent(pos.lon)}&zoom=18&addressdetails=1&accept-language=zh-TW`;
     const resp = await Promise.race([fetch(u, { cache: 'no-store' }), new Promise((_, r) => setTimeout(() => r(new Error('reverse-timeout')), 4500))]);
@@ -248,10 +272,10 @@ async function swReverseGeocodeGps(pos) {
       const r2 = await Promise.race([fetch(u2, { cache: 'no-store' }), new Promise((_, r) => setTimeout(() => r(new Error('reverse2-timeout')), 4500))]);
       if (r2.ok) {
         const d2 = await r2.json();
-        const county = swCleanAreaName(d2.principalSubdivision || d2.city || '');
         const admin = d2.localityInfo && d2.localityInfo.administrative || [];
         const pick = admin.find(x => /區|鎮|鄉|District|Township/i.test(x.description || ''));
-        const town = swCleanAreaName(d2.locality || (pick && pick.name) || '');
+        const county = swPickCounty(d2.principalSubdivision, d2.city, (admin.find(x => /縣|市|County|City/i.test(x.description || '')) || {}).name);
+        const town = swPickTown(d2.locality, pick && pick.name);
         if (county || town) {
           const out = { county: county || '', town: town && town !== county ? town : '', display: [county, town && town !== county ? town : ''].filter(Boolean).join(' '), source: 'gps-reverse-bdc', lat: pos.lat, lon: pos.lon, ts: Date.now() };
           await swPutWxCache('lastPlace', out);
@@ -267,14 +291,32 @@ async function swReverseGeocodeGps(pos) {
 function swPlaceKeys(pos) {
   const p = pos && pos.place;
   if (!p) return [];
+  const county = swIsValidCounty(p.county) ? swCleanAreaName(p.county) : '';
+  const town = swIsValidTown(p.town) ? swCleanAreaName(p.town) : '';
+  if (!county && !town) return [];
   const keys = [];
-  swTwVariants(p.county).forEach(x => keys.push(x));
-  swTwVariants(p.town).forEach(x => keys.push(x));
-  if (p.county && p.town) {
-    swTwVariants(p.county + p.town).forEach(x => keys.push(x));
-    swTwVariants(p.county + ' ' + p.town).forEach(x => keys.push(x));
+  if (county) swTwVariants(county).forEach(x => keys.push(x));
+  if (town) swTwVariants(town).forEach(x => keys.push(x));
+  if (county && town) {
+    swTwVariants(county + town).forEach(x => keys.push(x));
+    swTwVariants(county + ' ' + town).forEach(x => keys.push(x));
   }
-  return [...new Set(keys.filter(Boolean))];
+  return [...new Set(keys.filter(k => k && !swIsBroadArea(k)))];
+}
+function swPlaceText(pos) {
+  const p = pos && pos.place;
+  if (!p) return '';
+  const county = swIsValidCounty(p.county) ? swCleanAreaName(p.county) : '';
+  const town = swIsValidTown(p.town) ? swCleanAreaName(p.town) : '';
+  return [county, town].filter(Boolean).join(' ');
+}
+function swMatchedAreaLabel(a, pos) {
+  const place = swPlaceText(pos);
+  const keys = swPlaceKeys(pos);
+  const areas = Array.isArray(a && a.areas) ? a.areas.filter(Boolean) : [];
+  const matched = areas.filter(x => keys.some(k => String(x).indexOf(k) >= 0 || String(k).indexOf(x) >= 0));
+  if (place) return place + (matched.length && matched[0] !== place ? '（' + matched.slice(0, 3).join('、') + '）' : '');
+  return matched.slice(0, 3).join('、');
 }
 function swAreaMatchesGps(text, pos) {
   text = String(text || '');
@@ -286,8 +328,8 @@ function swAreaMatchesGps(text, pos) {
 function swOfficialAlertMatchesGps(a, pos) {
   if (!a) return false;
   if (a.matchedArea === false) return false;
-  if (a.gpsMatched === true || a.matchedBy === 'gps' || a.matchMode === 'gps' || a.matchSource === 'gps') return true;
-  const text = [a.event, a.title, a.headline, a.description, a.areaDesc, Array.isArray(a.areas) ? a.areas.join('、') : a.areas, a.county, a.town, a.locationName].filter(Boolean).join('｜');
+  // 背景通知也不信任 worker 的 gpsMatched 旗標；一定以本機 GPS 反查地名再驗一次。
+  const text = [a.event, a.title, a.headline, a.description, a.areaDesc, Array.isArray(a.areas) ? a.areas.join('、') : a.areas, a.county, a.town, a.locationName, a.matchedCounty, a.matchedTown, a.matchedAreaName].filter(Boolean).join('｜');
   return swAreaMatchesGps(text, pos);
 }
 
@@ -309,10 +351,10 @@ function swEvaluateCwaWeatherWarnings(cwaData, cfg, pos) {
   const raw = (cwaData.officialAlerts || cwaData.weatherWarnings || []).filter(a => swOfficialAlertMatchesGps(a, pos));
   const detailFromAlert = a => {
     const parts = [];
-    const area = Array.isArray(a.areas) ? a.areas.filter(Boolean).slice(0, 5).join('、') : (a.areas || a.areaDesc || '');
-    if (area) parts.push('影響區域：' + area);
+    const area = swMatchedAreaLabel(a, pos);
+    if (area) parts.push('GPS所在地：' + area);
     const desc = String(a.description || a.headline || '').replace(/\s+/g, ' ').trim();
-    if (desc) parts.push(desc.length > 160 ? desc.slice(0, 160) + '…' : desc);
+    if (desc) parts.push(desc.length > 120 ? desc.slice(0, 120) + '…' : desc);
     return parts.join('｜') || '中央氣象署官方警特報生效中';
   };
   const idFromText = text => {
@@ -345,8 +387,10 @@ function swEvaluateCwaWeatherWarnings(cwaData, cfg, pos) {
   const text = [...new Set(bag)].join('｜');
   if (!swAreaMatchesGps(text, pos)) return out;
   const detail = kind => {
-    const hits = bag.filter(t => t.indexOf(kind) >= 0 || t.indexOf('特報') >= 0 || t.indexOf('警報') >= 0).slice(0, 3);
-    return hits.length ? hits.join('；') : '中央氣象署官方警特報生效中';
+    const place = swPlaceText(pos);
+    const hit = bag.find(t => (t.indexOf(kind) >= 0 || t.indexOf('特報') >= 0 || t.indexOf('警報') >= 0) && swAreaMatchesGps(t, pos)) || '';
+    const short = String(hit).replace(/(臺灣|台灣|全臺|全台|北部|中部|南部|東部|離島)[；;、｜]*/g, '').slice(0, 110);
+    return (place ? 'GPS所在地：' + place + (short ? '｜' : '') : '') + (short || '中央氣象署官方警特報生效中');
   };
   if (cfg.heavyRain !== false && swTextIncludesAny(text, ['豪雨','大雨','豪大雨','短延時強降雨'])) out.push({ id: 'heavyRain', icon: '🌧', title: '中央氣象署豪大雨特報', body: detail('雨'), critical: true, official: true });
   if (cfg.storm !== false && swTextIncludesAny(text, ['大雷雨','雷雨','雷擊'])) out.push({ id: 'storm', icon: '⛈', title: '中央氣象署雷雨特報', body: detail('雷'), critical: true, official: true });
@@ -527,7 +571,7 @@ async function swBackgroundCheck() {
     // 取最後一次已知 GPS 位置；沒有 GPS 就不做背景警報，避免固定地點誤報
     let pos = await swGetCache('lastPos');
     if (!pos || !pos.lat || !pos.lon) return;
-    pos.place = pos.place || await swReverseGeocodeGps(pos);
+    if (!pos.place || !swPlaceKeys(pos).length) pos.place = await swReverseGeocodeGps(pos);
     // 同步取設定（先 Firestore，失敗用 cache）
     let cfg = await swFetchAlertConfig();
     if (!cfg) cfg = (await swGetCache('wxAlerts')) || Object.assign({}, ALERT_DEFS);
