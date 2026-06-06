@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v198-gust-alerts';
+const CACHE_NAME = 'myshift-v199-gust-admin';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -92,7 +92,7 @@ const NOTIFY_STATE_CACHE = 'wx-notify-state-v1';
 const ALERT_DEFS = {
   master: true, typhoon: true, storm: true, heavyRain: true, rain: true,
   strongWind: true, heat: true, cold: true, fog: false, earthquake: true,
-  rainProb: 60, heavyRainProb: 80, windThreshold: 62, windGustThreshold: 62, typhoonWind: 62,
+  rainProb: 60, heavyRainProb: 80, windAlertMetric: 'gust', windThreshold: 62, windGustThreshold: 62, typhoonWind: 62,
   heatThreshold: 36, coldThreshold: 10,
   cwaWorkerUrl: '', typhoonWorkerUrl: '',
   typhoonAlertDistanceKm: 800, typhoonMinIntensity: 'td', typhoonAlertOnNotice: true,
@@ -177,7 +177,16 @@ async function swFetchAlertConfig() {
       const v = _fsValue(fields[k]);
       if (v !== undefined) out[k] = v;
     }
-    return Object.assign({}, ALERT_DEFS, out);
+    const cfg = Object.assign({}, ALERT_DEFS, out);
+    // v199：強風固定使用陣風門檻；legacy windThreshold 只做 alias。
+    let gust = parseFloat(cfg.windGustThreshold);
+    const legacy = parseFloat(cfg.windThreshold);
+    if (Number.isFinite(legacy) && (!Number.isFinite(gust) || legacy !== gust)) gust = legacy;
+    if (!Number.isFinite(gust) || gust <= 0) gust = 62;
+    cfg.windAlertMetric = 'gust';
+    cfg.windGustThreshold = gust;
+    cfg.windThreshold = gust;
+    return cfg;
   } catch (e) { return null; }
 }
 
@@ -546,7 +555,7 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
   if (cfg.strongWind !== false && swInDetectionWindow('strongWind', cfg) && !out.some(a => a.id === 'typhoon' || a.id === 'strongWind')) {
     const w3 = maxGust(3);
     const mxW = Math.max(curGust, w3);
-    const th = Math.max(parseFloat(cfg.windGustThreshold || cfg.windThreshold) || 62, 62);
+    const th = parseFloat(cfg.windGustThreshold || cfg.windThreshold) || 62;
     if (mxW >= th) {
       out.push({ id: 'strongWind', icon: '💨', title: '強風警報', body: `最大陣風 ${Math.round(mxW)} km/h，騎車注意`, critical: false });
     }
