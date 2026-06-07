@@ -1531,6 +1531,7 @@ function rSalary(){
 setTimeout(()=>{const sp=document.getElementById("splash");if(sp)sp.remove()},2600);
 
 let _renderRAF=null;
+let _dashPainted=false; // 首次 dashboard 繪製後設 true；之後重繪移除 fi 入場淡入，避免開機資料分批到達時整片重播淡入(抖動)
 function render(){
   if(_renderRAF)cancelAnimationFrame(_renderRAF);
   _renderRAF=requestAnimationFrame(_doRender);
@@ -1552,9 +1553,15 @@ function _doRender(){
     return;
   }
   try{
-    if(S.step==="type")a.innerHTML=rType();
-    else if(S.step==="wiz")a.innerHTML=rWiz();
-    else a.innerHTML=rCal();
+    let _h=S.step==="type"?rType():S.step==="wiz"?rWiz():rCal();
+    // 第 2 次（含）以後的 dashboard 重繪：移除 fi 入場淡入 class。
+    // 否則每次非同步資料到達(天氣/CWA警報/雲端)整片卡片重新插入都會重播淡入，
+    // 開機時資料分批到達 → 整片 dashboard 淡入 2~4 次 = 使用者看到的「抖動/刷新」。
+    // 移除 class（而非塞 animation:none）較安全：元素退回卡片正常樣式，
+    // 不會因原 CSS 基礎 opacity:0 而整片消失。首次繪製仍保留 fi，入場淡入正常播一次。
+    if(_dashPainted)_h=_h.replace(/ fi"/g,'"');
+    a.innerHTML=_h;
+    _dashPainted=true;
     document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():S.showSal?rSalary():(S.showLeavesOv&&isAdmin())?rLeavesOv():"";
     document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
     if(document.getElementById("leaveTypeSel"))try{updateLeaveHours()}catch(e){}
@@ -2815,6 +2822,60 @@ function _matchedAreaLabel(a){
   if(place)return place+(matched.length&&matched[0]!==place?'（'+matched.slice(0,3).join('、')+'）':'');
   return matched.slice(0,3).join('、');
 }
+// ── CWA 警特報原文正規化（治本）──────────────────────────────
+// 病根：cwa-data worker 把「語言碼；生效起；生效迄；發布；更新；一、概述：…」
+// 全部攤平塞進同一個 description 字串，且未提供 effective/expires 結構化欄位，
+// 前端只能整串硬切，砍掉使用者最需要的「何時下雨」那句。
+// 本正規化器不論 worker 給乾淨欄位或攤平 blob，都還原出：生效時段 + 乾淨內文。
+function _cwaTs(v){if(!v)return NaN;const d=new Date(String(v).trim().replace(' ','T'));const n=d.getTime();return Number.isFinite(n)?n:NaN}
+function _cwaDateTokens(s){
+  const re=/\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?/g;
+  const out=[];let m;
+  while((m=re.exec(s)))out.push({raw:m[0],idx:m.index,end:re.lastIndex});
+  return out;
+}
+function _cwaSmartTrim(t,n){
+  t=String(t||'').replace(/\s+/g,' ').trim();
+  if(t.length<=n)return t;
+  let cut=t.slice(0,n);
+  const p=Math.max(cut.lastIndexOf('。'),cut.lastIndexOf('，'),cut.lastIndexOf('；'),cut.lastIndexOf('！'),cut.lastIndexOf('？'),cut.lastIndexOf('、'));
+  if(p>=Math.floor(n*0.5))cut=cut.slice(0,p+1);
+  return cut.replace(/[，、；]$/,'')+'…';
+}
+function _cleanArea(label){
+  label=String(label||'').trim();
+  const m=label.match(/^(.*?)（(.+?)）\s*$/);
+  if(m&&m[1].indexOf(m[2])>=0)return m[1].trim();   // 「臺南市 鹽水區（臺南市）」→「臺南市 鹽水區」
+  return label;
+}
+// 回傳 {validText, body}：validText=生效時段、body=乾淨概述
+function _parseCwaNarrative(a,isZh){
+  const vt=(a&&(a.validTime||a.valid))||{};
+  let startRaw=(a&&(a.effective||a.startTime||a.onset))||vt.startTime||'';
+  let endRaw  =(a&&(a.expires ||a.endTime))||vt.endTime||'';
+  let raw=String((a&&(a.contentText||a.description||a.headline||a.desc))||'');
+  raw=raw.replace(/^\s*[a-z]{2}-[A-Za-z]{2,4}\s*[；;]\s*/,'');   // 剝離開頭語言碼「zh-TW；」
+  // 取「緊貼開頭、之間只有分隔符」的連續時間戳當 metadata 前綴（worker 順序：生效起/迄/發布/更新）
+  const toks=_cwaDateTokens(raw);
+  let cur=0;const lead=[];
+  for(const tk of toks){
+    if(raw.slice(cur,tk.idx).replace(/[\s；;、｜.]/g,'')!=='')break;
+    lead.push(tk);cur=tk.end;
+  }
+  let bodyStart=0;
+  if(lead.length){
+    bodyStart=lead[lead.length-1].end;
+    if(!startRaw&&lead[0])startRaw=lead[0].raw;
+    if(!endRaw&&lead[1])endRaw=lead[1].raw;
+  }
+  let body=raw.slice(bodyStart).replace(/^\s*[；;、｜]\s*/,'');
+  body=body.replace(/^[一二三四五六七八九十]+[、.．]?\s*概述[：:]\s*/,'');     // 去「一、概述：」標號
+  const cut=body.search(/[一二三四五六七八九十]+[、.．]?\s*(注意事項|其他)/);    // 砍掉「二、注意事項」後段
+  if(cut>0)body=body.slice(0,cut);
+  if(startRaw&&endRaw){const s=_cwaTs(startRaw),e=_cwaTs(endRaw);if(Number.isFinite(s)&&Number.isFinite(e)&&e<s){const tmp=startRaw;startRaw=endRaw;endRaw=tmp}}
+  const validText=(startRaw||endRaw)?(_fmtTimeShort(startRaw)+(endRaw?'～'+_fmtTimeShort(endRaw):'')):'';
+  return {validText,body:_cwaSmartTrim(body,140)};
+}
 function evaluateCwaWeatherWarnings(cfg,isZh){
   const data=typhoonData||earthquakeData;
   if(!data)return[];
@@ -2830,13 +2891,12 @@ function evaluateCwaWeatherWarnings(cfg,isZh){
       if(id==='strongWind'&&!_strongWindGustGatePass(cfg))return;
       const key=id+'|'+(a.event||a.title||'')+'|'+(Array.isArray(a.areas)?a.areas.join(','):'');
       if(seen.has(key))return;seen.add(key);
-      const area=_matchedAreaLabel(a);
-      const time=[_fmtTimeShort(a.effective),_fmtTimeShort(a.expires)].filter(Boolean).join('～');
+      const area=_cleanArea(_matchedAreaLabel(a));
+      const np=_parseCwaNarrative(a,isZh);
       let detail='';
-      if(area)detail+=(isZh?'GPS所在地：':'GPS area: ')+area;
-      if(time)detail+=(detail?'｜':'')+(isZh?'有效：':'Valid: ')+time;
-      const desc=_limitText(a.description||a.headline||'',130);
-      if(desc)detail+=(detail?'｜':'')+desc;
+      if(area)detail+='📍'+area;
+      if(np.validText)detail+=(detail?'｜':'')+(isZh?'⏰生效 ':'Valid ')+np.validText;
+      if(np.body)detail+=(detail?'｜':'')+np.body;
       if(!detail)detail=isZh?'中央氣象署官方警特報生效中':'CWA official alert is active';
       if(id==='strongWind')detail=_appendGustGateDetail(detail,cfg,isZh);
       out.push({id,level:_alertLevel(id,a),icon:a.icon||_alertIcon(id),official:true,critical:(id==='typhoon'||id==='storm'||(id==='heavyRain'&&_alertLevel(id,a)==='danger')),
@@ -2849,7 +2909,17 @@ function evaluateCwaWeatherWarnings(cfg,isZh){
   if(!bag.length)return[];
   const text=[...new Set(bag)].join('｜');
   if(!_cwaAreaMatches(text))return[];
-  function detailFor(kind){const place=_gpsPlaceText();const hit=(bag.filter(t=>t.indexOf(kind)>=0||t.indexOf('特報')>=0||t.indexOf('警報')>=0).find(t=>_cwaAreaMatches(t))||'');const short=_limitText(hit.replace(/(臺灣|台灣|全臺|全台|北部|中部|南部|東部|離島)[；;、｜]*/g,''),110);return (place?(isZh?'GPS所在地：':'GPS area: ')+place+(short?'｜':''):'')+(short|| (isZh?'中央氣象署官方警特報生效中':'CWA official alert is active'))}
+  function detailFor(kind){
+    const place=_cleanArea(_gpsPlaceText());
+    const hit=(bag.filter(t=>t.indexOf(kind)>=0||t.indexOf('特報')>=0||t.indexOf('警報')>=0).find(t=>_cwaAreaMatches(t))||'');
+    const np=_parseCwaNarrative({description:hit},isZh);
+    let d='';
+    if(place)d+='📍'+place;
+    if(np.validText)d+=(d?'｜':'')+(isZh?'⏰生效 ':'Valid ')+np.validText;
+    let body=np.body;if(body)body=body.replace(/(臺灣|台灣|全臺|全台|北部|中部|南部|東部|離島)[；;、｜]*/g,'');
+    if(body)d+=(d?'｜':'')+body;
+    return d||(isZh?'中央氣象署官方警特報生效中':'CWA official alert is active');
+  }
   if(cfg.heavyRain!==false&&_cwaTextIncludesAny(text,['豪雨','大雨','豪大雨','短延時強降雨']))out.push({id:'heavyRain',level:'danger',icon:'🌧',official:true,critical:true,title:_alertTitle('heavyRain',isZh),detail:detailFor('雨')});
   if(cfg.storm!==false&&_cwaTextIncludesAny(text,['大雷雨','雷雨','雷擊']))out.push({id:'storm',level:'danger',icon:'⛈',official:true,critical:true,title:_alertTitle('storm',isZh),detail:detailFor('雷')});
   if(cfg.strongWind!==false&&_cwaTextIncludesAny(text,['陸上強風','強風','平均風','陣風'])&&_strongWindGustGatePass(cfg))out.push({id:'strongWind',level:'warn',icon:'💨',official:true,title:_alertTitle('strongWind',isZh),detail:_appendGustGateDetail(detailFor('風'),cfg,isZh)});
@@ -3570,7 +3640,7 @@ function wxHtml(){
   return`<div class="wx-card fi" style="cursor:pointer;position:relative"><button onclick="openUserPrefs();event.stopPropagation()" title="${lang==='zh'?'個人設定':'Settings'}" style="position:absolute;top:8px;right:8px;width:32px;height:32px;background:rgba(255,255,255,0.85);border:none;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.1)">⚙️</button><div onclick="showWxDetail()"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"}${d._cacheAgeMin?" "+d._cacheAgeMin+"m":""})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"即時雨量＋7日預報 ▸":"Live rain + 7-day forecast ▸"}${d.updatedAt?`<br><span style="font-size:9px;color:var(--tx3)">${lang==="zh"?"預報更新":"Forecast"} ${new Date(d.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>`:""}</div></div>${rainObsHtml()}<div class="wx-fc">${fc}</div></div></div>${tideHtml()}${userPrefsModalHtml()}`}
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 try{
-  const _ver='v197-gps-strict-area';
+  const _ver='v203-no-refade';
   if(localStorage.getItem('_myshiftWxVer')!==_ver){
     ['_wxPlace','_cwaCache','_wxCache'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
     localStorage.setItem('_myshiftWxVer',_ver);
