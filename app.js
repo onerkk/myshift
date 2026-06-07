@@ -173,11 +173,12 @@ function yijiFor(y,m,d){
   if(!YIJI||!YIJI.days)return null;
   var rec=YIJI.days[y+"-"+m+"-"+d];
   if(!rec)return null;
-  var V=YIJI.vocab;
+  var V=YIJI.vocab, LV=YIJI.level||["從宜不從忌","從宜亦從忌","從忌不從宜","諸事皆忌"];
   return {good:rec[0].map(function(i){return V[i];}),
           bad: rec[1].map(function(i){return V[i];}),
           gGod:rec[2].map(function(i){return V[i];}),
-          bGod:rec[3].map(function(i){return V[i];})};
+          bGod:rec[3].map(function(i){return V[i];}),
+          level:rec[4], levelName:LV[rec[4]]||""};
 }
 
 // CSS 一次性注入（index.html 不可改，故由 JS 注入）
@@ -204,6 +205,10 @@ function injCSS(){
   +".alm-tag{display:inline-block;font-size:10px;padding:0 5px;border-radius:4px;margin-left:5px}"
   +".alm-tag.g{background:#e8f5e9;color:#2e7d32}.alm-tag.b{background:#ffebee;color:#c62828}"
   +".alm-yi,.alm-ji{padding:7px 0;border-bottom:1px solid #f3ecd8}"
+  +".alm-lvrow{padding:7px 0 3px;font-size:12px;color:#9b8550;display:flex;align-items:center;gap:6px;flex-wrap:wrap}"
+  +".alm-lv{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:5px}"
+  +".alm-lv.g{background:#e8f5e9;color:#2e7d32}.alm-lv.n{background:#fff3e0;color:#a86b00}.alm-lv.b{background:#ffebee;color:#c62828}"
+  +".alm-fierce{font-size:11px;font-weight:700;color:#fff;background:#c62828;padding:1px 8px;border-radius:5px}"
   +".alm-yi .lab{color:#2e7d32;font-weight:800;font-size:14px;margin-right:6px}"
   +".alm-ji .lab{color:#c62828;font-weight:800;font-size:14px;margin-right:6px}"
   +".alm-words{font-size:12px;color:#4a3d20;line-height:1.85;word-break:break-all}"
@@ -258,8 +263,12 @@ window.lunarModalBlock=function(y,m,d){
   else{jqLine='—';}
   var yiji, yj=yijiFor(y,m,d);
   if(yj){
-    yiji='<div class="alm-yi"><span class="lab">宜</span><span class="alm-words">'+(yj.good.join("、")||"—")+'</span></div>'
-        +'<div class="alm-ji"><span class="lab">忌</span><span class="alm-words">'+(yj.bad.join("、")||"—")+'</span></div>'
+    var lvCls=yj.level===0?'g':(yj.level>=2?'b':'n');
+    var lvTag=yj.levelName?'<span class="alm-lv '+lvCls+'">'+yj.levelName+'</span>':'';
+    var fierce=(yj.level===3);
+    yiji='<div class="alm-lvrow">宜忌等第 '+lvTag+(fierce?'<span class="alm-fierce">凶日・吉事勿用</span>':'')+'</div>'
+        +'<div class="alm-yi"><span class="lab">宜</span><span class="alm-words">'+(yj.good.length?yj.good.join("、"):'諸事不宜')+'</span></div>'
+        +'<div class="alm-ji"><span class="lab">忌</span><span class="alm-words">'+(yj.bad.length?yj.bad.join("、"):'諸事不忌')+'</span></div>'
         +'<div class="alm-god"><span class="gl">吉神宜趨：</span>'+(yj.gGod.join("、")||"—")+'</div>'
         +'<div class="alm-god"><span class="bl">凶神宜忌：</span>'+(yj.bGod.join("、")||"—")+'</div>';
   } else if(YIJI_STATE==="loading"){
