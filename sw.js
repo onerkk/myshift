@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v201-gust-gate-fix';
+const CACHE_NAME = 'myshift-v202-almanac';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache

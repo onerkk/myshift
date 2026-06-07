@@ -1,3 +1,296 @@
+/* ════════════════════════════════════════════════════════════
+   農民曆引擎 + UI（歐那）— 純前端精算，已對 sxtwl+cnlunar 逐日驗證 0 誤差
+   宜忌神煞資料另存 almanac-yiji.json（2025-2028）首次開農曆時載入並由 SW 快取
+   ════════════════════════════════════════════════════════════ */
+/* === MyShift 農民曆引擎 almanac.js ===
+   純前端計算：農曆/干支(年立春界·月節界·日)/節氣/廿八宿/建除/黃黑道/沖煞/納音/彭祖/胎神/吉神方位
+   宜忌神煞另由 almanac-yiji.json 提供(2025-2028 真實通書資料)
+   所有演算法已對 sxtwl + cnlunar 標準庫逐日驗證 0 誤差 */
+(function(global){
+'use strict';
+var GAN="甲乙丙丁戊己庚辛壬癸";
+var ZHI="子丑寅卯辰巳午未申酉戌亥";
+var SX ="鼠牛虎兔龍蛇馬羊猴雞狗豬";
+var WX5=["木","木","火","火","土","土","金","金","水","水"]; // 天干五行
+var XIU28=["角","亢","氐","房","心","尾","箕","斗","牛","女","虛","危","室","壁","奎","婁","胃","昴","畢","觜","參","井","鬼","柳","星","張","翼","軫"];
+var XIU_LUCK={"角":"吉","亢":"凶","氐":"凶","房":"吉","心":"凶","尾":"吉","箕":"吉","斗":"吉","牛":"凶","女":"凶","虛":"凶","危":"凶","室":"吉","壁":"吉","奎":"凶","婁":"吉","胃":"吉","昴":"凶","畢":"吉","觜":"凶","參":"吉","井":"吉","鬼":"凶","柳":"凶","星":"凶","張":"吉","翼":"凶","軫":"吉"};
+var JIANCHU=["建","除","滿","平","定","執","破","危","成","收","開","閉"];
+var HD2=["青龍","明堂","天刑","朱雀","金匱","天德","白虎","玉堂","天牢","玄武","司命","勾陳"];
+var HD_GOOD={"青龍":1,"明堂":1,"金匱":1,"天德":1,"玉堂":1,"司命":1};
+var LUNAR=[19416,19168,42352,21717,53856,55632,91476,22176,39632,21970,19168,42422,42192,53840,119381,46400,54944,44450,38320,84343,18800,42160,46261,27216,27968,109396,11104,38256,21234,18800,25958,54432,59984,92821,23248,11104,100067,37600,116951,51536,54432,120998,46416,22176,107956,9680,37584,53938,43344,46423,27808,46416,86869,19872,42416,83315,21168,43432,59728,27296,44710,43856,19296,43748,42352,21088,62051,55632,23383,22176,38608,19925,19152,42192,54484,53840,54616,46400,46752,103846,38320,18864,43380,42160,45690,27216,27968,44870,43872,38256,19189,18800,25776,29859,59984,27480,23232,43872,38613,37600,51552,55636,54432,55888,30034,22176,43959,9680,37584,51893,43344,46240,47780,44368,21977,19360,42416,86390,21168,43312,31060,27296,44368,23378,19296,42726,42208,53856,60005,54576,23200,30371,38608,19195,19152,42192,118966,53840,54560,56645,46496,22224,21938,18864,42359,42160,43600,111189,27936,44448,84835,37744,18936,18800,25776,92326,59984,27296,108228,43744,37600,53987,51552,54615,54432,55888,23893,22176,42704,21972,21200,43448,43344,46240,46758,44368,21920,43940,42416,21168,45683,26928,29495,27296,44368,84821,19296,42352,21732,53600,59752,54560,55968,92838,22224,19168,43476,41680,53584,62034,54560];
+var JQ={"2019":["0105","0120","0204","0219","0306","0321","0405","0420","0506","0521","0606","0621","0707","0723","0808","0823","0908","0923","1008","1024","1108","1122","1207","1222"],"2020":["0106","0120","0204","0219","0305","0320","0404","0419","0505","0520","0605","0621","0706","0722","0807","0822","0907","0922","1008","1023","1107","1122","1207","1221"],"2021":["0105","0120","0203","0218","0305","0320","0404","0420","0505","0521","0605","0621","0707","0722","0807","0823","0907","0923","1008","1023","1107","1122","1207","1221"],"2022":["0105","0120","0204","0219","0305","0320","0405","0420","0505","0521","0606","0621","0707","0723","0807","0823","0907","0923","1008","1023","1107","1122","1207","1222"],"2023":["0105","0120","0204","0219","0306","0321","0405","0420","0506","0521","0606","0621","0707","0723","0808","0823","0908","0923","1008","1024","1108","1122","1207","1222"],"2024":["0106","0120","0204","0219","0305","0320","0404","0419","0505","0520","0605","0621","0706","0722","0807","0822","0907","0922","1008","1023","1107","1122","1206","1221"],"2025":["0105","0120","0203","0218","0305","0320","0404","0420","0505","0521","0605","0621","0707","0722","0807","0823","0907","0923","1008","1023","1107","1122","1207","1221"],"2026":["0105","0120","0204","0218","0305","0320","0405","0420","0505","0521","0605","0621","0707","0723","0807","0823","0907","0923","1008","1023","1107","1122","1207","1222"],"2027":["0105","0120","0204","0219","0306","0321","0405","0420","0506","0521","0606","0621","0707","0723","0808","0823","0908","0923","1008","1023","1107","1122","1207","1222"],"2028":["0106","0120","0204","0219","0305","0320","0404","0419","0505","0520","0605","0621","0706","0722","0807","0822","0907","0922","1008","1023","1107","1122","1206","1221"],"2029":["0105","0120","0203","0218","0305","0320","0404","0420","0505","0521","0605","0621","0707","0722","0807","0823","0907","0923","1008","1023","1107","1122","1207","1221"],"2030":["0105","0120","0204","0218","0305","0320","0405","0420","0505","0521","0605","0621","0707","0723","0807","0823","0907","0923","1008","1023","1107","1122","1207","1222"],"2031":["0105","0120","0204","0219","0306","0321","0405","0420","0506","0521","0606","0621","0707","0723","0808","0823","0908","0923","1008","1023","1107","1122","1207","1222"],"2032":["0106","0120","0204","0219","0305","0320","0404","0419","0505","0520","0605","0621","0706","0722","0807","0822","0907","0922","1008","1023","1107","1122","1206","1221"],"2033":["0105","0120","0203","0218","0305","0320","0404","0420","0505","0521","0605","0621","0707","0722","0807","0823","0907","0923","1008","1023","1107","1122","1207","1221"],"2034":["0105","0120","0204","0218","0305","0320","0405","0420","0505","0521","0605","0621","0707","0723","0807","0823","0907","0923","1008","1023","1107","1122","1207","1222"],"2035":["0105","0120","0204","0219","0306","0321","0405","0420","0505","0521","0606","0621","0707","0723","0807","0823","0908","0923","1008","1023","1107","1122","1207","1222"],"2036":["0106","0120","0204","0219","0305","0320","0404","0419","0505","0520","0605","0621","0706","0722","0807","0822","0907","0922","1008","1023","1107","1122","1206","1221"],"2037":["0105","0120","0203","0218","0305","0320","0404","0420","0505","0521","0605","0621","0707","0722","0807","0823","0907","0923","1008","1023","1107","1122","1207","1221"],"2038":["0105","0120","0204","0218","0305","0320","0405","0420","0505","0521","0605","0621","0707","0723","0807","0823","0907","0923","1008","1023","1107","1122","1207","1222"],"2039":["0105","0120","0204","0219","0306","0321","0405","0420","0505","0521","0606","0621","0707","0723","0807","0823","0908","0923","1008","1023","1107","1122","1207","1222"],"2040":["0106","0120","0204","0219","0305","0320","0404","0419","0505","0520","0605","0621","0706","0722","0807","0822","0907","0922","1008","1023","1107","1122","1206","1221"],"2041":["0105","0120","0203","0218","0305","0320","0404","0420","0505","0520","0605","0621","0707","0722","0807","0823","0907","0922","1008","1023","1107","1122","1207","1221"],"2042":["0105","0120","0204","0218","0305","0320","0404","0420","0505","0521","0605","0621","0707","0723","0807","0823","0907","0923","1008","1023","1107","1122","1207","1222"],"2043":["0105","0120","0204","0219","0306","0321","0405","0420","0505","0521","0606","0621","0707","0723","0807","0823","0908","0923","1008","1023","1107","1122","1207","1222"],"2044":["0106","0120","0204","0219","0305","0320","0404","0419","0505","0520","0605","0621","0706","0722","0807","0822","0907","0922","1007","1023","1107","1122","1206","1221"],"2045":["0105","0120","0203","0218","0305","0320","0404","0419","0505","0520","0605","0621","0707","0722","0807","0823","0907","0922","1008","1023","1107","1122","1207","1221"],"2046":["0105","0120","0204","0218","0305","0320","0404","0420","0505","0521","0605","0621","0707","0722","0807","0823","0907","0923","1008","1023","1107","1122","1207","1222"]};
+var NAYIN=["海中金","海中金","爐中火","爐中火","大林木","大林木","路旁土","路旁土","劍鋒金","劍鋒金","山頭火","山頭火","澗下水","澗下水","城頭土","城頭土","白蠟金","白蠟金","楊柳木","楊柳木","井泉水","井泉水","屋上土","屋上土","霹靂火","霹靂火","松柏木","松柏木","長流水","長流水","砂中金","砂中金","山下火","山下火","平地木","平地木","壁上土","壁上土","金箔金","金箔金","覆燈火","覆燈火","天河水","天河水","大驛土","大驛土","釵釧金","釵釧金","桑柘木","桑柘木","大溪水","大溪水","砂中土","砂中土","天上火","天上火","石榴木","石榴木","大海水","大海水"];
+var FETUS=["碓磨門外東南","碓磨廁外東南","廚灶爐外正南","倉庫門外正南","房床廁外正南","佔門床外正南","佔碓磨外正南","廚灶廁外西南","倉庫爐外西南","房床門外西南","門碓棲外西南","碓磨床外西南","廚灶碓外西南","倉庫廁外西南","房床廁外正南","房床爐外正西","碓磨棲外正西","廚灶床外正西","倉庫碓外西北","房床廁外西北","佔門爐外西北","碓磨門外西北","廚灶棲外西北","倉庫床外西北","房床碓外正北","佔門廁外正北","碓磨爐外正北","廚灶門外正北","倉庫棲外正北","占房床房內北","佔門碓房內北","碓磨門房內北","廚灶爐房內北","倉庫門房內北","房床棲房內中","佔門床房內中","佔碓磨房內南","廚灶廁房內南","倉庫爐房內南","房床門房內南","門雞棲房內東","碓磨床房內東","廚灶碓房內東","倉庫廁房內東","房床爐房內東","佔大門外東北","碓磨棲外東北","廚灶床外東北","倉庫碓外東北","房床廁外東北","佔門爐外東北","碓磨門外正東","廚灶棲外正東","倉庫床外正東","房床碓外正東","佔門廁外正東","碓磨爐外東南","倉庫棲外東南","占房床外東南","佔門碓外東南"];
+var PENG_GAN=["甲不開倉 財物耗散","乙不栽植 千株不長","丙不修灶 必見災殃","丁不剃頭 頭必生瘡","戊不受田 田主不祥","己不破券 二比並亡","庚不經絡 織機虛張","辛不合醬 主人不嘗","壬不泱水 更難提防","癸不詞訟 理弱敵強"];
+var PENG_ZHI=["子不問卜 自惹禍殃","丑不冠帶 主不還鄉","寅不祭祀 神鬼不嘗","卯不穿井 水泉不香","辰不哭泣 必主重喪","巳不遠行 財物伏藏","午不苫蓋 屋主更張","未不服藥 毒氣入腸","申不安床 鬼祟入房","酉不會客 醉坐顛狂","戌不吃犬 作怪上床","亥不嫁娶 不利新郎"];
+var DIRS=[["喜神東北","財神東北","福神正北","陽貴西南","陰貴東北"],["喜神西北","財神東北","福神西南","陽貴西南","陰貴正北"],["喜神西南","財神西南","福神西北","陽貴正西","陰貴西北"],["喜神正南","財神西南","福神東南","陽貴西北","陰貴正西"],["喜神東南","財神正北","福神東北","陽貴東北","陰貴西南"],["喜神東北","財神正北","福神正北","陽貴正北","陰貴西南"],["喜神西北","財神正東","福神西南","陽貴正南","陰貴東北"],["喜神西南","財神正東","福神西北","陽貴東北","陰貴正南"],["喜神正南","財神正南","福神東南","陽貴正東","陰貴東南"],["喜神東南","財神正南","福神東北","陽貴東南","陰貴正東"]];
+var JQ_DISPLAY=["小寒","大寒","立春","雨水","驚蟄","春分","清明","穀雨","立夏","小滿","芒種","夏至","小暑","大暑","立秋","處暑","白露","秋分","寒露","霜降","立冬","小雪","大雪","冬至"];
+var LM_CN=["正","二","三","四","五","六","七","八","九","十","冬","臘"];
+var LD_CN=["初一","初二","初三","初四","初五","初六","初七","初八","初九","初十","十一","十二","十三","十四","十五","十六","十七","十八","十九","二十","廿一","廿二","廿三","廿四","廿五","廿六","廿七","廿八","廿九","三十"];
+// 節在 display order 的偶數索引 -> 該節起的月支idx (小寒0->丑1, 立春2->寅2 ...大雪22->子0)
+var JIE=[[0,1],[2,2],[4,3],[6,4],[8,5],[10,6],[12,7],[14,8],[16,9],[18,10],[20,11],[22,0]];
+
+function jdn(y,m,d){var a=Math.floor((14-m)/12),yy=y+4800-a,mm=m+12*a-3;
+  return d+Math.floor((153*mm+2)/5)+365*yy+Math.floor(yy/4)-Math.floor(yy/100)+Math.floor(yy/400)-32045;}
+function mod(n,m){return ((n%m)+m)%m;}
+
+// ---- 農曆 (lunarInfo 標準表, base 1900-01-31) ----
+function leapMonth(y){return LUNAR[y-1900]&0xf;}
+function leapDays(y){if(!leapMonth(y))return 0;return (LUNAR[y-1900]&0x10000)?30:29;}
+function monthDays(y,m){return (LUNAR[y-1900]&(0x10000>>m))?30:29;}
+function lYearDays(y){var s=348,i;for(i=0x8000;i>0x8;i>>=1)s+=(LUNAR[y-1900]&i)?1:0;return s+leapDays(y);}
+function s2l(y,m,d){
+  var offset=Math.round((Date.UTC(y,m-1,d)-Date.UTC(1900,0,31))/86400000);
+  var i,temp=0,year,leap,isLeap=false,mo;
+  for(i=1900;i<2101&&offset>0;i++){temp=lYearDays(i);offset-=temp;}
+  if(offset<0){offset+=temp;i--;}
+  year=i; leap=leapMonth(i); isLeap=false;
+  for(mo=1;mo<13&&offset>0;mo++){
+    if(leap>0&&mo==(leap+1)&&!isLeap){mo--;isLeap=true;temp=leapDays(year);}
+    else{temp=monthDays(year,mo);}
+    if(isLeap&&mo==(leap+1))isLeap=false;
+    offset-=temp;
+  }
+  if(offset===0&&leap>0&&mo==leap+1){if(isLeap){isLeap=false;}else{isLeap=true;mo--;}}
+  if(offset<0){offset+=temp;mo--;}
+  var day=offset+1;
+  return {year:year,month:mo,day:day,isLeap:isLeap,
+          mCn:(isLeap?"閏":"")+LM_CN[mo-1]+"月",
+          dCn:LD_CN[day-1],
+          monthBig:(monthDays(year,mo)===30)};
+}
+
+// ---- 干支 ----
+function dayGZ(y,m,d){var i=mod(jdn(y,m,d)+49,60);return {gz:GAN[i%10]+ZHI[i%12],g:i%10,z:i%12};}
+function jqYear(y,idx){var s=(JQ[String(y)]||[])[idx];return s?{m:+s.slice(0,2),d:+s.slice(2)}:null;}
+function yearGZ(y,m,d){ // 立春界
+  var lc=jqYear(y,2); var yy=y;
+  if(lc){ if(m<lc.m||(m===lc.m&&d<lc.d)) yy=y-1; }
+  var gi=mod(yy-4,10),zi=mod(yy-4,12);
+  return {gz:GAN[gi]+ZHI[zi],g:gi,z:zi,solarYear:yy};
+}
+function monthZhi(y,m,d){
+  var target=m*100+d,best=null,arr=JQ[String(y)];
+  if(arr){for(var k=0;k<JIE.length;k++){var di=JIE[k][0],s=arr[di];if(!s)continue;
+    if(parseInt(s,10)<=target)best=JIE[k][1];}}
+  if(best===null)best=0; // 立春前(早一月)屬子月
+  return best;
+}
+function monthGZ(y,m,d){
+  var yg=yearGZ(y,m,d).g;                 // 立春界年干
+  var zi=monthZhi(y,m,d);                 // 月支idx
+  var yin=mod(yg%5*2+2,10);               // 五虎遁:寅月起干
+  var off=mod(zi-2,12);                   // 自寅起算
+  var gi=mod(yin+off,10);
+  return {gz:GAN[gi]+ZHI[zi],g:gi,z:zi};
+}
+
+// ---- 廿八宿 / 建除 / 黃黑道 / 沖煞 ----
+function xiu(y,m,d){var x=XIU28[mod(jdn(y,m,d)-17,28)];return {name:x,luck:XIU_LUCK[x]||""};}
+function jianChu(dz,mz){return JIANCHU[mod(dz-mz,12)];}
+function huangDao(dz,mz){var q=mod((mz-2)*2,12);var g=HD2[mod(dz-q,12)];return {god:g,good:!!HD_GOOD[g]};}
+var SHA={0:"南",1:"東",2:"北",3:"西"}; // 申子辰南/巳酉丑東/寅午戌北/亥卯未西
+function chongSha(dz){
+  var chong=SX[mod(dz+6,12)];
+  var grp; // 三合局
+  if([8,0,4].indexOf(dz)>=0)grp=0;       // 申子辰
+  else if([5,9,1].indexOf(dz)>=0)grp=1;  // 巳酉丑
+  else if([2,6,10].indexOf(dz)>=0)grp=2; // 寅午戌
+  else grp=3;                            // 亥卯未
+  return {chongSx:chong, chongZhi:ZHI[mod(dz+6,12)], sha:SHA[grp]};
+}
+
+// ---- 節氣 (當日 / 下一個 + 倒數) ----
+function jieqiOn(y,m,d){var arr=JQ[String(y)];if(!arr)return null;var s=(""+m).padStart(2,"0")+(""+d).padStart(2,"0");
+  for(var i=0;i<24;i++)if(arr[i]===s)return JQ_DISPLAY[i];return null;}
+function nextJieqi(y,m,d){
+  var today=Date.UTC(y,m-1,d);
+  for(var yy=y;yy<=y+1;yy++){var arr=JQ[String(yy)];if(!arr)continue;
+    for(var i=0;i<24;i++){var s=arr[i];if(!s)continue;var t=Date.UTC(yy,(+s.slice(0,2))-1,+s.slice(2));
+      if(t>today)return {name:JQ_DISPLAY[i],month:+s.slice(0,2),day:+s.slice(2),days:Math.round((t-today)/86400000)};}}
+  return null;
+}
+
+// ---- 納音 / 彭祖 / 胎神 / 方位 ----
+function nayin(gzIdx){return NAYIN[gzIdx];}
+function gz60(y,m,d){return mod(jdn(y,m,d)+49,60);}
+
+// ---- 完整組裝 ----
+function full(y,m,d){
+  var L=s2l(y,m,d);
+  var Y=yearGZ(y,m,d), M=monthGZ(y,m,d), D=dayGZ(y,m,d);
+  var di=gz60(y,m,d);
+  var hd=huangDao(D.z,M.z);
+  var cs=chongSha(D.z);
+  var xx=xiu(y,m,d);
+  var nj=nextJieqi(y,m,d);
+  var dow=["日","一","二","三","四","五","六"][new Date(y,m-1,d).getDay()];
+  return {
+    solar:{y:y,m:m,d:d,dow:dow},
+    lunar:L,
+    gz:{year:Y.gz,month:M.gz,day:D.gz,solarYear:Y.solarYear},
+    zodiac:SX[mod(Y.solarYear-4,12)],          // 生肖(年, 立春界)
+    dayWuxing:WX5[D.g],                          // 日干五行
+    nayin:{year:nayin(mod(Y.solarYear-4,60)), day:nayin(di)},
+    nayinDay:nayin(di),
+    jieqiToday:jieqiOn(y,m,d),
+    nextJieqi:nj,
+    jianchu:jianChu(D.z,M.z),
+    huangdao:hd,
+    xiu:xx,
+    chongsha:cs,
+    peng:[PENG_GAN[D.g],PENG_ZHI[D.z]],
+    fetus:FETUS[di],
+    dirs:DIRS[D.g],                              // [喜神,財神,福神,陽貴,陰貴]
+    gz60day:di
+  };
+}
+
+var API={full:full,s2l:s2l,dayGZ:dayGZ,yearGZ:yearGZ,monthGZ:monthGZ,
+  jianChu:jianChu,xiu:xiu,huangDao:huangDao,chongSha:chongSha,
+  jieqiOn:jieqiOn,nextJieqi:nextJieqi,gz60:gz60,nayin:nayin,
+  _const:{GAN:GAN,ZHI:ZHI,SX:SX}};
+global.Almanac=API;
+if(typeof module!=="undefined"&&module.exports)module.exports=API;
+})(typeof window!=="undefined"?window:(typeof globalThis!=="undefined"?globalThis:this));
+/* ===== MyShift 農民曆 UI helpers (歐那) ===== */
+(function(){
+'use strict';
+// 宜忌神煞資料(2025-2028, almanac-yiji.json)：首次開啟農曆時載入一次，之後 Service Worker 已快取 → 離線可用
+var YIJI=null, YIJI_STATE="idle"; // idle | loading | ready | error
+var RANGE_LO=2025, RANGE_HI=2028; // 宜忌資料涵蓋年份(與 almanac-yiji.json 一致)
+function inRange(y){return y>=RANGE_LO&&y<=RANGE_HI;}
+function _base(){return location.pathname.replace(/[^/]*$/,"");}
+window.loadYiji=function(){
+  if(YIJI_STATE==="ready"||YIJI_STATE==="loading")return;
+  YIJI_STATE="loading";
+  fetch(_base()+"almanac-yiji.json")
+    .then(function(r){if(!r.ok)throw new Error("http "+r.status);return r.json();})
+    .then(function(j){YIJI=j;YIJI_STATE="ready";if(j&&j.range){var p=(""+j.range).split("-");if(p.length===2){RANGE_LO=+p[0];RANGE_HI=+p[1];}}try{if(typeof render==="function")render();}catch(e){}})
+    .catch(function(e){YIJI_STATE="error";try{if(typeof render==="function")render();}catch(e2){}});
+};
+function yijiFor(y,m,d){
+  if(!YIJI||!YIJI.days)return null;
+  var rec=YIJI.days[y+"-"+m+"-"+d];
+  if(!rec)return null;
+  var V=YIJI.vocab;
+  return {good:rec[0].map(function(i){return V[i];}),
+          bad: rec[1].map(function(i){return V[i];}),
+          gGod:rec[2].map(function(i){return V[i];}),
+          bGod:rec[3].map(function(i){return V[i];})};
+}
+
+// CSS 一次性注入（index.html 不可改，故由 JS 注入）
+function injCSS(){
+  if(document.getElementById("alm-css"))return;
+  var s=document.createElement("style"); s.id="alm-css";
+  s.textContent=
+   ".lun-mini{display:block;font-size:9px;line-height:1.05;margin-top:1px;color:#9e6000;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
+  +".lun-mini.jq{color:#c62828}"
+  +".lun-mini.first{color:#00695c;font-weight:700}"
+  +".alm-strip{margin:6px 0;padding:9px 12px;border-radius:10px;background:linear-gradient(135deg,#fff8e1,#fff3e0);border:1px solid #ffd699;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;color:#6d4c00;line-height:1.4;flex-wrap:wrap}"
+  +".alm-strip b{color:#bf360c}"
+  +".alm-strip .ar{margin-left:auto;color:#bf8a00;font-size:11px;white-space:nowrap}"
+  +".alm-box{margin:10px 0 4px;border:1px solid #e8d9b0;border-radius:12px;overflow:hidden;background:#fffdf7}"
+  +".alm-hd{background:linear-gradient(135deg,#7a5c00,#a87b00);color:#fff;padding:9px 14px;font-weight:700;font-size:14px;letter-spacing:1px;display:flex;align-items:center;gap:6px}"
+  +".alm-bd{padding:10px 14px}"
+  +".alm-big{text-align:center;padding:2px 0 9px;border-bottom:1px dashed #e0cda0;margin-bottom:8px}"
+  +".alm-big .gd{font-size:12px;color:#8a6a00}"
+  +".alm-big .lz{font-size:21px;font-weight:800;color:#5d4000;margin:3px 0;letter-spacing:2px}"
+  +".alm-big .dz{font-size:15px;color:#a05a00;font-weight:700}"
+  +".alm-row{display:flex;font-size:12.5px;line-height:1.55;padding:3px 0;border-bottom:1px solid #f3ecd8}"
+  +".alm-row .k{flex:0 0 52px;color:#9b8550;font-weight:600}"
+  +".alm-row .v{flex:1;color:#4a3d20}"
+  +".alm-tag{display:inline-block;font-size:10px;padding:0 5px;border-radius:4px;margin-left:5px}"
+  +".alm-tag.g{background:#e8f5e9;color:#2e7d32}.alm-tag.b{background:#ffebee;color:#c62828}"
+  +".alm-yi,.alm-ji{padding:7px 0;border-bottom:1px solid #f3ecd8}"
+  +".alm-yi .lab{color:#2e7d32;font-weight:800;font-size:14px;margin-right:6px}"
+  +".alm-ji .lab{color:#c62828;font-weight:800;font-size:14px;margin-right:6px}"
+  +".alm-words{font-size:12px;color:#4a3d20;line-height:1.85;word-break:break-all}"
+  +".alm-god{font-size:11px;line-height:1.7;color:#6b5b30;padding-top:3px}"
+  +".alm-god .gl{color:#2e7d32;font-weight:700}.alm-god .bl{color:#c62828;font-weight:700}"
+  +".alm-note{font-size:10.5px;color:#9a824f;background:#fbf6e8;border-radius:6px;padding:7px 9px;margin-top:8px;line-height:1.55}"
+  +".alm-dirs{display:flex;flex-wrap:wrap;gap:4px 6px;font-size:11px;margin-top:2px}"
+  +".alm-dirs span{background:#f3ecd8;border-radius:5px;padding:1px 7px;color:#6d4c00}";
+  document.head.appendChild(s);
+}
+
+// 日格小字：節氣優先 → 初一顯示月名 → 其餘顯示農曆日
+window.lunarCellText=function(y,m,d){
+  injCSS();
+  var A=window.Almanac; if(!A)return"";
+  try{
+    var jq=A.jieqiOn(y,m,d);
+    if(jq)return '<span class="lun-mini jq">'+jq+'</span>';
+    var L=A.s2l(y,m,d);
+    if(L.day===1)return '<span class="lun-mini first">'+L.mCn+'</span>';
+    return '<span class="lun-mini">'+L.dCn+'</span>';
+  }catch(e){return"";}
+};
+
+// 今日農民曆橫條（可點 → 開今日完整農民曆）
+window.lunarTodayStrip=function(){
+  injCSS();
+  var A=window.Almanac; if(!A)return"";
+  if(YIJI_STATE==="idle")loadYiji();
+  try{
+    var f=A.full(TY,TM,TD);
+    var jq=f.jieqiToday?('<b>'+f.jieqiToday+'</b> · '):'';
+    var extra="";
+    if(YIJI_STATE==="ready"){var yj=yijiFor(TY,TM,TD); if(yj&&yj.good.length){extra=' · 宜 '+yj.good.slice(0,3).join("、");}}
+    else if(YIJI_STATE==="loading"){extra=' · 宜忌載入中…';}
+    return '<div class="alm-strip" data-a="almToday">📜 今日 '+jq+'農曆'+f.lunar.mCn+f.lunar.dCn+' · <b>'+f.gz.day+'日</b> · 生肖'+f.zodiac+extra+'<span class="ar">完整 ›</span></div>';
+  }catch(e){return"";}
+};
+
+// 完整農民曆（day-detail modal 內）
+window.lunarModalBlock=function(y,m,d){
+  injCSS();
+  var A=window.Almanac; if(!A)return"";
+  if(YIJI_STATE==="idle")loadYiji();
+  try{
+  var f=A.full(y,m,d);
+  var hd=f.huangdao.good?'<span class="alm-tag g">黃道吉日</span>':'<span class="alm-tag b">黑道凶日</span>';
+  var xl=f.xiu.luck==="吉"?'<span class="alm-tag g">吉</span>':(f.xiu.luck==="凶"?'<span class="alm-tag b">凶</span>':'');
+  var jqLine;
+  if(f.jieqiToday){jqLine='<b style="color:#c62828">'+f.jieqiToday+'</b>（今日交節）';}
+  else if(f.nextJieqi){jqLine='下一節氣 <b>'+f.nextJieqi.name+'</b>（'+f.nextJieqi.month+'/'+f.nextJieqi.day+'，還有 '+f.nextJieqi.days+' 天）';}
+  else{jqLine='—';}
+  var yiji, yj=yijiFor(y,m,d);
+  if(yj){
+    yiji='<div class="alm-yi"><span class="lab">宜</span><span class="alm-words">'+(yj.good.join("、")||"—")+'</span></div>'
+        +'<div class="alm-ji"><span class="lab">忌</span><span class="alm-words">'+(yj.bad.join("、")||"—")+'</span></div>'
+        +'<div class="alm-god"><span class="gl">吉神宜趨：</span>'+(yj.gGod.join("、")||"—")+'</div>'
+        +'<div class="alm-god"><span class="bl">凶神宜忌：</span>'+(yj.bGod.join("、")||"—")+'</div>';
+  } else if(YIJI_STATE==="loading"){
+    yiji='<div class="alm-words" style="color:#9a824f;padding:7px 0">宜忌・神煞資料載入中…</div>';
+  } else if(YIJI_STATE==="error"){
+    yiji='<div class="alm-words" style="color:#c62828;padding:7px 0">宜忌資料載入失敗（離線且尚未快取，連網開啟一次即可）</div>';
+  } else if(!inRange(y)){
+    yiji='<div class="alm-note">宜忌・吉凶神煞為真實通書資料，目前涵蓋 '+RANGE_LO+'–'+RANGE_HI+' 年；此日超出範圍，故僅顯示上方曆法資訊（干支/節氣/建除/黃黑道/廿八宿/沖煞/納音/彭祖/胎神/方位皆為精算）。</div>';
+  } else {
+    yiji='<div class="alm-words" style="color:#9a824f;padding:7px 0">宜忌・神煞資料載入中…</div>';
+  }
+  var dirs=f.dirs.map(function(x){return '<span>'+x+'</span>';}).join("");
+  return '<div class="alm-box"><div class="alm-hd">📜 農民曆</div><div class="alm-bd">'
+   +'<div class="alm-big"><div class="gd">'+f.solar.y+'年'+f.solar.m+'月'+f.solar.d+'日　星期'+f.solar.dow+'</div>'
+   +'<div class="lz">'+f.gz.year+'年　'+f.lunar.mCn+(f.lunar.monthBig?'大':'小')+'　'+f.lunar.dCn+'</div>'
+   +'<div class="dz">'+f.gz.day+'日</div></div>'
+   +'<div class="alm-row"><div class="k">干支</div><div class="v">年 '+f.gz.year+'　月 '+f.gz.month+'　日 '+f.gz.day+'</div></div>'
+   +'<div class="alm-row"><div class="k">生肖</div><div class="v">'+f.zodiac+'　納音 '+f.nayinDay+'（'+f.dayWuxing+'）</div></div>'
+   +'<div class="alm-row"><div class="k">節氣</div><div class="v">'+jqLine+'</div></div>'
+   +'<div class="alm-row"><div class="k">建除</div><div class="v">'+f.jianchu+'　值神 '+f.huangdao.god+hd+'</div></div>'
+   +'<div class="alm-row"><div class="k">廿八宿</div><div class="v">'+f.xiu.name+'宿'+xl+'</div></div>'
+   +'<div class="alm-row"><div class="k">沖煞</div><div class="v">沖'+f.chongsha.chongSx+'（'+f.chongsha.chongZhi+'）　煞'+f.chongsha.sha+'</div></div>'
+   +yiji
+   +'<div class="alm-row" style="border:none;margin-top:6px"><div class="k">彭祖</div><div class="v" style="font-size:11.5px">'+f.peng[0]+'　'+f.peng[1]+'</div></div>'
+   +'<div class="alm-row" style="border:none"><div class="k">胎神</div><div class="v">'+f.fetus+'</div></div>'
+   +'<div class="alm-row" style="border:none;align-items:flex-start"><div class="k">方位</div><div class="v"><div class="alm-dirs">'+dirs+'</div></div></div>'
+   +'</div></div>';
+  }catch(e){return'<div class="alm-box"><div class="alm-bd" style="color:#c62828;font-size:12px">農民曆計算錯誤：'+e.message+'</div></div>';}
+};
+})();
+
 const fbConfig={apiKey:"AIzaSyBKgqmsDIZgqf8nxWTDdTqVS01H0TIOCj4",authDomain:"myshift-a67f1.firebaseapp.com",projectId:"myshift-a67f1",storageBucket:"myshift-a67f1.firebasestorage.app",messagingSenderId:"779297515930",appId:"1:779297515930:web:7f5ba8992c5d5081a9f223"};
 firebase.initializeApp(fbConfig);
 const fbAuth=firebase.auth(),fbDb=firebase.firestore();
@@ -833,7 +1126,8 @@ function saveAppConfig(){
     ts:firebase.firestore.FieldValue.serverTimestamp()
   },{merge:true}),"saveCfg").catch(e=>console.log("saveCfg err",e));
 }
-let S={step:"type",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false,unit:"",lockedUnit:"",lockedRt:"",showSal:false,showLeavesOv:false};
+let S={step:"type",rt:"4on2off",pos:null,yr:TY,mo:TM,wT:null,wS:null,wD:null,wN:null,modal:null,showH:false,showStats:false,statsYr:TY,instH:false,unit:"",lockedUnit:"",lockedRt:"",showSal:false,showLeavesOv:false,showLunar:false};
+try{if(localStorage.getItem("sb_lunar")==="1")S.showLunar=true;}catch(e){}
 let EVS={};try{EVS=JSON.parse(localStorage.getItem("sb_ev"))||JSON.parse(gCk("sb_ev"))||{}}catch(e){}
 function sEv(){const d=JSON.stringify(EVS);try{localStorage.setItem("sb_ev",d)}catch(e){}try{sCk("sb_ev",d,3650)}catch(e){}_scheduleCloudSave()}
 let AL={};try{AL=JSON.parse(localStorage.getItem("sb_al2"))||JSON.parse(gCk("sb_al2"))||{}}catch(e){}
@@ -1311,7 +1605,7 @@ function rCal(){
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
   const pd5=getPayDay(y,m,5),pd20=getPayDay(y,m,20);
   for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(y,m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||isTWOff(y,m,d)),isPay=(d===pd5||d===pd20),isAdj=!!SHIFT_OV[ek(y,m,d)];
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${isAdj?'<span style="position:absolute;top:1px;right:2px;font-size:9px;line-height:1" title="已調班">🔄</span>':''}${td?'<span class="td">TODAY</span>':''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
+    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${S.showLunar?lunarCellText(y,m,d):""}${isAdj?'<span style="position:absolute;top:1px;right:2px;font-size:9px;line-height:1" title="已調班">🔄</span>':''}${td?'<span class="td">TODAY</span>':''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d));return lc.length?`<span class="leave-badge">${lc.length}</span>`:""})()}</div>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(y,m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<div class="hol-strip">🎌 ${mh.join("　")}</div>`:"";
@@ -1339,8 +1633,8 @@ function rCal(){
     if(payDay20<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay20=getPayDay(ny,nm,20)+dim(TY,TM)-TD}
     const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
     todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
-  return`<div class="top" style="flex-wrap:wrap"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button>${isAdmin()?`<button class="top-btn" data-a="leavesOv" style="background:rgba(255,167,38,.95);color:#fff;font-weight:700" title="${lang==="zh"?"請假總覽（管理員）":"Cuti (Admin)"}">📅${lang==="zh"?"請假":"Cuti"}</button>`:''}<span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div><div style="width:100%;font-size:11px;color:rgba(255,255,255,.7);padding:2px 0 0 44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}</div></div>
-  <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>
+  return`<div class="top" style="flex-wrap:wrap"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><button class="top-btn" data-a="lunar" style="${S.showLunar?'background:#a87b00;color:#fff;font-weight:700':''}" title="${lang==="zh"?"農民曆":"Imlek"}">📜${lang==="zh"?"農曆":"Imlek"}</button>${isAdmin()?`<button class="top-btn" data-a="leavesOv" style="background:rgba(255,167,38,.95);color:#fff;font-weight:700" title="${lang==="zh"?"請假總覽（管理員）":"Cuti (Admin)"}">📅${lang==="zh"?"請假":"Cuti"}</button>`:''}<span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div><div style="width:100%;font-size:11px;color:rgba(255,255,255,.7);padding:2px 0 0 44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}</div></div>
+  <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>${S.showLunar?lunarTodayStrip():""}
   <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
   <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${salaryEstHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
   <button class="sfx-btn" data-a="sfx">${WxSfx.isMuted()?'🔇':'🔊'}</button>
@@ -1425,7 +1719,7 @@ function rMod(){
   const hasTy=ev.includes("typhoon");const dayTy=TYD[ek(y,m,d)]||0;
   let tyP="";if(hasTy){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayTy?' selected':''}>${h} ${t("hr")}</option>`}tyP=`<div class="al-pick" style="border-color:#0288d1;background:rgba(2,136,209,.05)"><label style="color:#01579b">🌀 ${lang==="zh"?"颱風假時數":"Jam Libur Topan"}</label><select id="tySel" data-a="tyh" style="margin-top:4px">${opts}</select><div style="font-size:10px;color:var(--tx3);margin-top:4px;line-height:1.4">${lang==="zh"?"依公告自行換算：整日停班=12h、下午停班=6h 等。會自動扣減當月應出勤與加班時數。":"Sesuai pengumuman: seharian=12h, sore=6h, dll."}</div></div>`}
   return`<div class="modal-bg" data-a="close"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
-  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${shiftAdjHtml(y,m,d)}${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${tyP}${custP}
+  <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${shiftAdjHtml(y,m,d)}${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${tyP}${custP}${S.showLunar?lunarModalBlock(y,m,d):""}
   <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
 
 // ═══ 調班 UI ═══
@@ -1769,6 +2063,8 @@ function handle(e){
     case "reset":if(S.lockedRt){S.pos=null;S.step="wiz";S.wT=S.wS=S.wN=S.wD=null;break}S.step="type";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){fsEnqueue(()=>fbDb.collection("users").doc(fbUser.uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}),"reset").catch(()=>{})}break;
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
+    case "lunar":S.showLunar=!S.showLunar;try{localStorage.setItem("sb_lunar",S.showLunar?"1":"0")}catch(e){}if(S.showLunar&&typeof loadYiji==="function")loadYiji();break;
+    case "almToday":S.modal={y:TY,m:TM,d:TD};break;
     case "help":S.showH=true;break;
     case "sfx":WxSfx.initAudio();WxSfx.toggle();return;
     case "share":shareCalendar();return;
