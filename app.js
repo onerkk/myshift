@@ -3138,6 +3138,17 @@ function evaluateWxAlerts(){
       detail:isZh?"能見度差，行車開大燈、保持車距":"Visibilitas rendah, nyalakan lampu, jaga jarak"
     });
   }
+  // ★ 官方豪大雨特報補逐時降雨機率%：特報只說「縣市有豪雨」、不給逐時機率；
+  //   補上模型未來6小時最高降雨機率讓使用者掌握自己時段雨勢（維持單一橫幅、不另開重複警告）。
+  const _hvy=out.find(a=>a.id==='heavyRain'&&a.official);
+  if(_hvy&&hi>=0&&_hvy.detail.indexOf('降雨機率')<0&&_hvy.detail.indexOf('rain prob')<0){
+    const _r6=maxRain(6),_mm6=maxPrecipMm(6);
+    if(_r6.mx>0){
+      _hvy.detail+=(isZh
+        ?`｜未來6小時最高降雨機率 ${_r6.mx}%${_mm6.mx?`、預估雨量 ${_mm6.mx.toFixed(1)} mm/h`:''}（模型逐時）`
+        :`｜Next 6h max rain prob ${_r6.mx}%${_mm6.mx?`, est ${_mm6.mx.toFixed(1)} mm/h`:''} (model)`);
+    }
+  }
   return out;
 }
 
@@ -3617,13 +3628,18 @@ function rainObsHtml(){
     10m ${_rainMm(r10)}mm｜1h ${_rainMm(r1)}mm｜3h ${_rainMm(r3)}mm｜24h ${_rainMm(r24)}mm${obs}
   </div>`;
 }
+function _rainDbgBox(msg){
+  return`<div class="fi" style="margin:4px 0;padding:7px 10px;background:#fff3cd;border-left:3px solid #f0ad4e;border-radius:3px;font-size:10px;font-weight:600;color:#8a6d3b">🐞 ☔偵錯：${msg}</div>`;
+}
 function rainWarnHtml(){
-  if(!wxData||!wxData.hPrec||S.step!=="cal")return"";
-  const sh=gs(TY,TM,TD);if(!sh||sh==="休")return"";
-  const hrs=SHIFT_HR[sh];if(!hrs)return"";
+  const _dbg=(typeof location!=='undefined'&&location.search.indexOf('raindbg=1')>=0);  // 網址加 ?raindbg=1 開偵錯
+  if(!wxData||!wxData.hPrec||S.step!=="cal")return _dbg?_rainDbgBox(`wxData/hPrec 未就緒或非月曆頁`):"";
+  const sh=gs(TY,TM,TD);if(!sh||sh==="休")return _dbg?_rainDbgBox(`今天(${TY}/${TM}/${TD})班別=「${sh||'無'}」→休假或無班，不顯示`):"";
+  const hrs=SHIFT_HR[sh];if(!hrs)return _dbg?_rainDbgBox(`SHIFT_HR 找不到班別鍵「${sh}」`):"";
   const ds=`${TY}-${String(TM).padStart(2,"0")}-${String(TD).padStart(2,"0")}`;
-  let mx=0;
-  hrs.forEach(h=>{const k=ds+"T"+String(h).padStart(2,"0")+":00";const i=wxData.hTime.indexOf(k);if(i>=0&&wxData.hPrec[i]>mx)mx=wxData.hPrec[i]});
+  let mx=0;const _rows=[];
+  hrs.forEach(h=>{const k=ds+"T"+String(h).padStart(2,"0")+":00";const i=wxData.hTime.indexOf(k);if(i>=0){if(wxData.hPrec[i]>mx)mx=wxData.hPrec[i];_rows.push(`${String(h).padStart(2,"0")}時=${wxData.hPrec[i]}%`)}else{_rows.push(`${String(h).padStart(2,"0")}時=查無此刻`)}});
+  if(_dbg)return _rainDbgBox(`今天=${ds}｜班別=${sh}｜出門時段${hrs.join('/')}時｜${_rows.join('，')}｜最大=${mx}%｜門檻40%→${mx>=40?'達標應顯示':'未達標故不顯示'}`);
   if(mx<40)return"";
   const sn=lang==="zh"?{"早":"早班","中":"中班","晚":"晚班"}[sh]:{"早":"Pagi","中":"Siang","晚":"Malam"}[sh];
   const tr=`${String(hrs[0]).padStart(2,"0")}:00-${String(hrs[hrs.length-1]+1).padStart(2,"0")}:00`;
