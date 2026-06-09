@@ -3066,21 +3066,23 @@ function evaluateWxAlerts(){
   }
   // 3. 高降雨機率提醒（Open-Meteo 模型）
   // 注意：precipitation_probability 不是官方豪雨特報；官方豪大雨只由上方 CWA 警特報觸發 danger。
-  if(cfg.heavyRain!==false && userItems.heavyRain!==false && isInDetectionWindow('heavyRain') && !out.some(a=>a.id==='heavyRain'||a.id==='storm'||a.id==='typhoon')){
+  // ★ 改用獨立 id 'heavyRainModel'，與官方豪大雨特報「並存」永久顯示（不再被官方特報去重壓掉）；
+  //   仍在 storm/typhoon 時讓位（那兩種更嚴重，模型降雨提醒會變噪音）。
+  if(cfg.heavyRain!==false && userItems.heavyRain!==false && isInDetectionWindow('heavyRain') && !out.some(a=>a.id==='storm'||a.id==='typhoon')){
     const th=cfg.heavyRainProb||80;
     const r=maxRain(6);
     const rainMm=maxPrecipMm(6);
     if(r.mx>=th || rainMm.mx>=10){
       out.push({
-        id:"heavyRain",level:"warn",icon:"🌧",modelOnly:true,critical:false,
+        id:"heavyRainModel",level:"warn",icon:"🌧",modelOnly:true,critical:false,
         title:isZh?"高降雨機率提醒":"High Rain Probability",
         detail:isZh?`${hourLabel(r.at||rainMm.at)} 降雨機率 ${r.mx}%${rainMm.mx?`，預估雨量 ${rainMm.mx.toFixed(1)} mm/h`:''}；這是模型提醒，不是中央氣象署豪雨特報`
           :`Pukul ${hourLabel(r.at||rainMm.at)} rain probability ${r.mx}%${rainMm.mx?`, est. ${rainMm.mx.toFixed(1)} mm/h`:''}; model reminder, not official CWA warning`
       });
     }
   }
-  // 4. 一般降雨（未來 3h）— 若豪雨已觸發則跳過避免重複
-  if(cfg.rain!==false && userItems.rain!==false && isInDetectionWindow('rain') && !out.some(a=>a.id==="heavyRain"||a.id==="storm"||a.id==="typhoon")){
+  // 4. 一般降雨（未來 3h）— 若豪雨（官方或模型高降雨）已觸發則跳過避免重複
+  if(cfg.rain!==false && userItems.rain!==false && isInDetectionWindow('rain') && !out.some(a=>a.id==="heavyRain"||a.id==="heavyRainModel"||a.id==="storm"||a.id==="typhoon")){
     const th=cfg.rainProb||60;
     const r=maxRain(3);
     if(r.mx>=th){

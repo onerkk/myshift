@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v203-almanac-yiji';
+const CACHE_NAME = 'myshift-v204-rain-coexist';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -560,10 +560,10 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
   if (cfg.heavyRain !== false && swInDetectionWindow('heavyRain', cfg) && !out.some(a => a.id === 'heavyRain' || a.id === 'storm' || a.id === 'typhoon')) {
     const r = maxRain(6), mm = maxPrecipMm(6);
     if (r >= (cfg.heavyRainProb || 80) || mm >= 10) {
-      out.push({ id: 'heavyRain', icon: '🌧', title: '高降雨機率提醒', body: `未來 6 小時最高降雨機率 ${r}%${mm ? `，預估雨量 ${mm.toFixed(1)} mm/h` : ''}；模型提醒，非中央氣象署豪雨特報`, critical: false, modelOnly: true });
+      out.push({ id: 'heavyRainModel', icon: '🌧', title: '高降雨機率提醒', body: `未來 6 小時最高降雨機率 ${r}%${mm ? `，預估雨量 ${mm.toFixed(1)} mm/h` : ''}；模型提醒，非中央氣象署豪雨特報`, critical: false, modelOnly: true });
     }
   }
-  if (cfg.rain !== false && swInDetectionWindow('rain', cfg) && !out.some(a => a.id === 'heavyRain' || a.id === 'storm' || a.id === 'typhoon')) {
+  if (cfg.rain !== false && swInDetectionWindow('rain', cfg) && !out.some(a => a.id === 'heavyRain' || a.id === 'heavyRainModel' || a.id === 'storm' || a.id === 'typhoon')) {
     const r = maxRain(3);
     if (r >= (cfg.rainProb || 60)) {
       out.push({ id: 'rain', icon: '🌂', title: '降雨提醒', body: `未來 3 小時降雨機率 ${r}%，建議攜帶雨具`, critical: false });
@@ -645,6 +645,7 @@ async function swBackgroundCheck() {
 
     for (const a of alerts) {
       const notifyKey = ({ typhoon: 'notifyTyphoon', storm: 'notifyStorm', heavyRain: 'notifyHeavyRain', rain: 'notifyRain', strongWind: 'notifyStrongWind', heat: 'notifyHeat', cold: 'notifyCold', fog: 'notifyFog', earthquake: 'notifyEarthquake' })[a.id];
+      if (!notifyKey) continue;   // 無 notify key（如 heavyRainModel 模型提醒）只顯示橫幅、不推播，與 app.js 一致
       if (cfg[notifyKey] === false) continue;
       if (inQuiet) {
         if (!cfg.quietIgnoreCritical) continue;
