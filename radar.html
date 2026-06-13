@@ -180,7 +180,7 @@
   function hideOverlay(){ $("overlay").classList.add("hidden"); }
 
   function initMap(lat,lon){
-    map=L.map("map",{zoomControl:false,attributionControl:false,minZoom:5,maxZoom:12}).setView([lat,lon],9);
+    map=L.map("map",{zoomControl:false,attributionControl:false,minZoom:5,maxZoom:12}).setView([lat,lon],8);
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
       {subdomains:"abcd",maxZoom:19,detectRetina:true}).addTo(map);
     var icon=L.divIcon({className:"",html:'<div class="me-dot"></div>',iconSize:[16,16],iconAnchor:[8,8]});
@@ -198,7 +198,8 @@
     layers.forEach(function(L_){ if(L_) map.removeLayer(L_); });
     layers=frames.map(function(f){
       return L.tileLayer(host+f.path+"/"+SIZE+"/{z}/{x}/{y}/"+COLOR+"/"+SMOOTH+"_"+SNOW+".png",
-        {tileSize:SIZE,opacity:0,pane:"radar",crossOrigin:false,updateWhenZooming:false});
+        {tileSize:SIZE,opacity:0,pane:"radar",crossOrigin:false,updateWhenZooming:false,
+         maxNativeZoom:7,maxZoom:12}); // RainViewer 圖磚最高 zoom 7，超過則放大顯示
     });
     layers.forEach(function(L_){ L_.addTo(map); });
 
@@ -281,7 +282,7 @@
   $("prev").onclick=function(){ pause(); show(idx-1); };
   $("next").onclick=function(){ pause(); show(idx+1); };
   $("slider").oninput=function(){ pause(); show(parseInt(this.value,10)||0); };
-  $("recenter").onclick=function(){ if(map&&me) map.setView([me.lat,me.lon], Math.max(map.getZoom(),9)); };
+  $("recenter").onclick=function(){ if(map&&me) map.setView([me.lat,me.lon], Math.min(Math.max(map.getZoom(),8),9)); };
 
   start();
 })();
