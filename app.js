@@ -1920,7 +1920,7 @@ function wxDetailHtml(){
     rows+=`<div class="cell">${String(h).padStart(2,"0")}:00</div><div class="cell">${WXI[code]||""} ${tmp}°</div><div class="cell">${prec}</div><div class="cell">${wind}</div><div class="cell">${hum}</div>`;
   }
   const dayTabs=wxData.days.map((d,i)=>{const dt=new Date(d.date);return`<button onclick="wxDetailDay=${i};render();event.stopPropagation()" style="padding:4px 8px;border:none;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;${i===wxDetailDay?'background:var(--pri);color:#fff':'background:#eee;color:var(--tx2)'}">${i===0?(lang==="zh"?"今天":"Hari ini"):t("wk")[dt.getDay()]}</button>`}).join("");
-  return`<div class="wx-detail" onclick="closeWxDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">${lang==="zh"?"⛅ 每小時天氣":"⛅ Cuaca Per Jam"}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div class="wx-detail-grid"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"天氣":"Cuaca"}</div><div class="hdr">${lang==="zh"?"降雨":"Hujan"}</div><div class="hdr">${lang==="zh"?"陣風":"Gust"}</div><div class="hdr">${lang==="zh"?"濕度":"Humid"}</div>${rows}</div><button class="modal-done" onclick="closeWxDetail()" style="margin-top:12px">${t("done")}</button></div></div>`}
+  return`<div class="wx-detail" onclick="closeWxDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">${lang==="zh"?"⛅ 每小時天氣":"⛅ Cuaca Per Jam"}</div><div style="font-size:9px;color:var(--tx3);text-align:center;margin:-4px 0 8px">${wxData._popSource==='cwa'?(lang==="zh"?`降雨機率：中央氣象署鄉鎮預報${wxData._popWindowH?`（每${wxData._popWindowH}小時分段）`:''}`:'Hujan: CWA Taiwan'):(lang==="zh"?"降雨機率：Open-Meteo 模型（系集估算）":"Hujan: Open-Meteo")}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div class="wx-detail-grid"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"天氣":"Cuaca"}</div><div class="hdr">${lang==="zh"?"降雨":"Hujan"}</div><div class="hdr">${lang==="zh"?"陣風":"Gust"}</div><div class="hdr">${lang==="zh"?"濕度":"Humid"}</div>${rows}</div><button class="modal-done" onclick="closeWxDetail()" style="margin-top:12px">${t("done")}</button></div></div>`}
 
 function tideDetailHtml(){
   if(!tideDetailShow||!tideData||!tideData.tides)return"";
@@ -2367,6 +2367,67 @@ function _wxHourIndex(){
   return wxData.hTime.findIndex(t=>String(t).startsWith(nh));
 }
 
+// ═══ v205：中央氣象署官方鄉鎮降雨機率覆蓋 ═══
+// 治本說明：Open-Meteo 的 precipitation_probability 來自 GFS 系集模式（約 25km 網格），
+// 算法是「系集成員中該小時降雨 >0.1mm 的比例 ×100」。台灣夏季對流旺、地形破碎，
+// 25km 格內幾乎總有成員報雨 → 機率被系統性高估（截圖的 94~100%）。
+// CWA 鄉鎮預報是針對單一鄉鎮校準過的官方機率，與手機內建天氣一致。
+// 這裡只把「逐時降雨機率 hPrec / 天氣圖示碼 hCode / 目前圖示 code」換成 CWA；
+// 溫度、陣風、濕度仍用 Open-Meteo（這些本來就跟手機差不多）。
+// 國外或 GPS 反查不到台灣縣市鄉鎮時，完全不覆蓋，維持 Open-Meteo。
+const CWA_FCST_URL='https://cwa-forecast.onerkk.workers.dev'; // CWA 鄉鎮預報 worker（內含你的 CWA 授權碼）
+
+async function _fetchCwaForecast(lat,lon,place,force){
+  try{
+    const u=new URL(CWA_FCST_URL);
+    u.searchParams.set('lat',lat);
+    u.searchParams.set('lon',lon);
+    if(place&&place.county)u.searchParams.set('county',place.county);
+    if(place&&place.town)u.searchParams.set('town',place.town);
+    if(force)u.searchParams.set('_',String(Date.now()));
+    const resp=await Promise.race([
+      fetch(u.toString(),{cache:'no-store'}),
+      new Promise((_,r)=>setTimeout(()=>r(new Error('cwa-fcst-timeout')),7000))
+    ]);
+    if(!resp.ok)return null;
+    const d=await resp.json();
+    if(d&&d.ok&&d.hourly&&typeof d.hourly==='object')return d;
+    return null;
+  }catch(e){return null}
+}
+
+function _mergeCwaForecast(wx,fc){
+  if(!wx||!Array.isArray(wx.hTime)||!fc||!fc.hourly)return false;
+  const H=fc.hourly;let hit=0;
+  // 保留原始 Open-Meteo 機率/天氣碼，方便除錯比對
+  if(!wx.hPrecModel)wx.hPrecModel=Array.isArray(wx.hPrec)?wx.hPrec.slice():[];
+  if(!wx.hCodeModel)wx.hCodeModel=Array.isArray(wx.hCode)?wx.hCode.slice():[];
+  for(let i=0;i<wx.hTime.length;i++){
+    const k=String(wx.hTime[i]).slice(0,13); // "YYYY-MM-DDTHH"
+    const c=H[k];if(!c)continue;
+    if(typeof c.pop==='number'&&c.pop>=0&&c.pop<=100){wx.hPrec[i]=c.pop;hit++;}
+    if(typeof c.wmo==='number'&&Array.isArray(wx.hCode))wx.hCode[i]=c.wmo;
+  }
+  if(hit>0){
+    wx._popSource='cwa';
+    wx._popWindowH=fc.popWindowHours||null;
+    // 目前狀況圖示也對齊 CWA（避免大卡片顯示下雨、但實際多雲）
+    const hi=_wxHourIndex();
+    if(hi>=0&&Array.isArray(wx.hCode)&&typeof wx.hCode[hi]==='number')wx.code=wx.hCode[hi];
+  }
+  return hit>0;
+}
+
+async function _applyCwaPop(wx,lat,lon,place,force){
+  // 只在台灣（有縣市或鄉鎮反查結果）才覆蓋；國外或反查失敗 → 維持 Open-Meteo
+  const inTW=place&&(place.county||place.town);
+  if(!inTW)return false;
+  const fc=await _fetchCwaForecast(lat,lon,place,force);
+  if(!fc)return false;
+  return _mergeCwaForecast(wx,fc);
+}
+try{window._applyCwaPop=_applyCwaPop}catch(e){}
+
 async function loadWx(arg,retries){
   let force=false;
   if(typeof arg==='number'){retries=arg;}
@@ -2444,6 +2505,8 @@ async function loadWx(arg,retries){
       hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hGust:data.hourly.wind_gusts_10m||data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m
     };
     wxErr=false;delete wxData._cached;delete wxData._cacheAgeMin;
+    // v205：以中央氣象署鄉鎮官方降雨機率覆蓋 Open-Meteo（在寫快取前完成，快取即存校準後資料）
+    try{await _applyCwaPop(wxData,lat,lon,wxPlace,force);}catch(e){}
     try{localStorage.setItem('_wxCache',JSON.stringify({ts:Date.now(),d:wxData}))}catch(e){}
     // Tide
     try{
