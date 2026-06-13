@@ -52,6 +52,21 @@
   .rainbox .rb-u{font-size:9px;color:var(--tx3)}
   .rainbox.err{color:var(--tx3)}
 
+  /* 未來降雨機率（CWA 模型預報） */
+  .fcbox{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--tx2)}
+  .fcbox .fc-head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+  .fcbox .fc-title{color:var(--tx);font-weight:600}
+  .fcbox .fc-src{color:var(--tx3);margin-left:auto;font-size:10px}
+  .fcbox .fc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .fcbox .fc-cell{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:9px;padding:6px 4px;text-align:center}
+  .fcbox .fc-h{font-size:10px;color:var(--tx3)}
+  .fcbox .fc-ic{font-size:15px;line-height:1.15;margin:1px 0}
+  .fcbox .fc-p{font-size:16px;font-weight:650;line-height:1.1}
+  .fcbox .fc-p.fc-hi{color:#5fd0ff}
+  .fcbox .fc-p.fc-mid{color:#f6c544}
+  .fcbox .fc-p.fc-lo{color:var(--tx3)}
+  .fcbox .fc-note{margin-top:5px;font-size:9px;color:var(--tx3);line-height:1.4}
+
   /* 底部控制 */
   .ctrl{position:fixed;left:0;right:0;bottom:0;z-index:1000;padding:0 12px max(12px,env(safe-area-inset-bottom));
     display:flex;justify-content:center;pointer-events:none}
@@ -132,6 +147,7 @@
     <div class="loc"><span class="pin"></span><span id="locName">定位中…</span><span class="coords" id="coords"></span></div>
     <div class="verdict" id="verdict">讀取雷達回波…</div>
     <div class="rainbox" id="rainBox" style="display:none"></div>
+    <div class="fcbox" id="fcStrip" style="display:none"></div>
   </div>
 </div>
 
@@ -228,8 +244,9 @@
     var split = frames.length>1 ? (liveAt/(frames.length-1))*100 : 100;
     document.documentElement.style.setProperty("--split", split.toFixed(1)+"%");
     $("slider").max = String(frames.length-1);
-    // 預設停在「現在」
+    // 預設停在「現在」，並自動播放讓雨的移動方向一眼可見
     show(liveAt);
+    if(frames.length>1) play();
   }
 
   function show(i){
@@ -253,8 +270,8 @@
     var hasFore=frames.some(function(f){return f.kind==="fore"});
     var html='<span class="dot" style="background:var(--now)"></span>'
       +'最新雷達 <b>'+(live?hhmm(live.time):"--:--")+'</b> 觀測。';
-    if(hasFore) html+=' 拖到右邊看未來推估的雨往哪走。';
-    html+='<br><span style="color:var(--tx3)">雷達是「真的雨」；右側預報段最多到約 30 分後。</span>';
+    if(hasFore) html+=' 自動播放中，看那片雨往哪移動。';
+    html+='<br><span style="color:var(--tx3)">雷達是「真的雨」（推估最多約 30 分後）；下方「降雨機率」是未來幾小時的模型預報。</span>';
     $("verdict").innerHTML=html;
   }
 
@@ -310,6 +327,38 @@
      });
   }
 
+  // ── 未來降雨機率：CWA 鄉鎮預報（模型，非雷達）──
+  var FCAST_HOURS=3; // 未來 3 小時，涵蓋 1-2 小時需求
+  function _hourKey(d){ // → "YYYY-MM-DDTHH"（本地台灣時間，對齊 CWA key）
+    function p(n){return (n<10?"0":"")+n;}
+    return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours());
+  }
+  function loadForecast(){
+    if(!me) return;
+    var box=$("fcStrip");
+    fetch(CWA_WORKER+"?lat="+me.lat+"&lon="+me.lon,{cache:"no-store"})
+     .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+     .then(function(d){
+       if(!d||!d.ok||!d.hourly) throw new Error((d&&d.error)||"no forecast");
+       var H=d.hourly, now=new Date(), cells=[];
+       for(var i=1;i<=FCAST_HOURS;i++){
+         var dt=new Date(now.getTime()+i*3600*1000), c=H[_hourKey(dt)];
+         if(!c||typeof c.pop!=="number") continue;
+         cells.push({hour:dt.getHours(), pop:c.pop});
+       }
+       if(!cells.length) throw new Error("no upcoming hours");
+       var html="";
+       for(var j=0;j<cells.length;j++){
+         var p=cells[j].pop, cls=p>=60?"fc-hi":p>=30?"fc-mid":"fc-lo", ic=p>=60?"🌧":p>=30?"🌦":"⛅";
+         html+='<div class="fc-cell"><div class="fc-h">'+(cells[j].hour<10?"0":"")+cells[j].hour+'時</div><div class="fc-ic">'+ic+'</div><div class="fc-p '+cls+'">'+p+'%</div></div>';
+       }
+       box.className="fcbox";
+       box.innerHTML='<div class="fc-head"><span class="fc-title">未來降雨機率</span><span class="fc-src">中央氣象署 · 模型</span></div><div class="fc-grid">'+html+'</div><div class="fc-note">模型預報，非雷達實測；夏季對流常偏高，請以上方雷達實況為準。</div>';
+       box.style.display="";
+     })
+     .catch(function(){ box.style.display="none"; });
+  }
+
   function gotPosition(pos){
     me={lat:pos.coords.latitude,lon:pos.coords.longitude};
     $("coords").textContent=me.lat.toFixed(3)+", "+me.lon.toFixed(3);
@@ -317,7 +366,8 @@
     if(!map){ initMap(me.lat,me.lon); } else { meMarker.setLatLng([me.lat,me.lon]); map.setView([me.lat,me.lon],map.getZoom()); }
     loadRadar();
     loadRain();
-    clearInterval(refresh); refresh=setInterval(function(){ loadRadar(); loadRain(); }, 5*60*1000); // 每 5 分鐘更新雷達 + 雨量
+    loadForecast();
+    clearInterval(refresh); refresh=setInterval(function(){ loadRadar(); loadRain(); loadForecast(); }, 5*60*1000); // 每 5 分鐘更新雷達 + 雨量 + 預報
   }
   function geoError(err){
     var msg = err && err.code===1 ? "你拒絕了定位權限。請到瀏覽器設定允許此頁定位，再重試。"
