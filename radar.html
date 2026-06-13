@@ -37,6 +37,21 @@
   .verdict b{color:var(--tx);font-weight:600}
   .verdict .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
 
+  /* 實測雨量站 */
+  .rainbox{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--tx2)}
+  .rainbox .rb-head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+  .rainbox .rb-head .rdrop{color:#7fd0ff}
+  .rainbox .rb-st{color:var(--tx);font-weight:600}
+  .rainbox .rb-meta{color:var(--tx3);margin-left:auto;font-size:11px}
+  .rainbox .rb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .rainbox .rb-cell{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:9px;padding:6px 4px;text-align:center}
+  .rainbox .rb-k{font-size:10px;color:var(--tx3)}
+  .rainbox .rb-v{font-size:16px;font-weight:650;color:var(--tx);margin-top:1px;line-height:1.1}
+  .rainbox .rb-v.wet{color:#5fd0ff}
+  .rainbox .rb-v.dry{color:var(--tx3)}
+  .rainbox .rb-u{font-size:9px;color:var(--tx3)}
+  .rainbox.err{color:var(--tx3)}
+
   /* 底部控制 */
   .ctrl{position:fixed;left:0;right:0;bottom:0;z-index:1000;padding:0 12px max(12px,env(safe-area-inset-bottom));
     display:flex;justify-content:center;pointer-events:none}
@@ -103,6 +118,9 @@
   .me-dot{width:16px;height:16px;border-radius:50%;background:var(--now);border:3px solid #fff;box-shadow:0 0 0 6px rgba(55,214,239,.25),0 2px 6px rgba(0,0,0,.6)}
 
   @media (prefers-reduced-motion:reduce){.loc .pin{animation:none}.spinner{animation-duration:2s}}
+
+  .backchip{display:inline-flex;align-items:center;gap:3px;margin-bottom:8px;padding:4px 11px 4px 8px;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;color:var(--tx2);font-family:var(--mono);font-size:11px;text-decoration:none;-webkit-tap-highlight-color:transparent}
+  .backchip:active{background:rgba(255,255,255,.13)}
 </style>
 </head>
 <body>
@@ -110,8 +128,10 @@
 
 <div class="top">
   <div class="topcard">
+    <a class="backchip" href="./" onclick="if(history.length>1){history.back();return false}">‹ 班表</a>
     <div class="loc"><span class="pin"></span><span id="locName">定位中…</span><span class="coords" id="coords"></span></div>
     <div class="verdict" id="verdict">讀取雷達回波…</div>
+    <div class="rainbox" id="rainBox" style="display:none"></div>
   </div>
 </div>
 
@@ -255,13 +275,49 @@
     });
   }
 
+  // ── 實測雨量：抓最近 CWA 自動雨量站 ──
+  var CWA_WORKER="https://cwa-forecast.onerkk.workers.dev"; // 你的 CWA 代理（含雨量站端點）
+
+  function formatRain(v){ // v={mm,note}: ok/dry6h/trace/broken/no-data
+    if(!v) return {txt:"—",cls:"dry"};
+    if(v.note==="trace") return {txt:"微量",cls:"wet"};
+    if(v.note==="dry6h") return {txt:"0",cls:"dry"};
+    if(v.note!=="ok"||v.mm==null) return {txt:"—",cls:"dry"};
+    var mm=v.mm, txt = mm>=10 ? String(Math.round(mm)) : (Math.round(mm*10)/10).toFixed(1);
+    return {txt:txt, cls: mm>0?"wet":"dry"};
+  }
+
+  function loadRain(){
+    if(!me) return;
+    var box=$("rainBox");
+    fetch(CWA_WORKER+"?rain=1&lat="+me.lat+"&lon="+me.lon,{cache:"no-store"})
+     .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+     .then(function(d){
+       if(!d||!d.ok||!d.rain) throw new Error((d&&d.error)||"no data");
+       var t=""; if(d.obsTime){ var m=String(d.obsTime).match(/T(\d{2}:\d{2})/); if(m) t=m[1]; }
+       var dist=(d.distanceKm!=null)?d.distanceKm+" km":"";
+       var cells=[["10分",d.rain.min10],["1時",d.rain.hr1],["3時",d.rain.hr3],["24時",d.rain.hr24]];
+       var grid="";
+       for(var i=0;i<cells.length;i++){ var f=formatRain(cells[i][1]);
+         grid+='<div class="rb-cell"><div class="rb-k">'+cells[i][0]+'</div><div class="rb-v '+f.cls+'">'+f.txt+'</div><div class="rb-u">mm</div></div>'; }
+       box.className="rainbox";
+       box.innerHTML='<div class="rb-head"><span class="rdrop">●</span><span class="rb-st">'+(d.station||"最近雨量站")+'</span><span class="rb-meta">'+(dist?dist+" · ":"")+(t?t+" 實測":"實測")+'</span></div><div class="rb-grid">'+grid+'</div>';
+       box.style.display="";
+     })
+     .catch(function(){
+       box.className="rainbox err"; box.style.display="";
+       box.innerHTML='<div class="rb-head"><span class="rb-st" style="font-weight:500">雨量站讀取失敗</span></div>';
+     });
+  }
+
   function gotPosition(pos){
     me={lat:pos.coords.latitude,lon:pos.coords.longitude};
     $("coords").textContent=me.lat.toFixed(3)+", "+me.lon.toFixed(3);
     $("locName").textContent="你的位置";
     if(!map){ initMap(me.lat,me.lon); } else { meMarker.setLatLng([me.lat,me.lon]); map.setView([me.lat,me.lon],map.getZoom()); }
     loadRadar();
-    clearInterval(refresh); refresh=setInterval(loadRadar, 5*60*1000); // 每 5 分鐘更新雷達
+    loadRain();
+    clearInterval(refresh); refresh=setInterval(function(){ loadRadar(); loadRain(); }, 5*60*1000); // 每 5 分鐘更新雷達 + 雨量
   }
   function geoError(err){
     var msg = err && err.code===1 ? "你拒絕了定位權限。請到瀏覽器設定允許此頁定位，再重試。"
