@@ -272,14 +272,18 @@
     var html='<span class="dot" style="background:var(--now)"></span>'
       +'最新雷達 <b>'+(live?hhmm(live.time):"--:--")+'</b> 觀測。';
     if(hasFore) html+=' 自動播放「現在 → 未來」段，看雨往哪移（不回放過去）。';
+    else html+=' 目前無未來推估資料，播放最近實測的移動。';
     html+='<br><span style="color:var(--tx3)">雷達是「真的雨」（推估最多約 30 分後）；下方「降雨機率」是未來幾小時的模型預報。</span>';
     $("verdict").innerHTML=html;
   }
 
   function play(){ if(!frames.length) return; playing=true; $("playIcon").textContent="❚❚"; $("playTxt").textContent="暫停";
     clearInterval(timer);
-    if(idx<liveIdx) show(liveIdx); // 自動播放只跑「現在→未來」，不回放過去
-    timer=setInterval(function(){ var n=idx+1; if(n>=frames.length||n<liveIdx) n=liveIdx; show(n); }, 700);
+    var end=frames.length-1;
+    // 有未來幀 → 只跑「現在→未來」；沒有未來幀 → 退回最近幾格，避免只剩 1 格卡死
+    var loopStart = (end>liveIdx) ? liveIdx : Math.max(0, end-5);
+    if(idx<loopStart || idx>end) show(loopStart);
+    timer=setInterval(function(){ var n=idx+1; if(n>end||n<loopStart) n=loopStart; show(n); }, 700);
   }
   function pause(){ playing=false; $("playIcon").textContent="▶"; $("playTxt").textContent="播放"; clearInterval(timer); }
   function toggle(){ playing?pause():play(); }
