@@ -67,6 +67,13 @@
   .fcbox .fc-p.fc-lo{color:var(--tx3)}
   .fcbox .fc-note{margin-top:5px;font-size:9px;color:var(--tx3);line-height:1.4}
 
+  /* 常駐精簡數據 + 收合鈕 */
+  .ministat{display:flex;gap:14px;margin-top:8px;font-family:var(--mono);font-size:12px;color:var(--tx2)}
+  .ministat b{color:var(--tx);font-weight:650}
+  .ministat .mwet{color:#5fd0ff}
+  .cardtoggle{display:block;width:100%;margin-top:9px;padding:7px;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:9px;color:var(--tx2);font-family:var(--mono);font-size:11.5px;text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .cardtoggle:active{background:rgba(255,255,255,.1)}
+
   /* 底部控制 */
   .ctrl{position:fixed;left:0;right:0;bottom:0;z-index:1000;padding:0 12px max(12px,env(safe-area-inset-bottom));
     display:flex;justify-content:center;pointer-events:none}
@@ -146,8 +153,12 @@
     <a class="backchip" href="./" onclick="if(history.length>1){history.back();return false}">‹ 班表</a>
     <div class="loc"><span class="pin"></span><span id="locName">定位中…</span><span class="coords" id="coords"></span></div>
     <div class="verdict" id="verdict">讀取雷達回波…</div>
-    <div class="rainbox" id="rainBox" style="display:none"></div>
-    <div class="fcbox" id="fcStrip" style="display:none"></div>
+    <div class="ministat" id="miniStat" style="display:none"><span id="rainMini">雨量 —</span><span id="fcMini">未來 —</span></div>
+    <button class="cardtoggle" id="cardToggle" onclick="toggleCard()">▾ 詳細雨量・未來機率</button>
+    <div id="cardBody" style="display:none">
+      <div class="rainbox" id="rainBox" style="display:none"></div>
+      <div class="fcbox" id="fcStrip" style="display:none"></div>
+    </div>
   </div>
 </div>
 
@@ -166,7 +177,7 @@
       <div class="nowmark" id="nowmark"></div>
       <input type="range" id="slider" min="0" max="0" value="0" step="1" aria-label="雷達時間">
     </div>
-    <div class="rlabels"><span>過去 2 小時</span><span id="lblNow">現在</span><span>預報</span></div>
+    <div class="rlabels"><span>過去 2 小時</span><span></span><span id="lblNow">最新</span></div>
     <div class="buttons">
       <button class="step" id="prev" aria-label="上一格">‹</button>
       <button class="play" id="play"><span id="playIcon">▶</span><span id="playTxt">播放</span></button>
@@ -271,9 +282,8 @@
     var hasFore=frames.some(function(f){return f.kind==="fore"});
     var html='<span class="dot" style="background:var(--now)"></span>'
       +'最新雷達 <b>'+(live?hhmm(live.time):"--:--")+'</b> 觀測。';
-    if(hasFore) html+=' 自動播放「現在 → 未來」段，看雨往哪移（不回放過去）。';
-    else html+=' 目前無未來推估資料，播放最近實測的移動。';
-    html+='<br><span style="color:var(--tx3)">雷達是「真的雨」（推估最多約 30 分後）；下方「降雨機率」是未來幾小時的模型預報。</span>';
+    html+=' 自動播放最近移動，看雨往哪走。';
+    html+='<br><span style="color:var(--tx3)">雷達只到「現在」（免費版無未來推估）；未來請看下方「降雨機率」（模型估算）。</span>';
     $("verdict").innerHTML=html;
   }
 
@@ -326,10 +336,15 @@
        box.className="rainbox";
        box.innerHTML='<div class="rb-head"><span class="rdrop">●</span><span class="rb-st">'+(d.station||"最近雨量站")+'</span><span class="rb-meta">'+(dist?dist+" · ":"")+(t?t+" 實測":"實測")+'</span></div><div class="rb-grid">'+grid+'</div>';
        box.style.display="";
+       // 常駐精簡列：現在這 10 分鐘實測
+       var f10=formatRain(d.rain.min10);
+       $("rainMini").innerHTML='雨量 <b class="'+(f10.cls==="wet"?"mwet":"")+'">'+f10.txt+(f10.txt==="微量"?"":" mm")+'</b>';
+       $("miniStat").style.display="";
      })
      .catch(function(){
        box.className="rainbox err"; box.style.display="";
        box.innerHTML='<div class="rb-head"><span class="rb-st" style="font-weight:500">雨量站讀取失敗</span></div>';
+       $("rainMini").textContent="雨量 —"; $("miniStat").style.display="";
      });
   }
 
@@ -361,15 +376,34 @@
        box.className="fcbox";
        box.innerHTML='<div class="fc-head"><span class="fc-title">未來降雨機率</span><span class="fc-src">中央氣象署 · 模型</span></div><div class="fc-grid">'+html+'</div><div class="fc-note">模型預報，非雷達實測；夏季對流常偏高，請以上方雷達實況為準。</div>';
        box.style.display="";
+       // 常駐精簡列：未來 1-2 小時最高機率
+       var mx=0; for(var k=0;k<cells.length;k++){ if(cells[k].pop>mx) mx=cells[k].pop; }
+       $("fcMini").innerHTML='未來 <b class="'+(mx>=60?"mwet":"")+'">'+mx+'%</b>';
+       $("miniStat").style.display="";
      })
-     .catch(function(){ box.style.display="none"; });
+     .catch(function(){ box.style.display="none"; $("fcMini").textContent="未來 —"; });
+  }
+
+  var cardOpen=false;
+  function toggleCard(){
+    cardOpen=!cardOpen;
+    $("cardBody").style.display=cardOpen?"":"none";
+    $("cardToggle").textContent=cardOpen?"▴ 收合":"▾ 詳細雨量・未來機率";
+  }
+  // 把「你的位置」往畫面下方移，避開上方資訊卡，讓雲圖露出來
+  function offsetMapForCard(zoom){
+    if(!map||!me) return;
+    map.setView([me.lat,me.lon], (zoom||map.getZoom()), {animate:false});
+    var dy=Math.round(map.getSize().y*0.15);
+    map.panBy([0,-dy],{animate:false});
   }
 
   function gotPosition(pos){
     me={lat:pos.coords.latitude,lon:pos.coords.longitude};
     $("coords").textContent=me.lat.toFixed(3)+", "+me.lon.toFixed(3);
     $("locName").textContent="你的位置";
-    if(!map){ initMap(me.lat,me.lon); } else { meMarker.setLatLng([me.lat,me.lon]); map.setView([me.lat,me.lon],map.getZoom()); }
+    if(!map){ initMap(me.lat,me.lon); } else { meMarker.setLatLng([me.lat,me.lon]); }
+    offsetMapForCard();
     loadRadar();
     loadRain();
     loadForecast();
@@ -394,7 +428,7 @@
   $("prev").onclick=function(){ pause(); show(idx-1); };
   $("next").onclick=function(){ pause(); show(idx+1); };
   $("slider").oninput=function(){ pause(); show(parseInt(this.value,10)||0); };
-  $("recenter").onclick=function(){ if(map&&me) map.setView([me.lat,me.lon], Math.min(Math.max(map.getZoom(),8),9)); };
+  $("recenter").onclick=function(){ if(map&&me) offsetMapForCard(Math.min(Math.max(map.getZoom(),8),9)); };
 
   start();
 })();
