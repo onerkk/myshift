@@ -3789,8 +3789,14 @@ function rainWarnHtml(){
   const sn=lang==="zh"?{"早":"早班","中":"中班","晚":"晚班"}[sh]:{"早":"Pagi","中":"Siang","晚":"Malam"}[sh];
   const tr=`${String(hrs[0]).padStart(2,"0")}:00-${String(hrs[hrs.length-1]+1).padStart(2,"0")}:00`;
   const tip=lang==="zh"?`🌂 ${sn}出門注意！${tr} 降雨機率 ${mx}%，建議攜帶雨具`:`🌂 ${sn}: hujan ${mx}% (${tr}), bawa payung!`;
-  const bg=mx>=70?"var(--red-l)":"var(--amber-l)",bc=mx>=70?"var(--red)":"var(--amber)",tc=mx>=70?"var(--red)":"#b36b00";
-  return`<div class="rain-warn fi" style="margin:4px 0;padding:7px 10px;background:${bg};border-left:3px solid ${bc};border-radius:3px;font-size:10px;font-weight:600;color:${tc}">${tip}</div>`
+  // v211：改用與上方警報橫幅一致的「固定淺底＋深字」配色。
+  //   原本用 var(--red-l)/var(--red) 這類會隨暗色模式變暗的主題變數 → 暗色下對比不足看不清；
+  //   警報橫幅本來就用寫死淺底深字，這裡對齊它，暗色亮色都清楚、視覺也統一。
+  const _hi70=mx>=70;
+  const bg=_hi70?"linear-gradient(90deg,#ffebee,#ffcdd2)":"linear-gradient(90deg,#fff8e1,#ffe082)";
+  const bc=_hi70?"#c62828":"#f57f17";
+  const tc=_hi70?"#b71c1c":"#bf360c";
+  return`<div class="rain-warn fi" style="margin:4px 0;padding:8px 12px;background:${bg};border-left:4px solid ${bc};border-radius:6px;font-size:11px;font-weight:700;line-height:1.5;color:${tc}">${tip}</div>`
 }
 function wxHtml(){
   if(wxErr)return`<div class="wx-card fi"><div class="wx-err" style="text-align:center;padding:12px">🌡️ ${lang==="zh"?"天氣載入失敗":"Gagal muat cuaca"}<br><button data-a="wxR" style="margin-top:8px;padding:6px 16px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">${lang==="zh"?"重新載入":"Muat Ulang"}</button></div></div>`;
