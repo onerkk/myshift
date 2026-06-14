@@ -1920,7 +1920,7 @@ function wxDetailHtml(){
     rows+=`<div class="cell">${String(h).padStart(2,"0")}:00</div><div class="cell">${WXI[code]||""} ${tmp}°</div><div class="cell">${prec}</div><div class="cell">${wind}</div><div class="cell">${hum}</div>`;
   }
   const dayTabs=wxData.days.map((d,i)=>{const dt=new Date(d.date);return`<button onclick="wxDetailDay=${i};render();event.stopPropagation()" style="padding:4px 8px;border:none;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;${i===wxDetailDay?'background:var(--pri);color:#fff':'background:#eee;color:var(--tx2)'}">${i===0?(lang==="zh"?"今天":"Hari ini"):t("wk")[dt.getDay()]}</button>`}).join("");
-  return`<div class="wx-detail" onclick="closeWxDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">${lang==="zh"?"⛅ 每小時天氣":"⛅ Cuaca Per Jam"}</div><div style="font-size:9px;color:var(--tx3);text-align:center;margin:-4px 0 8px">${wxData._popSource==='cwa'?(lang==="zh"?`降雨機率：中央氣象署鄉鎮預報${wxData._popWindowH?`（每${wxData._popWindowH}小時分段）`:''}`:'Hujan: CWA Taiwan'):(lang==="zh"?"降雨機率：Open-Meteo 模型（系集估算）":"Hujan: Open-Meteo")}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div class="wx-detail-grid"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"天氣":"Cuaca"}</div><div class="hdr">${lang==="zh"?"降雨":"Hujan"}</div><div class="hdr">${lang==="zh"?"陣風":"Gust"}</div><div class="hdr">${lang==="zh"?"濕度":"Humid"}</div>${rows}</div><button class="modal-done" onclick="closeWxDetail()" style="margin-top:12px">${t("done")}</button></div></div>`}
+  return`<div class="wx-detail" onclick="closeWxDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">${lang==="zh"?"⛅ 每小時天氣":"⛅ Cuaca Per Jam"}</div><div style="font-size:9px;color:var(--tx3);text-align:center;margin:-4px 0 8px">${wxData._popSource==='cwa'?(lang==="zh"?`降雨機率：中央氣象署鄉鎮預報＋即時雨量校正${wxData._popWindowH?`（每${wxData._popWindowH}小時分段）`:''}`:'Hujan: CWA + koreksi realtime'):(lang==="zh"?"降雨機率：Open-Meteo 模型＋即時雨量校正":"Hujan: Open-Meteo + koreksi")}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div class="wx-detail-grid"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"天氣":"Cuaca"}</div><div class="hdr">${lang==="zh"?"降雨":"Hujan"}</div><div class="hdr">${lang==="zh"?"陣風":"Gust"}</div><div class="hdr">${lang==="zh"?"濕度":"Humid"}</div>${rows}</div><button class="modal-done" onclick="closeWxDetail()" style="margin-top:12px">${t("done")}</button></div></div>`}
 
 function tideDetailHtml(){
   if(!tideDetailShow||!tideData||!tideData.tides)return"";
@@ -2396,16 +2396,76 @@ async function _fetchCwaForecast(lat,lon,place,force){
   }catch(e){return null}
 }
 
+// ═══ v209：降雨機率「即時校正」— 修正 v205 純 CWA 覆蓋在實際下雨時低報 ═══
+// 根因：v205 把每小時 hPrec「整段換成」CWA 鄉鎮預報機率。CWA 鄉鎮機率是分段(每3/6/12h)的
+//   「預報」機率，不吃即時雷達/雨量站觀測，發布後不會因「現在正在下大雨」上修。
+//   → 豪大雨特報生效、雨量站 3.5mm/10min 時，App 仍顯示 70%；而手機內建天氣吃即時雷達的
+//   臨近預報，顯示 100%。誤差來源不是 bug 寫錯，是「拿預報機率當即時值用」。
+// 治本：hPrec 仍是唯一有效值（明細、出門提醒、警報引擎、動畫都讀它），但改成
+//   「CWA 為底，遇到實際降雨證據才上修」：
+//     ① 預報雨量地板：Open-Meteo 逐時預估雨量 hRain(mm/h，本就抓了) → 有量就不該低機率。
+//     ② 即時雨量站地板：附近雨量站 typhoonData.rainObservation(本就抓了) 若正在下雨，
+//        把「現在＋未來1~2h」拉到接近 100%（手機 100% 的來源就是這種即時觀測）。
+//   晴天(兩證據皆 0) → 維持 CWA 校準值，不會把好天氣灌成高機率(保留 v205 的好處)。
+//   全程用已抓資料、零額外 API 延遲；以不可變基準(hPopCwa/hPrecModel/hRain)重算，可重複呼叫不疊加。
+function _popAmountFloor(mm){
+  // 預報雨量(mm/h) → 該小時降雨機率「地板」(保守可解釋；只會上修不會下修)
+  mm=parseFloat(mm);
+  if(!Number.isFinite(mm)||mm<=0.05)return 0;  // 幾乎無雨：不上修，交給 CWA 判斷
+  if(mm<0.3)return 50;                           // 毛毛雨/不確定
+  if(mm<1)return 70;                            // 小雨
+  if(mm<4)return 85;                            // 中雨
+  if(mm<10)return 95;                           // 大雨
+  return 100;                                   // 強降雨
+}
+function _recomputeEffectivePop(){
+  // 以不可變基準重算每小時有效降雨機率(hPrec)。可安全重複呼叫，不會疊加。
+  const wx=wxData;
+  if(!wx||!Array.isArray(wx.hTime)||!wx.hTime.length)return;
+  const cwa=Array.isArray(wx.hPopCwa)?wx.hPopCwa:null;         // CWA 鄉鎮機率(某些小時可能無值)
+  const model=Array.isArray(wx.hPrecModel)?wx.hPrecModel:null; // Open-Meteo 原始機率
+  const rain=Array.isArray(wx.hRain)?wx.hRain:null;           // Open-Meteo 逐時預估雨量 mm
+  let stFloor=0;                                              // 即時雨量站地板(只對現在+1~2h有意義)
+  try{
+    const ro=(typeof _rainObs==='function')?_rainObs():null;
+    if(ro){
+      const r10=parseFloat(ro.rain10Min!=null?ro.rain10Min:ro.precipitation);
+      const r1=parseFloat(ro.rain1h);
+      const a=Number.isFinite(r10)?r10:0,b=Number.isFinite(r1)?r1:0;
+      if(a>=0.5||b>=2)stFloor=100;       // 明顯在下(≥約3mm/h)
+      else if(a>0||b>0)stFloor=90;       // 有降雨
+    }
+  }catch(e){}
+  const hi=_wxHourIndex();
+  const n=wx.hTime.length,out=new Array(n);
+  for(let i=0;i<n;i++){
+    // 預報機率基準：優先 CWA，該小時無 CWA 值時退回 Open-Meteo 原始機率
+    let base=(cwa&&Number.isFinite(Number(cwa[i])))?Number(cwa[i])
+            :(model&&Number.isFinite(Number(model[i])))?Number(model[i]):0;
+    let eff=base;
+    if(rain)eff=Math.max(eff,_popAmountFloor(rain[i]));               // 預報雨量地板(全部小時)
+    if(stFloor>0&&hi>=0&&i>=hi&&i<=hi+2){                             // 即時雨量站地板(現在+2h，逐時遞減)
+      const cap=(i===hi)?stFloor:(i===hi+1?Math.min(stFloor,85):Math.min(stFloor,70));
+      eff=Math.max(eff,cap);
+    }
+    out[i]=Math.max(0,Math.min(100,Math.round(eff)));
+  }
+  wx.hPrec=out;
+}
+try{window._recomputeEffectivePop=_recomputeEffectivePop}catch(e){}
+
 function _mergeCwaForecast(wx,fc){
   if(!wx||!Array.isArray(wx.hTime)||!fc||!fc.hourly)return false;
   const H=fc.hourly;let hit=0;
   // 保留原始 Open-Meteo 機率/天氣碼，方便除錯比對
   if(!wx.hPrecModel)wx.hPrecModel=Array.isArray(wx.hPrec)?wx.hPrec.slice():[];
   if(!wx.hCodeModel)wx.hCodeModel=Array.isArray(wx.hCode)?wx.hCode.slice():[];
+  // v209：CWA 機率存到獨立基準 hPopCwa（不再直接覆蓋 hPrec），有效值最後統一由 _recomputeEffectivePop 算出
+  if(!Array.isArray(wx.hPopCwa)||wx.hPopCwa.length!==wx.hTime.length)wx.hPopCwa=new Array(wx.hTime.length).fill(null);
   for(let i=0;i<wx.hTime.length;i++){
     const k=String(wx.hTime[i]).slice(0,13); // "YYYY-MM-DDTHH"
     const c=H[k];if(!c)continue;
-    if(typeof c.pop==='number'&&c.pop>=0&&c.pop<=100){wx.hPrec[i]=c.pop;hit++;}
+    if(typeof c.pop==='number'&&c.pop>=0&&c.pop<=100){wx.hPopCwa[i]=c.pop;hit++;}
     if(typeof c.wmo==='number'&&Array.isArray(wx.hCode))wx.hCode[i]=c.wmo;
   }
   if(hit>0){
@@ -2415,6 +2475,8 @@ function _mergeCwaForecast(wx,fc){
     const hi=_wxHourIndex();
     if(hi>=0&&Array.isArray(wx.hCode)&&typeof wx.hCode[hi]==='number')wx.code=wx.hCode[hi];
   }
+  // 不論 CWA 是否命中，都以最新基準重算有效降雨機率（含預報雨量＋即時雨量站校正）
+  try{_recomputeEffectivePop()}catch(e){}
   return hit>0;
 }
 
@@ -2568,6 +2630,7 @@ async function loadCwaData(arg){
       if(c&&c.key===cwaKey&&c.ts&&(Date.now()-c.ts)<2*60*1000&&c.d){
         typhoonData=c.d;
         earthquakeData=c.d;
+        try{_recomputeEffectivePop()}catch(e){}  // v209：雨量站快取就緒 → 即時校正當前小時降雨機率
         render();
       }
     }catch(e){}
@@ -2590,6 +2653,7 @@ async function loadCwaData(arg){
       typhoonData=data;earthquakeData=data;
       typhoonErr=false;earthquakeErr=false;
       try{localStorage.setItem('_cwaCache',JSON.stringify({ts:Date.now(),key:cwaKey,place:place||null,d:data}))}catch(e){}
+      try{_recomputeEffectivePop()}catch(e){}  // v209：即時雨量站就緒 → 即時校正當前小時降雨機率
       render();
       try{checkAndNotifyAlerts()}catch(e){}
     }
