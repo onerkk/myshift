@@ -154,7 +154,7 @@
     <div class="loc"><span class="pin"></span><span id="locName">定位中…</span><span class="coords" id="coords"></span></div>
     <div class="verdict" id="verdict">讀取雷達回波…</div>
     <div class="ministat" id="miniStat" style="display:none"><span id="rainMini">雨量 —</span><span id="fcMini">未來 —</span></div>
-    <button class="cardtoggle" id="cardToggle" onclick="toggleCard()">▾ 詳細雨量・未來機率</button>
+    <button class="cardtoggle" id="cardToggle">▾ 詳細雨量・未來機率</button>
     <div id="cardBody" style="display:none">
       <div class="rainbox" id="rainBox" style="display:none"></div>
       <div class="fcbox" id="fcStrip" style="display:none"></div>
@@ -429,6 +429,7 @@
   $("next").onclick=function(){ pause(); show(idx+1); };
   $("slider").oninput=function(){ pause(); show(parseInt(this.value,10)||0); };
   $("recenter").onclick=function(){ if(map&&me) offsetMapForCard(Math.min(Math.max(map.getZoom(),8),9)); };
+  $("cardToggle").onclick=toggleCard;
 
   start();
 })();
