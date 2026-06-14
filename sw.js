@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v206-radar';
+const CACHE_NAME = 'myshift-v207-radar';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
