@@ -256,9 +256,9 @@
     var split = frames.length>1 ? (liveAt/(frames.length-1))*100 : 100;
     document.documentElement.style.setProperty("--split", split.toFixed(1)+"%");
     $("slider").max = String(frames.length-1);
-    // 預設停在「現在」，並自動播放讓雨的移動方向一眼可見
+    // 預設停在「最新」那格（與上方雷達時間對齊）；不自動播，要看移動再按 ▶
     show(liveAt);
-    if(frames.length>1) play();
+    if(playing) play(); // 5 分鐘 refresh 時若正在播放就續播，否則停在最新
   }
 
   function show(i){
@@ -282,7 +282,7 @@
     var hasFore=frames.some(function(f){return f.kind==="fore"});
     var html='<span class="dot" style="background:var(--now)"></span>'
       +'最新雷達 <b>'+(live?hhmm(live.time):"--:--")+'</b> 觀測。';
-    html+=' 自動播放最近移動，看雨往哪走。';
+    html+=' 按 ▶ 看最近移動。';
     html+='<br><span style="color:var(--tx3)">雷達只到「現在」（免費版無未來推估）；未來請看下方「降雨機率」（模型估算）。</span>';
     $("verdict").innerHTML=html;
   }
@@ -290,10 +290,9 @@
   function play(){ if(!frames.length) return; playing=true; $("playIcon").textContent="❚❚"; $("playTxt").textContent="暫停";
     clearInterval(timer);
     var end=frames.length-1;
-    // 有未來幀 → 只跑「現在→未來」；沒有未來幀 → 退回最近幾格，避免只剩 1 格卡死
-    var loopStart = (end>liveIdx) ? liveIdx : Math.max(0, end-5);
-    if(idx<loopStart || idx>end) show(loopStart);
-    timer=setInterval(function(){ var n=idx+1; if(n>end||n<loopStart) n=loopStart; show(n); }, 700);
+    var loopStart = Math.max(0, end-3); // 只循環最近約 30-40 分鐘（滑桿右側），不從中間跑
+    if(idx<loopStart || idx>=end) show(loopStart);
+    timer=setInterval(function(){ var n=idx+1; if(n>end||n<loopStart) n=loopStart; show(n); }, 650);
   }
   function pause(){ playing=false; $("playIcon").textContent="▶"; $("playTxt").textContent="播放"; clearInterval(timer); }
   function toggle(){ playing?pause():play(); }
