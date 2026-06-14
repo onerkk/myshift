@@ -3023,11 +3023,19 @@ function evaluateCwaWeatherWarnings(cfg,isZh){
       let detail='';
       if(area)detail+='📍'+area;
       if(np.validText)detail+=(detail?'｜':'')+(isZh?'⏰生效 ':'Valid ')+np.validText;
-      if(np.body)detail+=(detail?'｜':'')+np.body;
+      // v210：豪大雨特報的官方長敘述改放摺疊區（bodyFull），預設只留地點/時效（＋後面補上的逐時機率雨量）；
+      //        其餘官方警報維持原樣（敘述本身即重點，不摺疊）。
+      let bodyFull='';
+      if(np.body){
+        if(id==='heavyRain')bodyFull=np.body;
+        else detail+=(detail?'｜':'')+np.body;
+      }
       if(!detail)detail=isZh?'中央氣象署官方警特報生效中':'CWA official alert is active';
       if(id==='strongWind')detail=_appendGustGateDetail(detail,cfg,isZh);
-      out.push({id,level:_alertLevel(id,a),icon:a.icon||_alertIcon(id),official:true,critical:(id==='typhoon'||id==='storm'||(id==='heavyRain'&&_alertLevel(id,a)==='danger')),
-        title:_alertTitle(id,isZh),detail});
+      const _alt={id,level:_alertLevel(id,a),icon:a.icon||_alertIcon(id),official:true,critical:(id==='typhoon'||id==='storm'||(id==='heavyRain'&&_alertLevel(id,a)==='danger')),
+        title:_alertTitle(id,isZh),detail};
+      if(bodyFull)_alt.bodyFull=bodyFull;
+      out.push(_alt);
     });
     return out;
   }
@@ -3064,7 +3072,13 @@ function _rainObservationAlert(cfg,userItems,isZh){
   const r10=_numRain(ro.rain10Min??ro.precipitation),r1=_numRain(ro.rain1h),r3=_numRain(ro.rain3h),r24=_numRain(ro.rain24h);
   const station=ro.stationName||'雨量站';
   const dist=Number.isFinite(parseFloat(ro.distanceKm))?`${ro.distanceKm}km`:'';
-  const base=`${station}${dist?' '+dist:''}｜10分鐘 ${_rainMm(r10)}mm｜1小時 ${_rainMm(r1)}mm｜3小時 ${_rainMm(r3)}mm｜24小時 ${_rainMm(r24)}mm`;
+  // v210：只印「有資料」的時段，空的 --mm 不顯示（減少無意義雜訊）
+  const _w=[];
+  if(r10!==null)_w.push(`10分鐘 ${_rainMm(r10)}mm`);
+  if(r1!==null)_w.push(`1小時 ${_rainMm(r1)}mm`);
+  if(r3!==null)_w.push(`3小時 ${_rainMm(r3)}mm`);
+  if(r24!==null)_w.push(`24小時 ${_rainMm(r24)}mm`);
+  const base=`${station}${dist?' '+dist:''}${_w.length?'｜'+_w.join('｜'):''}`;
   // CWA 雨量分級：大雨 40mm/h 或 80mm/24h；豪雨 100mm/3h 或 200mm/24h
   if((r3!==null&&r3>=100)||(r24!==null&&r24>=200)){
     if(cfg.heavyRain===false||userItems.heavyRain===false)return null;
@@ -3274,8 +3288,8 @@ function evaluateWxAlerts(){
     const _r6=maxRain(6),_mm6=maxPrecipMm(6);
     if(_r6.mx>0){
       _hvy.detail+=(isZh
-        ?`｜未來6小時最高降雨機率 ${_r6.mx}%${_mm6.mx?`、預估雨量 ${_mm6.mx.toFixed(1)} mm/h`:''}（模型逐時）`
-        :`｜Next 6h max rain prob ${_r6.mx}%${_mm6.mx?`, est ${_mm6.mx.toFixed(1)} mm/h`:''} (model)`);
+        ?`｜未來6小時最高降雨機率 ${_r6.mx}%${_r6.at?`（約${hourLabel(_r6.at)}）`:''}${_mm6.mx?`、預估雨量 ${_mm6.mx.toFixed(1)} mm/h`:''}（模型逐時）`
+        :`｜Next 6h max rain prob ${_r6.mx}%${_r6.at?` (~${hourLabel(_r6.at)})`:''}${_mm6.mx?`, est ${_mm6.mx.toFixed(1)} mm/h`:''} (model)`);
     }
   }
   return out;
@@ -3305,9 +3319,11 @@ function wxAlertHtml(){
     const s=styleOf[a.level]||styleOf.warn;
     const detail=esc(_limitText(a.detail||'',220));
     const badge=a.official?(isZh?'官方':'Official'):(a.realtimeObs?(isZh?'雨量站':'Station'):(a.modelOnly?(isZh?'模型':'Model'):''));
+    // v210：官方長敘述收進原生 <details> 摺疊，預設不展開——不洗版又保留官方完整資訊
+    const moreHtml=a.bodyFull?`<details style="margin-top:4px"><summary style="cursor:pointer;font-size:10px;opacity:.6;outline:none">${isZh?'官方說明':'Detail resmi'}</summary><div style="margin-top:3px;font-size:10px;opacity:.82;line-height:1.45;word-break:break-word">${esc(_limitText(a.bodyFull,220))}</div></details>`:'';
     return `<div class="wx-alert ${s.pulse?'wx-alert-pulse':''}" style="background:${s.bg};border-left:4px solid ${s.bc};color:${s.tc};padding:8px 12px;margin:4px 0;border-radius:6px;font-size:11px;line-height:1.5;display:flex;gap:8px;align-items:flex-start">
       <div style="font-size:18px;flex-shrink:0;line-height:1">${a.icon}</div>
-      <div style="flex:1;min-width:0"><div style="font-weight:800;font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span>${esc(a.title)}</span>${badge?`<span style="font-size:9px;border:1px solid currentColor;border-radius:999px;padding:0 5px;opacity:.75">${badge}</span>`:''}</div><div style="margin-top:2px;opacity:0.92;word-break:break-word">${detail}</div></div>
+      <div style="flex:1;min-width:0"><div style="font-weight:800;font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span>${esc(a.title)}</span>${badge?`<span style="font-size:9px;border:1px solid currentColor;border-radius:999px;padding:0 5px;opacity:.75">${badge}</span>`:''}</div><div style="margin-top:2px;opacity:0.92;word-break:break-word">${detail}</div>${moreHtml}</div>
     </div>`;
   }).join("");
   // 標題列
