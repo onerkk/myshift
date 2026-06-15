@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v211-umbrella-contrast';
+const CACHE_NAME = 'myshift-v213-festival-engine';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache

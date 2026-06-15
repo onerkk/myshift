@@ -804,48 +804,71 @@ function rebuildR(){
     RN.id[rot.id]=rot.nameId||rot.name;
   });
 }
-// Fixed holidays (same date every year) - display only
-// 國定假日（影響薪資/排班的紅色標線）+ 一般固定節慶（僅顯示，不影響休假）
-// 注意：08-08 父親節改至每年 HOL_YEAR 中（因為 2027 七夕也是 08-08，要合併顯示）
-// 09-25 中秋、04-05 清明每年國曆日期會變，但保留在 BASE 作為「該年若無 YEAR 條目時」的 fallback
-const HOL_BASE={"01-01":{zh:"元旦",id:"Tahun Baru"},"02-14":{zh:"💝 西洋情人節",id:"Hari Valentine"},"02-28":{zh:"和平紀念日",id:"Hari Perdamaian TW"},"03-08":{zh:"🌷 婦女節",id:"Hari Perempuan"},"03-14":{zh:"🤍 白色情人節",id:"White Day"},"04-01":{zh:"🤡 愚人節",id:"Hari April Mop"},"04-04":{zh:"兒童節",id:"Hari Anak TW"},"04-05":{zh:"清明節",id:"Qingming"},"04-22":{zh:"🌏 世界地球日",id:"Hari Bumi"},"05-01":{zh:"勞動節",id:"Hari Buruh"},"09-25":{zh:"中秋節",id:"Festival Kue Bulan"},"09-28":{zh:"教師節",id:"Hari Guru"},"10-10":{zh:"國慶日",id:"Hari Nasional TW"},"10-25":{zh:"光復節",id:"Hari Retrosesi"},"10-31":{zh:"🎃 萬聖節",id:"Halloween"},"11-11":{zh:"🛒 雙11購物節",id:"11.11 Shopping"},"12-24":{zh:"🎄 平安夜",id:"Malam Natal"},"12-25":{zh:"行憲紀念日／聖誕節",id:"Hari Natal"},"12-31":{zh:"🎆 跨年夜",id:"Malam Tahun Baru"}};
-// Indonesian holidays (display only, not in TW_OFF)
+// ════════════ 節慶顯示系統（歐那）2026-07 重構 ════════════
+// 為何重構：農曆/節氣節慶原本逐年「手打國曆日期」，會打錯(例:2026端午誤植2025的5/31)、新增年份會再錯、且無交叉驗證。
+// 根治：農曆/節氣節慶一律「由本檔農民曆引擎(Almanac, 對sxtwl+cnlunar 0誤差)即時推算」，任何年份都不會錯、不會漏。
+//   ├ 引擎算：春節/除夕/小年夜/端午/七夕/中元/中秋/重陽(農曆) ＋ 清明/冬至(節氣) ＋ 母親節(5月2nd日)/父親節西式(6月3rd日)
+//   ├ HOL_BASE：純固定國曆日(元旦/情人節/兒童節/勞動節/教師節/國慶/光復/萬聖/雙11/聖誕/台父親節08-08…)
+//   ├ HOL_YEAR：只放「補假/政策日」——2026 為行政院人事行政總處公告正式值；2027-2030 依法規預估(待每年6/30前公告次年)
+//   └ HOL_ID：印尼專屬節(開齋/宰牲/印尼國慶…)僅在印尼版(lang==='id')顯示
+// getHOL 把四來源「同日合併」並以／串接(例:清明節／兒童節(補假)、💕七夕情人節／👔父親節)。薪資/排班放假認定走另一套 isTWOff，與此無關。
+const HOL_BASE={"01-01":{zh:"元旦",id:"Tahun Baru"},"02-14":{zh:"💝 西洋情人節",id:"Hari Valentine"},"02-28":{zh:"和平紀念日",id:"Hari Perdamaian TW"},"03-08":{zh:"🌷 婦女節",id:"Hari Perempuan"},"03-14":{zh:"🤍 白色情人節",id:"White Day"},"04-01":{zh:"🤡 愚人節",id:"Hari April Mop"},"04-04":{zh:"兒童節",id:"Hari Anak TW"},"04-22":{zh:"🌏 世界地球日",id:"Hari Bumi"},"05-01":{zh:"勞動節",id:"Hari Buruh"},"08-08":{zh:"👔 父親節",id:"Hari Ayah TW"},"09-28":{zh:"教師節",id:"Hari Guru"},"10-10":{zh:"國慶日",id:"Hari Nasional TW"},"10-25":{zh:"光復節",id:"Hari Retrosesi"},"10-31":{zh:"🎃 萬聖節",id:"Halloween"},"11-11":{zh:"🛒 雙11購物節",id:"11.11 Shopping"},"12-24":{zh:"🎄 平安夜",id:"Malam Natal"},"12-25":{zh:"行憲紀念日／聖誕節",id:"Hari Natal"},"12-31":{zh:"🎆 跨年夜",id:"Malam Tahun Baru"}};
+// 印尼專屬節（僅 lang==='id' 顯示，且不進 TW_OFF）
 const HOL_ID={"01-27":{zh:"夜行登霄節",id:"Isra Mi'raj"},"01-29":{zh:"春節",id:"Imlek"},"03-28":{zh:"寧靜日",id:"Nyepi"},"03-31":{zh:"開齋節",id:"Idul Fitri"},"04-01":{zh:"開齋節",id:"Idul Fitri"},"04-18":{zh:"耶穌受難日",id:"Jumat Agung"},"05-12":{zh:"衛塞節",id:"Waisak"},"05-29":{zh:"耶穌升天日",id:"Kenaikan Yesus"},"06-07":{zh:"宰牲節",id:"Idul Adha"},"06-27":{zh:"伊斯蘭新年",id:"Tahun Baru Islam"},"08-17":{zh:"🇮🇩 印尼國慶",id:"🇮🇩 Kemerdekaan"},"09-05":{zh:"先知誕辰",id:"Maulid Nabi"}};
-// Year-specific holidays (lunar dates, 補假, etc)
-// 包含：國定假日浮動日期、國定假日補假、農曆變動節慶（七夕/中元/重陽/冬至/父親節/母親節等）
-//
-// ⚠️ 重要說明：
-// 1. 2026 已經由行政院人事行政總處公告，為正式日期
-// 2. 2027-2030 的【國定假日補假日期】為依法規條文推算的「預估」，正式版本須等行政院於每年 6/30 前公告次年日曆
-// 3. 2027-2030 的【農曆換算】（春節/除夕/端午/中秋/七夕/中元/重陽）為精確值，不會變動
-// 4. 父親節（08-08）放在每年 YEAR 表，因為 2027 七夕剛好也是 08-08，需合併顯示
+// 農曆節慶座標(月-日)→名稱；初一/初二/初三 皆標春節
+const FEST_LUNAR={"1-1":{zh:"春節",id:"Imlek"},"1-2":{zh:"春節",id:"Imlek"},"1-3":{zh:"春節",id:"Imlek"},"5-5":{zh:"端午節",id:"Peh Cun"},"7-7":{zh:"💕 七夕情人節",id:"Qixi"},"7-15":{zh:"中元節",id:"Zhongyuan"},"8-15":{zh:"中秋節",id:"Festival Kue Bulan"},"9-9":{zh:"🍂 重陽節",id:"Chongyang"}};
+function _nthSun(y,m,n){let c=0;for(let d=1;d<=31;d++){const dt=new Date(y,m-1,d);if(dt.getMonth()!==m-1)break;if(dt.getDay()===0&&++c===n)return d;}return null;}
+let _FEST_CACHE={};
+// 由農民曆引擎推算某年所有「可算節慶」→ {"MM-DD":{zh,id}}，每年算一次後快取
+function buildFest(y){
+  if(_FEST_CACHE[y])return _FEST_CACHE[y];
+  const map={},A=(typeof Almanac!=="undefined")?Almanac:((typeof window!=="undefined")?window.Almanac:null);
+  if(A&&A.s2l){
+    let spring=null;
+    for(let dt=new Date(y,0,1);dt<=new Date(y,11,31);dt.setDate(dt.getDate()+1)){
+      const mm=dt.getMonth()+1,dd=dt.getDate(),L=A.s2l(y,mm,dd);
+      if(!L.isLeap){const key=L.month+"-"+L.day;if(FEST_LUNAR[key]){map[hk(mm,dd)]=FEST_LUNAR[key];if(key==="1-1")spring=new Date(y,mm-1,dd);}}
+      const jq=A.jieqiOn?A.jieqiOn(y,mm,dd):null;
+      if(jq==="清明")map[hk(mm,dd)]={zh:"清明節",id:"Qingming"};
+      if(jq==="冬至")map[hk(mm,dd)]={zh:"❄️ 冬至",id:"Dongzhi"};
+    }
+    if(spring){const cx=new Date(spring);cx.setDate(cx.getDate()-1);map[hk(cx.getMonth()+1,cx.getDate())]={zh:"除夕",id:"Malam Imlek"};
+      const xy=new Date(spring);xy.setDate(xy.getDate()-2);map[hk(xy.getMonth()+1,xy.getDate())]={zh:"小年夜",id:"Malam Tahun Baru Imlek"};}
+    const ms=_nthSun(y,5,2);if(ms)map[hk(5,ms)]={zh:"🌸 母親節",id:"Hari Ibu"};
+    const fs=_nthSun(y,6,3);if(fs)map[hk(6,fs)]={zh:"👨 父親節(西式)",id:"Hari Ayah"};
+  }
+  _FEST_CACHE[y]=map;return map;
+}
+// 只放「補假/政策日」。2026=行政院公告正式值；2027-2030=依法規預估(待每年6/30前公告)
 const HOL_YEAR={
-  2026:{"02-15":{zh:"小年夜",id:"Malam Tahun Baru Imlek"},"02-16":{zh:"除夕",id:"Malam Imlek"},"02-17":{zh:"春節",id:"Imlek"},"02-18":{zh:"春節",id:"Imlek"},"02-19":{zh:"春節",id:"Imlek"},"02-20":{zh:"小年夜(補假)",id:"Libur Pengganti"},"02-27":{zh:"和平紀念日(補假)",id:"Libur Pengganti"},"04-03":{zh:"兒童節(補假)",id:"Libur Pengganti"},"04-06":{zh:"清明節(補假)",id:"Libur Pengganti"},"05-10":{zh:"🌸 母親節",id:"Hari Ibu"},"05-31":{zh:"端午節",id:"Peh Cun"},"06-01":{zh:"端午節(補假)",id:"Libur Pengganti"},"06-21":{zh:"👨 父親節(西式)",id:"Hari Ayah"},"08-08":{zh:"👔 父親節",id:"Hari Ayah TW"},"08-19":{zh:"💕 七夕情人節",id:"Qixi"},"08-27":{zh:"中元節",id:"Zhongyuan"},"10-09":{zh:"國慶日(補假)",id:"Libur Pengganti"},"10-18":{zh:"🍂 重陽節",id:"Chongyang"},"10-26":{zh:"光復節(補假)",id:"Libur Pengganti"},"12-22":{zh:"❄️ 冬至",id:"Dongzhi"}},
-
-  // 2027 浮動日期：春節 2/6-2/8(週六~週一)、清明 4/5(週一)、端午 6/9(週三)、中秋 9/15(週三)
-  // 預估補假：228(週日)→3/1、兒童節(週日)→4/5(與清明同日)、勞動節(週六)→4/30、國慶(週日)→10/11、行憲(週六)→12/24
-  // 春節補假：除夕前小年夜=2/4(週四上班日)、春節1(週六)前補→2/5(但2/5是除夕)、春節2(週日)後補→2/9
-  2027:{"02-04":{zh:"小年夜",id:"Malam Tahun Baru Imlek"},"02-05":{zh:"除夕",id:"Malam Imlek"},"02-06":{zh:"春節",id:"Imlek"},"02-07":{zh:"春節",id:"Imlek"},"02-08":{zh:"春節",id:"Imlek"},"02-09":{zh:"春節(補假)",id:"Libur Pengganti"},"03-01":{zh:"和平紀念日(補假)",id:"Libur Pengganti"},"04-05":{zh:"清明節／兒童節(補假)",id:"Qingming"},"04-30":{zh:"勞動節(補假)",id:"Libur Pengganti"},"05-09":{zh:"🌸 母親節",id:"Hari Ibu"},"06-09":{zh:"端午節",id:"Peh Cun"},"06-20":{zh:"👨 父親節(西式)",id:"Hari Ayah"},"08-08":{zh:"💕 七夕／👔 父親節",id:"Qixi & Hari Ayah TW"},"08-16":{zh:"中元節",id:"Zhongyuan"},"09-15":{zh:"中秋節",id:"Festival Kue Bulan"},"10-08":{zh:"🍂 重陽節",id:"Chongyang"},"10-11":{zh:"國慶日(補假)",id:"Libur Pengganti"},"12-22":{zh:"❄️ 冬至",id:"Dongzhi"},"12-24":{zh:"行憲紀念日(補假)／🎄 平安夜",id:"Malam Natal"}},
-
-  // 2028 浮動日期：春節 1/26-1/28(週三~週五)、清明 4/4(週二)、端午 5/28(週日)、中秋 10/3(週二)
-  // 預估補假：元旦(週六)→前一年12/31、端午(週日)→5/29
-  2028:{"01-24":{zh:"小年夜",id:"Malam Tahun Baru Imlek"},"01-25":{zh:"除夕",id:"Malam Imlek"},"01-26":{zh:"春節",id:"Imlek"},"01-27":{zh:"春節",id:"Imlek"},"01-28":{zh:"春節",id:"Imlek"},"04-04":{zh:"兒童節／清明節",id:"Qingming"},"05-14":{zh:"🌸 母親節",id:"Hari Ibu"},"05-28":{zh:"端午節",id:"Peh Cun"},"05-29":{zh:"端午節(補假)",id:"Libur Pengganti"},"06-18":{zh:"👨 父親節(西式)",id:"Hari Ayah"},"08-08":{zh:"👔 父親節",id:"Hari Ayah TW"},"08-26":{zh:"💕 七夕情人節",id:"Qixi"},"09-03":{zh:"中元節",id:"Zhongyuan"},"10-03":{zh:"中秋節",id:"Festival Kue Bulan"},"10-26":{zh:"🍂 重陽節",id:"Chongyang"},"12-21":{zh:"❄️ 冬至",id:"Dongzhi"}},
-
-  // 2029 浮動日期：春節 2/13-2/15(週二~週四)、清明 4/4(週三)、端午 6/16(週六)、中秋 9/22(週六)
-  // 預估補假：小年夜=2/11(週日)後補→2/16(但2/16非例假)、端午(週六)→6/15、中秋(週六)→9/21
-  2029:{"02-11":{zh:"小年夜",id:"Malam Tahun Baru Imlek"},"02-12":{zh:"除夕",id:"Malam Imlek"},"02-13":{zh:"春節",id:"Imlek"},"02-14":{zh:"春節／💝 西洋情人節",id:"Imlek & Valentine"},"02-15":{zh:"春節",id:"Imlek"},"04-04":{zh:"兒童節／清明節",id:"Qingming"},"05-13":{zh:"🌸 母親節",id:"Hari Ibu"},"06-15":{zh:"端午節(補假)",id:"Libur Pengganti"},"06-16":{zh:"端午節",id:"Peh Cun"},"06-17":{zh:"👨 父親節(西式)",id:"Hari Ayah"},"08-08":{zh:"👔 父親節",id:"Hari Ayah TW"},"08-16":{zh:"💕 七夕情人節",id:"Qixi"},"08-24":{zh:"中元節",id:"Zhongyuan"},"09-21":{zh:"中秋節(補假)",id:"Libur Pengganti"},"09-22":{zh:"中秋節",id:"Festival Kue Bulan"},"10-16":{zh:"🍂 重陽節",id:"Chongyang"},"12-21":{zh:"❄️ 冬至",id:"Dongzhi"}},
-
-  // 2030 浮動日期：春節 2/3-2/5(週日~週二)、清明 4/4(週四)、端午 6/5(週三)、中秋 9/12(週四)
-  // 預估補假：除夕(週六)→2/1、春節1(週日)→2/6、教師節(週六)→9/27
-  2030:{"02-01":{zh:"小年夜／除夕(補假)",id:"Malam Tahun Baru Imlek"},"02-02":{zh:"除夕",id:"Malam Imlek"},"02-03":{zh:"春節",id:"Imlek"},"02-04":{zh:"春節",id:"Imlek"},"02-05":{zh:"春節",id:"Imlek"},"02-06":{zh:"春節(補假)",id:"Libur Pengganti"},"04-04":{zh:"兒童節／清明節",id:"Qingming"},"05-12":{zh:"🌸 母親節",id:"Hari Ibu"},"06-05":{zh:"端午節",id:"Peh Cun"},"06-16":{zh:"👨 父親節(西式)",id:"Hari Ayah"},"08-05":{zh:"💕 七夕情人節",id:"Qixi"},"08-08":{zh:"👔 父親節",id:"Hari Ayah TW"},"08-13":{zh:"中元節",id:"Zhongyuan"},"09-12":{zh:"中秋節",id:"Festival Kue Bulan"},"09-27":{zh:"教師節(補假)",id:"Libur Pengganti"},"10-05":{zh:"🍂 重陽節",id:"Chongyang"},"12-22":{zh:"❄️ 冬至",id:"Dongzhi"}}
+  2026:{"02-20":{zh:"小年夜(補假)",id:"Libur Pengganti"},"02-27":{zh:"和平紀念日(補假)",id:"Libur Pengganti"},"04-03":{zh:"兒童節(補假)",id:"Libur Pengganti"},"04-06":{zh:"清明節(補假)",id:"Libur Pengganti"},"10-09":{zh:"國慶日(補假)",id:"Libur Pengganti"},"10-26":{zh:"光復節(補假)",id:"Libur Pengganti"}},
+  // 2027 預估補假：春節2(週日)後補2/9、228(週日)→3/1、兒童(週日)→4/5(與清明同日合併)、勞動(週六)→4/30、國慶(週日)→10/11、行憲(週六)→12/24
+  2027:{"02-09":{zh:"春節(補假)",id:"Libur Pengganti"},"03-01":{zh:"和平紀念日(補假)",id:"Libur Pengganti"},"04-05":{zh:"兒童節(補假)",id:"Libur Pengganti"},"04-30":{zh:"勞動節(補假)",id:"Libur Pengganti"},"10-11":{zh:"國慶日(補假)",id:"Libur Pengganti"},"12-24":{zh:"行憲紀念日(補假)",id:"Libur Pengganti"}},
+  // 2028 預估補假：端午(週日)→5/29
+  2028:{"05-29":{zh:"端午節(補假)",id:"Libur Pengganti"}},
+  // 2029 預估補假：端午(週六)→6/15、中秋(週六)→9/21
+  2029:{"06-15":{zh:"端午節(補假)",id:"Libur Pengganti"},"09-21":{zh:"中秋節(補假)",id:"Libur Pengganti"}},
+  // 2030 預估補假：春節(逢週末)→2/6、教師節(週六)→9/27
+  2030:{"02-06":{zh:"春節(補假)",id:"Libur Pengganti"},"09-27":{zh:"教師節(補假)",id:"Libur Pengganti"}}
 };
-function getHOL(y,m,d){const k=hk(m,d);return HOL_YEAR[y]&&HOL_YEAR[y][k]||HOL_BASE[k]||HOL_ID[k]||null}
+// 合併四來源(節慶/補假/固定/印尼)；印尼節僅 id 版；同日多節以／串接去重
+function getHOL(y,m,d){
+  const k=hk(m,d),srcs=[];
+  const fest=buildFest(y)[k];            if(fest)srcs.push(fest);
+  const pol=HOL_YEAR[y]&&HOL_YEAR[y][k]; if(pol)srcs.push(pol);
+  const base=HOL_BASE[k];               if(base)srcs.push(base);
+  if(lang==="id"){const idh=HOL_ID[k];  if(idh)srcs.push(idh);}
+  if(!srcs.length)return null;
+  if(srcs.length===1)return srcs[0];
+  const join=f=>{const s=[];srcs.forEach(x=>{if(x[f]&&s.indexOf(x[f])<0)s.push(x[f])});return s.join("／")};
+  return {zh:join("zh"),id:join("id")};
+}
 
 // Year-specific Taiwan weekday holidays (for isOff & payday calculation)
 // ⚠️ 只放「真正放假、影響加班/薪資/排班計算」的日期，不放純節慶（情人節、母親節等）
 // 2027-2030 為依法規預估，正式版本須等行政院前一年公告
 const TW_OFF_Y={
-  2026:new Set(["01-01","02-16","02-17","02-18","02-19","02-20","02-27","04-03","04-06","05-01","06-01","09-25","09-28","10-09","10-26","12-25"]),
+  2026:new Set(["01-01","02-16","02-17","02-18","02-19","02-20","02-27","04-03","04-06","05-01","06-19","09-25","09-28","10-09","10-26","12-25"]),
   // 2027：小年夜2/4、除夕2/5、春節2/6~2/8、春節補假2/9、228補假3/1、清明兒童4/2~4/5、勞動節補假4/30、勞動5/1、端午6/9、中秋9/15、教師9/28、國慶10/10、國慶補假10/11、光復10/25、行憲補假12/24、行憲12/25
   2027:new Set(["01-01","02-04","02-05","02-06","02-07","02-08","02-09","02-28","03-01","04-02","04-03","04-04","04-05","04-30","05-01","06-09","09-15","09-28","10-10","10-11","10-25","12-24","12-25"]),
   // 2028：元旦補假(前一年12-31)、元旦1/1(週六，前補12/31)、小年夜1/24、除夕1/25、春節1/26~1/28、228(週一)、清明兒童4/4、勞動5/1、端午5/28、端午補假5/29、中秋10/3、教師9/28、國慶10/10、光復10/25、行憲12/25
