@@ -212,7 +212,7 @@
   "use strict";
   var RV_API="https://api.rainviewer.com/public/weather-maps.json";
   var COLOR=4, SIZE=256, SMOOTH=1, SNOW=1; // RainViewer 色階 4，平滑
-  var map, meMarker, frames=[], layers=[], idx=0, playing=false, timer=null, refresh=null, me=null, liveIdx=0;
+  var map, meMarker, frames=[], layers=[], idx=0, playing=false, timer=null, refresh=null, refreshRain=null, me=null, liveIdx=0;
 
   var $=function(id){return document.getElementById(id)};
   function pad(n){return (n<10?"0":"")+n}
@@ -324,6 +324,12 @@
     return {txt:txt, cls: mm>0?"wet":"dry"};
   }
 
+  function parseObsMs(v){
+    if(!v) return NaN;
+    var t=String(v).trim();
+    if(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$/.test(t)) t=t.replace(" ","T")+"+08:00";
+    var n=new Date(t).getTime(); return isFinite(n)?n:NaN;
+  }
   function loadRain(){
     if(!me) return;
     var box=$("rainBox");
@@ -331,18 +337,23 @@
      .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
      .then(function(d){
        if(!d||!d.ok||!d.rain) throw new Error((d&&d.error)||"no data");
-       var t=""; if(d.obsTime){ var m=String(d.obsTime).match(/T(\d{2}:\d{2})/); if(m) t=m[1]; }
-       var dist=(d.distanceKm!=null)?d.distanceKm+" km":"";
+       var obsMs=parseObsMs(d.obsTime), ageMin=isFinite(obsMs)?Math.max(0,Math.round((Date.now()-obsMs)/60000)):9999;
+       var distNum=Number(d.distanceKm), hasDist=isFinite(distNum), fresh=ageMin<=20;
+       var local=fresh&&hasDist&&distNum<=10, nearby=fresh&&hasDist&&distNum<=20;
+       var t=""; if(d.obsTime){ var m=String(d.obsTime).match(/[T ](\d{2}:\d{2})/); if(m) t=m[1]; }
+       var dist=hasDist?distNum.toFixed(distNum<10?1:0)+" km":"";
+       var trust=local?"本地實測":nearby?"鄰近參考":(!fresh?"資料偏舊":"測站較遠");
        var cells=[["10分",d.rain.min10],["1時",d.rain.hr1],["3時",d.rain.hr3],["24時",d.rain.hr24]];
        var grid="";
        for(var i=0;i<cells.length;i++){ var f=formatRain(cells[i][1]);
          grid+='<div class="rb-cell"><div class="rb-k">'+cells[i][0]+'</div><div class="rb-v '+f.cls+'">'+f.txt+'</div><div class="rb-u">mm</div></div>'; }
        box.className="rainbox";
-       box.innerHTML='<div class="rb-head"><span class="rdrop">●</span><span class="rb-st">'+(d.station||"最近雨量站")+'</span><span class="rb-meta">'+(dist?dist+" · ":"")+(t?t+" 實測":"實測")+'</span></div><div class="rb-grid">'+grid+'</div>';
+       box.innerHTML='<div class="rb-head"><span class="rdrop">●</span><span class="rb-st">'+(d.station||"最近雨量站")+'</span><span class="rb-meta">'+(dist?dist+" · ":"")+(t?t+" · ":"")+trust+'</span></div><div class="rb-grid">'+grid+'</div>'+(local?'':'<div style="margin-top:6px;font-size:10px;color:var(--tx3)">非 10 km／20 分鐘內本地觀測，不用來判定你所在地現在是否下雨。</div>');
        box.style.display="";
-       // 常駐精簡列：現在這 10 分鐘實測
+       // 常駐精簡列只顯示可信的本地即時觀測；較遠或過舊資料只留在詳細卡供參考。
        var f10=formatRain(d.rain.min10);
-       $("rainMini").innerHTML='雨量 <b class="'+(f10.cls==="wet"?"mwet":"")+'">'+f10.txt+(f10.txt==="微量"?"":" mm")+'</b>';
+       if(local) $("rainMini").innerHTML='雨量 <b class="'+(f10.cls==="wet"?"mwet":"")+'">'+f10.txt+(f10.txt==="微量"?"":" mm")+'</b>';
+       else $("rainMini").innerHTML='雨量 <b>參考</b>';
        $("miniStat").style.display="";
      })
      .catch(function(){
@@ -411,7 +422,8 @@
     loadRadar();
     loadRain();
     loadForecast();
-    clearInterval(refresh); refresh=setInterval(function(){ loadRadar(); loadRain(); loadForecast(); }, 5*60*1000); // 每 5 分鐘更新雷達 + 雨量 + 預報
+    clearInterval(refresh); refresh=setInterval(function(){ loadRadar(); loadForecast(); }, 5*60*1000); // 雷達／預報每 5 分鐘同步
+    clearInterval(refreshRain); refreshRain=setInterval(loadRain, 60*1000); // 官方雨量觀測每分鐘檢查一次，仍以觀測時間與距離判可信度
   }
   function geoError(err){
     var msg = err && err.code===1 ? "你拒絕了定位權限。請到瀏覽器設定允許此頁定位，再重試。"

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v213-festival-engine';
+const CACHE_NAME = 'myshift-v214-realtime-trust';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -334,12 +334,100 @@ function swAreaMatchesGps(text, pos) {
   if (!keys.length) return false;
   return keys.some(k => k && text.indexOf(k) >= 0);
 }
+function swParseTs(v) {
+  if (v === null || v === undefined || v === '') return NaN;
+  if (typeof v === 'number') return v > 1e12 ? v : v * 1000;
+  let t = String(v).trim();
+  if (!t) return NaN;
+  // CWA 未附時區的時間視為臺灣時間，避免不同裝置各自解讀。
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$/.test(t)) t = t.replace(' ', 'T') + '+08:00';
+  const n = new Date(t).getTime();
+  return Number.isFinite(n) ? n : NaN;
+}
+function swAlertAreaText(a) {
+  if (!a) return '';
+  const areas = [];
+  if (Array.isArray(a.areas)) a.areas.forEach(x => areas.push(typeof x === 'string' ? x : JSON.stringify(x)));
+  else if (a.areas) areas.push(String(a.areas));
+  return [a.areaDesc, a.area, a.county, a.town, a.locationName, a.matchedCounty, a.matchedTown, a.matchedAreaName, ...areas].filter(Boolean).join('｜');
+}
+function swPointInPoly(lat, lon, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const yi = poly[i][0], xi = poly[i][1], yj = poly[j][0], xj = poly[j][1];
+    const hit = ((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / ((yj - yi) || 1e-12) + xi);
+    if (hit) inside = !inside;
+  }
+  return inside;
+}
+function swParseCapPolygon(v) {
+  if (Array.isArray(v)) {
+    if (v.length >= 3 && Array.isArray(v[0])) return v.map(p => [parseFloat(p[0]), parseFloat(p[1])]).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+    return [];
+  }
+  return String(v || '').trim().split(/\s+/).map(x => x.split(',').map(Number)).filter(p => p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+}
+function swGeometryContainsGps(a, pos) {
+  if (!a || !pos) return false;
+  const lat = parseFloat(pos.lat), lon = parseFloat(pos.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  const vals = [];
+  const walk = (v, d) => {
+    if (v == null || d > 5) return;
+    if (Array.isArray(v)) { v.forEach(x => walk(x, d + 1)); return; }
+    if (typeof v === 'object') {
+      for (const k in v) { if (/polygon|geometry|coordinate|circle/i.test(k)) vals.push(v[k]); walk(v[k], d + 1); }
+    }
+  };
+  walk(a, 0);
+  for (const v of vals) {
+    const poly = swParseCapPolygon(v);
+    if (poly.length >= 3) {
+      // CAP 常用 lat,lon；GeoJSON 常用 lon,lat，兩種都驗證。
+      if (swPointInPoly(lat, lon, poly) || swPointInPoly(lat, lon, poly.map(p => [p[1], p[0]]))) return true;
+    }
+    if (typeof v === 'string') {
+      const m = v.trim().match(/^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/);
+      if (m) { const d = swDistKm(lat, lon, parseFloat(m[1]), parseFloat(m[2])); if (d !== null && d <= parseFloat(m[3])) return true; }
+    }
+  }
+  return false;
+}
+function swOfficialAlertScope(a, pos) {
+  if (!a || a.matchedArea === false) return { match: 'none', reason: 'worker-no-match' };
+  const p = pos && pos.place || {};
+  const county = swIsValidCounty(p.county) ? swCleanAreaName(p.county) : '';
+  const town = swIsValidTown(p.town) ? swCleanAreaName(p.town) : '';
+  if (!county && !town) return { match: 'none', reason: 'no-place' };
+  if (swGeometryContainsGps(a, pos)) return { match: 'local', reason: 'geometry' };
+  const text = swAlertAreaText(a);
+  const townVars = swTwVariants(town);
+  if (town && townVars.some(k => k && text.indexOf(k) >= 0)) return { match: 'local', reason: 'town' };
+  // 明確列出其他鄉鎮時，同縣市名稱不能再被誤判成本地警報。
+  const listedTowns = (text.match(/[一-鿿]{1,8}[區鄉鎮]/g) || []).map(swCleanAreaName);
+  if (town && listedTowns.length && !listedTowns.some(x => swTwVariants(town).includes(x))) return { match: 'none', reason: 'other-towns' };
+  const countyMatch = county && swTwVariants(county).some(k => k && text.indexOf(k) >= 0);
+  if (countyMatch) return { match: 'regional', reason: 'county-only' };
+  return { match: 'none', reason: 'no-area' };
+}
 function swOfficialAlertMatchesGps(a, pos) {
+  return swOfficialAlertScope(a, pos).match === 'local';
+}
+function swOfficialAlertIsActive(a) {
   if (!a) return false;
-  if (a.matchedArea === false) return false;
-  // 背景通知也不信任 worker 的 gpsMatched 旗標；一定以本機 GPS 反查地名再驗一次。
-  const text = [a.event, a.title, a.headline, a.description, a.areaDesc, Array.isArray(a.areas) ? a.areas.join('、') : a.areas, a.county, a.town, a.locationName, a.matchedCounty, a.matchedTown, a.matchedAreaName].filter(Boolean).join('｜');
-  return swAreaMatchesGps(text, pos);
+  const vt = a.validTime || a.valid || {};
+  let start = swParseTs(a.effective || a.onset || a.startTime || vt.startTime);
+  let end = swParseTs(a.expires || a.endTime || vt.endTime);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    const raw = String(a.contentText || a.description || a.headline || '');
+    const m = raw.match(/\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?/g) || [];
+    if (!Number.isFinite(start) && m[0]) start = swParseTs(m[0]);
+    if (!Number.isFinite(end) && m[1]) end = swParseTs(m[1]);
+  }
+  const now = Date.now();
+  if (Number.isFinite(start) && start > now + 5 * 60 * 1000) return false;
+  if (Number.isFinite(end) && end < now - 2 * 60 * 1000) return false;
+  return true;
 }
 
 function swTextIncludesAny(text, arr) { return arr.some(k => text.indexOf(k) >= 0); }
@@ -357,7 +445,9 @@ function swPickCwaText(v, depth, bag) {
 function swEvaluateCwaWeatherWarnings(cwaData, cfg, pos) {
   const out = [];
   if (!cwaData) return out;
-  const raw = (cwaData.officialAlerts || cwaData.weatherWarnings || []).filter(a => swOfficialAlertMatchesGps(a, pos));
+  // 背景通知只允許「精確鄉鎮或 CAP 幾何範圍命中」且仍在有效期內的官方警特報。
+  // 縣市級但無法確認目前鄉鎮者，前景可標示為區域公告，背景不得推播。
+  const raw = (cwaData.officialAlerts || cwaData.weatherWarnings || []).filter(a => swOfficialAlertMatchesGps(a, pos) && swOfficialAlertIsActive(a));
   const detailFromAlert = a => {
     const parts = [];
     const area = swMatchedAreaLabel(a, pos);
@@ -378,38 +468,18 @@ function swEvaluateCwaWeatherWarnings(cwaData, cfg, pos) {
     return 'weather';
   };
   const titleMap = { heavyRain: '中央氣象署豪大雨特報', storm: '中央氣象署雷雨特報', strongWind: '中央氣象署強風特報', heat: '中央氣象署高溫資訊', cold: '中央氣象署低溫特報', fog: '中央氣象署濃霧特報', typhoon: '中央氣象署颱風警報' };
-  if (raw.length) {
-    const seen = new Set();
-    for (const a of raw) {
-      const id = a.id || idFromText((a.event || '') + ' ' + (a.title || '') + ' ' + (a.headline || '') + ' ' + (a.description || ''));
-      if (id === 'weather' || cfg[id] === false) continue;
-      const key = id + '|' + (a.event || a.title || '') + '|' + (Array.isArray(a.areas) ? a.areas.join(',') : (a.areas || ''));
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({ id, icon: ({ heavyRain: '🌧', storm: '⛈', strongWind: '💨', heat: '🥵', cold: '🥶', fog: '🌫', typhoon: '🌀' })[id] || '⚠️', title: titleMap[id] || '中央氣象署天氣警特報', body: detailFromAlert(a), critical: id === 'typhoon' || id === 'storm' || id === 'heavyRain', official: true });
-    }
-    return out;
+  const seen = new Set();
+  for (const a of raw) {
+    const id = a.id || idFromText((a.event || '') + ' ' + (a.title || '') + ' ' + (a.headline || '') + ' ' + (a.description || ''));
+    if (id === 'weather' || cfg[id] === false) continue;
+    const key = id + '|' + (a.event || a.title || '') + '|' + (Array.isArray(a.areas) ? a.areas.join(',') : (a.areas || ''));
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id, icon: ({ heavyRain: '🌧', storm: '⛈', strongWind: '💨', heat: '🥵', cold: '🥶', fog: '🌫', typhoon: '🌀' })[id] || '⚠️', title: titleMap[id] || '中央氣象署天氣警特報', body: detailFromAlert(a), critical: id === 'typhoon' || id === 'storm' || id === 'heavyRain', official: true });
   }
-  const bag = [];
-  swPickCwaText(cwaData, 0, bag);
-  if (!bag.length) return out;
-  const text = [...new Set(bag)].join('｜');
-  if (!swAreaMatchesGps(text, pos)) return out;
-  const detail = kind => {
-    const place = swPlaceText(pos);
-    const hit = bag.find(t => (t.indexOf(kind) >= 0 || t.indexOf('特報') >= 0 || t.indexOf('警報') >= 0) && swAreaMatchesGps(t, pos)) || '';
-    const short = String(hit).replace(/(臺灣|台灣|全臺|全台|北部|中部|南部|東部|離島)[；;、｜]*/g, '').slice(0, 110);
-    return (place ? 'GPS所在地：' + place + (short ? '｜' : '') : '') + (short || '中央氣象署官方警特報生效中');
-  };
-  if (cfg.heavyRain !== false && swTextIncludesAny(text, ['豪雨','大雨','豪大雨','短延時強降雨'])) out.push({ id: 'heavyRain', icon: '🌧', title: '中央氣象署豪大雨特報', body: detail('雨'), critical: true, official: true });
-  if (cfg.storm !== false && swTextIncludesAny(text, ['大雷雨','雷雨','雷擊'])) out.push({ id: 'storm', icon: '⛈', title: '中央氣象署雷雨特報', body: detail('雷'), critical: true, official: true });
-  if (cfg.strongWind !== false && swTextIncludesAny(text, ['陸上強風','強風','平均風','陣風'])) out.push({ id: 'strongWind', icon: '💨', title: '中央氣象署強風特報', body: detail('風'), critical: false, official: true });
-  if (cfg.heat !== false && swTextIncludesAny(text, ['高溫','橙色燈號','紅色燈號'])) out.push({ id: 'heat', icon: '🥵', title: '中央氣象署高溫資訊', body: detail('高溫'), critical: false, official: true });
-  if (cfg.cold !== false && swTextIncludesAny(text, ['低溫','寒流'])) out.push({ id: 'cold', icon: '🥶', title: '中央氣象署低溫特報', body: detail('低溫'), critical: false, official: true });
-  if (cfg.fog !== false && swTextIncludesAny(text, ['濃霧','能見度'])) out.push({ id: 'fog', icon: '🌫', title: '中央氣象署濃霧特報', body: detail('霧'), critical: false, official: true });
+  // 不再掃描整包 JSON 文字猜警報；沒有結構化區域與有效時間就不背景推播。
   return out;
 }
-
 
 // SW 端的警報判斷（簡化版，與 app.js evaluateWxAlerts 邏輯一致）
 function swEvaluate(wxData, cfg, cwaData, pos) {
@@ -457,12 +527,11 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
     }
   }
 
-  // v200：CWA 官方強風特報不能繞過後台陣風門檻。
-  // 先暫存 CWA 警特報；強風必須等取得本地 GPS 逐時陣風後再決定是否顯示。
+  // 官方警特報已在上方用精確 GPS 鄉鎮/CAP 幾何與有效時間篩選；不得再被另一套模型反向否決。
   const cwaAlerts = swEvaluateCwaWeatherWarnings(cwaData, cfg, pos);
 
   if (!wxData) {
-    for (const a of cwaAlerts) if (a.id !== 'strongWind' && !out.some(x => x.id === a.id)) out.push(a);
+    for (const a of cwaAlerts) if (!out.some(x => x.id === a.id)) out.push(a);
     return out;
   }
   const n = new Date();
@@ -505,17 +574,8 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
     return mx;
   }
 
-  // v200：CWA 官方警特報中，只有強風要再通過「本地最大陣風 >= 後台門檻」才顯示。
-  {
-    const th = parseFloat(cfg.windGustThreshold || cfg.windThreshold) || 62;
-    const localMaxGust = Math.max(parseFloat(curGust) || 0, maxGust(3));
-    for (const a of cwaAlerts) {
-      if (a.id === 'strongWind') {
-        if (localMaxGust < th) continue;
-        a.body = (a.body || '中央氣象署官方警特報生效中') + `；本地最大陣風 ${Math.round(localMaxGust)} / ${Math.round(th)} km/h`;
-      }
-      if (!out.some(x => x.id === a.id)) out.push(a);
-    }
+  for (const a of cwaAlerts) {
+    if (!out.some(x => x.id === a.id)) out.push(a);
   }
 
   // CWA 颱風優先
@@ -551,11 +611,11 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
     const w6 = maxGust(6), r6 = maxRain(6);
     const isStorm = (curCode === 95 || curCode === 96 || curCode === 99);
     if ((curGust >= wTh || w6 >= wTh) && (isStorm || r6 >= 80)) {
-      out.push({ id: 'typhoon', icon: '🌀', title: '颱風跡象警報', body: `陣風最高 ${Math.round(Math.max(curGust, w6))} km/h（模型推算，請以中央氣象署為準）`, critical: true });
+      out.push({ id: 'typhoon', icon: '🌀', title: '劇烈風雨模型提醒', body: `模型陣風最高 ${Math.round(Math.max(curGust, w6))} km/h；不是中央氣象署颱風警報`, critical: false, modelOnly: true });
     }
   }
   if (cfg.storm !== false && (curCode === 95 || curCode === 96 || curCode === 99)) {
-    out.push({ id: 'storm', icon: '⛈', title: '雷雨警報', body: '目前有雷雨，避免戶外、遠離高處與電器', critical: true });
+    out.push({ id: 'storm', icon: '⛈', title: '雷雨模型提醒', body: '模型格點顯示雷雨；請以雷達與中央氣象署警特報確認', critical: false, modelOnly: true });
   }
   if (cfg.heavyRain !== false && swInDetectionWindow('heavyRain', cfg) && !out.some(a => a.id === 'heavyRain' || a.id === 'storm' || a.id === 'typhoon')) {
     const r = maxRain(6), mm = maxPrecipMm(6);
@@ -566,7 +626,7 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
   if (cfg.rain !== false && swInDetectionWindow('rain', cfg) && !out.some(a => a.id === 'heavyRain' || a.id === 'heavyRainModel' || a.id === 'storm' || a.id === 'typhoon')) {
     const r = maxRain(3);
     if (r >= (cfg.rainProb || 60)) {
-      out.push({ id: 'rain', icon: '🌂', title: '降雨提醒', body: `未來 3 小時降雨機率 ${r}%，建議攜帶雨具`, critical: false });
+      out.push({ id: 'rain', icon: '🌂', title: '降雨機率模型提醒', body: `模型未來 3 小時最高降雨機率 ${r}%；不是即時雨量觀測`, critical: false, modelOnly: true });
     }
   }
   if (cfg.strongWind !== false && swInDetectionWindow('strongWind', cfg) && !out.some(a => a.id === 'typhoon' || a.id === 'strongWind')) {
@@ -574,17 +634,17 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
     const mxW = Math.max(curGust, w3);
     const th = parseFloat(cfg.windGustThreshold || cfg.windThreshold) || 62;
     if (mxW >= th) {
-      out.push({ id: 'strongWind', icon: '💨', title: '強風警報', body: `最大陣風 ${Math.round(mxW)} km/h，騎車注意`, critical: false });
+      out.push({ id: 'strongWind', icon: '💨', title: '強風模型提醒', body: `模型最大陣風 ${Math.round(mxW)} km/h；不是官方強風特報`, critical: false, modelOnly: true });
     }
   }
   if (cfg.heat !== false && swInDetectionWindow('heat', cfg) && !out.some(a => a.id === 'heat') && curTemp >= (cfg.heatThreshold || 36)) {
-    out.push({ id: 'heat', icon: '🥵', title: '高溫警報', body: `目前 ${curTemp}°C，多補水`, critical: false });
+    out.push({ id: 'heat', icon: '🥵', title: '高溫模型提醒', body: `模型目前值 ${curTemp}°C，多補水`, critical: false, modelOnly: true });
   }
   if (cfg.cold !== false && swInDetectionWindow('cold', cfg) && !out.some(a => a.id === 'cold') && curTemp <= (cfg.coldThreshold || 10)) {
-    out.push({ id: 'cold', icon: '🥶', title: '低溫警報', body: `目前 ${curTemp}°C，注意保暖`, critical: false });
+    out.push({ id: 'cold', icon: '🥶', title: '低溫模型提醒', body: `模型目前值 ${curTemp}°C，注意保暖`, critical: false, modelOnly: true });
   }
   if (cfg.fog === true && swInDetectionWindow('fog', cfg) && !out.some(a => a.id === 'fog') && (curCode === 45 || curCode === 48)) {
-    out.push({ id: 'fog', icon: '🌫', title: '濃霧提醒', body: '能見度差，行車開大燈', critical: false });
+    out.push({ id: 'fog', icon: '🌫', title: '濃霧模型提醒', body: '模型顯示能見度可能偏低；請以現場與官方資訊確認', critical: false, modelOnly: true });
   }
   return out;
 }
@@ -644,6 +704,8 @@ async function swBackgroundCheck() {
     let state = (await swGetCache('notifyState')) || {};
 
     for (const a of alerts) {
+      // 模型預報只在 App 內作提醒；背景通知只發官方警特報與地震/颱風官方資料。
+      if (a.modelOnly) continue;
       const notifyKey = ({ typhoon: 'notifyTyphoon', storm: 'notifyStorm', heavyRain: 'notifyHeavyRain', rain: 'notifyRain', strongWind: 'notifyStrongWind', heat: 'notifyHeat', cold: 'notifyCold', fog: 'notifyFog', earthquake: 'notifyEarthquake' })[a.id];
       if (!notifyKey) continue;   // 無 notify key（如 heavyRainModel 模型提醒）只顯示橫幅、不推播，與 app.js 一致
       if (cfg[notifyKey] === false) continue;
