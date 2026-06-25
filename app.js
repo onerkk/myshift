@@ -1181,6 +1181,8 @@ function applyVisualFxSetting(){
     if((!visualOn||!soundOn) && window.WxSfx && window.WxSfx._forceSilence) window.WxSfx._forceSilence();
     else if(soundOn && window.WxSfx && window.WxFx && window.WxFx.getMode && window.WxSfx.setMode && !window.WxSfx.isMuted()) window.WxSfx.setMode(window.WxFx.getMode());
   }catch(e){}
+  // 切換特效或後台設定後，立刻依目前最新天氣重新判定，不必等下一次 API 更新。
+  try{_syncWeatherFx()}catch(e){}
 }
 function saveAppConfig(){
   if(!isAdmin())return Promise.resolve();
@@ -2547,6 +2549,56 @@ async function _applyCwaPop(wx,lat,lon,place,force){
 }
 try{window._applyCwaPop=_applyCwaPop}catch(e){}
 
+// 將「預報＋即時雨量站＋官方警特報」同步到前景天氣動畫。
+// 原本動畫只在 Open-Meteo 完成時更新；CWA 資料稍後到達後雖會把降雨機率上修並顯示豪雨橫幅，
+// 卻沒有重新呼叫 WxFx.update，造成畫面已有 100% / 豪雨特報但動畫仍停在晴天或夜空模式。
+function _syncWeatherFx(){
+  try{
+    const fx=window.WxFx;
+    if(!fx||typeof fx.update!=='function')return;
+    if(!wxData){fx.update(null,0,0,0);return}
+
+    const hi=_wxHourIndex();
+    let curPrec=0,curWind=0;
+    if(hi>=0){
+      curPrec=Number(wxData.hPrec&&wxData.hPrec[hi])||0;
+      curWind=Number(wxData.hWind&&wxData.hWind[hi])||0;
+    }
+    let code=Number(wxData.code);
+    if(!Number.isFinite(code))code=null;
+
+    // 現在是否有下雨證據：目前降水、逐時預估雨量、附近 CWA 雨量站，或高降雨機率。
+    let actualRain=Math.max(0,Number(wxData.currentPrecip)||0);
+    if(hi>=0&&Array.isArray(wxData.hRain))actualRain=Math.max(actualRain,Number(wxData.hRain[hi])||0);
+    let obsRain=0;
+    try{
+      const ro=(typeof _rainObs==='function')?_rainObs():null;
+      if(ro){
+        obsRain=Math.max(
+          Number(ro.rain10Min!=null?ro.rain10Min:ro.precipitation)||0,
+          Number(ro.rain1h)||0
+        );
+      }
+    }catch(e){}
+    const rainEvidence=actualRain>0.05||obsRain>0||curPrec>=40;
+
+    // 官方警特報比單一預報代碼更晚到達；有下雨證據時用它提升動畫強度。
+    if(rainEvidence&&typeof evaluateWxAlerts==='function'){
+      const ids=new Set(evaluateWxAlerts().map(a=>a&&a.id).filter(Boolean));
+      if(ids.has('storm')) code=95;
+      else if(ids.has('heavyRain')) code=65;
+      else if(ids.has('rain')&&![51,53,55,56,61,63,65,66,67,80,81,82,95,96,99].includes(code)) code=61;
+    }
+
+    // 即時已在下雨時，即使目前天氣碼仍是多雲，也不可維持無雨動畫。
+    if(rainEvidence&&![51,53,55,56,61,63,65,66,67,80,81,82,95,96,99].includes(code)){
+      code=(actualRain>=4||obsRain>=4)?65:61;
+    }
+    fx.update(code,Number(wxData.temp)||0,curPrec,curWind);
+  }catch(e){console.log('sync weather fx err',e)}
+}
+try{window._syncWeatherFx=_syncWeatherFx}catch(e){}
+
 async function loadWx(arg,retries){
   let force=false;
   if(typeof arg==='number'){retries=arg;}
@@ -2560,10 +2612,7 @@ async function loadWx(arg,retries){
       const c=JSON.parse(localStorage.getItem('_wxCache'));
       if(c&&c.d&&c.ts&&(Date.now()-c.ts)<WX_CACHE_MAX_AGE_MS){
         wxData=c.d;wxData._cached=true;wxData._cacheAgeMin=Math.round((Date.now()-c.ts)/60000);wxErr=false;render();
-        let cp=0,cw=0;
-        const hi=_wxHourIndex();
-        if(hi>=0){cp=wxData.hPrec?wxData.hPrec[hi]||0:0;cw=wxData.hWind?wxData.hWind[hi]||0:0}
-        WxFx.update(wxData.code,wxData.temp,cp,cw);
+        _syncWeatherFx();
       }
     }catch(e){}
   }
@@ -2647,13 +2696,10 @@ async function loadWx(arg,retries){
   }
   render();
   if(wxData){
-    let curPrec=0,curWind=0;
-    const hi=_wxHourIndex();
-    if(hi>=0){curPrec=wxData.hPrec?wxData.hPrec[hi]||0:0;curWind=wxData.hWind?wxData.hWind[hi]||0:0}
-    WxFx.update(wxData.code,wxData.temp,curPrec,curWind);
+    _syncWeatherFx();
     try{loadCwaData({force:false})}catch(e){}
     try{checkAndNotifyAlerts()}catch(e){console.log('notify check err',e)}
-  }else WxFx.update(null,0,0,0);
+  }else _syncWeatherFx();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2688,6 +2734,7 @@ async function loadCwaData(arg){
         typhoonData=c.d;
         earthquakeData=c.d;
         try{_recomputeEffectivePop()}catch(e){}  // v209：雨量站快取就緒 → 即時校正當前小時降雨機率
+        _syncWeatherFx();
         render();
       }
     }catch(e){}
@@ -2711,6 +2758,7 @@ async function loadCwaData(arg){
       typhoonErr=false;earthquakeErr=false;
       try{localStorage.setItem('_cwaCache',JSON.stringify({ts:Date.now(),key:cwaKey,place:place||null,d:data}))}catch(e){}
       try{_recomputeEffectivePop()}catch(e){}  // v209：即時雨量站就緒 → 即時校正當前小時降雨機率
+      _syncWeatherFx();
       render();
       try{checkAndNotifyAlerts()}catch(e){}
     }
@@ -5822,7 +5870,7 @@ const WxFx = (function(){
   }
   return{update,getMode,_debug,_spawnBfly,_spawnLeaf,_forceSilence};
 })();
-try{window.WxFx=WxFx}catch(e){}
+try{window.WxFx=WxFx;_syncWeatherFx()}catch(e){}
 
 // ═══ WEATHER SOUND ENGINE ═══
 const WxSfx = (function(){
