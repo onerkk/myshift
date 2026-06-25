@@ -2558,18 +2558,41 @@ function _syncWeatherFx(){
     if(!fx||typeof fx.update!=='function')return;
     if(!wxData){fx.update(null,0,0,0);return}
 
-    const hi=_wxHourIndex();
-    let curPrec=0,curWind=0;
+    // 先找目前小時；若 API 小時字串因時區或更新延遲沒有完全對上，改抓距離現在最近的逐時資料。
+    let hi=_wxHourIndex();
+    if(hi<0&&Array.isArray(wxData.hTime)&&wxData.hTime.length){
+      const now=Date.now();let best=-1,bestDiff=Infinity;
+      for(let i=0;i<wxData.hTime.length;i++){
+        const ts=Date.parse(String(wxData.hTime[i]));
+        if(!Number.isFinite(ts))continue;
+        const diff=Math.abs(ts-now);
+        if(diff<bestDiff){bestDiff=diff;best=i}
+      }
+      if(best>=0&&bestDiff<=3*60*60*1000)hi=best;
+    }
+
+    const rainCodes=[51,53,55,56,61,63,65,66,67,80,81,82,95,96,99];
+    let curPrec=0,curWind=0,actualRain=Math.max(0,Number(wxData.currentPrecip)||0);
+    let code=Number(wxData.code);
     if(hi>=0){
       curPrec=Number(wxData.hPrec&&wxData.hPrec[hi])||0;
       curWind=Number(wxData.hWind&&wxData.hWind[hi])||0;
+      actualRain=Math.max(actualRain,Number(wxData.hRain&&wxData.hRain[hi])||0);
+      // current.weather_code 有時比逐時資料晚更新；動畫優先使用目前小時的 hCode。
+      const hourlyCode=Number(wxData.hCode&&wxData.hCode[hi]);
+      if(Number.isFinite(hourlyCode))code=hourlyCode;
     }
-    let code=Number(wxData.code);
     if(!Number.isFinite(code))code=null;
 
-    // 現在是否有下雨證據：目前降水、逐時預估雨量、附近 CWA 雨量站，或高降雨機率。
-    let actualRain=Math.max(0,Number(wxData.currentPrecip)||0);
-    if(hi>=0&&Array.isArray(wxData.hRain))actualRain=Math.max(actualRain,Number(wxData.hRain[hi])||0);
+    // 同時看目前與下一小時，避免 04:59/05:00 邊界剛好抓不到正在發生的降雨。
+    let nearPrec=curPrec,nearRain=actualRain;
+    if(hi>=0){
+      for(let i=hi;i<Math.min(hi+2,(wxData.hTime||[]).length);i++){
+        nearPrec=Math.max(nearPrec,Number(wxData.hPrec&&wxData.hPrec[i])||0);
+        nearRain=Math.max(nearRain,Number(wxData.hRain&&wxData.hRain[i])||0);
+      }
+    }
+
     let obsRain=0;
     try{
       const ro=(typeof _rainObs==='function')?_rainObs():null;
@@ -2580,21 +2603,25 @@ function _syncWeatherFx(){
         );
       }
     }catch(e){}
-    const rainEvidence=actualRain>0.05||obsRain>0||curPrec>=40;
 
-    // 官方警特報比單一預報代碼更晚到達；有下雨證據時用它提升動畫強度。
-    if(rainEvidence&&typeof evaluateWxAlerts==='function'){
-      const ids=new Set(evaluateWxAlerts().map(a=>a&&a.id).filter(Boolean));
-      if(ids.has('storm')) code=95;
-      else if(ids.has('heavyRain')) code=65;
-      else if(ids.has('rain')&&![51,53,55,56,61,63,65,66,67,80,81,82,95,96,99].includes(code)) code=61;
-    }
+    const codeSaysRain=rainCodes.includes(code);
+    const rainNow=codeSaysRain||actualRain>0.05||obsRain>0||curPrec>=40;
+    const rainNear=rainNow||nearRain>0.05||nearPrec>=60;
 
-    // 即時已在下雨時，即使目前天氣碼仍是多雲，也不可維持無雨動畫。
-    if(rainEvidence&&![51,53,55,56,61,63,65,66,67,80,81,82,95,96,99].includes(code)){
-      code=(actualRain>=4||obsRain>=4)?65:61;
+    // 官方警特報、模型高降雨提醒與即時資料要共同驅動動畫；不能只有警報卡更新，畫面仍停在星空。
+    let ids=new Set();
+    try{
+      if(typeof evaluateWxAlerts==='function')ids=new Set(evaluateWxAlerts().map(a=>a&&a.id).filter(Boolean));
+    }catch(e){}
+    if(ids.has('storm')&&(rainNear||codeSaysRain)) code=95;
+    else if((ids.has('heavyRain')||ids.has('heavyRainModel'))&&rainNear) code=65;
+    else if(ids.has('rain')&&rainNear&&!rainCodes.includes(code)) code=61;
+
+    // 即時或目前小時已有降雨證據時，多雲/晴天碼不得把雨特效關掉。
+    if(rainNow&&!rainCodes.includes(code)){
+      code=(actualRain>=4||obsRain>=4||nearRain>=4||nearPrec>=85)?65:61;
     }
-    fx.update(code,Number(wxData.temp)||0,curPrec,curWind);
+    fx.update(code,Number(wxData.temp)||0,Math.max(curPrec,rainNow?40:0),curWind);
   }catch(e){console.log('sync weather fx err',e)}
 }
 try{window._syncWeatherFx=_syncWeatherFx}catch(e){}
@@ -4159,7 +4186,7 @@ const WxFx = (function(){
     if(canvas) return;
     canvas=document.createElement("canvas");
     canvas.id="wxfx";
-    canvas.style.cssText="position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0.5";
+    canvas.style.cssText="position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0.58";
     document.body.appendChild(canvas);
     ctx=canvas.getContext("2d");
     resize();
@@ -4185,6 +4212,8 @@ const WxFx = (function(){
     mode=m;
     particles=[];splashes=[];debris=[];
     heatPhase=0;lightningTimer=0;lightningAlpha=0;
+    // 深色夜間背景會吃掉半透明雨線；雨天模式提高畫布可見度，其餘模式維持柔和。
+    if(canvas)canvas.style.opacity=(mode==="rain"?"0.82":(mode==="heavy"||mode==="storm"||mode==="typhoon")?"0.90":"0.58");
     if(typeof WxSfx!=='undefined') WxSfx.setMode(m);
     document.body.classList.remove("wx-heat","wx-rain","wx-storm","wx-fog","wx-snow","wx-wind","wx-typhoon","wx-cold");
     if(mode==="none") return;
@@ -4231,8 +4260,8 @@ const WxFx = (function(){
     const len=heavy?22+Math.random()*18:12+Math.random()*12;
     const drift=wind?5+Math.random()*6:1+Math.random()*2;
     return{type:"rain",x:Math.random()*_w*1.4-_w*.2, y:Math.random()*_h*-1, speed, len, drift,
-      alpha:heavy?0.35+Math.random()*0.25:0.18+Math.random()*0.18,
-      width:heavy?2+Math.random():1.2+Math.random()*0.5};
+      alpha:heavy?0.52+Math.random()*0.28:0.38+Math.random()*0.24,
+      width:heavy?2.2+Math.random()*1.1:1.45+Math.random()*0.65};
   }
   
   function mkSnow(){
@@ -4362,9 +4391,11 @@ const WxFx = (function(){
       grd.addColorStop(1,`rgba(12,20,45,${0.45*intensity})`);
       ctx.fillStyle=grd;
       ctx.fillRect(0,0,_w,_h);
-      stars.forEach(s=>{
+      // 下雨、豪雨、雷雨時不應仍滿天星；霧雨只保留極淡背景，避免誤以為特效仍是夜空模式。
+      const starWeatherFactor=(mode==="rain"?0.08:(mode==="fog"?0.18:(mode==="none"||mode==="heat"||mode==="cold")?1:0));
+      if(starWeatherFactor>0)stars.forEach(s=>{
         s.tw+=s.sp;
-        const a=(0.5+Math.sin(s.tw)*0.4)*intensity;
+        const a=(0.5+Math.sin(s.tw)*0.4)*intensity*starWeatherFactor;
         ctx.beginPath();
         ctx.fillStyle=`rgba(255,255,240,${a})`;
         ctx.arc(s.x*_w,s.y*_h,s.r,0,Math.PI*2);
@@ -4890,6 +4921,8 @@ const WxFx = (function(){
     if([51,53,56,61,63,66,80,81].includes(code)){setMode("rain");return}
     // Snow / sleet
     if([71,73,75,77,85,86].includes(code)){setMode("snow");return}
+    // 高降雨機率代表目前小時已有雨勢證據；即使 current code 暫時仍是多雲/霧，也先顯示雨。
+    if(prec>=40){setMode(prec>=85?"heavy":"rain");return}
     // Fog
     if(code===45||code===48){setMode("fog");return}
     // Strong wind (no rain)
