@@ -777,7 +777,7 @@ zh:{app:"我的班表",sub:"My Shift",desc:"選擇輪班制度，三步自動排
   instT:"安裝到主畫面",instS:"一鍵安裝",instSi:"Safari→分享→加入主畫面",instB:"安裝",
   aSet:"✅ 鬧鐘：#m#/#d# 07:00\n⚠️ 需保持瀏覽器開啟",aNow:"✅ 已提醒！",aBlock:"通知被封鎖",aNoPerm:"需開啟通知",aNo:"不支援通知",sRem:"班表提醒",
   helpT:"📖 使用說明",
-  h:["初始設定|首次使用回答三個問題（上班或休假→班別→第幾天），系統自動排出整年班表。若管理員已在後台鎖定你的輪班規則，只需設定今天是哪一班即可。可隨時點底部「重設」重新設定。","查看班表|左右箭頭切換月份，點「今天」立刻回到本月。每日格子以顏色區分：藍色＝早班、紫色＝晚班、黃色＝中班、灰色＝休假。點擊任一日期可查看詳情、請假或標記事項。今天的日期會以橘色粗框顯示。","請假系統|點擊日期後可新增請假：選擇假別（事假、病假、特休等，由管理員在後台設定）、時數（0.5 小時為單位），可填寫請假原因（選填，最多 50 字，只有管理員看得到），按確認送出。同單位同事只看到當天請假人數（不知道是誰、不知道原因），管理員可查看完整名單、假別、時數與原因。已請的假可隨時點 ✕ 取消。","標記事項與颱風假|每日可標記：📚上課、🚗公出、💰發薪日、🌴特休、🌀颱風假、📝自訂備註（最多 50 字）。颱風假可指定時數，會自動扣減當月加班時數與薪資前後段加班。管理員可額外設定 📋班股會議與 🏥體檢日期，全體使用者可見。","特休管理|在請假彈窗下方輸入年度特休總時數與已使用時數（0.5 小時為單位）。日曆上勾選特休的日期會自動扣除並計算剩餘時數。特休年度為每年 12/26 到隔年 12/25（華新麗華制度）。","統計功能|點擊「統計」按鈕查看年度出勤統計：各班別總天數、每月工時長條圖、加班時數、特休使用率（含剩餘時數）。12 小時制每日 4 小時加班；8 小時制超出 8h 部分計為加班。請假時數會按假別自動扣減加班。可按上方箭頭切換年度查看。","薪資預估|月曆下方薪資卡片可設定薪資條完整欄位：職能俸、伙食津貼、交通津貼、崗位津貼、夜點費、勞健保自付、工會、福利金、其他固定扣款。系統自動估算當月實領金額，包含：前 2h 與後段加班費（不同倍率，公司 HR System 1.33340 / 1.66670）、免稅約 46.67h 切點、晚班次數 × 夜點費、病假扣款、颱風假按比例扣加班。薪資資料同步至你個人雲端帳號（只有你看得到），換手機登入即可復原。","薪資計算週期|每月薪資計算區間為上月 26 日至當月 25 日。例如 3 月薪水計算的是 2/26 至 3/25 的出勤與加班時數。每月 5 日發放薪資（💰），每月 20 日發放績效獎金（🏆）。遇國定假日或週末自動提前至前一個工作日，日曆上直接標示實際發放日。","7 日天氣預報|自動偵測位置顯示 7 日天氣，點選可看逐時詳情（溫度、降雨機率、陣風、濕度）。資料每小時自動更新，可在個人設定 ⚙️ 點「重新抓取」強制立即更新。資料來源 Open-Meteo 逐時預報 + 中央氣象署 CWA 官方警特報。","9 種天氣警報|系統自動偵測並顯示警報橫幅，共 9 種：🌍地震、🌀颱風、⛈雷雨、🌧豪大雨/高降雨、🌂一般降雨、💨強風、🥵高溫、🥶低溫、🌫濃霧。地震使用中央氣象署即時資料，含規模、震度、距離、時效門檻判斷（規模或震度任一達標就警報）。颱風使用 CWA 官方警報優先。每種警報的觸發門檻可由管理員在後台調整。","下雨提醒|上班日出門時段（早班/中班/晚班各自上班前 1 至 2 小時）若降雨機率 ≥ 40%，會在日曆下方顯示醒目橘色提醒「☔ 出門記得帶雨具」。可在個人設定 ⚙️ 中關閉。","個人設定 ⚙️|點天氣卡片右上 ⚙️ 進入，包含：①目前狀況診斷（即時溫度、降雨、警報數量）②總開關（警報橫幅與手機通知 兩個獨立）③9 種警報個別開關（橫幅與系統通知分開控制）④動畫/音效總開關與分類開關（天氣、動物、季節、音效）⑤通知權限狀態與「測試通知」「重新抓取天氣」按鈕。所有設定即時生效並雲端同步。","手機系統通知|啟用通知權限後，颱風、官方豪大雨、強風、地震等嚴重警報會主動跳手機系統通知（即使 App 關閉也會收到）。靜音時段內（管理員可設定，預設 22:00 至 07:00）不通知，保護休息。iOS 必須先「分享 → 加入主畫面」並從主畫面開啟才能啟用通知。","潮汐預報|自動偵測位置，顯示最近海岸測站的 7 日潮汐（滿潮/乾潮時間與潮位高度）。點選任一日可查看當日逐時詳細資料。資料來源為中央氣象署 CWA 開放資料。可點卡片上方箭頭收合節省空間。","季節動畫與環境音效|搭配四季與天氣自動變化：春花蝶舞與青蛙吐舌、夏夜螢火與蟬鳴、秋楓飄落與蜻蜓、冬霜結晶與寒鴉、雨天雨滴水花與雷電閃光、颱風雲卷、晴天陽光暈與鳥鳴、夜晚星空與蟋蟀。可在個人設定 ⚙️ 中關閉以省電。","暗夜模式自動切換|19:00 至 05:00 自動切換為暗色 UI（黑底白字），05:00 至 19:00 自動恢復白天模式，不再使用漸暗遮罩。系統依手機時間自動判斷，無需手動切換。可保護夜間視力、省電、夜班使用不刺眼。","雲端同步|登入 Google 帳號後，班表設定、標記事項、請假紀錄、備註、特休額度、颱風假時數、語言偏好、個人警報設定全部自動同步至雲端 Firestore。更換手機或清除資料後重新登入即可完整恢復，無需備份碼。薪資設定也會同步，但僅限你本人帳號可讀取（Firestore 規則鎖定 uid），其他人與管理員都看不到。","單位與輪班管理|管理員可在後台建立單位（如「研磨股 A 班/B 班/C 班」）與多種輪班規則（如四休二、兩早兩晚循環等），並鎖定使用者的單位和輪班類型。鎖定後使用者無法自行更改，確保全員資料一致。管理員亦可設定假別、發薪日、體檢、會議、警報門檻、靜音時段、視覺特效開關等。","多單位查看|管理員可在頂部選擇「全部單位」一次查看所有單位請假人數，方便整廠人力調度。一般使用者只看到自己所屬單位的資料。","節慶與假日|自動顯示台灣國定假日（含補假、調整放假）與印尼節慶（開齋節、宰牲節、寧靜日、衛塞節等），假日以紅色頂部標線標示。語言隨中文/印尼文切換自動翻譯。同時顯示固定節慶（情人節、母親節、雙 11 等，不影響休假但便於記憶）。","分享班表|點擊「分享」按鈕可產生當月班表 PNG 圖片，包含班別、假日、標記、節日等完整資訊。支援系統分享面板（直接分享到 LINE、WhatsApp 等），或自動下載到相簿，方便傳送給同事或家人。","安裝到桌面|底部安裝按鈕可將 App 加到手機桌面，如同原生 App 全螢幕使用，離線也能查看本月班表。右上角可切換中文（中）/印尼文（ID）。iOS 請用 Safari 開啟後「分享 → 加入主畫面」。Android 用 Chrome 自動跳出安裝提示。","桌面今日捷徑|想不開 App 一眼看今天什麼班？在瀏覽器網址列把 ?w=1 加在網址結尾（例：…/myshift/?w=1），打開後選「加入主畫面」，命名為「今日班別」。從此桌面上會多一個專屬捷徑，點開就是巨型今日班別顯示，完全離線、秒開。"],
+  h:["初始設定|首次使用回答三個問題（上班或休假→班別→第幾天），系統自動排出整年班表。若管理員已在後台鎖定你的輪班規則，只需設定今天是哪一班即可。可隨時點底部「重設」重新設定。","查看班表|左右箭頭切換月份，點「今天」立刻回到本月。每日格子以顏色區分：藍色＝早班、紫色＝晚班、黃色＝中班、灰色＝休假。點擊任一日期可查看詳情、請假或標記事項。今天的日期會以橘色粗框顯示。","請假系統|點擊日期後可新增請假：選擇假別（事假、病假、特休等，由管理員在後台設定）、時數（0.5 小時為單位），可填寫請假原因（選填，最多 50 字，只有管理員看得到），按確認送出。同單位同事只看到當天請假人數（不知道是誰、不知道原因），管理員可查看完整名單、假別、時數與原因。已請的假可隨時點 ✕ 取消。","標記事項與颱風假|每日可標記：📚上課、🚗公出、💰發薪日、🌴特休、🌀颱風假、📝自訂備註（最多 50 字）。天災假可指定時數，依本期薪資條視為給薪時數，不扣加班與本薪。管理員可額外設定 📋班股會議與 🏥體檢日期，全體使用者可見。","特休管理|在請假彈窗下方輸入年度特休總時數與已使用時數（0.5 小時為單位）。日曆上勾選特休的日期會自動扣除並計算剩餘時數。特休年度為每年 12/26 到隔年 12/25（華新麗華制度）。","統計功能|點擊「統計」按鈕查看年度出勤統計：各班別總天數、每月工時長條圖、加班時數、特休使用率（含剩餘時數）。12 小時制每日 4 小時加班；8 小時制超出 8h 部分計為加班。請假時數會按假別自動扣減加班。可按上方箭頭切換年度查看。","薪資預估|月曆下方薪資卡片可設定薪資條完整欄位：職能俸、伙食津貼、交通津貼、崗位津貼、夜點費、勞健保自付、工會、福利金、其他固定扣款。系統自動估算當月實領金額，包含：前 2h 與後段加班費（不同倍率，公司 HR System 1.33340 / 1.66670）、免稅約 46.67h 切點、晚班次數 × 夜點費（可本期總額覆寫）、病假與事假扣款；天災假不扣加班。薪資資料同步至你個人雲端帳號（只有你看得到），換手機登入即可復原。","薪資計算週期|每月薪資計算區間為上月 26 日至當月 25 日。例如 3 月薪水計算的是 2/26 至 3/25 的出勤與加班時數。每月 5 日發放薪資（💰），每月 20 日發放績效獎金（🏆）。遇國定假日或週末自動提前至前一個工作日，日曆上直接標示實際發放日。","7 日天氣預報|自動偵測位置顯示 7 日天氣，點選可看逐時詳情（溫度、降雨機率、陣風、濕度）。資料每小時自動更新，可在個人設定 ⚙️ 點「重新抓取」強制立即更新。資料來源 Open-Meteo 逐時預報 + 中央氣象署 CWA 官方警特報。","9 種天氣警報|系統自動偵測並顯示警報橫幅，共 9 種：🌍地震、🌀颱風、⛈雷雨、🌧豪大雨/高降雨、🌂一般降雨、💨強風、🥵高溫、🥶低溫、🌫濃霧。地震使用中央氣象署即時資料，含規模、震度、距離、時效門檻判斷（規模或震度任一達標就警報）。颱風使用 CWA 官方警報優先。每種警報的觸發門檻可由管理員在後台調整。","下雨提醒|上班日出門時段（早班/中班/晚班各自上班前 1 至 2 小時）若降雨機率 ≥ 40%，會在日曆下方顯示醒目橘色提醒「☔ 出門記得帶雨具」。可在個人設定 ⚙️ 中關閉。","個人設定 ⚙️|點天氣卡片右上 ⚙️ 進入，包含：①目前狀況診斷（即時溫度、降雨、警報數量）②總開關（警報橫幅與手機通知 兩個獨立）③9 種警報個別開關（橫幅與系統通知分開控制）④動畫/音效總開關與分類開關（天氣、動物、季節、音效）⑤通知權限狀態與「測試通知」「重新抓取天氣」按鈕。所有設定即時生效並雲端同步。","手機系統通知|啟用通知權限後，颱風、官方豪大雨、強風、地震等嚴重警報會主動跳手機系統通知（即使 App 關閉也會收到）。靜音時段內（管理員可設定，預設 22:00 至 07:00）不通知，保護休息。iOS 必須先「分享 → 加入主畫面」並從主畫面開啟才能啟用通知。","潮汐預報|自動偵測位置，顯示最近海岸測站的 7 日潮汐（滿潮/乾潮時間與潮位高度）。點選任一日可查看當日逐時詳細資料。資料來源為中央氣象署 CWA 開放資料。可點卡片上方箭頭收合節省空間。","季節動畫與環境音效|搭配四季與天氣自動變化：春花蝶舞與青蛙吐舌、夏夜螢火與蟬鳴、秋楓飄落與蜻蜓、冬霜結晶與寒鴉、雨天雨滴水花與雷電閃光、颱風雲卷、晴天陽光暈與鳥鳴、夜晚星空與蟋蟀。可在個人設定 ⚙️ 中關閉以省電。","暗夜模式自動切換|19:00 至 05:00 自動切換為暗色 UI（黑底白字），05:00 至 19:00 自動恢復白天模式，不再使用漸暗遮罩。系統依手機時間自動判斷，無需手動切換。可保護夜間視力、省電、夜班使用不刺眼。","雲端同步|登入 Google 帳號後，班表設定、標記事項、請假紀錄、備註、特休額度、颱風假時數、語言偏好、個人警報設定全部自動同步至雲端 Firestore。更換手機或清除資料後重新登入即可完整恢復，無需備份碼。薪資設定也會同步，但僅限你本人帳號可讀取（Firestore 規則鎖定 uid），其他人與管理員都看不到。","單位與輪班管理|管理員可在後台建立單位（如「研磨股 A 班/B 班/C 班」）與多種輪班規則（如四休二、兩早兩晚循環等），並鎖定使用者的單位和輪班類型。鎖定後使用者無法自行更改，確保全員資料一致。管理員亦可設定假別、發薪日、體檢、會議、警報門檻、靜音時段、視覺特效開關等。","多單位查看|管理員可在頂部選擇「全部單位」一次查看所有單位請假人數，方便整廠人力調度。一般使用者只看到自己所屬單位的資料。","節慶與假日|自動顯示台灣國定假日（含補假、調整放假）與印尼節慶（開齋節、宰牲節、寧靜日、衛塞節等），假日以紅色頂部標線標示。語言隨中文/印尼文切換自動翻譯。同時顯示固定節慶（情人節、母親節、雙 11 等，不影響休假但便於記憶）。","分享班表|點擊「分享」按鈕可產生當月班表 PNG 圖片，包含班別、假日、標記、節日等完整資訊。支援系統分享面板（直接分享到 LINE、WhatsApp 等），或自動下載到相簿，方便傳送給同事或家人。","安裝到桌面|底部安裝按鈕可將 App 加到手機桌面，如同原生 App 全螢幕使用，離線也能查看本月班表。右上角可切換中文（中）/印尼文（ID）。iOS 請用 Safari 開啟後「分享 → 加入主畫面」。Android 用 Chrome 自動跳出安裝提示。","桌面今日捷徑|想不開 App 一眼看今天什麼班？在瀏覽器網址列把 ?w=1 加在網址結尾（例：…/myshift/?w=1），打開後選「加入主畫面」，命名為「今日班別」。從此桌面上會多一個專屬捷徑，點開就是巨型今日班別顯示，完全離線、秒開。"],
   wk:["日","一","二","三","四","五","六"]},
 id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis setahun",s12:"12 jam",s8:"8 jam",cyc:"hari",
   today:"Hari ini",reset:"Reset",help:"Info",lang:"ZH",work:"Kerja",off:"Libur",
@@ -790,7 +790,7 @@ id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis seta
   instT:"Pasang di HP",instS:"Satu klik",instSi:"Safari→Bagikan→Layar Utama",instB:"Pasang",
   aSet:"✅ Alarm: #m#/#d# 07:00",aNow:"✅ Terkirim!",aBlock:"Diblokir",aNoPerm:"Perlu izin",aNo:"Tidak mendukung",sRem:"Pengingat",
   helpT:"📖 Panduan",
-  h:["Pengaturan Awal|Pertama kali pakai, jawab 3 pertanyaan (kerja/libur → shift apa → hari ke berapa), jadwal setahun otomatis dibuat. Jika admin sudah mengunci aturan shift Anda, cukup pilih hari ini shift apa. Bisa tekan 'Reset' di bawah untuk atur ulang kapan saja.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, tekan 'Hari ini' untuk kembali ke bulan ini. Warna kotak: biru = Pagi, ungu = Malam, kuning = Siang, abu-abu = Libur. Tekan tanggal mana saja untuk lihat detail, ajukan cuti, atau tandai acara. Tanggal hari ini ditandai garis oranye tebal.","Sistem Cuti|Tekan tanggal lalu tambah cuti: pilih jenis (izin, sakit, cuti tahunan, melahirkan, dll — diatur admin), jumlah jam (per 0.5 jam), bisa isi Alasan Cuti (opsional, maks 50 huruf, hanya admin yang lihat), lalu konfirmasi. Rekan satu unit hanya lihat jumlah orang cuti hari itu (tidak tahu siapa, tidak tahu alasan). Admin bisa lihat nama lengkap, jenis, jam, dan alasan. Cuti bisa dibatalkan kapan saja dengan tekan ✕.","Tanda Acara & Libur Topan|Tandai harian: 📚Kelas, 🚗Dinas, 💰Gajian, 🌴Cuti Tahunan, 🌀Libur Topan, 📝Catatan bebas (maks 50 huruf). Libur Topan bisa diisi jumlah jam, otomatis mengurangi jam lembur bulan itu dan estimasi gaji. Admin bisa tambah 📋Rapat dan 🏥Cek Kesehatan untuk semua user.","Kelola Cuti Tahunan|Di bawah jendela cuti, isi total jam cuti tahunan dan jam terpakai (per 0.5 jam). Tanggal yang ditandai cuti tahunan otomatis dikurangi dan sisa dihitung. Tahun cuti: 26 Desember tahun ini sampai 25 Desember tahun depan (aturan Walsin Lihwa).","Statistik|Tekan 'Stat' untuk lihat statistik tahunan: jumlah hari per shift, grafik jam per bulan, total lembur, persentase cuti tahunan (dengan sisa jam). 12 jam: 4 jam lembur per hari. 8 jam: kelebihan dari 8 jam dihitung lembur. Jam cuti otomatis dikurangi dari lembur menurut jenis cuti. Tekan panah di atas untuk ganti tahun.","Estimasi Gaji|Kartu gaji di bawah kalender, atur semua kolom slip gaji: Gaji Pokok, Tunjangan Makan, Transport, Posisi, Tunjangan Malam (per shift malam), BPJS Tenaga Kerja, BPJS Kesehatan, Iuran Serikat, Tunjangan Kesejahteraan, Potongan Lain. Sistem otomatis hitung perkiraan gaji bersih, termasuk: lembur 2 jam awal dan sisanya (tarif berbeda, default 1.34 dan 1.67), batas bebas pajak 46 jam, jumlah shift malam × Tunjangan Malam, potongan sakit, Libur Topan kurangi lembur proporsional. Data hanya di HP, tidak ke cloud (lindungi privasi gaji). Disarankan foto sebagai cadangan.","Periode Perhitungan Gaji|Periode gaji dihitung dari tanggal 26 bulan lalu sampai tanggal 25 bulan ini. Contoh: gaji Maret dihitung dari 26 Februari sampai 25 Maret. Gaji dibayar tanggal 5 setiap bulan (💰), bonus kinerja tanggal 20 (🏆). Jika jatuh di hari libur nasional atau weekend, otomatis dimajukan ke hari kerja sebelumnya. Tanggal pembayaran asli ditampilkan di kalender.","Prakiraan Cuaca 7 Hari|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Tekan untuk detail per jam (suhu, kemungkinan hujan, kecepatan angin, kelembaban). Data diperbarui otomatis setiap jam. Bisa tekan ⚙️ Pengaturan lalu 'Reload' untuk update segera. Sumber data: Open-Meteo (realtime) + CWA Taiwan (peringatan).","9 Jenis Peringatan Cuaca|Sistem otomatis deteksi dan tampilkan banner peringatan, total 9 jenis: 🌍Gempa Bumi, 🌀Topan, ⛈Badai Petir, 🌧Hujan Lebat, 🌂Hujan Biasa, 💨Angin Kencang, 🥵Panas Ekstrem, 🥶Dingin Ekstrem, 🌫Kabut Tebal. Gempa pakai data realtime CWA Taiwan dengan ambang magnitudo, intensitas, jarak, dan waktu (salah satu lewat ambang langsung peringatan). Topan utamakan peringatan resmi CWA. Ambang setiap peringatan bisa diatur admin.","Pengingat Bawa Payung|Pada hari kerja, di jam berangkat (1 sampai 2 jam sebelum shift Pagi/Siang/Malam) jika kemungkinan hujan ≥ 40%, banner oranye 'Bawa payung' akan muncul di bawah kalender. Bisa dimatikan di Pengaturan ⚙️.","Pengaturan Pribadi ⚙️|Tekan ikon ⚙️ di pojok kanan atas kartu cuaca untuk masuk: ①Status saat ini (suhu, hujan, jumlah peringatan aktif) ②Saklar utama (Banner Peringatan dan Notifikasi HP — dua saklar terpisah) ③Saklar individu 9 peringatan (Banner dan Notifikasi diatur terpisah) ④Animasi cuaca dan suara on/off ⑤Status izin notifikasi dan tombol 'Test Notifikasi' dan 'Reload cuaca'. Semua pengaturan langsung aktif dan tersinkron ke cloud.","Notifikasi HP|Setelah izin notifikasi diaktifkan, peringatan serius seperti Topan, Hujan Lebat, Angin Kencang, Gempa akan muncul sebagai notifikasi sistem HP (bahkan saat App ditutup). Pada jam tenang (default 22:00 sampai 07:00, bisa diatur admin) tidak ada notifikasi, lindungi istirahat. iOS wajib 'Bagikan → Tambah ke Layar Utama' dan buka dari layar utama dulu, baru bisa aktifkan notifikasi.","Pasang Surut|Deteksi lokasi otomatis, tampilkan pasang surut 7 hari dari stasiun pantai terdekat (waktu pasang/surut dan ketinggian air). Tekan tanggal mana saja untuk detail per jam hari itu. Sumber data: CWA Taiwan open data. Tekan panah di atas kartu untuk lipat dan hemat ruang.","Animasi Musim dan Suara Alam|Berubah otomatis sesuai musim dan cuaca: musim semi (bunga, kupu-kupu, katak), musim panas malam (kunang-kunang, suara jangkrik), musim gugur (daun maple, capung), musim dingin (kristal es, burung gagak), hari hujan (tetesan, kilat petir), topan (awan bergulung), hari cerah (cahaya matahari, kicau burung), malam (langit berbintang, jangkrik). Bisa dimatikan di Pengaturan ⚙️ untuk hemat baterai.","Mode Gelap Otomatis|Pukul 19:00 sampai 05:00 otomatis ganti tampilan gelap (latar hitam, tulisan putih), 18:00 sampai 19:00 masa transisi (warna siang dengan layer gelap perlahan). Sistem otomatis berdasarkan jam HP, tidak perlu ganti manual. Melindungi mata di malam hari, hemat baterai, nyaman untuk shift malam.","Sinkronisasi Cloud|Login akun Google, semua pengaturan jadwal, tanda acara, riwayat cuti, catatan, kuota cuti tahunan, jam Libur Topan, bahasa, dan pengaturan peringatan pribadi otomatis tersimpan ke cloud Firestore. Ganti HP atau hapus data App, cukup login lagi untuk pulih lengkap, tanpa kode cadangan. Pengecualian: Data Gaji hanya di HP, tidak ke cloud (lindungi privasi).","Unit dan Aturan Shift|Admin bisa buat unit (contoh: Grinding Shift A/B/C) dan berbagai aturan shift (4 kerja 2 libur, 2 Pagi 2 Malam, dll) di panel admin, lalu kunci unit dan jenis shift setiap user. Setelah dikunci, user tidak bisa ubah sendiri agar data konsisten. Admin juga bisa atur jenis cuti, tanggal gajian, cek kesehatan, rapat, ambang peringatan, jam tenang, on/off animasi.","Lihat Semua Unit|Admin bisa pilih 'Semua Unit' di atas untuk lihat jumlah cuti semua unit sekaligus, memudahkan pengaturan tenaga kerja seluruh pabrik. User biasa hanya lihat data unitnya sendiri.","Hari Libur dan Perayaan|Otomatis tampilkan hari libur nasional Taiwan (termasuk pengganti, libur sambung) dan perayaan Indonesia (Idul Fitri, Idul Adha, Nyepi, Waisak, dll). Hari libur ditandai garis merah di atas tanggal. Terjemahan otomatis sesuai bahasa 中文/Indonesia. Perayaan tetap (Valentine, Hari Ibu, 11.11, dll) juga ditampilkan untuk diingat (tidak mempengaruhi libur).","Bagikan Jadwal|Tekan 'Share' untuk buat gambar PNG jadwal bulan ini, lengkap dengan shift, hari libur, tanda acara, dan perayaan. Mendukung panel berbagi sistem (langsung ke LINE, WhatsApp, dll) atau otomatis simpan ke galeri foto, mudah dikirim ke teman atau keluarga.","Pasang ke Layar|Tombol pasang di bawah untuk tambah App ke layar utama HP, seperti app asli — layar penuh, bisa offline. Ganti bahasa 中/ID di pojok kanan atas. iOS: buka di Safari → Bagikan → Tambah ke Layar Utama. Android: Chrome akan otomatis muncul tombol pasang.","Pintasan Hari Ini|Mau lihat shift hari ini tanpa buka App? Di browser, tambahkan ?w=1 di akhir URL (contoh: …/myshift/?w=1), lalu pilih 'Tambah ke Layar Utama', beri nama 'Shift Hari Ini'. Akan ada pintasan baru di layar HP — buka langsung tampil shift hari ini ukuran besar, offline, instan."],
+  h:["Pengaturan Awal|Pertama kali pakai, jawab 3 pertanyaan (kerja/libur → shift apa → hari ke berapa), jadwal setahun otomatis dibuat. Jika admin sudah mengunci aturan shift Anda, cukup pilih hari ini shift apa. Bisa tekan 'Reset' di bawah untuk atur ulang kapan saja.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, tekan 'Hari ini' untuk kembali ke bulan ini. Warna kotak: biru = Pagi, ungu = Malam, kuning = Siang, abu-abu = Libur. Tekan tanggal mana saja untuk lihat detail, ajukan cuti, atau tandai acara. Tanggal hari ini ditandai garis oranye tebal.","Sistem Cuti|Tekan tanggal lalu tambah cuti: pilih jenis (izin, sakit, cuti tahunan, melahirkan, dll — diatur admin), jumlah jam (per 0.5 jam), bisa isi Alasan Cuti (opsional, maks 50 huruf, hanya admin yang lihat), lalu konfirmasi. Rekan satu unit hanya lihat jumlah orang cuti hari itu (tidak tahu siapa, tidak tahu alasan). Admin bisa lihat nama lengkap, jenis, jam, dan alasan. Cuti bisa dibatalkan kapan saja dengan tekan ✕.","Tanda Acara & Libur Topan|Tandai harian: 📚Kelas, 🚗Dinas, 💰Gajian, 🌴Cuti Tahunan, 🌀Libur Topan, 📝Catatan bebas (maks 50 huruf). Jam libur bencana dapat dicatat; sesuai slip periode ini tidak mengurangi lembur atau gaji pokok. Admin bisa tambah 📋Rapat dan 🏥Cek Kesehatan untuk semua user.","Kelola Cuti Tahunan|Di bawah jendela cuti, isi total jam cuti tahunan dan jam terpakai (per 0.5 jam). Tanggal yang ditandai cuti tahunan otomatis dikurangi dan sisa dihitung. Tahun cuti: 26 Desember tahun ini sampai 25 Desember tahun depan (aturan Walsin Lihwa).","Statistik|Tekan 'Stat' untuk lihat statistik tahunan: jumlah hari per shift, grafik jam per bulan, total lembur, persentase cuti tahunan (dengan sisa jam). 12 jam: 4 jam lembur per hari. 8 jam: kelebihan dari 8 jam dihitung lembur. Jam cuti otomatis dikurangi dari lembur menurut jenis cuti. Tekan panah di atas untuk ganti tahun.","Estimasi Gaji|Kartu gaji di bawah kalender, atur semua kolom slip gaji: Gaji Pokok, Tunjangan Makan, Transport, Posisi, Tunjangan Malam (per shift malam), BPJS Tenaga Kerja, BPJS Kesehatan, Iuran Serikat, Tunjangan Kesejahteraan, Potongan Lain. Sistem otomatis hitung perkiraan gaji bersih, termasuk: lembur 2 jam awal dan sisanya (tarif berbeda, default 1.34 dan 1.67), batas bebas pajak 46 jam, jumlah shift malam × tunjangan malam (bisa override total per periode), potongan sakit/izin; libur bencana tidak mengurangi lembur. Data hanya di HP, tidak ke cloud (lindungi privasi gaji). Disarankan foto sebagai cadangan.","Periode Perhitungan Gaji|Periode gaji dihitung dari tanggal 26 bulan lalu sampai tanggal 25 bulan ini. Contoh: gaji Maret dihitung dari 26 Februari sampai 25 Maret. Gaji dibayar tanggal 5 setiap bulan (💰), bonus kinerja tanggal 20 (🏆). Jika jatuh di hari libur nasional atau weekend, otomatis dimajukan ke hari kerja sebelumnya. Tanggal pembayaran asli ditampilkan di kalender.","Prakiraan Cuaca 7 Hari|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Tekan untuk detail per jam (suhu, kemungkinan hujan, kecepatan angin, kelembaban). Data diperbarui otomatis setiap jam. Bisa tekan ⚙️ Pengaturan lalu 'Reload' untuk update segera. Sumber data: Open-Meteo (realtime) + CWA Taiwan (peringatan).","9 Jenis Peringatan Cuaca|Sistem otomatis deteksi dan tampilkan banner peringatan, total 9 jenis: 🌍Gempa Bumi, 🌀Topan, ⛈Badai Petir, 🌧Hujan Lebat, 🌂Hujan Biasa, 💨Angin Kencang, 🥵Panas Ekstrem, 🥶Dingin Ekstrem, 🌫Kabut Tebal. Gempa pakai data realtime CWA Taiwan dengan ambang magnitudo, intensitas, jarak, dan waktu (salah satu lewat ambang langsung peringatan). Topan utamakan peringatan resmi CWA. Ambang setiap peringatan bisa diatur admin.","Pengingat Bawa Payung|Pada hari kerja, di jam berangkat (1 sampai 2 jam sebelum shift Pagi/Siang/Malam) jika kemungkinan hujan ≥ 40%, banner oranye 'Bawa payung' akan muncul di bawah kalender. Bisa dimatikan di Pengaturan ⚙️.","Pengaturan Pribadi ⚙️|Tekan ikon ⚙️ di pojok kanan atas kartu cuaca untuk masuk: ①Status saat ini (suhu, hujan, jumlah peringatan aktif) ②Saklar utama (Banner Peringatan dan Notifikasi HP — dua saklar terpisah) ③Saklar individu 9 peringatan (Banner dan Notifikasi diatur terpisah) ④Animasi cuaca dan suara on/off ⑤Status izin notifikasi dan tombol 'Test Notifikasi' dan 'Reload cuaca'. Semua pengaturan langsung aktif dan tersinkron ke cloud.","Notifikasi HP|Setelah izin notifikasi diaktifkan, peringatan serius seperti Topan, Hujan Lebat, Angin Kencang, Gempa akan muncul sebagai notifikasi sistem HP (bahkan saat App ditutup). Pada jam tenang (default 22:00 sampai 07:00, bisa diatur admin) tidak ada notifikasi, lindungi istirahat. iOS wajib 'Bagikan → Tambah ke Layar Utama' dan buka dari layar utama dulu, baru bisa aktifkan notifikasi.","Pasang Surut|Deteksi lokasi otomatis, tampilkan pasang surut 7 hari dari stasiun pantai terdekat (waktu pasang/surut dan ketinggian air). Tekan tanggal mana saja untuk detail per jam hari itu. Sumber data: CWA Taiwan open data. Tekan panah di atas kartu untuk lipat dan hemat ruang.","Animasi Musim dan Suara Alam|Berubah otomatis sesuai musim dan cuaca: musim semi (bunga, kupu-kupu, katak), musim panas malam (kunang-kunang, suara jangkrik), musim gugur (daun maple, capung), musim dingin (kristal es, burung gagak), hari hujan (tetesan, kilat petir), topan (awan bergulung), hari cerah (cahaya matahari, kicau burung), malam (langit berbintang, jangkrik). Bisa dimatikan di Pengaturan ⚙️ untuk hemat baterai.","Mode Gelap Otomatis|Pukul 19:00 sampai 05:00 otomatis ganti tampilan gelap (latar hitam, tulisan putih), 18:00 sampai 19:00 masa transisi (warna siang dengan layer gelap perlahan). Sistem otomatis berdasarkan jam HP, tidak perlu ganti manual. Melindungi mata di malam hari, hemat baterai, nyaman untuk shift malam.","Sinkronisasi Cloud|Login akun Google, semua pengaturan jadwal, tanda acara, riwayat cuti, catatan, kuota cuti tahunan, jam Libur Topan, bahasa, dan pengaturan peringatan pribadi otomatis tersimpan ke cloud Firestore. Ganti HP atau hapus data App, cukup login lagi untuk pulih lengkap, tanpa kode cadangan. Pengecualian: Data Gaji hanya di HP, tidak ke cloud (lindungi privasi).","Unit dan Aturan Shift|Admin bisa buat unit (contoh: Grinding Shift A/B/C) dan berbagai aturan shift (4 kerja 2 libur, 2 Pagi 2 Malam, dll) di panel admin, lalu kunci unit dan jenis shift setiap user. Setelah dikunci, user tidak bisa ubah sendiri agar data konsisten. Admin juga bisa atur jenis cuti, tanggal gajian, cek kesehatan, rapat, ambang peringatan, jam tenang, on/off animasi.","Lihat Semua Unit|Admin bisa pilih 'Semua Unit' di atas untuk lihat jumlah cuti semua unit sekaligus, memudahkan pengaturan tenaga kerja seluruh pabrik. User biasa hanya lihat data unitnya sendiri.","Hari Libur dan Perayaan|Otomatis tampilkan hari libur nasional Taiwan (termasuk pengganti, libur sambung) dan perayaan Indonesia (Idul Fitri, Idul Adha, Nyepi, Waisak, dll). Hari libur ditandai garis merah di atas tanggal. Terjemahan otomatis sesuai bahasa 中文/Indonesia. Perayaan tetap (Valentine, Hari Ibu, 11.11, dll) juga ditampilkan untuk diingat (tidak mempengaruhi libur).","Bagikan Jadwal|Tekan 'Share' untuk buat gambar PNG jadwal bulan ini, lengkap dengan shift, hari libur, tanda acara, dan perayaan. Mendukung panel berbagi sistem (langsung ke LINE, WhatsApp, dll) atau otomatis simpan ke galeri foto, mudah dikirim ke teman atau keluarga.","Pasang ke Layar|Tombol pasang di bawah untuk tambah App ke layar utama HP, seperti app asli — layar penuh, bisa offline. Ganti bahasa 中/ID di pojok kanan atas. iOS: buka di Safari → Bagikan → Tambah ke Layar Utama. Android: Chrome akan otomatis muncul tombol pasang.","Pintasan Hari Ini|Mau lihat shift hari ini tanpa buka App? Di browser, tambahkan ?w=1 di akhir URL (contoh: …/myshift/?w=1), lalu pilih 'Tambah ke Layar Utama', beri nama 'Shift Hari Ini'. Akan ada pintasan baru di layar HP — buka langsung tampil shift hari ini ukuran besar, offline, instan."],
   wk:["Min","Sen","Sel","Rab","Kam","Jum","Sab"]}
 };
 let RN={zh:{"4on2off":"做4休2","2on2off":"做2休2"},id:{"4on2off":"4K 2L","2on2off":"2K 2L"}};
@@ -959,7 +959,7 @@ let APP_CFG={admins:[],visualFx:{enabled:true},
   leaveTypes:[
     {id:"annual",name:"特休",nameId:"Cuti Tahunan",step:0.5,color:"#4caf50",otDeduct:4},
     {id:"sick",name:"病假",nameId:"Sakit",step:1,color:"#f44336",otDeduct:4},
-    {id:"personal",name:"事假",nameId:"Izin Pribadi",step:1,color:"#ff9800",otDeduct:12},
+    {id:"personal",name:"事假",nameId:"Izin Pribadi",step:1,color:"#ff9800",otDeduct:4},
     {id:"funeral",name:"喪假",nameId:"Duka Cita",step:1,color:"#616161",otDeduct:4},
     {id:"marriage",name:"婚假",nameId:"Nikah",step:1,color:"#e91e63",otDeduct:4},
     {id:"maternity",name:"產假",nameId:"Melahirkan",step:1,color:"#9c27b0",otDeduct:4},
@@ -1057,8 +1057,16 @@ function getLT(id){return APP_CFG.leaveTypes.find(t=>t.id===id)}
 // 薪資邏輯修正：依 2026/05 薪資條回推，12h 班的病假 8h 會扣整日 4h 加班，不能只扣 2h。
 function normalizePayrollLeaveTypes(){
   try{
-    const sick=APP_CFG.leaveTypes&&APP_CFG.leaveTypes.find(t=>t.id==="sick"||t.name==="病假");
-    if(sick){sick.otDeduct=4}
+    const list=APP_CFG.leaveTypes||[];
+    for(const lt of list){
+      const id=String(lt.id||"").toLowerCase(),nm=String(lt.name||"");
+      const v=lt.otDeduct==null?null:Number(lt.otDeduct);
+      // 只遷移舊版錯誤預設，不覆蓋管理員已自訂的合理值。
+      if((id==="annual"||nm.indexOf("特休")>=0)&&v==null)lt.otDeduct=4;
+      if((id==="sick"||nm.indexOf("病假")>=0)&&(v==null||v===8))lt.otDeduct=4;
+      if((id==="personal"||nm.indexOf("事假")>=0)&&(v==null||v>4))lt.otDeduct=4;
+      if((id==="official"||id==="comp"||nm.indexOf("公假")>=0||nm.indexOf("補休")>=0)&&v==null)lt.otDeduct=0;
+    }
   }catch(e){}
 }
 function normalizeWxAlertConfig(){
@@ -1210,12 +1218,17 @@ let NOTES={};try{NOTES=JSON.parse(localStorage.getItem("sb_notes"))||JSON.parse(
 // 隱私：薪資存在 users/{自己uid} 的 sal 欄位，Firestore Rules 必須鎖 uid==自己才可讀寫
 // ═══════════════════════════════════════════════════════════════
 const SAL_DEFAULT={
-  base:0,meal:0,transport:0,position:0,night:0,nightCountOverride:0,proposal:0,
+  base:0,meal:0,transport:0,position:0,night:0,
+  // 舊版曾把本期浮動項目存成全域欄位；保留欄位只為相容，實際改用 monthly[YYYY-MM]。
+  nightCountOverride:0,proposal:0,
   union:0,welfare:0,laborIns:0,healthIns:0,otherDed:0,
   // 勞退：自願提繳是員工扣款；公司提繳只顯示，不扣實領。基準請填薪資條「月提繳工資/勞退提繳工資」。
   laborPensionWage:0,laborPensionSelfRate:0,laborPensionEmployerRate:6,
-  // 華新 HR System 截圖確認：平日加班倍率為 1.33340 / 1.66670；免稅切點約 46.6667h 才能對上 64h→11285/4192。
-  otTier1Rate:1.33340,otTier2Rate:1.66670,otTaxFreeH:46.6666667,sickRate:0.5,
+  // 華新 HR System 截圖確認：平日加班倍率為 1.33340 / 1.66670；免稅切點約 46.6667h。
+  otTier1Rate:1.33340,otTier2Rate:1.66670,otTaxFreeH:46.6666667,
+  sickRate:0.5,personalRate:1,
+  // 每期浮動欄位：提案獎金、其他加項、夜點總額/次數與加班時數覆寫，避免沿用到下個月。
+  monthly:{},
   enabled:false
 };
 let SAL={};
@@ -1230,8 +1243,60 @@ function normalizeSal(){
   if(SAL.laborPensionSelfRate===undefined)SAL.laborPensionSelfRate=0;
   if(SAL.laborPensionWage===undefined)SAL.laborPensionWage=0;
   if(SAL.nightCountOverride===undefined)SAL.nightCountOverride=0;
+  if(SAL.personalRate===undefined)SAL.personalRate=1;
+  SAL.monthly=(SAL.monthly&&typeof SAL.monthly==='object'&&!Array.isArray(SAL.monthly))?Object.assign({},SAL.monthly):{};
 }
 normalizeSal();
+function salPeriodKey(y,m){return`${y}-${String(m).padStart(2,"0")}`}
+function getSalPeriod(y,m){
+  const key=salPeriodKey(y,m),src=(SAL.monthly&&SAL.monthly[key])||{};
+  const has=k=>Object.prototype.hasOwnProperty.call(src,k);
+  return{
+    proposal:has("proposal")?(+src.proposal||0):(+SAL.proposal||0),
+    otherIncome:+src.otherIncome||0,
+    nightCountOverride:has("nightCountOverride")?(+src.nightCountOverride||0):(+SAL.nightCountOverride||0),
+    nightTotalOverride:+src.nightTotalOverride||0,
+    otHoursOverride:+src.otHoursOverride||0
+  };
+}
+function setSalPeriod(y,m,data){
+  if(!SAL.monthly||typeof SAL.monthly!=="object")SAL.monthly={};
+  SAL.monthly[salPeriodKey(y,m)]=Object.assign({},data);
+  // 完成舊版資料遷移後清空全域浮動值，避免下一期誤沿用。
+  SAL.proposal=0;SAL.nightCountOverride=0;
+}
+function _leaveId(lt){return String((lt&&lt.id)||"").toLowerCase()}
+function _leaveName(lt){return String((lt&&lt.name)||"")}
+function leaveWageDeductRate(lt){
+  const id=_leaveId(lt),nm=_leaveName(lt);
+  if(id==="sick"||nm.indexOf("病假")>=0)return Math.max(0,+SAL.sickRate||0);
+  if(id==="personal"||nm.indexOf("事假")>=0){const r=Number(SAL.personalRate);return Number.isFinite(r)?Math.max(0,r):1;}
+  return 0;
+}
+// otDeduct 現在表示「同一工作日最多扣除的加班時數」。未設定=0（公假/補休不應被誤扣）。
+function leaveOtDeductForDay(leaves,dailyOT,shiftHours,uid){
+  if(!(dailyOT>0)||!Array.isArray(leaves))return 0;
+  let total=0;
+  for(const l of leaves){
+    if(uid&&l.uid!==uid)continue;
+    const lt=getLT(l.leaveType),cap=lt&&lt.otDeduct!=null?Math.max(0,+lt.otDeduct||0):0;
+    if(!(cap>0))continue;
+    const hrs=Math.min(Math.max(0,+l.hours||0),Math.max(0,shiftHours||0));
+    // 每少出勤 1 小時，最多少 1 小時班內加班；同日上限不得超過該班原有加班。
+    total+=Math.min(hrs,cap,dailyOT);
+  }
+  return Math.min(dailyOT,total);
+}
+function getPayrollLeaves(dateKey){
+  const uid=fbUser&&fbUser.uid;
+  // 正式請假資料屬個人雲端：有登入才讀自己的紀錄；未登入仍可使用本機舊版 ALD 特休標記。
+  const out=uid?(getLeaves(dateKey)||[]).filter(l=>l.uid===uid).map(l=>Object.assign({},l)):[];
+  // 舊版「標記事項→特休」資料存在 ALD；同日沒有正式特休紀錄時補入，避免薪資漏算。
+  const legacyH=Math.max(0,+ALD[dateKey]||0);
+  const hasAnnual=out.some(l=>{const lt=getLT(l.leaveType);return _leaveId(lt)==="annual"||_leaveName(lt).indexOf("特休")>=0});
+  if(legacyH>0&&!hasAnnual)out.push({uid:uid||"",leaveType:"annual",hours:legacyH,_legacy:true});
+  return out;
+}
 
 // ═══ 班別覆寫（調班）═══
 // 排班是公式算出來的，調班＝針對特定某天「覆寫」成別的班別，不影響其他天
@@ -1311,36 +1376,48 @@ function ek(y,m,d){return`${y}-${String(m).padStart(2,'0')}-${String(d).padStart
 function hk(m,d){return`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function gh(y,m,d){const h=getHOL(y,m,d);if(!h)return null;return h[lang]||null}
 function en(id){return t(id)}
-function calcOT(y,m,wd,sh){const dm=dim(y,m);let wdays=0;for(let d=1;d<=dm;d++){const dw=new Date(y,m-1,d).getDay();if(dw>=1&&dw<=5)wdays++}let hwd=0;for(let d=1;d<=dm;d++){const dw=new Date(y,m-1,d).getDay();if(dw>=1&&dw<=5&&isTWOff(y,m,d))hwd++}const rH=(wdays-hwd)*8;const tH=wd*sh;let otDed=0;for(let d=1;d<=dm;d++){const lv=getLeaves(ek(y,m,d));lv.forEach(l=>{if(l.uid===(fbUser&&fbUser.uid)){const hrs=l.hours||0;const lt=getLT(l.leaveType);const dp8=lt&&lt.otDeduct!==undefined?lt.otDeduct:4;otDed+=(hrs/8)*dp8}})}return{tH,oH:sh===12?Math.max(0,wd*4-otDed):Math.max(0,tH-rH),rH}}
+function calcOT(y,m,wd,sh){
+  const dm=dim(y,m);let wdays=0,hwd=0;
+  for(let d=1;d<=dm;d++){
+    const dw=new Date(y,m-1,d).getDay();
+    if(dw>=1&&dw<=5){wdays++;if(isTWOff(y,m,d))hwd++}
+  }
+  const rH=(wdays-hwd)*8,tH=wd*sh,dailyOT=Math.max(0,sh-8),uid=fbUser&&fbUser.uid;
+  let otDed=0;
+  if(dailyOT>0){
+    for(let d=1;d<=dm;d++){
+      const shift=gs(y,m,d);
+      if(!shift||shift==="休")continue;
+      otDed+=leaveOtDeductForDay(getPayrollLeaves(ek(y,m,d)),dailyOT,sh,uid);
+    }
+  }
+  const oH=sh===12?Math.max(0,wd*dailyOT-otDed):Math.max(0,tH-rH);
+  return{tH,oH:Math.round(oH*10)/10,rH};
+}
 function calcPayPeriod(y,m){
   const pm=m===1?12:m-1,py=m===1?y-1:y;
   const sd=new Date(py,pm-1,26),ed=new Date(y,m-1,25);
-  let wd=0,tH=0,leaveH=0,otDeductTotal=0,typhoonH=0;
+  const r=rot();
+  if(!r)return{sd,ed,wd:0,tH:0,oH:0,rH:0,sh:12,leaveH:0,otDeductTotal:0,typhoonH:0,typhoonOtDed:0,rawOH:0};
+  const sh=r.h,dailyOT=Math.max(0,sh-8),uid=fbUser&&fbUser.uid;
+  let wd=0,leaveH=0,otDeductTotal=0,typhoonH=0;
   for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
-    const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate();
-    const s=gs(cy,cm,cd);
-    if(s&&s!=="休")wd++;
-    const dayLeaves=getLeaves(ek(cy,cm,cd));
-    dayLeaves.forEach(l=>{
-      if(l.uid===(fbUser&&fbUser.uid)){
-        const hrs=l.hours||0;
-        leaveH+=hrs;
-        const lt=getLT(l.leaveType);
-        const deductPer8=lt&&lt.otDeduct!==undefined?lt.otDeduct:4;
-        otDeductTotal+=(hrs/8)*deductPer8;
-      }
-    });
-    // 颱風假時數：按班長扣減加班（12h 班整日颱風 → 扣 4h 加班；8h 班整日 → 扣 0h）
-    const tyHours=TYD[ek(cy,cm,cd)]||0;
-    if(tyHours&&s&&s!=="休")typhoonH+=tyHours;
+    const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate(),key=ek(cy,cm,cd);
+    const shift=gs(cy,cm,cd),isWork=!!(shift&&shift!=="休");
+    if(isWork)wd++;
+    const dayLeaves=getPayrollLeaves(key);
+    if(isWork){
+      let dayLeaveH=0;
+      dayLeaves.forEach(l=>{dayLeaveH+=Math.min(Math.max(0,+l.hours||0),sh)});
+      leaveH+=Math.min(sh,dayLeaveH);
+      otDeductTotal+=leaveOtDeductForDay(dayLeaves,dailyOT,sh,uid);
+    }
+    // 天災假依本次 HR 薪資條屬給薪時數：只記錄時數，不扣班內加班，也不扣薪。
+    const tyHours=Math.max(0,+TYD[key]||0);
+    if(tyHours&&isWork)typhoonH+=Math.min(tyHours,sh);
   }
-  const r=rot();if(!r)return{sd,ed,wd,tH:0,oH:0,rH:0,sh:12,leaveH:0,otDeductTotal:0,typhoonH:0,typhoonOtDed:0};
-  const sh=r.h;
-  // 每天班內隱含加班 = sh - 8（12h 班是 4h、8h 班是 0h）
-  const dailyOT=Math.max(0,sh-8);
-  // 颱風假按比例扣加班：(整體颱風時數 / 班長) × 每天隱含加班
-  const typhoonOtDed=Math.round((typhoonH/sh)*dailyOT*10)/10;
-  tH=Math.max(0,wd*sh-typhoonH);
+  // 卡片顯示排定工時；請假/天災資訊另列，不再把天災假誤當未給薪工時。
+  const tH=wd*sh;
   let wdays=0,hwd=0;
   for(let dt=new Date(sd);dt<=ed;dt.setDate(dt.getDate()+1)){
     const dw=dt.getDay(),cm=dt.getMonth()+1,cd=dt.getDate();
@@ -1348,9 +1425,9 @@ function calcPayPeriod(y,m){
     if(dw>=1&&dw<=5&&isTWOff(dt.getFullYear(),cm,cd))hwd++;
   }
   const rH=(wdays-hwd)*8;
-  const rawOH=sh===12?wd*4:Math.max(0,wd*sh-rH);
-  const oH=Math.max(0,rawOH-otDeductTotal-typhoonOtDed);
-  return{sd,ed,wd,tH,oH,rH,sh,leaveH,otDeductTotal,typhoonH,typhoonOtDed};
+  const rawOH=sh===12?wd*dailyOT:Math.max(0,wd*sh-rH);
+  const oH=Math.max(0,Math.round((rawOH-otDeductTotal)*10)/10);
+  return{sd,ed,wd,tH,oH,rH,sh,leaveH,otDeductTotal:Math.round(otDeductTotal*10)/10,typhoonH,typhoonOtDed:0,rawOH};
 }
 function payCardHtml(y,m){
   const pp=calcPayPeriod(y,m);
@@ -1388,83 +1465,81 @@ function calcSalaryEst(y,m){
   if(!SAL.enabled||!SAL.base)return null;
   const pp=calcPayPeriod(y,m);
   if(!pp||!rot())return null;
+  const period=getSalPeriod(y,m);
   const baseSum=SAL.base+SAL.meal+SAL.transport+SAL.position;
   const hourly=baseSum/240;
-  const sh=rot().h;
-  // 班內隱含加班 = sh - 8（12h 班 = 4h，對半 2h前/2h後）
-  const dailyOT=Math.max(0,sh-8);
-  const dailyFront=dailyOT/2,dailyBack=dailyOT/2;
-  // 走訪期間統計「實際有出勤」晚班數、病假時數、前後段加班扣減
-  let nightCount=0,sickH=0,frontDed=0,backDed=0,tyFront=0,tyBack=0;
+  const sh=rot().h,dailyOT=Math.max(0,sh-8);
+  const dailyFront=dailyOT/2,dailyBack=dailyOT-dailyFront,uid=fbUser&&fbUser.uid;
+  // 逐日計算，避免 10h 特休被舊公式誤扣 5h 加班；同日最多只能扣掉原有的 4h 班內加班。
+  let nightCount=0,sickH=0,personalH=0,sickDedRaw=0,personalDedRaw=0,frontDed=0,backDed=0;
   for(let dt=new Date(pp.sd);dt<=pp.ed;dt.setDate(dt.getDate()+1)){
-    const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate();
-    const s=gs(cy,cm,cd);
-    let dayLeaveH=0;
-    // 請假按假別分配前後扣減
-    const dayLeaves=getLeaves(ek(cy,cm,cd));
-    dayLeaves.forEach(l=>{
-      if(l.uid===(fbUser&&fbUser.uid)){
-        const hrs=l.hours||0;
-        dayLeaveH+=hrs;
-        if(_isSickLT(l.leaveType))sickH+=hrs;
-        const lt=getLT(l.leaveType);
-        const dp8=lt&&lt.otDeduct!==undefined?lt.otDeduct:4;
-        const totalDed=(hrs/8)*dp8;
-        // 華新 12h 薪資條回推：病假 8h 也會扣該日整段 4h 加班；故 dp8>=4 對半扣前後段。
-        if(dp8>=4){frontDed+=totalDed/2;backDed+=totalDed/2}
-        else backDed+=totalDed;
+    const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate(),key=ek(cy,cm,cd);
+    const shift=gs(cy,cm,cd),isWork=!!(shift&&shift!=="休");
+    const dayLeaves=getPayrollLeaves(key);
+    if(isWork){
+      // 同一工作日所有假別合計不得超過班別工時，避免重複/重疊紀錄造成超額扣薪。
+      let remainingLeaveH=sh;
+      for(const l of dayLeaves){
+        if(remainingLeaveH<=0)break;
+        const hrs=Math.min(Math.max(0,+l.hours||0),remainingLeaveH),lt=getLT(l.leaveType),rate=leaveWageDeductRate(lt);
+        remainingLeaveH-=hrs;
+        const id=_leaveId(lt),nm=_leaveName(lt),amt=hrs*hourly*rate;
+        if(id==="sick"||nm.indexOf("病假")>=0){sickH+=hrs;sickDedRaw+=amt}
+        else if(id==="personal"||nm.indexOf("事假")>=0){personalH+=hrs;personalDedRaw+=amt}
       }
-    });
-    // 颱風假按比例扣前後（跟特休同邏輯，對半）
-    const tyHours=TYD[ek(cy,cm,cd)]||0;
-    if(tyHours&&s&&s!=="休"){
-      const tyDed=(tyHours/sh)*dailyOT;
-      tyFront+=tyDed/2;tyBack+=tyDed/2;
+      const dayDed=leaveOtDeductForDay(dayLeaves,dailyOT,sh,uid);
+      if(dayDed>0&&dailyOT>0){
+        const f=dayDed*(dailyFront/dailyOT);
+        frontDed+=f;backDed+=dayDed-f;
+      }
     }
-    // 薪資條回推：夜點費以薪資區間內「排到晚班」計算。
-    // 2026/05 薪資條夜點費 5868 = 489 × 12，不能因特休/病假直接排除晚班。
-    if(s==="晚")nightCount++;
+    // HR 薪資條的夜點費以薪資區間內排定晚班為基礎；若公司當期有調整，用本期總額覆寫。
+    if(shift==="晚")nightCount++;
   }
-  // 前後段加班時數
-  const totalFront=Math.max(0,pp.wd*dailyFront-frontDed-tyFront);
-  const totalBack=Math.max(0,pp.wd*dailyBack-backDed-tyBack);
+  const autoFront=Math.max(0,pp.wd*dailyFront-frontDed);
+  const autoBack=Math.max(0,pp.wd*dailyBack-backDed);
+  const autoOtH=autoFront+autoBack;
+  let totalFront=autoFront,totalBack=autoBack;
+  if(period.otHoursOverride>0){
+    totalFront=period.otHoursOverride/2;
+    totalBack=period.otHoursOverride-totalFront;
+  }
   const otH=totalFront+totalBack;
   const rawOtPay=totalFront*hourly*SAL.otTier1Rate+totalBack*hourly*SAL.otTier2Rate;
-  // 薪資條分成「免稅加班費 / 應稅加班費」兩項。依薪資條金額欄位分項整數進位後再相加，才能對上官方總額。
+  // 薪資條分成免稅/應稅兩項，依免稅時數比例拆分，各自無條件進位後相加。
   let otTaxFree=0,otTaxable=0;
   const taxFreeH=SAL.otTaxFreeH||46.6666667;
   if(otH>0){
     if(otH>taxFreeH){
-      const r=taxFreeH/otH;
-      otTaxFree=Math.ceil(rawOtPay*r);
-      otTaxable=Math.ceil(rawOtPay*(1-r));
-    }else{
-      otTaxFree=Math.ceil(rawOtPay);
-      otTaxable=0;
-    }
+      const ratio=taxFreeH/otH;
+      otTaxFree=Math.ceil(rawOtPay*ratio);
+      otTaxable=Math.ceil(rawOtPay*(1-ratio));
+    }else otTaxFree=Math.ceil(rawOtPay);
   }
   const otPay=otTaxFree+otTaxable;
   const nightAutoCount=nightCount;
-  if(SAL.nightCountOverride&&SAL.nightCountOverride>0)nightCount=SAL.nightCountOverride;
-  const nightPay=nightCount*SAL.night;
-  const proposal=SAL.proposal||0;
-  const sickDed=Math.round(sickH*hourly*SAL.sickRate);
+  if(period.nightCountOverride>0)nightCount=period.nightCountOverride;
+  const nightAutoPay=nightCount*SAL.night;
+  const nightPay=period.nightTotalOverride>0?period.nightTotalOverride:nightAutoPay;
+  const proposal=period.proposal||0,otherIncome=period.otherIncome||0;
+  const sickDed=Math.round(sickDedRaw),personalDed=Math.round(personalDedRaw);
+  const leaveDed=Math.round(sickDedRaw+personalDedRaw);
   const pensionWage=SAL.laborPensionWage||0;
   const pensionSelfRate=SAL.laborPensionSelfRate||0;
   const pensionEmployerRate=(SAL.laborPensionEmployerRate===undefined?6:SAL.laborPensionEmployerRate)||0;
   const laborPensionSelf=Math.round(pensionWage*pensionSelfRate/100);
   const laborPensionEmployer=Math.round(pensionWage*pensionEmployerRate/100);
-  const income=Math.round(baseSum+proposal+otPay+nightPay);
+  const income=Math.round(baseSum+proposal+otherIncome+otPay+nightPay);
   const fixedDed=SAL.union+SAL.welfare+SAL.laborIns+SAL.healthIns+SAL.otherDed;
-  const deduction=fixedDed+sickDed+laborPensionSelf;
+  const deduction=fixedDed+leaveDed+laborPensionSelf;
   const net=income-deduction;
   return{
-    hourly,baseSum,proposal,nightCount,sickH,otH,otPay,rawOtPay,otTaxFree,otTaxable,nightPay,sickDed,
-    pensionWage,pensionSelfRate,pensionEmployerRate,laborPensionSelf,laborPensionEmployer,
-    income,deduction,fixedDed,net,totalFront,totalBack,nightAutoCount
+    hourly,baseSum,proposal,otherIncome,nightCount,sickH,personalH,otH,autoOtH,otPay,rawOtPay,otTaxFree,otTaxable,
+    nightPay,nightAutoPay,sickDed,personalDed,leaveDed,pensionWage,pensionSelfRate,pensionEmployerRate,
+    laborPensionSelf,laborPensionEmployer,income,deduction,fixedDed,net,totalFront,totalBack,nightAutoCount,
+    nightTotalOverridden:period.nightTotalOverride>0,otHoursOverridden:period.otHoursOverride>0,periodKey:salPeriodKey(y,m)
   };
 }
-
 function salaryEstHtml(y,m){
   if(!rot())return"";
   const isZh=lang==="zh";
@@ -1495,7 +1570,7 @@ function salaryEstHtml(y,m){
       <span style="font-size:13px;font-weight:700;color:var(--tx)">${isZh?"預估實領":"Estimasi Bersih"}</span>
       <span style="font-size:22px;font-weight:900;color:#00695c;letter-spacing:1px">${fmt(est.net)}</span>
     </div>
-    <div style="font-size:10px;color:var(--tx3);text-align:right;margin-top:4px">${isZh?`時薪 $${est.hourly.toFixed(2)} · 加班 ${est.otH}h · 晚班 ${est.nightCount} 次${est.nightAutoCount!==est.nightCount?`(自動${est.nightAutoCount})`:``}`:`Per jam $${est.hourly.toFixed(2)}`}</div>
+    <div style="font-size:10px;color:var(--tx3);text-align:right;margin-top:4px">${isZh?`時薪 $${est.hourly.toFixed(2)} · 加班 ${est.otH}h${est.otHoursOverridden?`(本期覆寫；自動${est.autoOtH}h)`:``} · 晚班 ${est.nightCount} 次${est.nightAutoCount!==est.nightCount?`(自動${est.nightAutoCount})`:``}`:`Per jam $${est.hourly.toFixed(2)}`}</div>
     <details style="margin-top:10px;border-top:1px solid #eee;padding-top:8px">
       <summary style="font-size:11px;color:var(--tx3);cursor:pointer;outline:none">${isZh?"明細拆解 ›":"Detail ›"}</summary>
       <div style="font-size:11px;color:var(--tx2);margin-top:8px;line-height:1.8">
@@ -1505,9 +1580,10 @@ function salaryEstHtml(y,m){
         ${SAL.transport?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"交通津貼":"Transport"}</span><span>${fmt(SAL.transport)}</span></div>`:""}
         ${SAL.position?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"崗位津貼":"Posisi"}</span><span>${fmt(SAL.position)}</span></div>`:""}
         ${est.proposal?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"提案獎金":"Bonus proposal"}</span><span>${fmt(est.proposal)}</span></div>`:""}
+        ${est.otherIncome?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"其他加項":"Pendapatan lain"}</span><span>${fmt(est.otherIncome)}</span></div>`:""}
         ${est.otTaxFree>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"免稅加班費":"Lembur Bebas Pajak"}</span><span>${fmt(est.otTaxFree)}</span></div>`:""}
         ${est.otTaxable>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"應稅加班費":"Lembur Pajak"}</span><span>${fmt(est.otTaxable)}</span></div>`:""}
-        ${est.nightPay>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"夜點費":"Tunjangan Malam"} (${est.nightCount}×${est.nightAutoCount!==est.nightCount?`, ${isZh?"覆寫":"override"}`:""})</span><span>${fmt(est.nightPay)}</span></div>`:""}
+        ${est.nightPay>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"夜點費":"Tunjangan Malam"}${est.nightTotalOverridden?` (${isZh?"本期總額覆寫":"total override"})`:` (${est.nightCount}${isZh?"次":"x"})`}</span><span>${fmt(est.nightPay)}</span></div>`:""}
         <div style="color:#b71c1c;font-weight:700;margin-top:6px;margin-bottom:2px">${isZh?"應扣":"Potongan"}</div>
         ${SAL.union?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"工會會費":"Iuran Serikat"}</span><span>-${fmt(SAL.union)}</span></div>`:""}
         ${SAL.welfare?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"福利金":"Kesejahteraan"}</span><span>-${fmt(SAL.welfare)}</span></div>`:""}
@@ -1516,6 +1592,7 @@ function salaryEstHtml(y,m){
         ${est.laborPensionSelf?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"勞退自提":"Pensiun sukarela"} (${est.pensionSelfRate}%)</span><span>-${fmt(est.laborPensionSelf)}</span></div>`:""}
         ${SAL.otherDed?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"其他固定扣款":"Potongan Lain"}</span><span>-${fmt(SAL.otherDed)}</span></div>`:""}
         ${est.sickDed>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"病假扣薪":"Potongan Sakit"} (${est.sickH}h)</span><span>-${fmt(est.sickDed)}</span></div>`:""}
+        ${est.personalDed>0?`<div style="display:flex;justify-content:space-between"><span>　${isZh?"事假扣薪":"Potongan Izin"} (${est.personalH}h)</span><span>-${fmt(est.personalDed)}</span></div>`:""}
         ${est.laborPensionEmployer?`<div style="display:flex;justify-content:space-between;color:#2e7d32;margin-top:6px;border-top:1px dashed rgba(46,125,50,.25);padding-top:5px"><span>　${isZh?"公司勞退提撥(不扣實領)":"Pensiun perusahaan"} (${est.pensionEmployerRate}%)</span><span>+${fmt(est.laborPensionEmployer)}</span></div>`:""}
       </div>
     </details>
@@ -1527,13 +1604,13 @@ function salaryEstHtml(y,m){
 // 薪資設定 Modal
 // ═══════════════════════════════════════════════════════════════
 function rSalary(){
-  const isZh=lang==="zh";
+  const isZh=lang==="zh",period=getSalPeriod(S.yr,S.mo),periodLabel=`${S.yr}/${String(S.mo).padStart(2,"0")}`;
   // 欄位 helper:
   // - placeholder 用 "例:XXXX" 前綴,跟「真實填入值」視覺區隔,避免上次「以為填了其實是空的」bug 重演
   // - background 跟 color 改用 CSS 變數,深色模式時自動跟著切換
-  const num=(id,label,val,hint,ph)=>`<div style="margin-bottom:10px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">${label}</label><input type="number" id="${id}" value="${val||""}"${ph?` placeholder="${isZh?"例:":"Cth:"}${ph}"`:""} inputmode="numeric" class="sal-in" style="width:100%;padding:10px;border:1px solid var(--tx3);border-radius:8px;font-size:14px;font-weight:600;background:var(--card);color:var(--tx)">${hint?`<div style="font-size:10px;color:var(--tx3);margin-top:3px;line-height:1.4">${hint}</div>`:""}</div>`;
+  const num=(id,label,val,hint,ph)=>`<div style="margin-bottom:10px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">${label}</label><input type="number" id="${id}" value="${val||""}"${ph?` placeholder="${isZh?"例:":"Cth:"}${ph}"`:""} step="0.01" inputmode="decimal" class="sal-in" style="width:100%;padding:10px;border:1px solid var(--tx3);border-radius:8px;font-size:14px;font-weight:600;background:var(--card);color:var(--tx)">${hint?`<div style="font-size:10px;color:var(--tx3);margin-top:3px;line-height:1.4">${hint}</div>`:""}</div>`;
   return`<style>.sal-in::placeholder{color:var(--tx3);opacity:.55;font-weight:400}.sal-in:focus{border-color:#00897b;outline:none;box-shadow:0 0 0 2px rgba(0,137,123,.15)}</style><div class="modal-bg" data-a="salClose"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()" style="max-width:480px"><div class="modal-handle"></div>
-    <div class="modal-title">💰 ${isZh?"薪資設定":"Atur Gaji"}</div>
+    <div class="modal-title">💰 ${isZh?`薪資設定｜${periodLabel}`:`Atur Gaji | ${periodLabel}`}</div>
     <div style="background:${fbUser?'#e8f5e9':'#fff3e0'};border:1px solid ${fbUser?'#81c784':'#ffb74d'};border-radius:8px;padding:10px;margin:10px 0;font-size:11px;color:${fbUser?'#2e7d32':'#e65100'};line-height:1.6">
       ${fbUser?(isZh?"🔒 薪資僅同步至你個人雲端帳號（只有你看得到），換手機或清除資料後登入即可復原。對照薪資條填入即可,未填的欄位視為 0。":"🔒 Gaji disinkron ke akun pribadi Anda (hanya Anda yang lihat). Login untuk pulih setelah ganti HP."):(isZh?"⚠️ 你尚未登入，目前僅存本機，清除瀏覽器資料會遺失。建議先 Google 登入，薪資會同步至你個人雲端（只有你看得到）。對照薪資條填入即可,未填的欄位視為 0。":"⚠️ Belum login — hanya tersimpan di HP. Login Google agar tersimpan di cloud pribadi.")}
     </div>
@@ -1544,9 +1621,13 @@ function rSalary(){
       ${num("sal_meal",isZh?"伙食津貼":"Tunjangan Makan",SAL.meal,null,"3000")}
       ${num("sal_transport",isZh?"交通津貼":"Transport",SAL.transport,null,"1000")}
       ${num("sal_position",isZh?"崗位津貼":"Tunjangan Posisi",SAL.position,null,"500")}
-      ${num("sal_night",isZh?"夜點費(每次晚班的單價)":"Tunjangan Malam / shift",SAL.night,isZh?"會自動 × 晚班次數。若與 HR 薪資條不同，可用下一欄覆寫次數。":"","489")}
-      ${num("sal_nightCountOverride",isZh?"本期夜點次數覆寫（0=自動）":"Override jumlah shift malam (0=auto)",SAL.nightCountOverride,isZh?"薪資條 2026/05：夜點費 5,868 ÷ 489 = 12，所以若自動次數不準，這欄填 12。":"","12")}
-      ${num("sal_proposal",isZh?"提案獎金 / 當月浮動獎金":"Bonus proposal / bulanan",SAL.proposal,isZh?"薪資條本期有提案獎金 800；每月不同就手動改。":"","800")}
+      ${num("sal_night",isZh?"夜點費單價（固定；留空可只填本期總額）":"Tarif malam / shift",SAL.night,isZh?"自動算法＝單價 × 晚班次數。公司若按請假或其他規則調整，請直接填本期夜點總額。":"","489")}
+      <div style="font-size:11px;font-weight:800;color:#00695c;margin:12px 0 8px;padding-top:8px;border-top:1px dashed rgba(0,105,92,.25)">🗓️ ${isZh?`${periodLabel} 本期浮動項目`:`Item periode ${periodLabel}`}</div>
+      ${num("sal_nightCountOverride",isZh?"本期夜點次數覆寫（0=自動）":"Override jumlah malam (0=auto)",period.nightCountOverride,isZh?"只在本期生效，不會帶到下個月。":"","12")}
+      ${num("sal_nightTotalOverride",isZh?"本期夜點費總額覆寫（0=自動）":"Override total tunjangan malam",period.nightTotalOverride,isZh?"本期薪資條為 5,286 時直接填 5286；優先於單價×次數。":"","5286")}
+      ${num("sal_proposal",isZh?"本期提案獎金":"Bonus proposal periode ini",period.proposal,isZh?"只在本期生效。":"","500")}
+      ${num("sal_otherIncome",isZh?"本期其他加項／其他加項二":"Pendapatan lain periode ini",period.otherIncome,isZh?"本期薪資條「其他加項二」1,075，請填 1075。":"","1075")}
+      ${num("sal_otHoursOverride",isZh?"本期加班時數覆寫（0=自動）":"Override jam lembur (0=auto)",period.otHoursOverride,isZh?"正常由班表與請假自動計算；只有公司薪資條時數不同才填。2026/06 本期為 68h。":"","68")}
     </div>
 
     <div style="background:rgba(198,40,40,.04);border-radius:10px;padding:12px;margin-bottom:12px">
@@ -1570,13 +1651,14 @@ function rSalary(){
 
     <div style="background:rgba(63,81,181,.04);border-radius:10px;padding:12px;margin-bottom:12px">
       <div style="font-size:13px;font-weight:700;color:#283593;margin-bottom:10px">⚙️ ${isZh?"加班費規則(勞基法預設)":"Aturan Lembur"}</div>
-      <div style="display:flex;gap:8px">
-        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"前段每小時倍率":"2h Awal / jam"}</label><input type="number" id="sal_otTier1Rate" value="${Number(SAL.otTier1Rate||1.33340).toFixed(5)}" step="0.00001" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
-        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"後段每小時倍率":"Sisa / jam"}</label><input type="number" id="sal_otTier2Rate" value="${Number(SAL.otTier2Rate||1.66670).toFixed(5)}" step="0.00001" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
-        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"免稅 h":"Bebas Pjk h"}</label><input type="number" id="sal_otTaxFreeH" value="${SAL.otTaxFreeH}" inputmode="numeric" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
-        <div style="flex:1"><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"病假倍率":"Sakit x"}</label><input type="number" id="sal_sickRate" value="${SAL.sickRate}" step="0.1" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+        <div><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"前段每小時倍率":"2h Awal / jam"}</label><input type="number" id="sal_otTier1Rate" value="${Number(SAL.otTier1Rate||1.33340).toFixed(5)}" step="0.00001" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+        <div><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"後段每小時倍率":"Sisa / jam"}</label><input type="number" id="sal_otTier2Rate" value="${Number(SAL.otTier2Rate||1.66670).toFixed(5)}" step="0.00001" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+        <div><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"免稅時數":"Bebas Pajak h"}</label><input type="number" id="sal_otTaxFreeH" value="${SAL.otTaxFreeH}" step="0.0001" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+        <div><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"病假扣薪率":"Sakit x"}</label><input type="number" id="sal_sickRate" value="${SAL.sickRate}" step="0.1" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
+        <div><label style="font-size:11px;color:var(--tx2);display:block;margin-bottom:4px">${isZh?"事假扣薪率":"Izin x"}</label><input type="number" id="sal_personalRate" value="${SAL.personalRate}" step="0.1" inputmode="decimal" class="sal-in" style="width:100%;padding:8px;border:1px solid var(--tx3);border-radius:6px;font-size:13px;background:var(--card);color:var(--tx)"></div>
       </div>
-      <div style="font-size:10px;color:var(--tx3);margin-top:6px;line-height:1.5">${isZh?"公司 HR System 本期顯示：平日 1.33340 × 32h、平日 1.66670 × 32h。2.66670 屬休息日/假日表格倍率，不是這期平日後段加班。":"HR System shows weekday 1.33340 × 32h and 1.66670 × 32h for this period."}</div>
+      <div style="font-size:10px;color:var(--tx3);margin-top:6px;line-height:1.5">${isZh?"薪資條驗證：時薪＝固定應領 38,690 ÷ 240；68h 加班拆成前/後段各 34h，可對上免稅 11,285、應稅 5,159。病假扣薪率 0.5，事假扣薪率 1。":"Rumus diverifikasi dengan slip gaji periode 2026/06."}</div>
     </div>
 
     <div style="display:flex;gap:10px;margin-top:14px">
@@ -2162,10 +2244,16 @@ function handle(e){
     }
     case "salSave":{
       const g=id=>{const el=document.getElementById(id);return el?parseFloat(el.value)||0:0};
-      SAL.base=g("sal_base");SAL.meal=g("sal_meal");SAL.transport=g("sal_transport");SAL.position=g("sal_position");SAL.night=g("sal_night");SAL.nightCountOverride=g("sal_nightCountOverride");SAL.proposal=g("sal_proposal");
+      SAL.base=g("sal_base");SAL.meal=g("sal_meal");SAL.transport=g("sal_transport");SAL.position=g("sal_position");SAL.night=g("sal_night");
       SAL.union=g("sal_union");SAL.welfare=g("sal_welfare");SAL.laborIns=g("sal_laborIns");SAL.healthIns=g("sal_healthIns");SAL.otherDed=g("sal_otherDed");
       SAL.laborPensionWage=g("sal_laborPensionWage");SAL.laborPensionSelfRate=g("sal_laborPensionSelfRate");SAL.laborPensionEmployerRate=g("sal_laborPensionEmployerRate");
-      SAL.otTier1Rate=g("sal_otTier1Rate")||1.33340;SAL.otTier2Rate=g("sal_otTier2Rate")||1.66670;SAL.otTaxFreeH=g("sal_otTaxFreeH")||46.6666667;SAL.sickRate=g("sal_sickRate")||0;normalizeSal();
+      SAL.otTier1Rate=g("sal_otTier1Rate")||1.33340;SAL.otTier2Rate=g("sal_otTier2Rate")||1.66670;SAL.otTaxFreeH=g("sal_otTaxFreeH")||46.6666667;
+      SAL.sickRate=g("sal_sickRate");SAL.personalRate=g("sal_personalRate");
+      setSalPeriod(S.yr,S.mo,{
+        nightCountOverride:g("sal_nightCountOverride"),nightTotalOverride:g("sal_nightTotalOverride"),
+        proposal:g("sal_proposal"),otherIncome:g("sal_otherIncome"),otHoursOverride:g("sal_otHoursOverride")
+      });
+      normalizeSal();
       if(!SAL.base){alert(lang==="zh"?"職能俸為必填欄位":"Gaji pokok wajib diisi");return}
       SAL.enabled=true;sSAL();S.showSal=false;break;
     }
