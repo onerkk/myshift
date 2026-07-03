@@ -331,14 +331,14 @@ function leaveTypesTabHtml(){
           <option value="0.5">0.5h</option>
           <option value="1" selected>1h</option>
         </select>
-        <input id="newLTOT" class="inp" placeholder="加班扣" type="number" value="8">
+        <input id="newLTOT" class="inp" placeholder="每日最多扣加班" type="number" value="4">
         <input id="newLTColor" class="inp" type="color" value="#607d8b" style="padding:2px">
       </div>
       <button class="btn green" onclick="addLT()" style="width:100%">新增假別</button>
     </div>
     <div style="color:#666;font-size:10px;margin-top:10px;line-height:1.5">
-      說明：otDeduct 代表每 8 小時該假別會扣除多少加班時數。<br>
-      常見值：特休=4、病假=8、事假=12、喪/婚/產假=4、公假=0。
+      說明：otDeduct 代表同一工作日因該假別「最多」扣除多少班內加班時數。12 小時班每日原有 4h 加班，所以一般假別填 4；公假／補休填 0。<br>
+      薪資扣款另由前台計算：病假 0.5、事假 1；不可再用 otDeduct 代替本薪扣款。
     </div>
   </div>`;
 }
