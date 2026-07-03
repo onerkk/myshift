@@ -312,7 +312,7 @@ function leaveTypesTabHtml(){
       <div class="color-dot" style="background:${esc(lt.color||'#888')}"></div>
       <div class="info">
         <div class="name">${esc(lt.name)} <span class="badge">${lt.step||1}h</span></div>
-        <div class="sub">ID: ${esc(lt.id)} · ${esc(lt.nameId||"")} · 加班扣除: ${lt.otDeduct==null?'(無)':lt.otDeduct+'h'}</div>
+        <div class="sub">ID: ${esc(lt.id)} · ${esc(lt.nameId||"")} · 舊資料加班推定: ${lt.otDeduct==null?'0h':lt.otDeduct+'h'}</div>
       </div>
       <button class="btn red sm" onclick="delLT(${i})">✕</button>
     </div>`).join("")
@@ -331,14 +331,14 @@ function leaveTypesTabHtml(){
           <option value="0.5">0.5h</option>
           <option value="1" selected>1h</option>
         </select>
-        <input id="newLTOT" class="inp" placeholder="每日最多扣加班" type="number" value="4">
+        <input id="newLTOT" class="inp" placeholder="舊資料每日最多推定少做加班" type="number" value="4">
         <input id="newLTColor" class="inp" type="color" value="#607d8b" style="padding:2px">
       </div>
       <button class="btn green" onclick="addLT()" style="width:100%">新增假別</button>
     </div>
     <div style="color:#666;font-size:10px;margin-top:10px;line-height:1.5">
-      說明：otDeduct 代表同一工作日因該假別「最多」扣除多少班內加班時數。12 小時班每日原有 4h 加班，所以一般假別填 4；公假／補休填 0。<br>
-      薪資扣款另由前台計算：病假 0.5、事假 1；不可再用 otDeduct 代替本薪扣款。
+      說明：新版請假已改為起訖時間，正常工時請假與加班出勤分開計算。otDeduct 只用來相容「沒有起訖時間」的舊請假紀錄；一般假別可填 4，公假／補休填 0。<br>
+      新紀錄的加班時數以員工每天填寫的實際加班出勤為準。
     </div>
   </div>`;
 }
@@ -358,7 +358,7 @@ async function addLT(){
   CFG.leaveTypes.push(o);
   await saveCfg();
   ["newLTName","newLTNameId"].forEach(k=>$(k).value="");
-  $("newLTOT").value="8";
+  $("newLTOT").value="4";
   render();
 }
 async function delLT(i){
@@ -406,6 +406,15 @@ function setLeavesUnitFilter(v){leavesUnitFilter=v;render()}
 function setLeavesTypeFilter(v){leavesTypeFilter=v;render()}
 function setLeavesNameSearch(v){leavesNameSearch=v;const list=$("leavesListBody");if(list){_renderLeavesList(list)}}
 
+function _adminLeaveClock(startMinute,offset){
+  const total=(Number(startMinute)||0)+(Number(offset)||0),day=Math.floor(total/1440),mm=((total%1440)+1440)%1440;
+  return(day>0?'翌日 ':'')+String(Math.floor(mm/60)).padStart(2,'0')+':'+String(mm%60).padStart(2,'0');
+}
+function _adminLeaveRange(l){
+  if(!l||!Number.isFinite(+l.startOffset)||!Number.isFinite(+l.endOffset)||(+l.endOffset)<= (+l.startOffset))return'舊資料：未記錄時段';
+  return _adminLeaveClock(l.shiftStartMinute,+l.startOffset)+'–'+_adminLeaveClock(l.shiftStartMinute,+l.endOffset);
+}
+
 function _renderLeavesList(container){
   let filtered=LEAVES_DATA.slice();
   if(leavesUnitFilter)filtered=filtered.filter(l=>(l.unit||"")===leavesUnitFilter);
@@ -430,11 +439,11 @@ function _renderLeavesList(container){
     const isToday=d===today;
     const isFuture=d>today;
     const dateBg=isToday?'#1565c0':(isFuture?'#2e7d32':'#555');
-    const totalHrs=byDate[d].reduce((s,l)=>s+(l.hours||0),0);
+    const totalHrs=byDate[d].reduce((s,l)=>s+(l.hours||0),0),people=new Set(byDate[d].map(l=>l.uid)).size;
     html+=`<div style="margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${dateBg};border-radius:6px;color:#fff;margin-bottom:6px">
         <span style="font-size:14px;font-weight:800">${d.slice(5)} (${wk})${isToday?' 今天':''}</span>
-        <span style="font-size:11px;opacity:0.85">${byDate[d].length} 人 · 共 ${totalHrs}h</span>
+        <span style="font-size:11px;opacity:0.85">${people} 人 · 共 ${totalHrs}h</span>
       </div>`;
     byDate[d].forEach(l=>{
       const lt=CFG.leaveTypes.find(x=>x.id===l.leaveType);
@@ -450,7 +459,7 @@ function _renderLeavesList(container){
         <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;flex-wrap:wrap">
           <div style="flex:1;min-width:0">
             <div style="font-size:14px;font-weight:700;color:#fff">${esc(l.name||"未知")} <span style="font-size:11px;font-weight:500;color:#aaa">${esc(l.unit||"無單位")}</span></div>
-            <div style="font-size:12px;color:#ccc;margin-top:2px"><span style="color:${esc(color)};font-weight:600">${esc(ltName)}</span> · ${l.hours||0}h${timeStr?' · <span style="color:#888">提交於 '+timeStr+'</span>':''}</div>
+            <div style="font-size:12px;color:#ccc;margin-top:2px"><span style="color:${esc(color)};font-weight:600">${esc(ltName)}</span> · ${l.hours||0}h · 🕒 ${esc(_adminLeaveRange(l))}${timeStr?' · <span style="color:#888">提交於 '+timeStr+'</span>':''}</div>
           </div>
         </div>
         ${reasonRow}
