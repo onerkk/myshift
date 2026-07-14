@@ -1697,38 +1697,121 @@ setTimeout(()=>{const sp=document.getElementById("splash");if(sp)sp.remove()},26
 
 let _renderRAF=null;
 let _dashPainted=false; // 首次 dashboard 繪製後設 true；之後重繪移除 fi 入場淡入，避免開機資料分批到達時整片重播淡入(抖動)
+let _lastAppHtml=null;
+let _lastOverlayHtml=null;
+let _lastOverlayKind="";
+
 function render(){
   if(_renderRAF)cancelAnimationFrame(_renderRAF);
   _renderRAF=requestAnimationFrame(_doRender);
 }
+
+// 只在內容真的改變時才替換 DOM。背景天氣／雲端資料常會連續呼叫 render()；
+// 舊作法每次都重建 modal，造成 slideUp 動畫重播、捲動位置歸零與輸入框閃爍。
+function _overlayView(){
+  if(wxDetailShow)return{kind:"wx",html:wxDetailHtml()};
+  if(tideDetailShow)return{kind:"tide",html:tideDetailHtml()};
+  if(S.modal)return{kind:"day",html:rMod()};
+  if(typeof showUserPrefs!=="undefined"&&showUserPrefs)return{kind:"prefs",html:userPrefsModalHtml()};
+  if(S.showH)return{kind:"help",html:rHelp()};
+  if(S.showStats)return{kind:"stats",html:rStats()};
+  if(S.showSal)return{kind:"salary",html:rSalary()};
+  if(S.showLeavesOv&&isAdmin())return{kind:"leaves",html:rLeavesOv()};
+  if(typeof showAdmin!=="undefined"&&showAdmin)return{kind:"admin",html:adminPanelHtml()};
+  return{kind:"",html:""};
+}
+function _captureReplaceState(root){
+  const state={scroll:[],fields:[],active:null};
+  if(!root)return state;
+  root.querySelectorAll(".modal-sheet,.wx-detail-sheet").forEach((el,i)=>state.scroll.push({i,top:el.scrollTop,left:el.scrollLeft}));
+  root.querySelectorAll("input[id],select[id],textarea[id]").forEach(el=>{
+    state.fields.push({id:el.id,value:el.value,checked:!!el.checked,type:el.type||""});
+  });
+  const ac=document.activeElement;
+  if(ac&&root.contains(ac)&&ac.id){
+    state.active={id:ac.id,start:typeof ac.selectionStart==="number"?ac.selectionStart:null,end:typeof ac.selectionEnd==="number"?ac.selectionEnd:null};
+  }
+  return state;
+}
+function _restoreReplaceState(root,state){
+  if(!root||!state)return;
+  const sc=root.querySelectorAll(".modal-sheet,.wx-detail-sheet");
+  state.scroll.forEach(x=>{const el=sc[x.i];if(el){el.scrollTop=x.top;el.scrollLeft=x.left}});
+  state.fields.forEach(x=>{
+    const el=document.getElementById(x.id);if(!el||!root.contains(el))return;
+    if(x.type==="checkbox"||x.type==="radio")el.checked=x.checked;
+    else if(el.tagName==="SELECT"){
+      if(Array.from(el.options).some(o=>o.value===x.value))el.value=x.value;
+    }else el.value=x.value;
+  });
+  if(state.active){
+    const el=document.getElementById(state.active.id);
+    if(el&&root.contains(el)){
+      try{el.focus({preventScroll:true})}catch(e){try{el.focus()}catch(e2){}}
+      if(state.active.start!==null&&typeof el.setSelectionRange==="function")try{el.setSelectionRange(state.active.start,state.active.end)}catch(e){}
+    }
+  }
+}
+function _withoutEnterAnimation(html){
+  if(!html)return html;
+  return html.replace('class="modal-bg"','class="modal-bg modal-refresh"')
+             .replace('class="wx-detail"','class="wx-detail modal-refresh"');
+}
+function _setModalLock(on){
+  document.documentElement.classList.toggle("modal-open",!!on);
+  document.body.classList.toggle("modal-open",!!on);
+}
+function _bindActions(root){
+  (root||document).querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
+}
 function _doRender(){
   _renderRAF=null;
-  const a=document.getElementById("app");
+  const a=document.getElementById("app"),mr=document.getElementById("mr");
   // ═══ WIDGET MODE：URL ?w=1 → 只渲染巨型今日顯示 ═══
   // 不等 Firebase，直接從 localStorage 讀本地班別設定渲染
   if(location.search.indexOf("w=1")>=0){
-    try{a.innerHTML=rWidget()}catch(err){a.innerHTML=`<div style="padding:30px;color:#c62828;font-size:13px">Widget error: ${esc(err&&err.message||"unknown")}</div>`}
-    // 隱藏其他 layer（modal/help/stats）
-    const mr=document.getElementById("mr");if(mr)mr.innerHTML="";
-    document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
+    try{
+      const h=rWidget();
+      if(h!==_lastAppHtml){a.innerHTML=h;_lastAppHtml=h}
+    }catch(err){a.innerHTML=`<div style="padding:30px;color:#c62828;font-size:13px">Widget error: ${esc(err&&err.message||"unknown")}</div>`}
+    if(mr&&mr.innerHTML){mr.innerHTML="";_lastOverlayHtml="";_lastOverlayKind=""}
+    _setModalLock(false);
+    _bindActions(document);
     return;
   }
   if(!fbAuthReady||_cloudLoading){
-    a.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--tx3);font-size:13px">⏳ ${lang==="zh"?"載入中...":"Loading..."}</div>`;
+    const h=`<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--tx3);font-size:13px">⏳ ${lang==="zh"?"載入中...":"Loading..."}</div>`;
+    if(h!==_lastAppHtml){a.innerHTML=h;_lastAppHtml=h}
     return;
   }
   try{
-    let _h=S.step==="type"?rType():S.step==="wiz"?rWiz():rCal();
-    // 第 2 次（含）以後的 dashboard 重繪：移除 fi 入場淡入 class。
-    // 否則每次非同步資料到達(天氣/CWA警報/雲端)整片卡片重新插入都會重播淡入，
-    // 開機時資料分批到達 → 整片 dashboard 淡入 2~4 次 = 使用者看到的「抖動/刷新」。
-    // 移除 class（而非塞 animation:none）較安全：元素退回卡片正常樣式，
-    // 不會因原 CSS 基礎 opacity:0 而整片消失。首次繪製仍保留 fi，入場淡入正常播一次。
-    if(_dashPainted)_h=_h.replace(/ fi"/g,'"');
-    a.innerHTML=_h;
-    _dashPainted=true;
-    document.getElementById("mr").innerHTML=wxDetailShow?wxDetailHtml():tideDetailShow?tideDetailHtml():S.modal?rMod():S.showH?rHelp():S.showStats?rStats():S.showSal?rSalary():(S.showLeavesOv&&isAdmin())?rLeavesOv():"";
-    document.querySelectorAll("[data-a]").forEach(el=>{el.onclick=handle});
+    const ov=_overlayView();
+    const overlayOpen=!!ov.html;
+
+    // modal 開啟期間凍結底層 dashboard。資料仍會更新到記憶體，關閉 modal 後一次套用，
+    // 避免半透明遮罩後方的月曆／薪資卡反覆重畫造成可見閃動。
+    if(!overlayOpen||!_lastAppHtml||!a.firstElementChild){
+      let h=S.step==="type"?rType():S.step==="wiz"?rWiz():rCal();
+      if(_dashPainted)h=h.replace(/ fi"/g,'"');
+      if(h!==_lastAppHtml){
+        a.innerHTML=h;
+        _lastAppHtml=h;
+        _dashPainted=true;
+        _bindActions(a);
+      }
+    }
+
+    if(ov.html!==_lastOverlayHtml||ov.kind!==_lastOverlayKind){
+      const sameKind=!!ov.kind&&ov.kind===_lastOverlayKind;
+      const saved=sameKind?_captureReplaceState(mr):null;
+      mr.innerHTML=sameKind?_withoutEnterAnimation(ov.html):ov.html;
+      _lastOverlayHtml=ov.html;
+      _lastOverlayKind=ov.kind;
+      _bindActions(mr);
+      if(saved)_restoreReplaceState(mr,saved);
+    }
+    _setModalLock(overlayOpen||!!document.querySelector(".modal-bg,.wx-detail"));
+
     if(document.getElementById("leaveTypeSel")&&S.modal)try{updateLeaveTimeOptions(ek(S.modal.y,S.modal.m,S.modal.d))}catch(e){}
     // 請假總覽 modal：渲染列表內容（rLeavesOv 只生成空 container，列表內容需在這裡填入）
     if(S.showLeavesOv&&isAdmin()&&!leavesOvLoading){
@@ -1743,6 +1826,7 @@ function _doRender(){
       <div style="background:#fff3e0;padding:10px;border-radius:6px;margin-bottom:12px;word-break:break-all;font-family:monospace;font-size:11px">${esc(err&&err.message||"unknown")}</div>
       <button onclick="location.reload()" style="background:#00897b;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">${lang==="zh"?"重新載入":"Reload"}</button>
     </div>`;
+    _lastAppHtml=null;
   }
 }
 
@@ -4098,7 +4182,7 @@ function wxHtml(){
   const d=wxData,wk=t("wk"),desc=lang==="zh"?WXZ:WXD;
   const fc=d.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();
     return`<div class="wx-day${i===0?' today':''}"><div class="wx-day-name">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dw]}</div><div class="wx-day-icon">${WXI[f.code]||"🌡"}</div><div class="wx-day-hi">${f.hi}°</div><div class="wx-day-lo">${f.lo}°</div></div>`}).join("");
-  return`<div class="wx-card fi" style="cursor:pointer;position:relative"><button onclick="openUserPrefs();event.stopPropagation()" title="${lang==='zh'?'個人設定':'Settings'}" style="position:absolute;top:8px;right:8px;width:32px;height:32px;background:rgba(255,255,255,0.85);border:none;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.1)">⚙️</button><div onclick="showWxDetail()"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"}${d._cacheAgeMin?" "+d._cacheAgeMin+"m":""})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"即時雨量＋7日預報 ▸":"Live rain + 7-day forecast ▸"}${d.updatedAt?`<br><span style="font-size:9px;color:var(--tx3)">${lang==="zh"?"預報更新":"Forecast"} ${new Date(d.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>`:""}</div></div>${rainObsHtml()}<div class="wx-fc">${fc}</div></div><a href="radar2.html" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 10px 10px;padding:9px 12px;background:linear-gradient(135deg,#0b2942,#123a5a);color:#dff3ff;border:1px solid rgba(95,208,255,.35);border-radius:9px;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.3px">🛰 ${lang==='zh'?'即時雷達回波圖':'Live radar map'} ▸</a></div>${tideHtml()}${userPrefsModalHtml()}`}
+  return`<div class="wx-card fi" style="cursor:pointer;position:relative"><button onclick="openUserPrefs();event.stopPropagation()" title="${lang==='zh'?'個人設定':'Settings'}" style="position:absolute;top:8px;right:8px;width:32px;height:32px;background:rgba(255,255,255,0.85);border:none;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.1)">⚙️</button><div onclick="showWxDetail()"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"}${d._cacheAgeMin?" "+d._cacheAgeMin+"m":""})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?"即時雨量＋7日預報 ▸":"Live rain + 7-day forecast ▸"}${d.updatedAt?`<br><span style="font-size:9px;color:var(--tx3)">${lang==="zh"?"預報更新":"Forecast"} ${new Date(d.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>`:""}</div></div>${rainObsHtml()}<div class="wx-fc">${fc}</div></div><a href="radar2.html" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 10px 10px;padding:9px 12px;background:linear-gradient(135deg,#0b2942,#123a5a);color:#dff3ff;border:1px solid rgba(95,208,255,.35);border-radius:9px;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.3px">🛰 ${lang==='zh'?'即時雷達回波圖':'Live radar map'} ▸</a></div>${tideHtml()}`}
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 try{
   const _ver='v203-no-refade';

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v217-salary-audit';
+const CACHE_NAME = 'myshift-v218-no-modal-flicker';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
