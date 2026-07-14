@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v226-studio-max';
+const CACHE_NAME = 'myshift-v227-apex-atelier';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache

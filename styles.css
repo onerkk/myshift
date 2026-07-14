@@ -953,3 +953,404 @@ html[data-theme="dark"] #wxfx{mix-blend-mode:screen}
 }
 @media(max-width:350px){.header-settings{display:none}.brand-copy span{max-width:130px}.hero-footer{font-size:8px}.schedule-day{height:69px}.studio-calendar .day{height:61px}.shift-code{font-size:12px}.studio-calendar .lun-mini{display:none}.salary-hero{gap:8px}.salary-ring{width:75px;height:75px;flex-basis:75px}}
 @media(min-width:700px){.screen-pay,.screen-weather,.screen-calendar,.screen-more{max-width:720px}.studio-hero{min-height:254px}.schedule-day{height:84px}}
+
+/* ═══════════════════════════════════════════════════════════════
+   APEX ATELIER UI — daylight-first flagship visual system
+   Version 227
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --apex-paper:#f2f3ef;
+  --apex-paper-2:#e9ece7;
+  --apex-card:#fbfcf9;
+  --apex-card-strong:#ffffff;
+  --apex-ink:#071b1c;
+  --apex-ink-2:#425755;
+  --apex-ink-3:#778784;
+  --apex-line:rgba(11,47,45,.105);
+  --apex-line-strong:rgba(11,47,45,.17);
+  --apex-jade:#007a6e;
+  --apex-jade-deep:#063e3b;
+  --apex-jade-night:#082c2b;
+  --apex-mint:#c9eee7;
+  --apex-copper:#d66a2b;
+  --apex-sand:#e6b965;
+  --apex-blue:#2c6f91;
+  --apex-shadow:0 1px 1px rgba(9,30,29,.03),0 12px 34px rgba(9,30,29,.075);
+  --apex-shadow-high:0 24px 70px rgba(0,63,59,.20),0 4px 14px rgba(0,63,59,.10);
+}
+html{background:#dfe3de}
+body.apex-ui{
+  max-width:520px;
+  background:var(--apex-paper);
+  color:var(--apex-ink);
+  font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC",sans-serif;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.006em;
+}
+.apex-ui .app-shell{
+  background:
+    radial-gradient(120% 46% at 100% -10%,rgba(0,122,110,.105),transparent 52%),
+    linear-gradient(180deg,rgba(255,255,255,.68),rgba(255,255,255,0) 310px),
+    var(--apex-paper);
+}
+.apex-ui #wxfx{display:none!important}
+.apex-ui .app-main{padding:20px 18px calc(112px + env(safe-area-inset-bottom));min-height:calc(100dvh - 72px)}
+.apex-ui .content-end-space{height:10px}
+
+/* Header: a compact identity rail with a single deliberate control cluster. */
+.apex-ui .studio-app-header{
+  min-height:72px;
+  padding:calc(10px + env(safe-area-inset-top)) 18px 10px;
+  background:rgba(246,248,244,.88);
+  border-bottom:1px solid var(--apex-line);
+  box-shadow:0 8px 26px rgba(13,45,43,.035);
+  backdrop-filter:blur(26px) saturate(1.25);
+  -webkit-backdrop-filter:blur(26px) saturate(1.25);
+}
+.apex-ui .brand-lockup{gap:12px}
+.apex-ui .brand-mark{
+  width:44px;height:44px;border-radius:14px;
+  border:1px solid rgba(255,255,255,.88);
+  box-shadow:0 9px 24px rgba(0,78,72,.18),inset 0 0 0 1px rgba(8,29,29,.08);
+}
+.apex-ui .brand-copy strong{font-size:18px;line-height:1.08;font-weight:900;letter-spacing:-.045em;color:var(--apex-ink)}
+.apex-ui .brand-copy span{max-width:250px;margin-top:5px;font-size:10.5px;line-height:1.15;font-weight:650;color:var(--apex-ink-3)}
+.apex-ui .header-actions{gap:9px}
+.apex-ui .header-utility{
+  height:42px;padding:4px;border:0;border-radius:15px;
+  background:var(--apex-jade-night);
+  box-shadow:0 8px 22px rgba(3,47,45,.15),inset 0 1px 0 rgba(255,255,255,.07);
+}
+.apex-ui .utility-mini{width:37px;height:34px;border-radius:11px;color:#c9d7d5;font-size:11px}
+.apex-ui .utility-mini:active{background:rgba(255,255,255,.10)}
+.apex-ui .utility-language{color:#8fe2d4}
+.apex-ui .utility-dot{right:6px;bottom:5px;width:6px;height:6px;background:#8fe2d4;box-shadow:0 0 0 2px var(--apex-jade-night)}
+.apex-ui .utility-dot.muted{background:#7a8a88}
+.apex-ui .header-settings{
+  width:42px;height:42px;border-radius:15px;
+  background:rgba(255,255,255,.82);border:1px solid var(--apex-line);
+  color:var(--apex-ink-2);box-shadow:0 7px 20px rgba(13,45,43,.055)
+}
+
+/* Editorial page heading: clear hierarchy and a subtle system label. */
+.apex-ui .screen-heading{position:relative;align-items:flex-end;margin:5px 2px 20px;padding-top:18px}
+.apex-ui .screen-heading::before{
+  content:"MY SHIFT / CONTROL";position:absolute;left:0;top:0;
+  font-size:8px;font-weight:850;letter-spacing:.18em;color:var(--apex-jade);opacity:.78
+}
+.apex-ui .app-shell[data-screen="calendar"] .screen-heading::before{content:"ROSTER / MONTH"}
+.apex-ui .app-shell[data-screen="pay"] .screen-heading::before{content:"PAYROLL / PERIOD"}
+.apex-ui .app-shell[data-screen="weather"] .screen-heading::before{content:"CLIMATE / SAFETY"}
+.apex-ui .app-shell[data-screen="more"] .screen-heading::before{content:"TOOLS / PROFILE"}
+.apex-ui .screen-heading h2{font-size:29px;line-height:1.02;font-weight:920;letter-spacing:-.058em;color:var(--apex-ink)}
+.apex-ui .screen-heading p{margin-top:7px;font-size:11px;line-height:1.45;font-weight:600;color:var(--apex-ink-3)}
+.apex-ui .text-action,.apex-ui .icon-action{
+  min-height:40px;border-radius:13px;border:1px solid var(--apex-line);background:rgba(255,255,255,.72);
+  color:var(--apex-jade);box-shadow:0 6px 18px rgba(10,44,42,.04)
+}
+.apex-ui .text-action{padding:0 13px;font-size:10px;font-weight:820}
+.apex-ui .icon-action{width:40px;height:40px}
+
+/* Today hero: industrial instrument, not a generic gradient card. */
+.apex-ui .studio-hero{
+  min-height:270px;margin:0 0 24px;padding:24px;border-radius:32px;
+  background:
+    linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
+    radial-gradient(95% 140% at 100% 0%,rgba(113,226,205,.22),transparent 55%),
+    linear-gradient(145deg,#0a746b 0%,#07554f 55%,#063c39 100%);
+  background-size:28px 28px,28px 28px,auto,auto;
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:var(--apex-shadow-high);
+}
+.apex-ui .studio-hero::before{
+  width:124px;height:124px;right:20px;top:50px;border:1px solid rgba(255,255,255,.12);
+  background:transparent;box-shadow:0 0 0 18px rgba(255,255,255,.025),0 0 0 36px rgba(255,255,255,.018)
+}
+.apex-ui .studio-hero::after{display:none}
+.apex-ui .studio-hero.shift-night{background:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),radial-gradient(95% 140% at 100% 0%,rgba(178,158,255,.20),transparent 55%),linear-gradient(145deg,#4f427e,#352b5d 58%,#241e44);background-size:28px 28px,28px 28px,auto,auto}
+.apex-ui .studio-hero.shift-mid{background:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),radial-gradient(95% 140% at 100% 0%,rgba(255,210,112,.22),transparent 55%),linear-gradient(145deg,#91600e,#694508 58%,#473005);background-size:28px 28px,28px 28px,auto,auto}
+.apex-ui .studio-hero.shift-off{background:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),radial-gradient(95% 140% at 100% 0%,rgba(196,217,219,.18),transparent 55%),linear-gradient(145deg,#4a5d61,#34484c 58%,#243539);background-size:28px 28px,28px 28px,auto,auto}
+.apex-ui .hero-topline>div{gap:6px}
+.apex-ui .hero-date{font-size:12.5px;font-weight:780;letter-spacing:.045em}
+.apex-ui .hero-phase{font-size:10px;color:rgba(255,255,255,.57)}
+.apex-ui .hero-shift-badge{padding:7px 12px;border-radius:999px;font-size:10.5px;background:rgba(255,255,255,.11)}
+.apex-ui .hero-status-row{margin-top:38px;gap:16px;position:relative;z-index:1}
+.apex-ui .hero-status-icon{width:58px;height:58px;flex-basis:58px;border-radius:19px;background:rgba(255,255,255,.09)}
+.apex-ui .hero-status-copy h1{font-size:31px;line-height:1.08;font-weight:930;letter-spacing:-.058em;max-width:320px}
+.apex-ui .hero-status-copy p{margin-top:7px;font-size:12.5px;letter-spacing:.02em}
+.apex-ui .hero-timeline{margin-top:33px}
+.apex-ui .hero-track{height:7px;background:rgba(255,255,255,.14)}
+.apex-ui .hero-track span{background:linear-gradient(90deg,#87e4d5,#f5fffd)}
+.apex-ui .hero-time-labels{margin-top:10px;font-size:9.5px}
+.apex-ui .hero-time-labels strong{font-size:10px}
+.apex-ui .hero-footer{margin-top:19px;padding-top:15px;font-size:10px}
+
+/* Seven days: a precise schedule rail with no cloned-card feeling. */
+.apex-ui .studio-week{margin:22px 0}
+.apex-ui .section-kicker{margin:0 3px 10px}
+.apex-ui .section-kicker>span{font-size:9px;letter-spacing:.14em;color:var(--apex-ink-3)}
+.apex-ui .section-kicker button{font-size:10.5px;color:var(--apex-jade)}
+.apex-ui .schedule-strip{
+  padding:7px;border-radius:24px;background:rgba(255,255,255,.76);border:1px solid var(--apex-line);
+  box-shadow:var(--apex-shadow);backdrop-filter:blur(10px)
+}
+.apex-ui .schedule-day{height:88px;border-radius:17px;gap:4px}
+.apex-ui .schedule-day:not(:last-child)::before{content:"";position:absolute;right:-1px;top:17px;bottom:17px;width:1px;background:var(--apex-line)}
+.apex-ui .schedule-day.current{background:var(--apex-jade-night);color:white;box-shadow:0 10px 24px rgba(5,58,55,.18)}
+.apex-ui .schedule-day.current .schedule-week,.apex-ui .schedule-day.current strong{color:white}
+.apex-ui .schedule-week{font-size:8.5px}
+.apex-ui .schedule-day strong{font-size:20px}
+.apex-ui .schedule-shift{font-size:9.5px}
+.apex-ui .schedule-day.current .schedule-shift{color:#8fe2d4}
+.apex-ui .schedule-accent{left:13px;right:13px;bottom:9px;height:2.5px}
+
+/* Summary rows: asymmetrical, editorial, and comfortably tappable. */
+.apex-ui .insight-row{
+  min-height:90px;margin-top:12px;padding:15px 16px;border-radius:23px;
+  background:rgba(255,255,255,.82);border:1px solid var(--apex-line);box-shadow:var(--apex-shadow)
+}
+.apex-ui .insight-icon{width:54px;height:54px;flex-basis:54px;border-radius:18px}
+.apex-ui .insight-icon.weather{background:#dff3ee;color:var(--apex-jade)}
+.apex-ui .insight-icon.pay{background:#e8eef8;color:#2d6391}
+.apex-ui .insight-copy small{font-size:9.5px}
+.apex-ui .insight-copy strong{font-size:21px}
+.apex-ui .insight-copy em{font-size:11px}
+.apex-ui .insight-meta{font-size:8.5px}
+
+/* Calendar: restrained paper grid with a dark month masthead. */
+.apex-ui .calendar-legend{margin:0 3px 12px;gap:15px}
+.apex-ui .calendar-legend span{font-size:9.5px}
+.apex-ui .calendar-legend i{width:8px;height:8px}
+.apex-ui .studio-calendar{
+  padding:0 12px 14px;border-radius:29px;background:rgba(255,255,255,.84);
+  border:1px solid var(--apex-line);box-shadow:var(--apex-shadow);overflow:hidden
+}
+.apex-ui .studio-calendar .mnav{
+  margin:0 -12px 13px;padding:16px 14px 15px;
+  background:linear-gradient(135deg,var(--apex-jade-night),#0b4b47);
+  border-radius:28px 28px 19px 19px;color:#fff
+}
+.apex-ui .studio-calendar .mnav-btn{width:42px;height:42px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#c9eee7}
+.apex-ui .studio-calendar .mnav-title span{font-size:21px;color:#fff;font-weight:900}
+.apex-ui .studio-calendar .mnav-title small{margin-top:4px;font-size:8.5px;color:rgba(255,255,255,.55)}
+.apex-ui .studio-calendar .wk-row{margin-bottom:6px;border-bottom:1px solid var(--apex-line)}
+.apex-ui .studio-calendar .wk-cell{height:34px;font-size:9.5px;font-weight:800}
+.apex-ui .studio-calendar .cal{gap:5px}
+.apex-ui .studio-calendar .day{
+  height:70px;padding:8px 7px 6px;border-radius:12px;background:transparent;border:1px solid transparent;
+  transition:transform .14s ease,box-shadow .14s ease
+}
+.apex-ui .studio-calendar .day:hover{transform:translateY(-1px)}
+.apex-ui .studio-calendar .day::after{left:8px;right:8px;bottom:5px;height:2px;opacity:.7}
+.apex-ui .studio-calendar .day.e{background:rgba(0,122,110,.075);color:#006d64}
+.apex-ui .studio-calendar .day.n{background:rgba(104,78,171,.085);color:#6246a0}
+.apex-ui .studio-calendar .day.m{background:rgba(181,119,18,.09);color:#8f5d08}
+.apex-ui .studio-calendar .day.o{background:rgba(80,102,103,.035);color:#8a9797}
+.apex-ui .studio-calendar .day.today{
+  background:var(--apex-jade-night)!important;color:#fff!important;border-color:var(--apex-jade-night)!important;
+  box-shadow:0 10px 22px rgba(5,58,55,.19)
+}
+.apex-ui .studio-calendar .day.today::after{background:#8fe2d4!important;opacity:1}
+.apex-ui .studio-calendar .day-top{width:100%;align-items:center}
+.apex-ui .studio-calendar .num{font-size:15.5px;font-weight:900}
+.apex-ui .studio-calendar .shift-code{margin-top:5px;font-size:14px;font-weight:900}
+.apex-ui .studio-calendar .lun-mini{font-size:7px}
+.apex-ui .studio-calendar .today-label{padding:2px 4px;background:var(--apex-copper);color:#fff;font-size:6px}
+.apex-ui .day-marker,.apex-ui .day-count{box-shadow:0 2px 6px rgba(8,33,32,.14)}
+.apex-ui .calendar-notice{
+  margin-top:11px;padding:14px 15px;border-radius:19px;background:rgba(255,255,255,.78);
+  border:1px solid var(--apex-line);box-shadow:0 7px 20px rgba(12,44,42,.04)
+}
+.apex-ui .calendar-notice .notice-icon{width:39px;height:39px;border-radius:13px}
+.apex-ui .calendar-notice strong{font-size:11px}
+.apex-ui .calendar-notice span{font-size:9.5px}
+.apex-ui .studio-dash{
+  margin-top:13px;padding:7px;border-radius:22px;background:var(--apex-jade-night)!important;
+  border:0!important;box-shadow:0 13px 30px rgba(5,58,55,.16)
+}
+.apex-ui .studio-dash .dash-item{min-height:70px;border-color:rgba(255,255,255,.09)}
+.apex-ui .studio-dash .dash-val{font-size:22px;color:#fff!important}
+.apex-ui .studio-dash .dash-lbl{font-size:8.5px;color:rgba(255,255,255,.56)}
+
+/* Salary: a financial statement with a dark focus panel and quiet ledger. */
+.apex-ui .salary-dashboard{
+  padding:18px;border-radius:30px;background:rgba(255,255,255,.86);border:1px solid var(--apex-line);box-shadow:var(--apex-shadow)
+}
+.apex-ui .salary-dashboard-head{margin-bottom:14px}
+.apex-ui .salary-dashboard-head span{font-size:9px;color:var(--apex-jade)}
+.apex-ui .salary-dashboard-head h3{font-size:13px;color:var(--apex-ink-2)}
+.apex-ui .salary-hero{
+  margin:0 -2px;padding:20px;border-radius:23px;
+  background:linear-gradient(140deg,var(--apex-jade-night),#0b514c);color:#fff;
+  box-shadow:0 16px 34px rgba(4,55,52,.16)
+}
+.apex-ui .salary-amount small{color:rgba(255,255,255,.58);font-size:9.5px}
+.apex-ui .salary-amount strong{font-size:34px;color:#fff;letter-spacing:-.055em}
+.apex-ui .salary-amount span{font-size:9.5px;color:rgba(255,255,255,.54)}
+.apex-ui .salary-ring{width:94px;height:94px;flex-basis:94px}
+.apex-ui .salary-ring .ring-base{stroke:rgba(255,255,255,.12)}
+.apex-ui .salary-ring .ring-value{stroke:#82decf}
+.apex-ui .salary-ring div strong{color:#fff;font-size:22px}
+.apex-ui .salary-ring div span{color:rgba(255,255,255,.53)}
+.apex-ui .salary-flow{margin-top:18px}
+.apex-ui .salary-flow-label{font-size:10px}
+.apex-ui .salary-flow-track{height:8px}
+.apex-ui .salary-metrics{gap:8px;margin-top:14px}
+.apex-ui .salary-metrics>div{min-height:94px;padding:15px 6px;border-radius:18px;background:#f4f6f3}
+.apex-ui .salary-metrics strong{font-size:24px}
+.apex-ui .salary-metrics span{font-size:9px}
+.apex-ui .pay-calendar-row{margin:16px -18px 0;border-color:var(--apex-line)}
+.apex-ui .pay-calendar-row>div{min-height:58px}
+.apex-ui .salary-breakdown summary{min-height:52px;font-size:10.5px}
+.apex-ui .salary-disclaimer{font-size:8.5px}
+.apex-ui .al-bar{min-height:67px;border-radius:21px;background:linear-gradient(135deg,#eaf5ea,#f8fbf6);border:1px solid rgba(46,126,82,.13);box-shadow:0 8px 23px rgba(24,93,61,.055)}
+.apex-ui .al-bar-label,.apex-ui .al-bar-val{font-size:11px}
+
+/* Weather: climate instrument, not a stack of nested generic cards. */
+.apex-ui .weather-dashboard,.apex-ui .tide-instrument{
+  padding:18px;border-radius:30px;background:rgba(255,255,255,.86);border:1px solid var(--apex-line);box-shadow:var(--apex-shadow)
+}
+.apex-ui .weather-current{
+  min-height:120px;margin:-4px -4px 16px;padding:20px;border-radius:24px;
+  background:
+    radial-gradient(80% 120% at 100% 0%,rgba(130,222,207,.28),transparent 58%),
+    linear-gradient(140deg,var(--apex-jade-night),#0c514d);
+  color:#fff;text-align:left
+}
+.apex-ui .weather-current-icon{width:64px;height:64px;border-radius:20px;background:rgba(255,255,255,.10);color:#a9eee2}
+.apex-ui .weather-current-copy small{font-size:9px;color:rgba(255,255,255,.55)}
+.apex-ui .weather-current-copy strong{font-size:35px;color:#fff}
+.apex-ui .weather-current-copy em{font-size:11px;color:rgba(255,255,255,.70)}
+.apex-ui .weather-source{color:rgba(255,255,255,.66);font-size:8px}
+.apex-ui .weather-source b{color:#b8f2e8}
+.apex-ui .weather-settings{top:29px;right:29px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.15);color:#b8f2e8}
+.apex-ui .precip-visual{padding:15px;border-radius:19px;background:#f3f6f3}
+.apex-ui .precip-visual-head strong{font-size:22px}
+.apex-ui .rain-station{margin-top:13px;padding:14px;border-radius:20px;background:#f7f9f6;border:1px solid var(--apex-line)}
+.apex-ui .rain-station-head strong{font-size:10.5px}
+.apex-ui .rain-station-place{font-size:9px}
+.apex-ui .rain-metrics{gap:7px}
+.apex-ui .rain-metrics>div{padding:9px 4px;border-radius:12px;background:#fff}
+.apex-ui .rain-metrics strong{font-size:13px}
+.apex-ui .forecast-strip{gap:5px;margin-top:15px;padding-top:13px;border-top:1px solid var(--apex-line)}
+.apex-ui .forecast-day{height:84px;border-radius:15px}
+.apex-ui .forecast-day.today{background:var(--apex-jade-night);color:#fff}
+.apex-ui .forecast-day.today span,.apex-ui .forecast-day.today small{color:rgba(255,255,255,.62)}
+.apex-ui .forecast-day strong{font-size:12px}
+.apex-ui .radar-action{min-height:64px;margin-top:15px;padding:12px 14px;border-radius:18px;background:linear-gradient(135deg,#102e43,#123a52);box-shadow:0 12px 26px rgba(14,47,68,.16)}
+.apex-ui .radar-action b{font-size:10.5px}
+.apex-ui .radar-action small{font-size:8.5px}
+.apex-ui .tide-instrument{margin-top:14px}
+.apex-ui .tide-instrument-head strong{font-size:12px}
+.apex-ui .tide-instrument-head small{font-size:8.5px}
+.apex-ui .tide-title-icon{width:42px;height:42px;flex-basis:42px;border-radius:14px;background:#e2f1f4}
+.apex-ui .tide-status{margin-top:15px;padding:15px 14px 20px;border-radius:20px;background:#f2f6f5;border:1px solid var(--apex-line)}
+.apex-ui .tide-status-icon{width:48px;height:48px;border-radius:16px}
+.apex-ui .tide-status-copy strong{font-size:19px}
+.apex-ui .tide-status-copy em{font-size:8.5px}
+.apex-ui .tide-next strong{font-size:16px}
+.apex-ui .tide-curve{margin-top:16px;padding-top:13px}
+.apex-ui .tide-days{gap:8px;margin-top:12px}
+.apex-ui .tide-days .tide-day{min-width:105px;padding:10px;border-radius:15px;background:#f5f7f4}
+
+/* Alerts: civic-information hierarchy, not decorative warning cards. */
+.apex-ui .studio-alerts{margin:9px 0 18px}
+.apex-ui .studio-alerts .wx-alert-head{margin:0 2px 8px}
+.apex-ui .studio-alerts .wx-alert{
+  padding:15px 15px 15px 17px;border-radius:21px;background:rgba(255,255,255,.82);
+  border:1px solid var(--apex-line);box-shadow:0 8px 24px rgba(10,43,41,.045)
+}
+.apex-ui .studio-alerts .wx-alert-icon{width:42px;height:42px;flex-basis:42px;border-radius:14px}
+.apex-ui .studio-alerts .wx-alert-title-row strong{font-size:12.5px}
+.apex-ui .studio-alerts .wx-alert-detail{margin-top:5px;font-size:10.5px;line-height:1.65}
+.apex-ui .studio-alerts .wx-alert-badge{font-size:7.5px}
+
+/* Settings: a control console with visible hierarchy and larger reading sizes. */
+.apex-ui .quick-controls{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px}
+.apex-ui .quick-control-card{min-height:78px;padding:13px;border-radius:21px;background:rgba(255,255,255,.82);border:1px solid var(--apex-line);box-shadow:0 8px 24px rgba(10,43,41,.04)}
+.apex-ui .quick-control-card.language-control{grid-column:1/-1;min-height:70px}
+.apex-ui .quick-control-card b{font-size:12px}
+.apex-ui .quick-control-card small{font-size:9px}
+.apex-ui .quick-control-icon{width:42px;height:42px;flex-basis:42px;border-radius:14px}
+.apex-ui .quick-control-label{font-size:10px}
+.apex-ui .segmented-language{min-width:215px;padding:4px;border-radius:14px;background:#e9eeeb}
+.apex-ui .segmented-language button{min-height:38px;border-radius:11px;font-size:10.5px}
+.apex-ui .leave-center{padding:18px;border-radius:27px;background:linear-gradient(145deg,rgba(255,255,255,.93),rgba(239,246,242,.92));border:1px solid var(--apex-line);box-shadow:var(--apex-shadow)}
+.apex-ui .section-label{font-size:8.5px;letter-spacing:.14em}
+.apex-ui .leave-center h3{font-size:20px}
+.apex-ui .leave-metrics{gap:8px}
+.apex-ui .leave-metrics>div{padding:15px 5px;border-radius:17px;background:rgba(255,255,255,.82)}
+.apex-ui .leave-metrics strong{font-size:22px}
+.apex-ui .settings-panel{margin-top:14px;border-radius:26px;background:rgba(255,255,255,.82);border:1px solid var(--apex-line);box-shadow:var(--apex-shadow);overflow:hidden}
+.apex-ui .settings-group-title{padding:15px 16px 8px;font-size:8.5px;letter-spacing:.13em;color:var(--apex-ink-3)}
+.apex-ui .settings-row{min-height:72px;padding:12px 15px}
+.apex-ui .settings-row-icon{width:42px;height:42px;border-radius:14px}
+.apex-ui .settings-row-copy strong{font-size:12px}
+.apex-ui .settings-row-copy small{font-size:9px}
+
+/* Floating navigation dock: visually separated platform chrome. */
+.apex-ui .bottom-nav{
+  left:50%;bottom:10px;width:min(496px,calc(100% - 20px));
+  padding:7px 8px calc(7px + env(safe-area-inset-bottom));
+  border:1px solid rgba(255,255,255,.10);border-radius:25px;
+  background:rgba(8,29,29,.94);box-shadow:0 18px 42px rgba(4,31,30,.25),inset 0 1px 0 rgba(255,255,255,.07);
+  backdrop-filter:blur(24px) saturate(1.35);-webkit-backdrop-filter:blur(24px) saturate(1.35)
+}
+.apex-ui .bottom-nav-item{height:58px;gap:3px;border-radius:17px;color:#8ea3a0;font-size:9px}
+.apex-ui .bottom-nav-icon{width:42px;height:32px;border-radius:13px}
+.apex-ui .bottom-nav-item.active{color:#a7eee2}
+.apex-ui .bottom-nav-item.active .bottom-nav-icon{background:#154b46;color:#a7eee2;box-shadow:inset 0 0 0 1px rgba(144,229,215,.13)}
+
+/* Dark mode keeps the same hierarchy without a flat-black wash. */
+html[data-theme="dark"] body.apex-ui{
+  --apex-paper:#071113;--apex-paper-2:#0b1719;--apex-card:#0f1c1e;--apex-card-strong:#122124;
+  --apex-ink:#eff8f6;--apex-ink-2:#b4c5c2;--apex-ink-3:#80928f;
+  --apex-line:rgba(174,218,210,.12);--apex-line-strong:rgba(174,218,210,.19);
+  background:#030a0b;color:var(--apex-ink)
+}
+html[data-theme="dark"] .apex-ui .app-shell{background:radial-gradient(120% 46% at 100% -10%,rgba(65,180,165,.10),transparent 52%),#071113}
+html[data-theme="dark"] .apex-ui .studio-app-header{background:rgba(7,17,19,.90);border-bottom-color:var(--apex-line);box-shadow:none}
+html[data-theme="dark"] .apex-ui .brand-copy strong,html[data-theme="dark"] .apex-ui .screen-heading h2{color:var(--apex-ink)}
+html[data-theme="dark"] .apex-ui .header-settings,html[data-theme="dark"] .apex-ui .text-action,html[data-theme="dark"] .apex-ui .icon-action{background:#101d1f;border-color:var(--apex-line);color:#9adfd5}
+html[data-theme="dark"] .apex-ui .schedule-strip,html[data-theme="dark"] .apex-ui .insight-row,html[data-theme="dark"] .apex-ui .studio-calendar,html[data-theme="dark"] .apex-ui .calendar-notice,html[data-theme="dark"] .apex-ui .salary-dashboard,html[data-theme="dark"] .apex-ui .weather-dashboard,html[data-theme="dark"] .apex-ui .tide-instrument,html[data-theme="dark"] .apex-ui .quick-control-card,html[data-theme="dark"] .apex-ui .leave-center,html[data-theme="dark"] .apex-ui .settings-panel{background:rgba(15,28,30,.92);border-color:var(--apex-line);box-shadow:0 18px 40px rgba(0,0,0,.18)}
+html[data-theme="dark"] .apex-ui .schedule-day:not(:last-child)::before{background:var(--apex-line)}
+html[data-theme="dark"] .apex-ui .schedule-day.current{background:#174b46}
+html[data-theme="dark"] .apex-ui .studio-calendar .day.e{background:rgba(55,179,164,.14);color:#79d7ca}
+html[data-theme="dark"] .apex-ui .studio-calendar .day.n{background:rgba(146,119,218,.15);color:#c5b4ff}
+html[data-theme="dark"] .apex-ui .studio-calendar .day.m{background:rgba(214,162,70,.14);color:#e7bd71}
+html[data-theme="dark"] .apex-ui .studio-calendar .day.o{background:rgba(255,255,255,.025);color:#82928f}
+html[data-theme="dark"] .apex-ui .salary-metrics>div,html[data-theme="dark"] .apex-ui .precip-visual,html[data-theme="dark"] .apex-ui .rain-station,html[data-theme="dark"] .apex-ui .tide-status,html[data-theme="dark"] .apex-ui .tide-days .tide-day{background:#132124;border-color:var(--apex-line)}
+html[data-theme="dark"] .apex-ui .rain-metrics>div{background:#18272a}
+html[data-theme="dark"] .apex-ui .segmented-language{background:#132124}
+html[data-theme="dark"] .apex-ui .segmented-language button.active{background:#203336;color:#8de0d3}
+html[data-theme="dark"] .apex-ui .al-bar{background:#10231b;border-color:rgba(97,187,132,.18)}
+html[data-theme="dark"] .apex-ui .bottom-nav{background:rgba(5,16,17,.95)}
+
+@media(max-width:410px){
+  .apex-ui .app-main{padding-left:12px;padding-right:12px}
+  .apex-ui .studio-app-header{padding-left:12px;padding-right:12px}
+  .apex-ui .brand-copy span{max-width:155px}
+  .apex-ui .screen-heading h2{font-size:27px}
+  .apex-ui .studio-hero{padding:21px;min-height:258px}
+  .apex-ui .hero-status-copy h1{font-size:28px}
+  .apex-ui .schedule-strip{padding:5px}
+  .apex-ui .schedule-day{height:82px}
+  .apex-ui .studio-calendar .cal{gap:3px}
+  .apex-ui .studio-calendar .day{height:66px;padding-left:5px;padding-right:5px}
+  .apex-ui .salary-amount strong{font-size:31px}
+  .apex-ui .quick-controls{grid-template-columns:1fr}
+  .apex-ui .quick-control-card.language-control{grid-column:auto}
+  .apex-ui .segmented-language{min-width:180px}
+}
+@media(max-width:360px){
+  .apex-ui .brand-copy span{max-width:125px}
+  .apex-ui .header-settings{display:grid}
+  .apex-ui .studio-hero{padding:18px}
+  .apex-ui .hero-status-icon{width:50px;height:50px;flex-basis:50px}
+  .apex-ui .hero-status-copy h1{font-size:25px}
+  .apex-ui .studio-calendar .day{height:62px}
+  .apex-ui .studio-calendar .num{font-size:14px}
+  .apex-ui .studio-calendar .shift-code{font-size:12px}
+}
+@media(min-width:700px){body.apex-ui{max-width:920px}.apex-ui .bottom-nav{width:min(660px,calc(100% - 28px))}}

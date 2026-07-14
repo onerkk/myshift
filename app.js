@@ -2045,7 +2045,7 @@ function rCal(){
   let chips=Object.entries(st).map(([s,n])=>`<div class="dash-item"><div class="dash-val ${SC[s]}">${n}</div><div class="dash-lbl">${sf(s)}</div></div>`).join("");
   chips+=`<div class="dash-item"><div class="dash-val w">${wk}</div><div class="dash-lbl">${t("workD")}</div></div>`;
   const hH="";
-  const alH=getAL().total>0?`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer"><span class="al-bar-label">🌴 ${t("alRem")} (${alYRange(curALY())})</span><span class="al-bar-val">${alRem()} ${t("hr")}</span></div>`:`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer;background:rgba(76,175,80,.08);color:var(--green);font-weight:600;justify-content:center;text-align:center"><span>🌴 ${lang==="zh"?`點此設定 ${curALY()+1} 年度特休時數`:`Atur cuti tahun ${curALY()+1}`}</span></div>`;
+  const alH=getAL().total>0?`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer"><span class="al-bar-label">${studioIcon("leave",16)} ${t("alRem")} (${alYRange(curALY())})</span><span class="al-bar-val">${alRem()} ${t("hr")}</span></div>`:`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer;background:rgba(76,175,80,.08);color:var(--green);font-weight:600;justify-content:center;text-align:center"><span>${studioIcon("leave",16)} ${lang==="zh"?`點此設定 ${curALY()+1} 年度特休時數`:`Atur cuti tahun ${curALY()+1}`}</span></div>`;
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent),showI=(!!DP||isIOS)&&!S.instH;
   let instH="";if(showI){instH=`<div class="install-wrap"><div class="install-card"><img class="install-icon" src="${IMG.icon}"><div class="install-info"><div class="install-title">${t("instT")}</div><div class="install-sub">${DP?t("instS"):t("instSi")}</div></div>${DP?`<button class="install-btn" data-a="inst">${t("instB")}</button>`:''}<button class="install-x" data-a="hideI">✕</button></div></div>`}
   const ml=lang==="zh"?`${y}年${m}月`:`${m}/${y}`;
@@ -2075,7 +2075,7 @@ function rCal(){
   }else{
     tabContent=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${remH}${uiWeatherPreviewHtml()}${uiPayPreviewHtml(y,m)}${todayBarH}`;
   }
-  return `<div class="app-shell">${uiHeaderHtml()}<main class="app-main screen-${UI_TAB}">${tabContent}<div class="content-end-space"></div></main>${uiBottomNavHtml()}${instH}</div>`;
+  return `<div class="app-shell" data-screen="${UI_TAB}">${uiHeaderHtml()}<main class="app-main screen-${UI_TAB}">${tabContent}<div class="content-end-space"></div></main>${uiBottomNavHtml()}${instH}</div>`;
 
 }
 
@@ -4499,7 +4499,7 @@ function wxHtml(){
   return`<div class="wx-card fi" style="cursor:pointer;position:relative"><button onclick="openUserPrefs();event.stopPropagation()" class="card-settings-button wx-settings-button" title="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon("settings",18)}</button><div onclick="showWxDetail()"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"}${d._cacheAgeMin?" "+d._cacheAgeMin+"m":""})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?(_popSourceAt(d,_wxHourIndex())==='cwa'?"雨量實測＋CWA預報 ▸":"雨量實測＋模式備援 ▸"):(_popSourceAt(d,_wxHourIndex())==='cwa'?"Rain obs + CWA forecast ▸":"Rain obs + model fallback ▸")}${d.updatedAt?`<br><span style="font-size:9px;color:var(--tx3)">${lang==="zh"?"預報更新":"Forecast"} ${new Date(d.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>`:""}</div></div>${rainObsHtml()}<div class="wx-fc">${fc}</div></div><a href="radar2.html" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 10px 10px;padding:9px 12px;background:linear-gradient(135deg,#0b2942,#123a5a);color:#dff3ff;border:1px solid rgba(95,208,255,.35);border-radius:9px;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.3px">🛰 ${lang==='zh'?'即時雷達回波圖':'Live radar map'} ▸</a></div>${tideHtml()}`}
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 try{
-  const _ver='v226-studio-max';
+  const _ver='v227-apex-atelier';
   if(localStorage.getItem('_myshiftWxVer')!==_ver){
     ['_wxPlace','_cwaCache','_wxCache'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
     localStorage.setItem('_myshiftWxVer',_ver);
@@ -6936,7 +6936,7 @@ try{window.WxSfx=WxSfx}catch(e){}
       else document.documentElement.removeAttribute('data-theme');
     }
     const mt=document.querySelector('meta[name="theme-color"]');
-    if(mt) mt.setAttribute('content',darkUI?'#000000':'#00897b');
+    if(mt) mt.setAttribute('content',darkUI?'#071113':'#007a6e');
     const dim=document.getElementById('_dim');
     if(dim) dim.remove();
   }
@@ -7150,7 +7150,7 @@ function rCal(){
   let chips=Object.entries(st).map(([s,n])=>`<div class="dash-item"><div class="dash-val ${SC[s]}">${n}</div><div class="dash-lbl">${sf(s)}</div></div>`).join("");
   chips+=`<div class="dash-item"><div class="dash-val w">${wk}</div><div class="dash-lbl">${t("workD")}</div></div>`;
   const hH="";
-  const alH=getAL().total>0?`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer"><span class="al-bar-label">🌴 ${t("alRem")} (${alYRange(curALY())})</span><span class="al-bar-val">${alRem()} ${t("hr")}</span></div>`:`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer;background:rgba(76,175,80,.08);color:var(--green);font-weight:600;justify-content:center;text-align:center"><span>🌴 ${lang==="zh"?`點此設定 ${curALY()+1} 年度特休時數`:`Atur cuti tahun ${curALY()+1}`}</span></div>`;
+  const alH=getAL().total>0?`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer"><span class="al-bar-label">${studioIcon("leave",16)} ${t("alRem")} (${alYRange(curALY())})</span><span class="al-bar-val">${alRem()} ${t("hr")}</span></div>`:`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer;background:rgba(76,175,80,.08);color:var(--green);font-weight:600;justify-content:center;text-align:center"><span>${studioIcon("leave",16)} ${lang==="zh"?`點此設定 ${curALY()+1} 年度特休時數`:`Atur cuti tahun ${curALY()+1}`}</span></div>`;
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent),showI=(!!DP||isIOS)&&!S.instH;
   let instH="";if(showI){instH=`<div class="install-wrap"><div class="install-card"><img class="install-icon" src="${IMG.icon}"><div class="install-info"><div class="install-title">${t("instT")}</div><div class="install-sub">${DP?t("instS"):t("instSi")}</div></div>${DP?`<button class="install-btn" data-a="inst">${t("instB")}</button>`:''}<button class="install-x" data-a="hideI">✕</button></div></div>`}
   const ml=lang==="zh"?`${y}年${m}月`:`${m}/${y}`;
@@ -7180,7 +7180,7 @@ function rCal(){
   }else{
     tabContent=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${remH}${uiWeatherPreviewHtml()}${uiPayPreviewHtml(y,m)}${todayBarH}`;
   }
-  return `<div class="app-shell">${uiHeaderHtml()}<main class="app-main screen-${UI_TAB}">${tabContent}<div class="content-end-space"></div></main>${uiBottomNavHtml()}${instH}</div>`;
+  return `<div class="app-shell" data-screen="${UI_TAB}">${uiHeaderHtml()}<main class="app-main screen-${UI_TAB}">${tabContent}<div class="content-end-space"></div></main>${uiBottomNavHtml()}${instH}</div>`;
 
 }
 
