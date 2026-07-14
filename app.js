@@ -7128,6 +7128,17 @@ function studioCalendarLegendHtml(){
   const isZh=lang==='zh';
   return `<div class="calendar-legend" aria-label="${isZh?'班別圖例':'Legenda shift'}"><span class="legend-early"><i></i>${isZh?'早班':'Pagi'}</span><span class="legend-night"><i></i>${isZh?'晚班':'Malam'}</span><span class="legend-mid"><i></i>${isZh?'中班':'Siang'}</span><span class="legend-off"><i></i>${isZh?'休假':'Libur'}</span></div>`;
 }
+function uiMonthSummaryHtml(st,workDays){
+  const isZh=lang==='zh';
+  const defs=[
+    {key:'早',tone:'early',label:isZh?'早班':'Pagi',value:Number(st['早']||0)},
+    {key:'休',tone:'off',label:isZh?'休假':'Libur',value:Number(st['休']||0)},
+    {key:'晚',tone:'night',label:isZh?'晚班':'Malam',value:Number(st['晚']||0)}
+  ];
+  if(Number(st['中']||0)>0)defs.splice(2,0,{key:'中',tone:'mid',label:isZh?'中班':'Siang',value:Number(st['中']||0)});
+  defs.push({key:'work',tone:'work',label:isZh?'上班天數':'Hari kerja',value:Number(workDays||0)});
+  return `<section class="month-summary-v229 items-${defs.length}" aria-label="${isZh?'本月班別統計':'Ringkasan shift bulan ini'}">${defs.map(x=>`<div class="month-summary-item tone-${x.tone}"><strong>${x.value}</strong><span><i></i>${x.label}</span></div>`).join('')}</section>`;
+}
 
 function rCal(){
   const r=rot(),c=cyc(),y=S.yr,m=S.mo,dm=dim(y,m),fd=fdw(y,m),ic=y===TY&&m===TM;
@@ -7147,8 +7158,7 @@ function rCal(){
   if(lvParts.length)holH+=`<section class="calendar-notice leave"><span class="notice-icon">${studioIcon("leave",18)}</span><div><strong>${lang==="zh"?"請假動態":"Status cuti"}</strong><span>${lvParts.join("　")}</span></div></section>`;
   const rems=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const evs=EVS[ek(y,m,d)];if(evs&&evs.length){const s=gs(y,m,d),dw=new Date(y,m-1,d).getDay();evs.forEach(eid=>rems.push({d,dw,shift:sf(s),eid}))}}
   let remH="";if(rems.length){remH=`<div class="rem-sec"><div class="rem-title">${t("rem")}</div><div class="rem-list">${rems.map(r=>{const nm=r.eid==="custom"&&NOTES[ek(y,m,r.d)]?esc(NOTES[ek(y,m,r.d)]):r.eid==="typhoon"&&TYD[ek(y,m,r.d)]?`${en(r.eid)} ${TYD[ek(y,m,r.d)]}h`:en(r.eid);return`<div class="rem-item" data-a="open" data-d="${r.d}"><div class="rem-date"><div class="d">${r.d}</div><div class="w">${WK[r.dw]}</div></div><div class="rem-info"><div class="rem-name">${nm}</div><div class="rem-shift">${r.shift}</div></div><div style="font-size:16px">${EE[r.eid]||"📌"}</div></div>`}).join("")}</div></div>`}
-  let chips=Object.entries(st).map(([s,n])=>`<div class="dash-item"><div class="dash-val ${SC[s]}">${n}</div><div class="dash-lbl">${sf(s)}</div></div>`).join("");
-  chips+=`<div class="dash-item"><div class="dash-val w">${wk}</div><div class="dash-lbl">${t("workD")}</div></div>`;
+  const monthSummaryH=uiMonthSummaryHtml(st,wk);
   const hH="";
   const alH=getAL().total>0?`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer"><span class="al-bar-label">${studioIcon("leave",16)} ${t("alRem")} (${alYRange(curALY())})</span><span class="al-bar-val">${alRem()} ${t("hr")}</span></div>`:`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer;background:rgba(76,175,80,.08);color:var(--green);font-weight:600;justify-content:center;text-align:center"><span>${studioIcon("leave",16)} ${lang==="zh"?`點此設定 ${curALY()+1} 年度特休時數`:`Atur cuti tahun ${curALY()+1}`}</span></div>`;
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent),showI=(!!DP||isIOS)&&!S.instH;
@@ -7167,12 +7177,12 @@ function rCal(){
     todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
   const topMeta=`${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}`;
   const monthHeading=uiScreenHeading(ml,lang==="zh"?"點選日期可查看班別、請假與標記事項":"Ketuk tanggal untuk detail",`<button class="text-action" data-a="today">${lang==="zh"?"回到本月":"Bulan ini"}</button>`);
-  const calendarPanel=`${monthHeading}${studioCalendarLegendHtml()}<section class="calendar-shell studio-calendar" aria-label="${ml}"><div class="mnav"><button class="mnav-btn" data-a="prev" aria-label="${lang==="zh"?"上個月":"Previous month"}">${uiIcon("chevron",18)}</button><div class="mnav-title"><span>${ml}</span><small>${lang==="zh"?"輪班月曆":"Shift calendar"}</small></div><button class="mnav-btn next" data-a="next" aria-label="${lang==="zh"?"下個月":"Next month"}">${uiIcon("chevron",18)}</button></div>${S.showLunar?lunarTodayStrip():""}<div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?" we":""}">${w}</div>`).join("")}</div><div class="cal fi">${cells}</div></section>${holH}${remH}<div class="dash fi studio-dash">${chips}</div>`;
+  const calendarPanel=`${monthHeading}${studioCalendarLegendHtml()}<section class="calendar-shell studio-calendar" aria-label="${ml}"><div class="mnav"><button class="mnav-btn" data-a="prev" aria-label="${lang==="zh"?"上個月":"Previous month"}">${uiIcon("chevron",18)}</button><div class="mnav-title"><span>${ml}</span><small>${lang==="zh"?"輪班月曆":"Shift calendar"}</small></div><button class="mnav-btn next" data-a="next" aria-label="${lang==="zh"?"下個月":"Next month"}">${uiIcon("chevron",18)}</button></div>${S.showLunar?lunarTodayStrip():""}<div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?" we":""}">${w}</div>`).join("")}</div><div class="cal fi">${cells}</div></section>${holH}${remH}${monthSummaryH}`;
   let tabContent="";
   if(UI_TAB==="calendar"){
     tabContent=calendarPanel;
   }else if(UI_TAB==="pay"){
-    tabContent=`${uiScreenHeading(lang==="zh"?"薪資中心":"Pusat gaji",lang==="zh"?"本期實領、工時、加班與薪資結構":"Gaji bersih, jam kerja dan lembur")}${uiSalaryDashboardHtml(y,m)}${alH}<div class="dash fi studio-dash">${chips}</div>`;
+    tabContent=`${uiScreenHeading(lang==="zh"?"薪資中心":"Pusat gaji",lang==="zh"?"本期實領、工時、加班與薪資結構":"Gaji bersih, jam kerja dan lembur")}${uiSalaryDashboardHtml(y,m)}${alH}${monthSummaryH}`;
   }else if(UI_TAB==="weather"){
     tabContent=`${uiScreenHeading(lang==="zh"?"天氣與災防":"Cuaca & peringatan",lang==="zh"?"官方警特報、即時雨量、預報與潮汐":"Peringatan resmi, hujan, prakiraan, pasang",`<button class="icon-action" data-a="prefs">${uiIcon("settings",18)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${typeof wxHtml==='function'?wxHtml():''}`;
   }else if(UI_TAB==="more"){
