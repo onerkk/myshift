@@ -110,6 +110,15 @@ input,select{font-family:inherit;outline:none}
 .wx-detail-grid{display:grid;grid-template-columns:60px 1fr 50px 50px 50px;gap:2px;font-size:10px}
 .wx-detail-grid .hdr{font-weight:700;color:var(--tx2);padding:4px 2px;border-bottom:1px solid #ddd}
 .wx-detail-grid .cell{padding:4px 2px;border-bottom:1px solid #f0f0f0}
+
+/* v220 weather accuracy: provenance, interval probability, trusted rain observation */
+.wx-source-panel{margin:0 0 8px;padding:8px 10px;background:rgba(0,137,123,.07);border:1px solid rgba(0,137,123,.14);border-radius:8px;font-size:9px;line-height:1.5;color:var(--tx2)}
+.wx-source-note{margin-top:3px;color:var(--tx3)}
+.wx-pop-cell{text-align:center;line-height:1.05}.wx-pop-value{font-weight:800;font-size:11px}.wx-pop-badge{display:inline-block;margin-top:2px;padding:1px 4px;border-radius:999px;font-size:7px;white-space:nowrap}.wx-pop-badge.official{background:rgba(0,137,123,.12);color:#00796b}.wx-pop-badge.model{background:rgba(245,124,0,.12);color:#e65100}
+.wx-rain-observation{margin:6px 0 8px;padding:7px 9px;border-left:3px solid;border-radius:6px;font-size:10px;line-height:1.5;color:var(--tx2)}
+.wx-rain-observation-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}.wx-rain-observation-head span{font-size:8px;color:var(--tx3);text-align:right}.wx-rain-values{display:flex;flex-wrap:wrap;gap:3px 9px;margin-top:2px}.wx-rain-values span{white-space:nowrap}.wx-rain-values b{font-size:11px}
+html[data-theme="dark"] .wx-source-panel{background:rgba(38,166,154,.08);border-color:rgba(38,166,154,.18)}
+html[data-theme="dark"] .wx-pop-badge.official{background:rgba(38,166,154,.16);color:#80cbc4}html[data-theme="dark"] .wx-pop-badge.model{background:rgba(255,152,0,.16);color:#ffcc80}
 .admin-leave-edit{margin:8px 0;padding:8px;background:var(--card);border-radius:var(--r);border:1px dashed var(--amber)}
 .admin-leave-edit label{font-size:10px;color:var(--tx2);font-weight:600}
 .admin-leave-edit input{width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px;text-align:center;margin:0 6px}

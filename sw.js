@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v218-no-modal-flicker';
+const CACHE_NAME = 'myshift-v220-weather-accuracy';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -86,6 +86,7 @@ self.addEventListener('notificationclick', event => {
 // 觸發頻率由瀏覽器決定（最低 1 小時，視 engagement score）
 // ════════════════════════════════════════════════════════════════
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
+const CWA_FORECAST_URL = 'https://cwa-forecast.onerkk.workers.dev';
 const FIRESTORE_PROJECT = 'myshift-a67f1';
 const NOTIFY_STATE_CACHE = 'wx-notify-state-v1';
 
@@ -196,6 +197,36 @@ async function swFetchWeather(lat, lon) {
   const resp = await fetch(u);
   if (!resp.ok) throw new Error('wx api ' + resp.status);
   return await resp.json();
+}
+
+async function swFetchCwaForecast(pos) {
+  if (!pos || !pos.lat || !pos.lon || !pos.place) return null;
+  try {
+    const u = new URL(CWA_FORECAST_URL);
+    u.searchParams.set('lat', pos.lat); u.searchParams.set('lon', pos.lon);
+    if (pos.place.county) u.searchParams.set('county', pos.place.county);
+    if (pos.place.town) u.searchParams.set('town', pos.place.town);
+    u.searchParams.set('_', String(Date.now()));
+    const resp = await Promise.race([fetch(u.toString(), { cache: 'no-store' }), new Promise((_, r) => setTimeout(() => r(new Error('cwa forecast timeout')), 8000))]);
+    if (!resp.ok) return null;
+    const d = await resp.json();
+    return d && d.ok && d.hourly ? d : null;
+  } catch (e) { return null; }
+}
+function swMergeCwaForecast(wx, fc) {
+  if (!wx || !wx.hourly || !Array.isArray(wx.hourly.time) || !fc || !fc.hourly) return false;
+  const base = (wx.hourly.precipitation_probability || []).slice();
+  const src = base.map(() => 'open-meteo'); let hit = 0;
+  for (let i = 0; i < wx.hourly.time.length; i++) {
+    const c = fc.hourly[String(wx.hourly.time[i]).slice(0, 13)];
+    const raw = c && c.pop, p = (raw===null||raw===undefined||raw==='') ? NaN : Number(raw);
+    if (Number.isFinite(p) && p >= 0 && p <= 100) { base[i] = Math.round(p); src[i] = 'cwa'; hit++; }
+  }
+  wx.hourly.precipitation_probability = base;
+  wx.hourly.precipitation_probability_source = src;
+  wx._popSource = hit ? 'cwa-mixed' : 'open-meteo';
+  wx._popWindowH = Number(fc.popWindowHours) || null;
+  return hit > 0;
 }
 
 function swNum(v) { v = parseFloat(v); return Number.isFinite(v) ? v : null; }
@@ -540,6 +571,7 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
   const curCode = wxData.current ? wxData.current.weather_code : 0;
   const curTemp = wxData.current ? Math.round(wxData.current.temperature_2m) : 0;
   const hPrec = (wxData.hourly && wxData.hourly.precipitation_probability) || [];
+  const hPrecSource = (wxData.hourly && wxData.hourly.precipitation_probability_source) || [];
   const hRain = (wxData.hourly && wxData.hourly.precipitation) || [];
   const hWind = (wxData.hourly && wxData.hourly.wind_speed_10m) || [];
   const hGust = (wxData.hourly && (wxData.hourly.wind_gusts_10m || wxData.hourly.wind_speed_10m)) || [];
@@ -547,12 +579,13 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
   const curGust = (wxData.current && (wxData.current.wind_gusts_10m || wxData.current.wind_speed_10m)) || (hi >= 0 ? (hGust[hi] || curWind) : curWind);
 
   function maxRain(hours) {
-    if (hi < 0) return 0;
-    let mx = 0;
+    if (hi < 0) return { value: 0, source: 'none' };
+    let mx = -1, source = 'none';
     for (let k = hi; k < Math.min(hi + hours, hPrec.length); k++) {
-      if (hPrec[k] > mx) mx = hPrec[k];
+      const raw = hPrec[k], v = (raw===null||raw===undefined||raw==='') ? NaN : Number(raw);
+      if (Number.isFinite(v) && v > mx) { mx = v; source = hPrecSource[k] || 'open-meteo'; }
     }
-    return mx;
+    return { value: Math.max(0, mx), source };
   }
   function maxPrecipMm(hours) {
     if (hi < 0) return 0;
@@ -608,7 +641,7 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
   // Open-Meteo 推算颱風（僅在 CWA 沒觸發時）
   if (!cwaUsed && cfg.typhoon !== false) {
     const wTh = cfg.typhoonWind || 62;
-    const w6 = maxGust(6), r6 = maxRain(6);
+    const w6 = maxGust(6), r6 = maxRain(6).value;
     const isStorm = (curCode === 95 || curCode === 96 || curCode === 99);
     if ((curGust >= wTh || w6 >= wTh) && (isStorm || r6 >= 80)) {
       out.push({ id: 'typhoon', icon: '🌀', title: '劇烈風雨模型提醒', body: `模型陣風最高 ${Math.round(Math.max(curGust, w6))} km/h；不是中央氣象署颱風警報`, critical: false, modelOnly: true });
@@ -618,15 +651,15 @@ function swEvaluate(wxData, cfg, cwaData, pos) {
     out.push({ id: 'storm', icon: '⛈', title: '雷雨模型提醒', body: '模型格點顯示雷雨；請以雷達與中央氣象署警特報確認', critical: false, modelOnly: true });
   }
   if (cfg.heavyRain !== false && swInDetectionWindow('heavyRain', cfg) && !out.some(a => a.id === 'heavyRain' || a.id === 'storm' || a.id === 'typhoon')) {
-    const r = maxRain(6), mm = maxPrecipMm(6);
-    if (r >= (cfg.heavyRainProb || 80) || mm >= 10) {
-      out.push({ id: 'heavyRainModel', icon: '🌧', title: '高降雨機率提醒', body: `未來 6 小時最高降雨機率 ${r}%${mm ? `，預估雨量 ${mm.toFixed(1)} mm/h` : ''}；模型提醒，非中央氣象署豪雨特報`, critical: false, modelOnly: true });
+    const r = maxRain(6), mm = maxPrecipMm(6), officialForecast = r.source === 'cwa' && r.value >= (cfg.heavyRainProb || 80);
+    if (r.value >= (cfg.heavyRainProb || 80) || mm >= 10) {
+      out.push({ id: 'heavyRainModel', icon: '🌧', title: '高降雨機率預報', body: `未來 6 小時最高降雨機率 ${r.value}%${mm ? `，模式預估雨量 ${mm.toFixed(1)} mm/h` : ''}；機率來源：${r.source === 'cwa' ? '中央氣象署鄉鎮預報' : 'Open-Meteo 模式備援'}，非豪雨特報`, critical: false, modelOnly: !officialForecast, officialForecast });
     }
   }
   if (cfg.rain !== false && swInDetectionWindow('rain', cfg) && !out.some(a => a.id === 'heavyRain' || a.id === 'heavyRainModel' || a.id === 'storm' || a.id === 'typhoon')) {
-    const r = maxRain(3);
-    if (r >= (cfg.rainProb || 60)) {
-      out.push({ id: 'rain', icon: '🌂', title: '降雨機率模型提醒', body: `模型未來 3 小時最高降雨機率 ${r}%；不是即時雨量觀測`, critical: false, modelOnly: true });
+    const r = maxRain(3), isCwa = r.source === 'cwa';
+    if (r.value >= (cfg.rainProb || 60)) {
+      out.push({ id: 'rain', icon: '🌂', title: '降雨預報提醒', body: `未來 3 小時最高降雨機率 ${r.value}%；來源：${isCwa ? '中央氣象署鄉鎮預報' : 'Open-Meteo 模式備援'}，不是即時雨量觀測`, critical: false, modelOnly: !isCwa, officialForecast: isCwa });
     }
   }
   if (cfg.strongWind !== false && swInDetectionWindow('strongWind', cfg) && !out.some(a => a.id === 'typhoon' || a.id === 'strongWind')) {
@@ -673,6 +706,10 @@ async function swBackgroundCheck() {
     // 抓天氣（地震不依賴天氣，但其他警報要）
     let wx = null;
     try { wx = await swFetchWeather(pos.lat, pos.lon); } catch (e) {}
+    // 與前景一致：降雨機率優先採 CWA 鄉鎮預報原始值；失敗才保留 Open-Meteo。
+    if (wx) {
+      try { const fc = await swFetchCwaForecast(pos); if (fc) swMergeCwaForecast(wx, fc); } catch (e) {}
+    }
 
     // 抓 CWA 資料（颱風 + 地震）— Worker URL 已寫死
     let cwaData = null;

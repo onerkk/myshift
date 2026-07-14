@@ -289,7 +289,7 @@
     var html='<span class="dot" style="background:var(--now)"></span>'
       +'最新雷達 <b>'+(live?hhmm(live.time):"--:--")+'</b> 觀測。';
     html+=' 按 ▶ 看最近半小時移動，判斷往哪走。';
-    html+='<br><span style="color:var(--tx3)">雷達只到「現在」（免費版無未來推估）；未來請看下方「降雨機率」（模型估算）。</span>';
+    html+='<br><span style="color:var(--tx3)">'+(hasFore?'目前服務有提供短時雷達推估；標示「預報」的影格不是實測。':'目前只有雷達實測；未來降雨請看下方 CWA 鄉鎮區間預報。')+'</span>';
     $("verdict").innerHTML=html;
   }
 
@@ -364,7 +364,7 @@
   }
 
   // ── 未來降雨機率：CWA 鄉鎮預報（模型，非雷達）──
-  var FCAST_HOURS=3; // 未來 3 小時，涵蓋 1-2 小時需求
+  var FCAST_HOURS=6; // 讀取未來 6 小時，依 CWA 原始區間分組顯示
   function _hourKey(d){ // → "YYYY-MM-DDTHH"（本地台灣時間，對齊 CWA key）
     function p(n){return (n<10?"0":"")+n;}
     return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours());
@@ -376,20 +376,27 @@
      .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
      .then(function(d){
        if(!d||!d.ok||!d.hourly) throw new Error((d&&d.error)||"no forecast");
-       var H=d.hourly, now=new Date(), cells=[];
+       var H=d.hourly, now=new Date(), raw=[];
        for(var i=1;i<=FCAST_HOURS;i++){
-         var dt=new Date(now.getTime()+i*3600*1000), c=H[_hourKey(dt)];
-         if(!c||typeof c.pop!=="number") continue;
-         cells.push({hour:dt.getHours(), pop:c.pop});
+         var dt=new Date(now.getTime()+i*3600*1000), c=H[_hourKey(dt)], p=c&&Number(c.pop);
+         if(!isFinite(p)) continue;
+         raw.push({dt:dt,pop:Math.round(p)});
        }
-       if(!cells.length) throw new Error("no upcoming hours");
+       if(!raw.length) throw new Error("no upcoming hours");
+       var win=Math.max(1,Number(d.popWindowHours)||3),cells=[];
+       for(var q=0;q<raw.length;){
+         var first=raw[q],end=q+1;
+         while(end<raw.length&&end-q<win&&raw[end].pop===first.pop)end++;
+         var endDt=new Date(raw[end-1].dt.getTime()+3600*1000);
+         cells.push({start:first.dt,end:endDt,pop:first.pop});q=end;
+       }
        var html="";
        for(var j=0;j<cells.length;j++){
          var p=cells[j].pop, cls=p>=60?"fc-hi":p>=30?"fc-mid":"fc-lo", ic=p>=60?"🌧":p>=30?"🌦":"⛅";
-         html+='<div class="fc-cell"><div class="fc-h">'+(cells[j].hour<10?"0":"")+cells[j].hour+'時</div><div class="fc-ic">'+ic+'</div><div class="fc-p '+cls+'">'+p+'%</div></div>';
+         html+='<div class="fc-cell"><div class="fc-h">'+pad(cells[j].start.getHours())+'–'+pad(cells[j].end.getHours())+'</div><div class="fc-ic">'+ic+'</div><div class="fc-p '+cls+'">'+p+'%</div></div>';
        }
        box.className="fcbox";
-       box.innerHTML='<div class="fc-head"><span class="fc-title">未來降雨機率</span><span class="fc-src">中央氣象署 · 模型</span></div><div class="fc-grid">'+html+'</div><div class="fc-note">模型預報，非雷達實測；夏季對流常偏高，請以上方雷達實況為準。</div>';
+       box.innerHTML='<div class="fc-head"><span class="fc-title">未來降雨機率</span><span class="fc-src">中央氣象署 · '+win+' 小時區間</span></div><div class="fc-grid">'+html+'</div><div class="fc-note">保留 CWA 原始區間機率；雨量站與模式雨量不會把機率強制上修。雷達實測與預報機率請分開判讀。</div>';
        box.style.display="";
        // 常駐精簡列：未來 1-2 小時最高機率
        var mx=0; for(var k=0;k<cells.length;k++){ if(cells[k].pop>mx) mx=cells[k].pop; }
