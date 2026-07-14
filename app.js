@@ -1889,7 +1889,7 @@ function rCal(){
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
   const pd5=getPayDay(y,m,5),pd20=getPayDay(y,m,20);
   for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(y,m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||isTWOff(y,m,d)),isPay=(d===pd5||d===pd20),isAdj=!!SHIFT_OV[ek(y,m,d)];
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${S.showLunar?lunarCellText(y,m,d):""}${isAdj?'<span style="position:absolute;top:1px;right:2px;font-size:9px;line-height:1" title="已調班">🔄</span>':''}${td?'<span class="td">TODAY</span>':''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d)),n=new Set(lc.map(x=>x.uid)).size;return n?`<span class="leave-badge">${n}</span>`:""})()}</div>`}
+    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${S.showLunar?lunarCellText(y,m,d):""}${isAdj?'<span style="position:absolute;top:1px;right:2px;font-size:9px;line-height:1" title="已調班">🔄</span>':''}${td?`<span class="td">${lang==="zh"?"今天":"TODAY"}</span>`:''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d)),n=new Set(lc.map(x=>x.uid)).size;return n?`<span class="leave-badge">${n}</span>`:""})()}</div>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(y,m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<div class="hol-strip">🎌 ${mh.join("　")}</div>`:"";
@@ -1917,12 +1917,32 @@ function rCal(){
     if(payDay20<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay20=getPayDay(ny,nm,20)+dim(TY,TM)-TD}
     const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
     todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
-  return`<div class="top" style="flex-wrap:wrap"><div class="top-left"><img class="top-logo" src="${IMG.icon}"><div class="top-info"><h1>${t("app")}</h1></div></div><div class="top-actions"><button class="top-btn primary" data-a="today">${t("today")}</button><button class="top-btn" data-a="stats">${lang==="zh"?"統計":"Stat"}</button><button class="top-btn" data-a="share">${lang==="zh"?"分享":"Share"}</button><button class="top-btn" data-a="lunar" style="${S.showLunar?'background:#a87b00;color:#fff;font-weight:700':''}" title="${lang==="zh"?"農民曆":"Imlek"}">📜${lang==="zh"?"農曆":"Imlek"}</button>${isAdmin()?`<button class="top-btn" data-a="leavesOv" style="background:rgba(255,167,38,.95);color:#fff;font-weight:700" title="${lang==="zh"?"請假總覽（管理員）":"Cuti (Admin)"}">📅${lang==="zh"?"請假":"Cuti"}</button>`:''}<span class="lang-tog"><button class="lt-btn${lang==='zh'?' lt-on':''}" data-a="lzh">中</button><button class="lt-btn${lang==='id'?' lt-on':''}" data-a="lid">ID</button></span><button class="top-btn" data-a="help">${t("help")}</button></div><div style="width:100%;font-size:11px;color:rgba(255,255,255,.7);padding:2px 0 0 44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}</div></div>
-  <div class="mnav"><button class="mnav-btn" data-a="prev">◀</button><div class="mnav-title">${ml}</div><button class="mnav-btn" data-a="next">▶</button></div>${S.showLunar?lunarTodayStrip():""}
-  <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
-  <div class="cal fi">${cells}</div>${holH}${remH}${todayBarH}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${salaryEstHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
-  <button class="sfx-btn" data-a="sfx">${WxSfx.isMuted()?'🔇':'🔊'}</button>
-  <div style="height:${showI?'80':'12'}px"></div>${instH}`;
+  const topMeta=`${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}`;
+  const navBtn=(action,icon,label,extra="")=>`<button class="top-btn ${extra}" data-a="${action}"><span class="top-btn-ic" aria-hidden="true">${icon}</span><span>${label}</span></button>`;
+  return`<header class="top">
+    <div class="top-main">
+      <div class="top-left"><img class="top-logo" src="${IMG.icon}" alt=""><div class="top-info"><h1>${t("app")}</h1><span>${topMeta}</span></div></div>
+      <div class="top-quick">
+        <button class="top-quick-btn" data-a="sfx" aria-label="${lang==="zh"?"切換提示音":"Toggle sound"}">${WxSfx.isMuted()?'🔇':'🔊'}</button>
+        <button class="top-quick-btn top-lang-btn" data-a="lang" aria-label="${lang==="zh"?"切換為印尼文":"Ganti bahasa Mandarin"}">${lang==="zh"?"中":"ID"}</button>
+        <button class="top-quick-btn" data-a="help" aria-label="${t("help")}">?</button>
+      </div>
+    </div>
+    <nav class="top-actions" aria-label="${lang==="zh"?"主要功能":"Main actions"}">
+      ${navBtn("today","●",t("today"),"primary")}
+      ${navBtn("stats","▥",lang==="zh"?"統計":"Stat")}
+      ${navBtn("share","↗",lang==="zh"?"分享":"Share")}
+      ${navBtn("lunar","☾",lang==="zh"?"農曆":"Imlek",S.showLunar?"active":"")}
+      ${isAdmin()?navBtn("leavesOv","▣",lang==="zh"?"請假":"Cuti","admin-action"):''}
+    </nav>
+  </header>
+  <section class="calendar-shell" aria-label="${ml}">
+    <div class="mnav"><button class="mnav-btn" data-a="prev" aria-label="${lang==="zh"?"上個月":"Previous month"}">‹</button><div class="mnav-title"><span>${ml}</span><small>${lang==="zh"?"班表月曆":"Shift calendar"}</small></div><button class="mnav-btn" data-a="next" aria-label="${lang==="zh"?"下個月":"Next month"}">›</button></div>${S.showLunar?lunarTodayStrip():""}
+    <div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join("")}</div>
+    <div class="cal fi">${cells}</div>
+  </section>
+  ${holH}${remH}${todayBarH}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}<div class="dash fi">${chips}</div>${payCardHtml(y,m)}${salaryEstHtml(y,m)}${hH}${alH}${fbBarHtml()}${typeof wxHtml==='function'?wxHtml():''}
+  <div style="height:${showI?'80':'18'}px"></div>${instH}`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3773,11 +3793,10 @@ function evaluateWxAlerts(){
 }
 
 // ═══ 警報橫幅 HTML ═══
-// 一次性注入脈動動畫 CSS
 (function(){
   if(document.getElementById('_wxAlertCss'))return;
   const s=document.createElement('style');s.id='_wxAlertCss';
-  s.textContent='@keyframes wxAlertPulse{0%,100%{box-shadow:0 0 0 0 rgba(198,40,40,0.4)}50%{box-shadow:0 0 0 4px rgba(198,40,40,0)}}.wx-alert-pulse{animation:wxAlertPulse 1.8s ease-in-out infinite}.wx-alert{transition:transform .15s}.wx-alert:active{transform:scale(.98)}';
+  s.textContent='@keyframes wxAlertPulse{0%,100%{transform:scale(1);opacity:.45}50%{transform:scale(1.55);opacity:1}}.wx-alert-pulse .wx-alert-status-dot{animation:wxAlertPulse 1.8s ease-in-out infinite}';
   if(document.head)document.head.appendChild(s);
   else document.addEventListener('DOMContentLoaded',()=>document.head.appendChild(s));
 })();
@@ -3786,26 +3805,20 @@ function wxAlertHtml(){
   const alerts=evaluateWxAlerts();
   if(!alerts.length) return "";
   const isZh=lang==="zh";
-  // 顏色映射
-  const styleOf={
-    danger:{bg:"linear-gradient(90deg,#ffebee,#ffcdd2)",bc:"#c62828",tc:"#b71c1c",pulse:true},
-    warn:  {bg:"linear-gradient(90deg,#fff8e1,#ffe082)",bc:"#f57f17",tc:"#bf360c",pulse:false},
-    info:  {bg:"#e3f2fd",bc:"#1976d2",tc:"#0d47a1",pulse:false}
-  };
   const items=alerts.map(a=>{
-    const s=styleOf[a.level]||styleOf.warn;
+    const level=['danger','warn','info'].includes(a.level)?a.level:'warn';
     const detail=esc(_limitText(a.detail||'',220));
-    const badge=a.official?(a.regional?(isZh?'縣市公告':'Regional notice'):(isZh?'官方警特報':'Official warning')):(a.realtimeObs?(isZh?'官方測站實況':'Station observation'):(a.officialForecast?(isZh?'官方預報':'Official forecast'):(a.modelOnly?(isZh?'模式/實況提醒':'Model/observation'):'')));
-    // v210：官方長敘述收進原生 <details> 摺疊，預設不展開——不洗版又保留官方完整資訊
-    const moreHtml=a.bodyFull?`<details style="margin-top:4px"><summary style="cursor:pointer;font-size:10px;opacity:.6;outline:none">${isZh?'官方說明':'Detail resmi'}</summary><div style="margin-top:3px;font-size:10px;opacity:.82;line-height:1.45;word-break:break-word">${esc(_limitText(a.bodyFull,220))}</div></details>`:'';
-    return `<div class="wx-alert ${s.pulse?'wx-alert-pulse':''}" style="background:${s.bg};border-left:4px solid ${s.bc};color:${s.tc};padding:8px 12px;margin:4px 0;border-radius:6px;font-size:11px;line-height:1.5;display:flex;gap:8px;align-items:flex-start">
-      <div style="font-size:18px;flex-shrink:0;line-height:1">${a.icon}</div>
-      <div style="flex:1;min-width:0"><div style="font-weight:800;font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span>${esc(a.title)}</span>${badge?`<span style="font-size:9px;border:1px solid currentColor;border-radius:999px;padding:0 5px;opacity:.75">${badge}</span>`:''}</div><div style="margin-top:2px;opacity:0.92;word-break:break-word">${detail}</div>${moreHtml}</div>
-    </div>`;
+    const badge=a.official?(a.regional?(isZh?'縣市公告':'Regional notice'):(isZh?'官方警特報':'Official warning')):(a.realtimeObs?(isZh?'官方測站實況':'Station observation'):(a.officialForecast?(isZh?'官方預報':'Official forecast'):(a.modelOnly?(isZh?'模式／實況':'Model / observation'):'')));
+    const moreHtml=a.bodyFull?`<details class="wx-alert-more"><summary>${isZh?'查看官方說明':'Official detail'}</summary><div>${esc(_limitText(a.bodyFull,220))}</div></details>`:'';
+    return `<article class="wx-alert wx-alert-${level} ${level==='danger'?'wx-alert-pulse':''}">
+      <div class="wx-alert-icon" aria-hidden="true">${a.icon}</div>
+      <div class="wx-alert-copy">
+        <div class="wx-alert-title-row"><span class="wx-alert-status-dot" aria-hidden="true"></span><strong>${esc(a.title)}</strong>${badge?`<span class="wx-alert-badge">${badge}</span>`:''}</div>
+        <div class="wx-alert-detail">${detail}</div>${moreHtml}
+      </div>
+    </article>`;
   }).join("");
-  // 標題列
-  const head=`<div style="font-size:10px;color:var(--tx3);margin:6px 0 2px;display:flex;align-items:center;gap:4px"><span>🚨</span><span>${isZh?"即時災防與天氣提醒":"Peringatan bencana & cuaca"}</span></div>`;
-  return head+items;
+  return `<section class="wx-alert-stack"><div class="wx-alert-head"><div><span class="wx-alert-head-icon">⌁</span><span>${isZh?"即時災防與天氣":"Disaster & weather alerts"}</span></div><span class="wx-alert-count">${alerts.length}</span></div>${items}</section>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4307,7 +4320,7 @@ function wxHtml(){
   return`<div class="wx-card fi" style="cursor:pointer;position:relative"><button onclick="openUserPrefs();event.stopPropagation()" title="${lang==='zh'?'個人設定':'Settings'}" style="position:absolute;top:8px;right:8px;width:32px;height:32px;background:rgba(255,255,255,0.85);border:none;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.1)">⚙️</button><div onclick="showWxDetail()"><div class="wx-head"><div class="wx-now"><div class="wx-now-icon">${WXI[d.code]||"🌡"}</div><div><div class="wx-now-temp">${d.temp}°C${d._cached?` <span style="font-size:9px;color:var(--tx3)">(${lang==="zh"?"快取":"cache"}${d._cacheAgeMin?" "+d._cacheAgeMin+"m":""})</span>`:""}</div><div class="wx-now-desc">${desc[d.code]||""}</div></div></div><div class="wx-loc">${lang==="zh"?(_popSourceAt(d,_wxHourIndex())==='cwa'?"雨量實測＋CWA預報 ▸":"雨量實測＋模式備援 ▸"):(_popSourceAt(d,_wxHourIndex())==='cwa'?"Rain obs + CWA forecast ▸":"Rain obs + model fallback ▸")}${d.updatedAt?`<br><span style="font-size:9px;color:var(--tx3)">${lang==="zh"?"預報更新":"Forecast"} ${new Date(d.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>`:""}</div></div>${rainObsHtml()}<div class="wx-fc">${fc}</div></div><a href="radar2.html" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 10px 10px;padding:9px 12px;background:linear-gradient(135deg,#0b2942,#123a5a);color:#dff3ff;border:1px solid rgba(95,208,255,.35);border-radius:9px;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.3px">🛰 ${lang==='zh'?'即時雷達回波圖':'Live radar map'} ▸</a></div>${tideHtml()}`}
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 try{
-  const _ver='v221-disaster-alert-rootfix';
+  const _ver='v222-premium-ui';
   if(localStorage.getItem('_myshiftWxVer')!==_ver){
     ['_wxPlace','_cwaCache','_wxCache'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
     localStorage.setItem('_myshiftWxVer',_ver);
