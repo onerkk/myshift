@@ -5219,19 +5219,13 @@ const WxFx = (function(){
   }
 
   // ═══ MAIN LOOP ═══
+  // 視覺引擎與音效引擎統一使用頁面層的設定判定，避免各 IIFE 各自維護造成作用域或邏輯分歧。
   function fxEnabled(kind){
     try{
-      const adminOff=window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false;
-      if(adminOff) return false;
-      const up=window.USER_PREFS||{};
-      if(up.visualFx===false) return false;
-      const d=up.fxDetail||{};
-      if(kind==='weather') return d.weather!==false;
-      if(kind==='animals') return d.animals!==false;
-      if(kind==='seasonal') return d.seasonal!==false;
-      if(kind==='sound') return d.sound!==false;
-      return true;
-    }catch(e){return true}
+      if(typeof isFxEnabled==='function') return isFxEnabled(kind);
+      if(window&&typeof window.isFxEnabled==='function') return window.isFxEnabled(kind);
+    }catch(e){}
+    return true;
   }
   function anyVisualEnabled(){
     return fxEnabled('weather')||fxEnabled('animals')||fxEnabled('seasonal');
@@ -6660,7 +6654,13 @@ const WxSfx = (function(){
   function hasWeatherWind(){return mode==='wind'||mode==='storm'||mode==='typhoon'||mode==='cold'}
   function hasWeatherRain(){return mode==='rain'||mode==='heavy'||mode==='storm'||mode==='typhoon'||mode==='snow'}
   function wxSuppressSound(){return mode==='rain'||mode==='heavy'||mode==='storm'||mode==='typhoon'||mode==='snow'||mode==='fog'}
-  function soundEnabled(){return fxEnabled('sound')}
+  function soundEnabled(){
+    try{
+      if(typeof isFxEnabled==='function') return isFxEnabled('sound');
+      if(window&&typeof window.isFxEnabled==='function') return window.isFxEnabled('sound');
+    }catch(e){}
+    return true;
+  }
 
   function setSeasonSnd(s){
     const suppress=wxSuppressSound();
@@ -6738,8 +6738,9 @@ const WxSfx = (function(){
     setSeasonSnd(getSeason());
   },15000);
 
-  return{setMode,toggle,triggerThunder,isMuted,initAudio,setSeasonSnd,stopSeasonSnd};
+  return{setMode,toggle,triggerThunder,isMuted,initAudio,setSeasonSnd,stopSeasonSnd,_forceSilence};
 })();
+try{window.WxSfx=WxSfx}catch(e){}
 
 // ══════════════ AUTO DARK MODE（直接切換，不再漸暗） ══════════════
 (function(){

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v222-premium-ui';
+const CACHE_NAME = 'myshift-v223-fx-scope-fix';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
