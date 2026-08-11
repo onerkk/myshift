@@ -1912,3 +1912,620 @@ html[data-theme="dark"] body.apex-ui.polish-v229 .bottom-nav{background:rgba(8,1
   body.apex-ui.polish-v229 .month-summary-item span i{display:none}
   body.apex-ui.polish-v229 .month-summary-item span{font-size:8px}
 }
+
+/* =====================================================================
+   NOVA UI v300
+   A high-contrast roster system built around one unmistakable date:
+   today is always amber; shift colors never reuse that signal.
+   ===================================================================== */
+body.apex-ui.nova-v300{
+  --nova-canvas:#eef2ef;
+  --nova-surface:#ffffff;
+  --nova-surface-2:#f5f7f5;
+  --nova-surface-3:#e9efec;
+  --nova-ink:#0d2422;
+  --nova-ink-2:#415b56;
+  --nova-ink-3:#718681;
+  --nova-line:#dce5e1;
+  --nova-line-strong:#c9d7d2;
+  --nova-jade:#075f58;
+  --nova-jade-2:#0a8278;
+  --nova-jade-soft:#dcefeb;
+  --nova-today:#ff9d45;
+  --nova-today-strong:#ee7d22;
+  --nova-today-soft:#fff0df;
+  --nova-early:#0c8c82;
+  --nova-early-soft:#e6f5f2;
+  --nova-night:#7459bd;
+  --nova-night-soft:#f0ecfa;
+  --nova-mid:#b47411;
+  --nova-mid-soft:#fff4dc;
+  --nova-off:#74827f;
+  --nova-off-soft:#f0f3f2;
+  --nova-danger:#c84f5b;
+  --nova-info:#2f7798;
+  --nova-shadow:0 1px 2px rgba(7,42,38,.04),0 13px 34px rgba(7,42,38,.075);
+  --nova-shadow-high:0 24px 58px rgba(3,55,51,.18),0 5px 18px rgba(3,55,51,.10);
+  --canvas:var(--nova-canvas);
+  --surface:var(--nova-surface);
+  --surface-2:var(--nova-surface-2);
+  --surface-3:var(--nova-surface-3);
+  --ink:var(--nova-ink);
+  --ink-2:var(--nova-ink-2);
+  --ink-3:var(--nova-ink-3);
+  --line:var(--nova-line);
+  --brand:var(--nova-jade-2);
+  --brand-2:var(--nova-jade);
+  --brand-soft:var(--nova-jade-soft);
+  --early:var(--nova-early);
+  --early-soft:var(--nova-early-soft);
+  --night:var(--nova-night);
+  --night-soft:var(--nova-night-soft);
+  --mid:var(--nova-mid);
+  --mid-soft:var(--nova-mid-soft);
+  --off:var(--nova-off);
+  --off-soft:var(--nova-off-soft);
+  width:100%;max-width:520px;min-height:100dvh;margin:0 auto;
+  color:var(--nova-ink);background:var(--nova-canvas);
+  font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC",sans-serif;
+  font-variant-numeric:tabular-nums;letter-spacing:-.008em;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility
+}
+body.apex-ui.nova-v300 *{box-sizing:border-box}
+body.apex-ui.nova-v300 button,body.apex-ui.nova-v300 a{-webkit-tap-highlight-color:transparent}
+body.apex-ui.nova-v300 button:focus-visible,body.apex-ui.nova-v300 a:focus-visible,
+body.apex-ui.nova-v300 [role="button"]:focus-visible{
+  outline:3px solid rgba(255,157,69,.48);outline-offset:2px
+}
+body.apex-ui.nova-v300 .app-shell{
+  min-height:100dvh;
+  background:
+    radial-gradient(80% 34% at 96% -3%,rgba(10,130,120,.12),transparent 72%),
+    radial-gradient(60% 24% at -8% 16%,rgba(255,157,69,.07),transparent 76%),
+    linear-gradient(180deg,#f7f9f7 0,var(--nova-canvas) 360px)
+}
+body.apex-ui.nova-v300 #wxfx{opacity:.16!important;mix-blend-mode:multiply}
+body.apex-ui.nova-v300 .app-main{
+  padding:18px 14px calc(112px + env(safe-area-inset-bottom));
+  min-height:calc(100dvh - 76px)
+}
+body.apex-ui.nova-v300 .content-end-space{height:10px}
+
+/* Splash */
+body.apex-ui.nova-v300 #splash{background:#07191a;color:#fff}
+body.apex-ui.nova-v300 #splash::before{background:linear-gradient(180deg,rgba(3,17,18,.28),rgba(3,17,18,.68))}
+body.apex-ui.nova-v300 #splash img{filter:saturate(.82) contrast(1.05)}
+body.apex-ui.nova-v300 #splash h1{letter-spacing:-.05em;text-shadow:0 8px 28px rgba(0,0,0,.35)}
+body.apex-ui.nova-v300 #splash p{letter-spacing:.22em;text-transform:uppercase;color:#a8ded6}
+
+/* Header: product identity + a persistent date landmark. */
+body.apex-ui.nova-v300 .nova-header{
+  min-height:76px;padding:calc(9px + env(safe-area-inset-top)) 13px 9px;
+  gap:8px;background:rgba(247,249,247,.91);border-bottom:1px solid rgba(201,215,210,.74);
+  box-shadow:0 7px 26px rgba(6,42,39,.045);
+  backdrop-filter:blur(26px) saturate(1.35);-webkit-backdrop-filter:blur(26px) saturate(1.35)
+}
+body.apex-ui.nova-v300 .nova-header .brand-lockup{
+  min-width:0;flex:1;gap:9px;text-align:left;color:inherit;border-radius:14px
+}
+body.apex-ui.nova-v300 .nova-header .brand-mark{
+  width:43px;height:43px;flex:0 0 43px;border-radius:14px;border:1px solid rgba(255,255,255,.82);
+  box-shadow:0 8px 20px rgba(5,70,65,.17)
+}
+body.apex-ui.nova-v300 .nova-header .brand-copy{min-width:0}
+body.apex-ui.nova-v300 .nova-header .brand-copy strong{
+  color:var(--nova-ink);font-size:17px;font-weight:900;letter-spacing:-.04em
+}
+body.apex-ui.nova-v300 .nova-header .brand-copy>span{
+  max-width:125px;margin-top:4px;color:var(--nova-ink-3);font-size:9.5px;font-weight:650
+}
+body.apex-ui.nova-v300 .header-date-chip{
+  width:49px;height:45px;flex:0 0 49px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border:1px solid #f2c79d;border-radius:14px;background:var(--nova-today-soft);color:#8b470d;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8)
+}
+body.apex-ui.nova-v300 .header-date-chip span{font-size:13px;line-height:1;font-weight:920;letter-spacing:-.03em}
+body.apex-ui.nova-v300 .header-date-chip small{margin-top:4px;font-size:8px;font-weight:780;color:#a55a1d}
+body.apex-ui.nova-v300 .nova-header .header-actions{flex:0 0 auto;gap:6px}
+body.apex-ui.nova-v300 .nova-header .header-utility{
+  height:43px;padding:3px;border:1px solid var(--nova-line);border-radius:14px;background:var(--nova-surface);
+  box-shadow:0 5px 15px rgba(7,42,38,.045)
+}
+body.apex-ui.nova-v300 .nova-header .utility-mini{width:32px;height:35px;color:var(--nova-ink-2)}
+body.apex-ui.nova-v300 .nova-header .utility-language{color:var(--nova-jade-2);font-weight:900}
+body.apex-ui.nova-v300 .nova-header .utility-dot{box-shadow:0 0 0 2px #fff}
+body.apex-ui.nova-v300 .nova-header .header-settings{
+  width:43px;height:43px;border-radius:14px;background:var(--nova-surface);border:1px solid var(--nova-line);
+  color:var(--nova-ink-2);box-shadow:0 5px 15px rgba(7,42,38,.045)
+}
+
+/* Screen headings */
+body.apex-ui.nova-v300 .screen-heading{
+  margin:4px 2px 17px;padding:0;align-items:flex-end;gap:10px
+}
+body.apex-ui.nova-v300 .screen-heading::before{content:none!important;display:none!important}
+body.apex-ui.nova-v300 .screen-heading-copy{min-width:0}
+body.apex-ui.nova-v300 .screen-overline{
+  display:flex;align-items:center;gap:7px;margin-bottom:7px;color:var(--nova-jade-2);
+  font-size:8px;font-weight:900;letter-spacing:.15em;text-transform:uppercase
+}
+body.apex-ui.nova-v300 .screen-overline i{width:18px;height:2px;border-radius:2px;background:var(--nova-today)}
+body.apex-ui.nova-v300 .screen-heading h2{
+  color:var(--nova-ink);font-size:30px;line-height:1.02;font-weight:930;letter-spacing:-.058em
+}
+body.apex-ui.nova-v300 .screen-heading p{
+  max-width:310px;margin-top:7px;color:var(--nova-ink-3);font-size:10.5px;line-height:1.5;font-weight:590
+}
+body.apex-ui.nova-v300 .text-action,body.apex-ui.nova-v300 .icon-action{
+  min-height:40px;border:1px solid var(--nova-line);border-radius:13px;background:var(--nova-surface);
+  color:var(--nova-jade-2);box-shadow:0 5px 15px rgba(7,42,38,.045)
+}
+body.apex-ui.nova-v300 .text-action{padding:0 12px;font-size:10px;font-weight:830}
+
+/* Today: the date is the hero, not metadata. */
+body.apex-ui.nova-v300 .nova-hero{
+  --shift-accent:#85eadc;position:relative;min-height:294px;margin:0 0 22px;padding:20px;border-radius:30px;
+  overflow:hidden;color:#fff;border:1px solid rgba(255,255,255,.13);
+  background:
+    linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
+    radial-gradient(110% 160% at 100% -10%,rgba(119,234,216,.22),transparent 55%),
+    linear-gradient(145deg,#0a7169,#07514d 58%,#053a38);
+  background-size:26px 26px,26px 26px,auto,auto;box-shadow:var(--nova-shadow-high)
+}
+body.apex-ui.nova-v300 .nova-hero.shift-night{
+  --shift-accent:#c9b8ff;
+  background:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),radial-gradient(110% 160% at 100% -10%,rgba(202,184,255,.22),transparent 55%),linear-gradient(145deg,#514381,#352b5e 58%,#251e45);background-size:26px 26px,26px 26px,auto,auto
+}
+body.apex-ui.nova-v300 .nova-hero.shift-mid{
+  --shift-accent:#ffe0a2;
+  background:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),radial-gradient(110% 160% at 100% -10%,rgba(255,221,148,.23),transparent 55%),linear-gradient(145deg,#94600d,#694507 58%,#493105);background-size:26px 26px,26px 26px,auto,auto
+}
+body.apex-ui.nova-v300 .nova-hero.shift-off{
+  --shift-accent:#d6e3df;
+  background:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),radial-gradient(110% 160% at 100% -10%,rgba(214,227,223,.2),transparent 55%),linear-gradient(145deg,#4e6160,#354846 58%,#263836);background-size:26px 26px,26px 26px,auto,auto
+}
+body.apex-ui.nova-v300 .nova-hero::before,body.apex-ui.nova-v300 .nova-hero::after{display:none}
+body.apex-ui.nova-v300 .nova-hero-glow{
+  position:absolute;width:164px;height:164px;right:-44px;top:22px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.10);box-shadow:0 0 0 24px rgba(255,255,255,.022),0 0 0 49px rgba(255,255,255,.014);pointer-events:none
+}
+body.apex-ui.nova-v300 .nova-hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:116px minmax(0,1fr);gap:18px;align-items:stretch}
+body.apex-ui.nova-v300 .nova-date-block{
+  min-height:158px;padding:13px 11px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border:1px solid rgba(255,255,255,.17);border-radius:24px;background:rgba(255,255,255,.10);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)
+}
+body.apex-ui.nova-v300 .nova-today-flag{
+  display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;
+  background:var(--nova-today);color:#2c1a08;font-size:8px;font-weight:930;letter-spacing:.09em
+}
+body.apex-ui.nova-v300 .nova-today-flag i{width:5px;height:5px;border-radius:50%;background:#2c1a08;box-shadow:0 0 0 3px rgba(44,26,8,.10)}
+body.apex-ui.nova-v300 .nova-date-block>strong{margin-top:5px;font-size:71px;line-height:.9;font-weight:950;letter-spacing:-.08em;color:#fff}
+body.apex-ui.nova-v300 .nova-date-block>small{margin-top:10px;font-size:9.5px;font-weight:720;color:rgba(255,255,255,.72);white-space:nowrap}
+body.apex-ui.nova-v300 .nova-status-block{position:relative;z-index:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+body.apex-ui.nova-v300 .nova-shift-badge{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid rgba(255,255,255,.14);
+  border-radius:999px;background:rgba(8,23,25,.20);font-size:10px;font-weight:850;color:#fff
+}
+body.apex-ui.nova-v300 .nova-shift-badge i{width:7px;height:7px;border-radius:50%;background:var(--shift-accent);box-shadow:0 0 0 4px rgba(255,255,255,.07)}
+body.apex-ui.nova-v300 .nova-phase{margin-top:20px;font-size:9px;font-weight:760;letter-spacing:.08em;color:rgba(255,255,255,.62)}
+body.apex-ui.nova-v300 .nova-status-block h1{margin-top:5px;font-size:25px;line-height:1.15;font-weight:930;letter-spacing:-.045em;color:#fff}
+body.apex-ui.nova-v300 .nova-status-block p{margin-top:7px;font-size:11.5px;font-weight:680;color:rgba(255,255,255,.72)}
+body.apex-ui.nova-v300 .nova-timeline{position:relative;z-index:1;margin-top:23px}
+body.apex-ui.nova-v300 .nova-track{position:relative;height:7px;border-radius:99px;background:rgba(255,255,255,.15)}
+body.apex-ui.nova-v300 .nova-track span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--shift-accent),#fff);box-shadow:0 0 16px rgba(255,255,255,.25)}
+body.apex-ui.nova-v300 .nova-track i{position:absolute;top:50%;width:17px;height:17px;border:4px solid rgba(255,255,255,.92);border-radius:50%;background:var(--shift-accent);transform:translate(-50%,-50%);box-shadow:0 3px 12px rgba(0,0,0,.22)}
+body.apex-ui.nova-v300 .nova-time-labels{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;margin-top:10px;font-size:9px;font-weight:720;color:rgba(255,255,255,.69)}
+body.apex-ui.nova-v300 .nova-time-labels strong{padding:3px 7px;border-radius:7px;background:rgba(0,0,0,.14);font-size:8.5px;color:#fff}
+body.apex-ui.nova-v300 .nova-time-labels span:last-child{text-align:right}
+body.apex-ui.nova-v300 .nova-hero-footer{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid rgba(255,255,255,.12);font-size:9px;font-weight:700;color:rgba(255,255,255,.75)}
+body.apex-ui.nova-v300 .nova-hero-footer span{display:flex;align-items:center;gap:6px}
+
+/* Seven-day schedule */
+body.apex-ui.nova-v300 .studio-week{margin:18px 0}
+body.apex-ui.nova-v300 .section-kicker{margin:0 2px 9px}
+body.apex-ui.nova-v300 .section-kicker>span{color:var(--nova-ink-3);font-size:9px;font-weight:870;letter-spacing:.13em}
+body.apex-ui.nova-v300 .section-kicker button{color:var(--nova-jade-2);font-size:9.5px;font-weight:830}
+body.apex-ui.nova-v300 .schedule-strip{
+  display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:6px;
+  border:1px solid var(--nova-line);border-radius:22px;background:var(--nova-surface);box-shadow:var(--nova-shadow)
+}
+body.apex-ui.nova-v300 .schedule-day{
+  position:relative;min-width:0;height:91px;padding:9px 2px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  border:1px solid transparent;border-radius:16px;background:transparent;color:var(--nova-ink)
+}
+body.apex-ui.nova-v300 .schedule-week{font-size:7px;font-weight:780;color:var(--nova-ink-3);white-space:nowrap}
+body.apex-ui.nova-v300 .schedule-date{display:flex;align-items:flex-end;justify-content:center;gap:2px;line-height:1}
+body.apex-ui.nova-v300 .schedule-date strong{font-size:19px;font-weight:930;color:var(--nova-ink)}
+body.apex-ui.nova-v300 .schedule-date small{padding-bottom:1px;font-size:6px;font-weight:760;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .schedule-shift{font-size:10px;font-weight:920}
+body.apex-ui.nova-v300 .schedule-day.shift-early .schedule-shift{color:var(--nova-early)}
+body.apex-ui.nova-v300 .schedule-day.shift-night .schedule-shift{color:var(--nova-night)}
+body.apex-ui.nova-v300 .schedule-day.shift-mid .schedule-shift{color:var(--nova-mid)}
+body.apex-ui.nova-v300 .schedule-day.shift-off .schedule-shift{color:var(--nova-off)}
+body.apex-ui.nova-v300 .schedule-accent{left:9px;right:9px;bottom:6px;height:3px;opacity:.58}
+body.apex-ui.nova-v300 .schedule-day.current{
+  background:var(--nova-today-soft);border-color:#f4bd86;box-shadow:0 5px 14px rgba(210,111,24,.12)
+}
+body.apex-ui.nova-v300 .schedule-day.current .schedule-week{color:#985216;font-weight:930;letter-spacing:.03em}
+body.apex-ui.nova-v300 .schedule-day.current .schedule-date strong{color:#6e3709}
+body.apex-ui.nova-v300 .schedule-day.current .schedule-accent{background:var(--nova-today);opacity:1}
+body.apex-ui.nova-v300 .schedule-event-dot{top:7px;right:7px;background:var(--nova-danger);box-shadow:0 0 0 2px var(--nova-surface)}
+
+/* Compact actionable insights */
+body.apex-ui.nova-v300 .insight-row{
+  min-height:78px;margin-top:10px;padding:12px 14px;gap:12px;border:1px solid var(--nova-line);border-radius:20px;
+  background:var(--nova-surface);color:var(--nova-ink);box-shadow:var(--nova-shadow)
+}
+body.apex-ui.nova-v300 .insight-row:active{transform:scale(.987)}
+body.apex-ui.nova-v300 .insight-icon{width:48px;height:48px;flex:0 0 48px;border-radius:16px}
+body.apex-ui.nova-v300 .insight-icon.weather{background:#dff2ed;color:var(--nova-jade-2)}
+body.apex-ui.nova-v300 .insight-icon.pay{background:#e5edf7;color:#315f90}
+body.apex-ui.nova-v300 .insight-copy small{font-size:9px;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .insight-copy strong{margin-top:3px;font-size:19px;color:var(--nova-ink)}
+body.apex-ui.nova-v300 .insight-copy em{font-size:10px;color:var(--nova-ink-2)}
+body.apex-ui.nova-v300 .insight-meta{font-size:8px;color:var(--nova-ink-3)}
+
+/* Calendar: persistent today locator + calm shift grid. */
+body.apex-ui.nova-v300 .calendar-today-anchor{
+  --anchor-shift:var(--nova-off);width:100%;min-height:76px;margin:-2px 0 12px;padding:9px 11px;
+  display:grid;grid-template-columns:57px minmax(0,1fr) auto;align-items:center;gap:11px;text-align:left;
+  border:1px solid #efc08e;border-radius:21px;background:linear-gradient(105deg,#fff5e9,#fff 68%);
+  color:var(--nova-ink);box-shadow:0 8px 23px rgba(117,65,17,.075)
+}
+body.apex-ui.nova-v300 .calendar-today-anchor.shift-early{--anchor-shift:var(--nova-early)}
+body.apex-ui.nova-v300 .calendar-today-anchor.shift-night{--anchor-shift:var(--nova-night)}
+body.apex-ui.nova-v300 .calendar-today-anchor.shift-mid{--anchor-shift:var(--nova-mid)}
+body.apex-ui.nova-v300 .today-anchor-date{
+  width:57px;height:57px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-radius:16px;background:var(--nova-today);color:#321d0a;box-shadow:inset 0 1px 0 rgba(255,255,255,.42)
+}
+body.apex-ui.nova-v300 .today-anchor-date small{font-size:7px;font-weight:830}
+body.apex-ui.nova-v300 .today-anchor-date strong{font-size:27px;line-height:1;font-weight:950;letter-spacing:-.06em}
+body.apex-ui.nova-v300 .today-anchor-copy{min-width:0}
+body.apex-ui.nova-v300 .today-anchor-copy b{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:900;color:var(--nova-ink)}
+body.apex-ui.nova-v300 .today-anchor-copy b i{width:7px;height:7px;border-radius:50%;background:var(--anchor-shift);box-shadow:0 0 0 4px color-mix(in srgb,var(--anchor-shift) 13%,transparent)}
+body.apex-ui.nova-v300 .today-anchor-copy small{display:block;margin-top:5px;font-size:9.5px;font-weight:670;color:var(--nova-ink-2)}
+body.apex-ui.nova-v300 .today-anchor-action{display:flex;align-items:center;gap:4px;color:#a95c1d;font-size:8px;font-weight:850;white-space:nowrap}
+body.apex-ui.nova-v300 .calendar-legend{margin:0 3px 11px;gap:12px;padding:2px 0;overflow-x:auto}
+body.apex-ui.nova-v300 .calendar-legend span{font-size:9px;font-weight:760;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .calendar-legend i{width:7px;height:7px}
+body.apex-ui.nova-v300 .calendar-legend .legend-today{color:#9a5319;font-weight:900}
+body.apex-ui.nova-v300 .calendar-legend .legend-today i{background:var(--nova-today);box-shadow:0 0 0 3px rgba(255,157,69,.16)}
+body.apex-ui.nova-v300 .studio-calendar{
+  padding:0 9px 11px;border:1px solid var(--nova-line);border-radius:25px;background:var(--nova-surface);
+  box-shadow:var(--nova-shadow);overflow:hidden
+}
+body.apex-ui.nova-v300 .studio-calendar .mnav{
+  min-height:69px;margin:0 -9px 9px;padding:10px 11px;display:flex;align-items:center;justify-content:space-between;
+  border:0;border-bottom:1px solid var(--nova-line);border-radius:0;background:linear-gradient(105deg,#e9f2ee,#f4f7f5);color:var(--nova-ink)
+}
+body.apex-ui.nova-v300 .studio-calendar .mnav-btn{
+  width:42px;height:42px;border:1px solid var(--nova-line-strong);border-radius:14px;background:rgba(255,255,255,.82);
+  color:var(--nova-jade-2);box-shadow:0 3px 10px rgba(7,42,38,.04)
+}
+body.apex-ui.nova-v300 .studio-calendar .mnav-btn.next{transform:none}
+body.apex-ui.nova-v300 .studio-calendar .mnav-btn.next .ui-icon{transform:rotate(180deg)}
+body.apex-ui.nova-v300 .studio-calendar .mnav-title span{color:var(--nova-ink);font-size:21px;font-weight:930;letter-spacing:-.045em}
+body.apex-ui.nova-v300 .studio-calendar .mnav-title small{margin-top:4px;color:var(--nova-ink-3);font-size:8px;font-weight:700;letter-spacing:.06em}
+body.apex-ui.nova-v300 .studio-calendar .wk-row{padding:4px 0 8px;border-bottom:1px solid var(--nova-line)}
+body.apex-ui.nova-v300 .studio-calendar .wk-cell{font-size:9px;font-weight:780;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .studio-calendar .wk-cell.we{color:#b95f64}
+body.apex-ui.nova-v300 .studio-calendar .cal{gap:4px;padding-top:7px}
+body.apex-ui.nova-v300 .studio-calendar .day{
+  position:relative;height:65px;min-width:0;padding:6px 5px 7px;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:0;
+  aspect-ratio:auto;border:1px solid transparent;border-radius:13px;background:var(--nova-surface-2);color:var(--nova-off);box-shadow:none;overflow:visible
+}
+body.apex-ui.nova-v300 .studio-calendar .day::after{left:7px;right:7px;bottom:5px;height:3px;opacity:.62}
+body.apex-ui.nova-v300 .studio-calendar .day.e{background:var(--nova-early-soft);border-color:#d5ebe6;color:var(--nova-early)}
+body.apex-ui.nova-v300 .studio-calendar .day.n{background:var(--nova-night-soft);border-color:#e1d9f3;color:var(--nova-night)}
+body.apex-ui.nova-v300 .studio-calendar .day.m{background:var(--nova-mid-soft);border-color:#f0dfbd;color:var(--nova-mid)}
+body.apex-ui.nova-v300 .studio-calendar .day.o{background:var(--nova-off-soft);border-color:#e3e9e6;color:var(--nova-off)}
+body.apex-ui.nova-v300 .studio-calendar .day-top{height:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:2px}
+body.apex-ui.nova-v300 .studio-calendar .day .num{font-size:15px;line-height:1;font-weight:920;color:currentColor}
+body.apex-ui.nova-v300 .studio-calendar .shift-code{margin-top:4px;font-size:13px;line-height:1;font-weight:950;color:currentColor}
+body.apex-ui.nova-v300 .studio-calendar .lun-mini{margin-top:4px;font-size:6px;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .studio-calendar .today-label{
+  max-width:22px;padding:2px 3px;border-radius:6px;background:var(--nova-today);color:#321d0a;
+  font-size:6px;line-height:1.2;font-weight:950;letter-spacing:0;text-align:center
+}
+body.apex-ui.nova-v300 .studio-calendar .day.today{
+  z-index:2;background:#fff9f2!important;border:2px solid var(--nova-today)!important;color:#4a2a0e!important;
+  box-shadow:0 0 0 3px rgba(255,157,69,.18),0 8px 18px rgba(117,65,17,.16)!important;transform:translateY(-1px)
+}
+body.apex-ui.nova-v300 .studio-calendar .day.today .num{
+  width:24px;height:24px;margin:-2px 0 0 -2px;display:grid;place-items:center;border-radius:8px;
+  background:var(--nova-today);color:#2d1a08!important;font-size:14px
+}
+body.apex-ui.nova-v300 .studio-calendar .day.today .shift-code{color:#4a2a0e!important}
+body.apex-ui.nova-v300 .studio-calendar .day.today::after{background:var(--nova-today-strong)!important;opacity:1}
+body.apex-ui.nova-v300 .studio-calendar .day-markers{left:4px;right:4px;bottom:5px}
+body.apex-ui.nova-v300 .studio-calendar .day-marker{width:13px;height:13px;border-radius:5px}
+body.apex-ui.nova-v300 .studio-calendar .day-dot{width:5px;height:5px}
+body.apex-ui.nova-v300 .calendar-notice{
+  margin-top:10px;padding:12px 13px;border:1px solid var(--nova-line);border-radius:18px;background:var(--nova-surface);
+  color:var(--nova-ink);box-shadow:0 5px 17px rgba(7,42,38,.04)
+}
+body.apex-ui.nova-v300 .calendar-notice .notice-icon{width:38px;height:38px;flex:0 0 38px;border-radius:13px}
+body.apex-ui.nova-v300 .calendar-notice strong{font-size:11px;color:var(--nova-ink)}
+body.apex-ui.nova-v300 .calendar-notice div>span{font-size:9.5px;color:var(--nova-ink-2)}
+
+/* One integrated monthly summary instead of a row of cloned cards. */
+body.apex-ui.nova-v300 .month-summary-v300{
+  margin-top:13px;padding:15px;border:1px solid var(--nova-line);border-radius:22px;background:var(--nova-surface);box-shadow:var(--nova-shadow)
+}
+body.apex-ui.nova-v300 .month-summary-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+body.apex-ui.nova-v300 .month-summary-head>span small{display:block;color:var(--nova-jade-2);font-size:7px;font-weight:900;letter-spacing:.15em}
+body.apex-ui.nova-v300 .month-summary-head>span b{display:block;margin-top:4px;color:var(--nova-ink);font-size:13px;font-weight:900}
+body.apex-ui.nova-v300 .month-summary-head>strong{display:flex;align-items:baseline;gap:4px;color:var(--nova-ink);font-size:24px;font-weight:940}
+body.apex-ui.nova-v300 .month-summary-head>strong small{font-size:8px;font-weight:730;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .month-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:13px}
+body.apex-ui.nova-v300 .month-summary-item{
+  min-width:0;min-height:65px;padding:9px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border:1px solid var(--nova-line);border-radius:14px;background:var(--nova-surface-2);text-align:center
+}
+body.apex-ui.nova-v300 .month-summary-item span{display:flex;align-items:center;gap:4px;color:var(--nova-ink-3);font-size:8px;font-weight:740;white-space:nowrap}
+body.apex-ui.nova-v300 .month-summary-item span i{width:6px;height:6px;border-radius:50%;background:var(--nova-off)}
+body.apex-ui.nova-v300 .month-summary-item strong{margin-top:6px;color:var(--nova-ink);font-size:21px;line-height:1;font-weight:930}
+body.apex-ui.nova-v300 .month-summary-item.tone-early span i{background:var(--nova-early)}
+body.apex-ui.nova-v300 .month-summary-item.tone-night span i{background:var(--nova-night)}
+body.apex-ui.nova-v300 .month-summary-item.tone-mid span i{background:var(--nova-mid)}
+body.apex-ui.nova-v300 .month-summary-item.tone-off span i{background:var(--nova-off)}
+body.apex-ui.nova-v300 .month-summary-foot{display:flex;justify-content:space-between;margin-top:10px;padding-top:9px;border-top:1px solid var(--nova-line);font-size:8px;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .month-summary-foot b{color:var(--nova-ink-2)}
+
+/* Salary */
+body.apex-ui.nova-v300 .salary-dashboard{
+  margin-bottom:12px;padding:18px;border:1px solid var(--nova-line);border-radius:25px;background:var(--nova-surface);box-shadow:var(--nova-shadow)
+}
+body.apex-ui.nova-v300 .salary-dashboard-head span{font-size:9.5px;color:var(--nova-jade-2);font-weight:850}
+body.apex-ui.nova-v300 .salary-dashboard-head h3{margin-top:4px;font-size:13px;color:var(--nova-ink-2);font-weight:760}
+body.apex-ui.nova-v300 .salary-hero{
+  margin:4px 0 0;padding:19px;border-radius:21px;background:
+    radial-gradient(100% 160% at 100% 0,rgba(132,236,219,.24),transparent 57%),
+    linear-gradient(135deg,#086b63,#06433f);color:#fff;box-shadow:0 16px 34px rgba(4,70,65,.16)
+}
+body.apex-ui.nova-v300 .salary-amount small{color:rgba(255,255,255,.65);font-size:8.5px}
+body.apex-ui.nova-v300 .salary-amount strong{color:#fff;font-size:34px;letter-spacing:-.055em}
+body.apex-ui.nova-v300 .salary-amount span{color:rgba(255,255,255,.68);font-size:8.5px}
+body.apex-ui.nova-v300 .salary-ring{width:92px;height:92px}
+body.apex-ui.nova-v300 .salary-ring .ring-base{stroke:rgba(255,255,255,.14)}
+body.apex-ui.nova-v300 .salary-ring .ring-value{stroke:#91e3d6}
+body.apex-ui.nova-v300 .salary-ring strong{color:#fff}
+body.apex-ui.nova-v300 .salary-ring span{color:rgba(255,255,255,.62)}
+body.apex-ui.nova-v300 .salary-flow-label{font-size:10px;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .salary-flow-label b{color:var(--nova-ink-2)}
+body.apex-ui.nova-v300 .salary-metrics{gap:7px}
+body.apex-ui.nova-v300 .salary-metrics>div{min-height:78px;border:1px solid var(--nova-line);border-radius:17px;background:var(--nova-surface-2)}
+body.apex-ui.nova-v300 .salary-metrics strong{font-size:22px;color:var(--nova-ink)}
+body.apex-ui.nova-v300 .salary-metrics span{font-size:9px;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .pay-calendar-row{border-color:var(--nova-line)}
+body.apex-ui.nova-v300 .salary-detail-list{background:var(--nova-surface-2);border:1px solid var(--nova-line)}
+body.apex-ui.nova-v300 .salary-disclaimer{font-size:8.5px;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .al-bar{border-radius:18px!important;background:#edf7f2!important;border:1px solid #cfe7da!important;box-shadow:none!important}
+
+/* Weather and tide */
+body.apex-ui.nova-v300 .weather-dashboard,body.apex-ui.nova-v300 .tide-instrument{
+  margin-bottom:12px;padding:17px;border:1px solid var(--nova-line);border-radius:25px;background:var(--nova-surface);box-shadow:var(--nova-shadow)
+}
+body.apex-ui.nova-v300 .weather-current-icon{width:60px;height:60px;flex:0 0 60px;border-radius:19px;background:#dcefeb;color:var(--nova-jade-2)}
+body.apex-ui.nova-v300 .weather-current-copy small{font-size:9px;color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .weather-current-copy strong{font-size:32px;color:var(--nova-ink)}
+body.apex-ui.nova-v300 .weather-current-copy em{font-size:10px;color:var(--nova-ink-2)}
+body.apex-ui.nova-v300 .weather-settings{border-color:var(--nova-line);background:var(--nova-surface-2);color:var(--nova-jade-2)}
+body.apex-ui.nova-v300 .precip-visual{border:1px solid var(--nova-line);background:var(--nova-surface-2)}
+body.apex-ui.nova-v300 .rain-station{border-color:var(--nova-line);background:var(--nova-surface-2)}
+body.apex-ui.nova-v300 .forecast-day{height:79px;border:1px solid transparent}
+body.apex-ui.nova-v300 .forecast-day.today{border-color:#efc08e;background:var(--nova-today-soft);color:#8b470d}
+body.apex-ui.nova-v300 .forecast-day.today span,body.apex-ui.nova-v300 .forecast-day.today small{color:#a45b1e}
+body.apex-ui.nova-v300 .radar-action{border-radius:17px;background:linear-gradient(135deg,#123750,#0c293e)}
+body.apex-ui.nova-v300 .tide-status{border:1px solid var(--nova-line);background:var(--nova-surface-2)}
+body.apex-ui.nova-v300 .tide-days .tide-day.today{border-color:#efc08e;background:var(--nova-today-soft)}
+body.apex-ui.nova-v300 .commute-alert{border-left:4px solid #d2912b}
+
+/* Controls, account and settings */
+body.apex-ui.nova-v300 .quick-controls{gap:8px}
+body.apex-ui.nova-v300 .quick-control-card,body.apex-ui.nova-v300 .leave-center,
+body.apex-ui.nova-v300 .settings-panel,body.apex-ui.nova-v300 .settings-group{
+  border:1px solid var(--nova-line);background:var(--nova-surface);box-shadow:var(--nova-shadow)
+}
+body.apex-ui.nova-v300 .quick-control-card{min-height:66px;border-radius:18px}
+body.apex-ui.nova-v300 .quick-control-card b,body.apex-ui.nova-v300 .settings-row-copy strong{color:var(--nova-ink);font-size:12px}
+body.apex-ui.nova-v300 .quick-control-card small,body.apex-ui.nova-v300 .settings-row-copy small{color:var(--nova-ink-3);font-size:9.5px}
+body.apex-ui.nova-v300 .leave-center{border-radius:22px}
+body.apex-ui.nova-v300 .leave-metrics>div{border:1px solid var(--nova-line);background:var(--nova-surface-2)}
+body.apex-ui.nova-v300 .settings-panel{gap:0;margin-top:12px;border-radius:23px;overflow:hidden}
+body.apex-ui.nova-v300 .settings-group{border:0;border-radius:0;box-shadow:none!important}
+body.apex-ui.nova-v300 .settings-group+.settings-group{border-top:8px solid var(--nova-canvas)}
+body.apex-ui.nova-v300 .settings-group-title{padding:14px 15px 8px;color:var(--nova-ink-3);font-size:8.5px;letter-spacing:.14em}
+body.apex-ui.nova-v300 .settings-row{min-height:67px;padding:11px 14px;border-top-color:var(--nova-line)}
+body.apex-ui.nova-v300 .settings-row-icon{width:41px;height:41px;border-radius:14px;background:var(--nova-jade-soft)!important;color:var(--nova-jade-2)}
+body.apex-ui.nova-v300 .danger-zone .settings-row-icon{background:#fbe9eb!important;color:var(--nova-danger)}
+body.apex-ui.nova-v300 .fb-bar{border-color:var(--nova-line)!important;background:var(--nova-surface)!important;box-shadow:none!important}
+
+/* Initial setup and all bottom sheets share the same system. */
+body.apex-ui.nova-v300 .page{padding:20px 15px calc(26px + env(safe-area-inset-bottom))}
+body.apex-ui.nova-v300 .page .hero img{width:76px;height:76px;border-radius:24px;box-shadow:0 16px 36px rgba(5,70,65,.18)}
+body.apex-ui.nova-v300 .page .hero h1{color:var(--nova-ink);font-size:30px;letter-spacing:-.055em}
+body.apex-ui.nova-v300 .page .hero p{color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .rcard,body.apex-ui.nova-v300 .al-setup,body.apex-ui.nova-v300 .opt-btn{
+  border:1px solid var(--nova-line);border-radius:19px;background:var(--nova-surface);box-shadow:var(--nova-shadow)
+}
+body.apex-ui.nova-v300 .rcard{min-height:76px;padding:12px 14px}
+body.apex-ui.nova-v300 .rcard-icon{border-radius:15px;background:var(--nova-jade-soft);color:var(--nova-jade)}
+body.apex-ui.nova-v300 .opt-btn{min-height:116px;color:var(--nova-ink)}
+body.apex-ui.nova-v300 .wiz-back{width:43px;height:43px;border-color:var(--nova-line);border-radius:14px;background:var(--nova-surface)}
+body.apex-ui.nova-v300 .wiz-step{color:var(--nova-jade-2);letter-spacing:.12em}
+body.apex-ui.nova-v300 .wiz-q{color:var(--nova-ink);font-size:18px}
+body.apex-ui.nova-v300 .wiz-badge{padding:5px 9px;border-color:var(--nova-line);border-radius:9px;background:var(--nova-surface);color:var(--nova-ink-3)}
+body.apex-ui.nova-v300 .modal-bg{background:rgba(5,18,20,.58);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+body.apex-ui.nova-v300 .modal-sheet,body.apex-ui.nova-v300 .wx-detail-sheet{
+  max-width:520px;border:1px solid var(--nova-line);border-bottom:0;border-radius:30px 30px 0 0!important;
+  background:var(--nova-surface);color:var(--nova-ink);box-shadow:0 -30px 80px rgba(4,24,25,.28)!important
+}
+body.apex-ui.nova-v300 .modal-handle{width:44px;height:5px;background:var(--nova-line-strong)}
+body.apex-ui.nova-v300 .modal-title{color:var(--nova-ink);font-size:18px;letter-spacing:-.025em}
+body.apex-ui.nova-v300 .modal-done{min-height:48px;border-radius:15px;background:var(--nova-jade-2);box-shadow:0 8px 18px rgba(10,130,120,.2)}
+body.apex-ui.nova-v300 input,body.apex-ui.nova-v300 select,body.apex-ui.nova-v300 textarea{
+  border-color:var(--nova-line)!important;background:var(--nova-surface-2)!important;color:var(--nova-ink)!important
+}
+
+/* Floating navigation dock */
+body.apex-ui.nova-v300 .bottom-nav{
+  left:50%;bottom:8px;width:min(500px,calc(100% - 20px));padding:6px 7px calc(6px + env(safe-area-inset-bottom));
+  border:1px solid rgba(201,215,210,.88)!important;border-radius:24px!important;
+  background:rgba(250,252,250,.94);box-shadow:0 18px 50px rgba(7,35,34,.16),0 4px 18px rgba(7,35,34,.10)!important;
+  backdrop-filter:blur(26px) saturate(1.3);-webkit-backdrop-filter:blur(26px) saturate(1.3)
+}
+body.apex-ui.nova-v300 .bottom-nav-item{
+  position:relative;height:57px;gap:2px;border-radius:17px;color:var(--nova-ink-3);font-size:9px;font-weight:760
+}
+body.apex-ui.nova-v300 .bottom-nav-icon{width:39px;height:31px;border-radius:12px}
+body.apex-ui.nova-v300 .bottom-nav-item.active{color:var(--nova-jade)}
+body.apex-ui.nova-v300 .bottom-nav-item.active .bottom-nav-icon{background:var(--nova-jade-soft);color:var(--nova-jade);box-shadow:inset 0 0 0 1px rgba(7,95,88,.08)}
+body.apex-ui.nova-v300 .nav-active-mark{position:absolute;left:50%;bottom:2px;width:4px;height:4px;border-radius:50%;background:transparent;transform:translateX(-50%)}
+body.apex-ui.nova-v300 .bottom-nav-item.active .nav-active-mark{background:var(--nova-today)}
+
+/* Dark mode parity */
+html[data-theme="dark"] body.apex-ui.nova-v300{
+  color-scheme:dark;
+  --nova-canvas:#071113;
+  --nova-surface:#0f1b1e;
+  --nova-surface-2:#152326;
+  --nova-surface-3:#1b2b2f;
+  --nova-ink:#eef7f5;
+  --nova-ink-2:#b9cac6;
+  --nova-ink-3:#879d98;
+  --nova-line:#233438;
+  --nova-line-strong:#31464a;
+  --nova-jade:#8adfd3;
+  --nova-jade-2:#68d0c4;
+  --nova-jade-soft:#173834;
+  --nova-today:#ffad61;
+  --nova-today-strong:#ff9340;
+  --nova-today-soft:#302116;
+  --nova-early:#72d6cc;
+  --nova-early-soft:#12312f;
+  --nova-night:#c8b6ff;
+  --nova-night-soft:#29233e;
+  --nova-mid:#efc067;
+  --nova-mid-soft:#352a17;
+  --nova-off:#91a19e;
+  --nova-off-soft:#151f22;
+  --nova-shadow:0 1px 2px rgba(0,0,0,.30),0 16px 38px rgba(0,0,0,.24);
+  --nova-shadow-high:0 26px 60px rgba(0,0,0,.36),0 5px 18px rgba(0,0,0,.24)
+}
+html[data-theme="dark"] body.apex-ui.nova-v300 .app-shell{
+  background:radial-gradient(80% 34% at 96% -3%,rgba(40,155,144,.13),transparent 72%),linear-gradient(180deg,#0c191b 0,var(--nova-canvas) 370px)
+}
+html[data-theme="dark"] body.apex-ui.nova-v300 #wxfx{opacity:.25!important;mix-blend-mode:screen}
+html[data-theme="dark"] body.apex-ui.nova-v300 .nova-header{background:rgba(7,17,19,.93);border-bottom-color:var(--nova-line)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .nova-header .brand-copy strong{color:var(--nova-ink)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .header-date-chip{border-color:#644424;background:#2a2017;color:#ffd2a8}
+html[data-theme="dark"] body.apex-ui.nova-v300 .header-date-chip small{color:#eeb67e}
+html[data-theme="dark"] body.apex-ui.nova-v300 .nova-header .header-utility,
+html[data-theme="dark"] body.apex-ui.nova-v300 .nova-header .header-settings,
+html[data-theme="dark"] body.apex-ui.nova-v300 .text-action,
+html[data-theme="dark"] body.apex-ui.nova-v300 .icon-action{background:var(--nova-surface);border-color:var(--nova-line);color:var(--nova-jade-2)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .nova-header .utility-dot{box-shadow:0 0 0 2px var(--nova-surface)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .calendar-today-anchor{border-color:#684726;background:linear-gradient(105deg,#2b2118,#111d20 68%)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .today-anchor-date{color:#2a1808}
+html[data-theme="dark"] body.apex-ui.nova-v300 .today-anchor-action{color:#f1b579}
+html[data-theme="dark"] body.apex-ui.nova-v300 .studio-calendar,
+html[data-theme="dark"] body.apex-ui.nova-v300 .schedule-strip,
+html[data-theme="dark"] body.apex-ui.nova-v300 .insight-row,
+html[data-theme="dark"] body.apex-ui.nova-v300 .calendar-notice,
+html[data-theme="dark"] body.apex-ui.nova-v300 .month-summary-v300,
+html[data-theme="dark"] body.apex-ui.nova-v300 .salary-dashboard,
+html[data-theme="dark"] body.apex-ui.nova-v300 .weather-dashboard,
+html[data-theme="dark"] body.apex-ui.nova-v300 .tide-instrument,
+html[data-theme="dark"] body.apex-ui.nova-v300 .quick-control-card,
+html[data-theme="dark"] body.apex-ui.nova-v300 .leave-center,
+html[data-theme="dark"] body.apex-ui.nova-v300 .settings-panel,
+html[data-theme="dark"] body.apex-ui.nova-v300 .fb-bar{background:var(--nova-surface)!important;border-color:var(--nova-line)!important}
+html[data-theme="dark"] body.apex-ui.nova-v300 .studio-calendar .mnav{background:linear-gradient(105deg,#172a29,#122124);border-color:var(--nova-line)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .studio-calendar .mnav-btn{background:#1a2b2e;border-color:var(--nova-line-strong)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .studio-calendar .day.e{background:var(--nova-early-soft);border-color:#234c48;color:var(--nova-early)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .studio-calendar .day.n{background:var(--nova-night-soft);border-color:#413663;color:var(--nova-night)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .studio-calendar .day.m{background:var(--nova-mid-soft);border-color:#503e20;color:var(--nova-mid)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .studio-calendar .day.o{background:var(--nova-off-soft);border-color:#253135;color:var(--nova-off)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .studio-calendar .day.today{
+  background:#2b2118!important;border-color:var(--nova-today)!important;color:#ffe4c8!important;
+  box-shadow:0 0 0 3px rgba(255,173,97,.19),0 9px 20px rgba(0,0,0,.33)!important
+}
+html[data-theme="dark"] body.apex-ui.nova-v300 .studio-calendar .day.today .num{color:#2a1808!important}
+html[data-theme="dark"] body.apex-ui.nova-v300 .studio-calendar .day.today .shift-code{color:#ffe4c8!important}
+html[data-theme="dark"] body.apex-ui.nova-v300 .month-summary-item,
+html[data-theme="dark"] body.apex-ui.nova-v300 .salary-metrics>div,
+html[data-theme="dark"] body.apex-ui.nova-v300 .salary-detail-list,
+html[data-theme="dark"] body.apex-ui.nova-v300 .precip-visual,
+html[data-theme="dark"] body.apex-ui.nova-v300 .rain-station,
+html[data-theme="dark"] body.apex-ui.nova-v300 .tide-status,
+html[data-theme="dark"] body.apex-ui.nova-v300 .leave-metrics>div{background:var(--nova-surface-2)!important;border-color:var(--nova-line)!important}
+html[data-theme="dark"] body.apex-ui.nova-v300 .forecast-day.today,
+html[data-theme="dark"] body.apex-ui.nova-v300 .tide-days .tide-day.today{border-color:#684726;background:#2b2118;color:#ffd0a3}
+html[data-theme="dark"] body.apex-ui.nova-v300 .forecast-day.today span,
+html[data-theme="dark"] body.apex-ui.nova-v300 .forecast-day.today small{color:#eeb67e}
+html[data-theme="dark"] body.apex-ui.nova-v300 .settings-group+.settings-group{border-top-color:var(--nova-canvas)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .settings-row-icon{background:var(--nova-jade-soft)!important}
+html[data-theme="dark"] body.apex-ui.nova-v300 .al-bar{background:#13271e!important;border-color:#294633!important;color:#81d0a0!important}
+html[data-theme="dark"] body.apex-ui.nova-v300 .bottom-nav{background:rgba(10,23,25,.95);border-color:var(--nova-line)!important;box-shadow:0 18px 50px rgba(0,0,0,.42)!important}
+html[data-theme="dark"] body.apex-ui.nova-v300 .bottom-nav-item.active{color:var(--nova-jade)}
+html[data-theme="dark"] body.apex-ui.nova-v300 .modal-sheet,
+html[data-theme="dark"] body.apex-ui.nova-v300 .wx-detail-sheet{background:var(--nova-surface);border-color:var(--nova-line)}
+
+@keyframes novaTodayPulse{0%,100%{box-shadow:0 0 0 3px rgba(255,157,69,.18),0 8px 18px rgba(117,65,17,.16)}50%{box-shadow:0 0 0 5px rgba(255,157,69,.10),0 9px 20px rgba(117,65,17,.18)}}
+body.apex-ui.nova-v300 .studio-calendar .day.today{animation:novaTodayPulse 2.8s ease-in-out infinite}
+
+@media(max-width:390px){
+  body.apex-ui.nova-v300 .app-main{padding-left:10px;padding-right:10px}
+  body.apex-ui.nova-v300 .nova-header{padding-left:9px;padding-right:9px;gap:5px}
+  body.apex-ui.nova-v300 .nova-header .brand-mark{width:40px;height:40px;flex-basis:40px}
+  body.apex-ui.nova-v300 .nova-header .brand-copy strong{font-size:15px}
+  body.apex-ui.nova-v300 .nova-header .brand-copy>span{max-width:82px;font-size:8px}
+  body.apex-ui.nova-v300 .header-date-chip{width:46px;flex-basis:46px}
+  body.apex-ui.nova-v300 .nova-header .utility-mini{width:29px}
+  body.apex-ui.nova-v300 .nova-header .header-settings{width:40px;height:43px}
+  body.apex-ui.nova-v300 .nova-hero{min-height:281px;padding:17px}
+  body.apex-ui.nova-v300 .nova-hero-grid{grid-template-columns:104px minmax(0,1fr);gap:14px}
+  body.apex-ui.nova-v300 .nova-date-block{min-height:151px;padding-left:7px;padding-right:7px}
+  body.apex-ui.nova-v300 .nova-date-block>strong{font-size:64px}
+  body.apex-ui.nova-v300 .nova-status-block h1{font-size:22px}
+  body.apex-ui.nova-v300 .schedule-strip{gap:3px;padding:5px}
+  body.apex-ui.nova-v300 .schedule-day{height:88px;border-radius:14px}
+  body.apex-ui.nova-v300 .schedule-date strong{font-size:17px}
+  body.apex-ui.nova-v300 .calendar-today-anchor{grid-template-columns:54px minmax(0,1fr) auto;gap:9px;padding:8px}
+  body.apex-ui.nova-v300 .today-anchor-date{width:54px;height:54px}
+  body.apex-ui.nova-v300 .today-anchor-action{font-size:0;gap:0}
+  body.apex-ui.nova-v300 .today-anchor-action .ui-icon{width:17px;height:17px}
+  body.apex-ui.nova-v300 .studio-calendar .cal{gap:3px}
+  body.apex-ui.nova-v300 .studio-calendar .day{height:62px;padding:5px 4px 6px;border-radius:11px}
+  body.apex-ui.nova-v300 .studio-calendar .day .num{font-size:14px}
+  body.apex-ui.nova-v300 .studio-calendar .shift-code{font-size:12px}
+  body.apex-ui.nova-v300 .studio-calendar .today-label{max-width:20px;font-size:5.5px}
+  body.apex-ui.nova-v300 .month-summary-grid{gap:4px}
+  body.apex-ui.nova-v300 .month-summary-item{padding-left:2px;padding-right:2px}
+  body.apex-ui.nova-v300 .month-summary-item span{font-size:7.5px;gap:3px}
+}
+@media(max-width:345px){
+  body.apex-ui.nova-v300 .nova-header .brand-copy>span{display:none}
+  body.apex-ui.nova-v300 .nova-header .brand-lockup{flex:0 1 auto}
+  body.apex-ui.nova-v300 .header-date-chip{width:43px;flex-basis:43px}
+  body.apex-ui.nova-v300 .nova-hero-grid{grid-template-columns:96px minmax(0,1fr);gap:11px}
+  body.apex-ui.nova-v300 .nova-date-block>strong{font-size:59px}
+  body.apex-ui.nova-v300 .nova-status-block h1{font-size:20px}
+  body.apex-ui.nova-v300 .calendar-legend{gap:9px}
+  body.apex-ui.nova-v300 .month-summary-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(min-width:700px){
+  body.apex-ui.nova-v300{max-width:940px}
+  body.apex-ui.nova-v300 .nova-header,body.apex-ui.nova-v300 .bottom-nav{width:min(940px,100%)}
+  body.apex-ui.nova-v300 .app-main{max-width:940px;padding-left:20px;padding-right:20px}
+  body.apex-ui.nova-v300 .screen-calendar,body.apex-ui.nova-v300 .screen-pay,
+  body.apex-ui.nova-v300 .screen-weather,body.apex-ui.nova-v300 .screen-more{max-width:720px;margin-left:auto;margin-right:auto}
+  body.apex-ui.nova-v300 .nova-hero{min-height:310px}
+}
+@media(prefers-reduced-motion:reduce){
+  body.apex-ui.nova-v300 .studio-calendar .day.today{animation:none!important}
+}

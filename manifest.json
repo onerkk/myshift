@@ -7,8 +7,8 @@
   "scope": "/myshift/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f2f3ef",
-  "theme_color": "#087b70",
+  "background_color": "#071619",
+  "theme_color": "#071619",
   "lang": "zh-TW",
   "icons": [
     {

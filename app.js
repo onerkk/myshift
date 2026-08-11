@@ -2053,10 +2053,11 @@ function uiBottomNavHtml(){
     ["weather","tabWeather","weather",lang==="zh"?"天氣":"Cuaca"],
     ["more","tabMore","more",lang==="zh"?"更多":"Lainnya"]
   ];
-  return `<nav class="bottom-nav" aria-label="${lang==="zh"?"主要導覽":"Main navigation"}">${defs.map(([tab,action,icon,label])=>`<button class="bottom-nav-item${UI_TAB===tab?" active":""}" data-a="${action}" aria-current="${UI_TAB===tab?"page":"false"}"><span class="bottom-nav-icon">${uiIcon(icon,21)}</span><span>${label}</span></button>`).join("")}</nav>`;
+  return `<nav class="bottom-nav" aria-label="${lang==="zh"?"主要導覽":"Main navigation"}">${defs.map(([tab,action,icon,label])=>`<button class="bottom-nav-item${UI_TAB===tab?" active":""}" data-a="${action}" aria-current="${UI_TAB===tab?"page":"false"}"><span class="bottom-nav-icon">${uiIcon(icon,21)}</span><span>${label}</span><i class="nav-active-mark" aria-hidden="true"></i></button>`).join("")}</nav>`;
 }
 function uiScreenHeading(title,sub,actionHtml=""){
-  return `<div class="screen-heading"><div><h2>${title}</h2>${sub?`<p>${sub}</p>`:""}</div>${actionHtml}</div>`;
+  const overline={calendar:lang==="zh"?"輪班月曆":"SHIFT CALENDAR",pay:lang==="zh"?"薪資與工時":"PAY & HOURS",weather:lang==="zh"?"即時環境資訊":"LIVE CONDITIONS",more:lang==="zh"?"個人控制台":"CONTROL CENTER"}[UI_TAB]||"MY SHIFT";
+  return `<div class="screen-heading"><div class="screen-heading-copy"><span class="screen-overline"><i></i>${overline}</span><h2>${title}</h2>${sub?`<p>${sub}</p>`:""}</div>${actionHtml}</div>`;
 }
 function uiTodayHeroHtml(){
   const s=gs(TY,TM,TD),rule=getShiftWorkRule(TY,TM,TD),WK=t("wk"),dw=new Date(TY,TM-1,TD).getDay();
@@ -7084,7 +7085,7 @@ if('serviceWorker' in navigator){
 
 // ═══════════════════════════════════════════════════════════════
 // STUDIO MAX UI — refined hierarchy, unified iconography, data visuals
-// Version 230
+// Version 300
 // ═══════════════════════════════════════════════════════════════
 function studioIcon(name,size=22){
   const paths={
@@ -7122,12 +7123,11 @@ function studioShiftTime(rule){
 }
 function uiHeaderHtml(){
   const meta=`${(RN[lang]&&RN[lang][S.rt])||S.rt||''}${S.unit&&S.unit!=='__all'?' · '+S.unit:S.unit==='__all'?' · '+(lang==='zh'?'全部單位':'All Units'):''}`;
-  const muted=WxSfx.isMuted();
-  return `<header class="app-header studio-app-header"><div class="brand-lockup"><img src="${IMG.icon}" alt="" class="brand-mark"><div class="brand-copy"><strong>${t('app')}</strong><span>${esc(meta)}</span></div></div><div class="header-actions"><div class="header-utility" role="group" aria-label="${lang==='zh'?'快速控制':'Quick controls'}"><button class="utility-mini" data-a="sfx" aria-label="${lang==='zh'?'切換提示音':'Toggle sound'}" aria-pressed="${muted?'false':'true'}">${uiIcon('sound',18)}<i class="utility-dot${muted?' muted':''}"></i></button><button class="utility-mini utility-language" data-a="lang" aria-label="${lang==='zh'?'切換為印尼文':'Ganti ke 中文'}">${lang==='zh'?'中':'ID'}</button></div><button class="icon-button header-settings" data-a="tabMore" aria-label="${lang==='zh'?'功能與設定':'Tools and settings'}">${uiIcon('settings',19)}</button></div></header>`;
+  const muted=WxSfx.isMuted(),WK=t('wk'),dw=new Date(TY,TM-1,TD).getDay();
+  return `<header class="app-header studio-app-header nova-header"><button class="brand-lockup" data-a="tabToday" aria-label="${lang==='zh'?'回到今天':'Go to today'}"><img src="${IMG.icon}" alt="" class="brand-mark"><span class="brand-copy"><strong>${t('app')}</strong><span>${esc(meta)}</span></span></button><button class="header-date-chip" data-a="tabToday" aria-label="${lang==='zh'?`${TM}月${TD}日，星期${WK[dw]}`:`${WK[dw]}, ${TD}/${TM}`}"><span>${TM}/${TD}</span><small>${lang==='zh'?`週${WK[dw]}`:WK[dw]}</small></button><div class="header-actions"><div class="header-utility" role="group" aria-label="${lang==='zh'?'快速控制':'Quick controls'}"><button class="utility-mini" data-a="sfx" aria-label="${lang==='zh'?'切換提示音':'Toggle sound'}" aria-pressed="${muted?'false':'true'}">${uiIcon('sound',18)}<i class="utility-dot${muted?' muted':''}"></i></button><button class="utility-mini utility-language" data-a="lang" aria-label="${lang==='zh'?'切換為印尼文':'Ganti ke 中文'}">${lang==='zh'?'中':'ID'}</button></div><button class="icon-button header-settings" data-a="tabMore" aria-label="${lang==='zh'?'功能與設定':'Tools and settings'}">${uiIcon('settings',19)}</button></div></header>`;
 }
 function uiTodayHeroHtml(){
   const s=gs(TY,TM,TD),rule=getShiftWorkRule(TY,TM,TD),WK=t('wk'),dw=new Date(TY,TM-1,TD).getDay();
-  const dateLabel=lang==='zh'?`${TM}月${TD}日・星期${WK[dw]}`:`${WK[dw]}, ${TD}/${TM}`;
   let status=lang==='zh'?'今日尚未設定班別':'Belum ada shift',progress=0,phaseLabel=lang==='zh'?'今日狀態':'Status hari ini';
   const shiftTime=studioShiftTime(rule);
   if(s==='休'){
@@ -7144,13 +7144,13 @@ function uiTodayHeroHtml(){
   let nextOff='';if(s&&s!=='休')for(let i=1;i<=30;i++){const d=new Date(TY,TM-1,TD+i);if(gs(d.getFullYear(),d.getMonth()+1,d.getDate())==='休'){nextOff=lang==='zh'?`${i} 天後休假`:`Libur dalam ${i} hari`;break}}
   const todayKey=ek(TY,TM,TD),eventCount=(EVS[todayKey]||[]).length+(getAdminEv(todayKey)||[]).length,leaveCount=new Set(getLeaves(todayKey).map(x=>x.uid).filter(Boolean)).size;
   const taskText=eventCount?`${eventCount} ${lang==='zh'?'項行程':'agenda'}`:leaveCount?`${leaveCount} ${lang==='zh'?'人請假':'cuti'}`:(lang==='zh'?'今日無待辦':'Tidak ada agenda');
-  return `<section class="today-hero studio-hero shift-${uiShiftClass(s)}"><div class="hero-topline"><div><span class="hero-date">${dateLabel}</span><span class="hero-phase">${phaseLabel}</span></div><span class="hero-shift-badge"><i></i>${studioShiftLabel(s)}</span></div><div class="hero-status-row"><div class="hero-status-icon">${studioIcon(s==='休'?'vacation':'clock',27)}</div><div class="hero-status-copy"><h1>${status}</h1><p>${rule.isWork?shiftTime.range:(lang==='zh'?'今日不需出勤':'Tidak perlu bekerja')}</p></div></div><div class="hero-timeline" aria-label="${lang==='zh'?'班次進度':'Shift progress'}"><div class="hero-track"><span style="width:${progress.toFixed(1)}%"></span><i style="left:${Math.max(1,Math.min(99,progress)).toFixed(1)}%"></i></div><div class="hero-time-labels"><span>${rule.isWork?shiftTime.start:(lang==='zh'?'休息':'Libur')}</span><strong>${Math.round(progress)}%</strong><span>${rule.isWork?shiftTime.end:(lang==='zh'?'充電':'Istirahat')}</span></div></div><div class="hero-footer"><span>${studioIcon('vacation',15)} ${nextOff||(lang==='zh'?'班表已同步':'Jadwal tersinkron')}</span><span>${studioIcon('event',15)} ${taskText}</span></div></section>`;
+  return `<section class="today-hero studio-hero nova-hero shift-${uiShiftClass(s)}"><div class="nova-hero-glow" aria-hidden="true"></div><div class="nova-hero-grid"><div class="nova-date-block"><span class="nova-today-flag"><i></i>${lang==='zh'?'今天':'TODAY'}</span><strong>${TD}</strong><small>${lang==='zh'?`${TM}月 · 星期${WK[dw]}`:`${WK[dw]} · ${TM}/${TY}`}</small></div><div class="nova-status-block"><span class="nova-shift-badge"><i></i>${studioShiftLabel(s)}</span><span class="nova-phase">${phaseLabel}</span><h1>${status}</h1><p>${rule.isWork?shiftTime.range:(lang==='zh'?'今日不需出勤':'Tidak perlu bekerja')}</p></div></div><div class="nova-timeline" aria-label="${lang==='zh'?'班次進度':'Shift progress'}"><div class="nova-track"><span style="width:${progress.toFixed(1)}%"></span><i style="left:${Math.max(1,Math.min(99,progress)).toFixed(1)}%"></i></div><div class="nova-time-labels"><span>${rule.isWork?shiftTime.start:(lang==='zh'?'休息':'Libur')}</span><strong>${Math.round(progress)}%</strong><span>${rule.isWork?shiftTime.end:(lang==='zh'?'充電':'Istirahat')}</span></div></div><div class="nova-hero-footer"><span>${studioIcon('vacation',15)} ${nextOff||(lang==='zh'?'班表已同步':'Jadwal tersinkron')}</span><span>${studioIcon('event',15)} ${taskText}</span></div></section>`;
 }
 function uiWeekStripHtml(){
   const WK=t('wk');let items='';
   for(let i=0;i<7;i++){
     const dt=new Date(TY,TM-1,TD+i),y=dt.getFullYear(),m=dt.getMonth()+1,d=dt.getDate(),s=gs(y,m,d),key=ek(y,m,d),has=(EVS[key]||[]).length+(getAdminEv(key)||[]).length>0;
-    items+=`<button class="schedule-day shift-${uiShiftClass(s)}${i===0?' current':''}" data-a="openDate" data-y="${y}" data-m="${m}" data-d="${d}" aria-label="${WK[dt.getDay()]} ${d} ${studioShiftLabel(s)}"><span class="schedule-week">${i===0?(lang==='zh'?'今天':'Hari ini'):WK[dt.getDay()]}</span><strong>${d}</strong><span class="schedule-shift">${s||'—'}</span>${has?'<i class="schedule-event-dot"></i>':''}<b class="schedule-accent"></b></button>`;
+    items+=`<button class="schedule-day shift-${uiShiftClass(s)}${i===0?' current':''}" data-a="openDate" data-y="${y}" data-m="${m}" data-d="${d}" aria-current="${i===0?'date':'false'}" aria-label="${i===0?(lang==='zh'?'今天 ':'Today '):''}${WK[dt.getDay()]} ${d} ${studioShiftLabel(s)}"><span class="schedule-week">${i===0?(lang==='zh'?'今天':'TODAY'):WK[dt.getDay()]}</span><span class="schedule-date"><strong>${d}</strong>${(i===0||d===1)?`<small>${m}${lang==='zh'?'月':''}</small>`:''}</span><span class="schedule-shift">${s||'—'}</span>${has?'<i class="schedule-event-dot"></i>':''}<b class="schedule-accent"></b></button>`;
   }
   return `<section class="week-overview studio-week"><div class="section-kicker"><span>${lang==='zh'?'未來七天':'7 hari ke depan'}</span><button data-a="tabCalendar">${lang==='zh'?'完整月曆':'Kalender'} ${uiIcon('arrow',14)}</button></div><div class="schedule-strip">${items}</div></section>`;
 }
@@ -7253,7 +7253,12 @@ function tideHtml(){
 }
 function studioCalendarLegendHtml(){
   const isZh=lang==='zh';
-  return `<div class="calendar-legend" aria-label="${isZh?'班別圖例':'Legenda shift'}"><span class="legend-early"><i></i>${isZh?'早班':'Pagi'}</span><span class="legend-night"><i></i>${isZh?'晚班':'Malam'}</span><span class="legend-mid"><i></i>${isZh?'中班':'Siang'}</span><span class="legend-off"><i></i>${isZh?'休假':'Libur'}</span></div>`;
+  return `<div class="calendar-legend" aria-label="${isZh?'班別與日期圖例':'Legenda shift dan tanggal'}"><span class="legend-today"><i></i>${isZh?'今天':'Hari ini'}</span><span class="legend-early"><i></i>${isZh?'早班':'Pagi'}</span><span class="legend-night"><i></i>${isZh?'晚班':'Malam'}</span><span class="legend-mid"><i></i>${isZh?'中班':'Siang'}</span><span class="legend-off"><i></i>${isZh?'休假':'Libur'}</span></div>`;
+}
+function uiCalendarTodayAnchorHtml(){
+  const isZh=lang==='zh',s=gs(TY,TM,TD),WK=t('wk'),dw=new Date(TY,TM-1,TD).getDay(),inView=S.yr===TY&&S.mo===TM;
+  const rule=getShiftWorkRule(TY,TM,TD),time=studioShiftTime(rule);
+  return `<button class="calendar-today-anchor shift-${uiShiftClass(s)}${inView?' is-visible-month':''}" data-a="today" aria-label="${isZh?'回到今天':'Go to today'}"><span class="today-anchor-date"><small>${TM}${isZh?'月':''}</small><strong>${TD}</strong></span><span class="today-anchor-copy"><b><i></i>${isZh?`今天 · 星期${WK[dw]}`:`Today · ${WK[dw]}`}</b><small>${studioShiftLabel(s)}${rule&&rule.isWork&&time.range?` · ${time.range}`:''}</small></span><span class="today-anchor-action">${inView?(isZh?'已在本月':'This month'):(isZh?'回到今天':'Go today')} ${uiIcon('arrow',15)}</span></button>`;
 }
 function uiMonthSummaryHtml(st,workDays){
   const isZh=lang==='zh';
@@ -7263,8 +7268,8 @@ function uiMonthSummaryHtml(st,workDays){
     {key:'晚',tone:'night',label:isZh?'晚班':'Malam',value:Number(st['晚']||0)}
   ];
   if(Number(st['中']||0)>0)defs.splice(2,0,{key:'中',tone:'mid',label:isZh?'中班':'Siang',value:Number(st['中']||0)});
-  defs.push({key:'work',tone:'work',label:isZh?'上班天數':'Hari kerja',value:Number(workDays||0)});
-  return `<section class="month-summary-v229 items-${defs.length}" aria-label="${isZh?'本月班別統計':'Ringkasan shift bulan ini'}">${defs.map(x=>`<div class="month-summary-item tone-${x.tone}"><strong>${x.value}</strong><span><i></i>${x.label}</span></div>`).join('')}</section>`;
+  const days=defs.reduce((sum,x)=>sum+x.value,0);
+  return `<section class="month-summary-v300" aria-label="${isZh?'本月班別統計':'Ringkasan shift bulan ini'}"><div class="month-summary-head"><span><small>${isZh?'MONTH OVERVIEW':'MONTH OVERVIEW'}</small><b>${isZh?'本月輪班概覽':'Ringkasan bulan'}</b></span><strong>${workDays}<small>${isZh?'工作天':'hari kerja'}</small></strong></div><div class="month-summary-grid">${defs.map(x=>`<div class="month-summary-item tone-${x.tone}"><span><i></i>${x.label}</span><strong>${x.value}</strong></div>`).join('')}</div><div class="month-summary-foot"><span>${isZh?'本月排程':'Jadwal bulan ini'}</span><b>${days} ${isZh?'天':'hari'}</b></div></section>`;
 }
 
 function rCal(){
@@ -7275,7 +7280,7 @@ function rCal(){
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
   const pd5=getPayDay(y,m,5),pd20=getPayDay(y,m,20);
   for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(y,m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||isTWOff(y,m,d)),isPay=(d===pd5||d===pd20),isAdj=!!SHIFT_OV[ek(y,m,d)];
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}${dw===0||dw===6?' weekend':''}" data-a="open" data-d="${d}" role="button" aria-label="${d} ${esc(studioShiftLabel(s))}"><div class="day-top"><span class="num">${d}</span>${td?`<span class="today-label">${lang==="zh"?"今":"TODAY"}</span>`:''}</div><span class="shift-code">${s||'—'}</span>${S.showLunar?lunarCellText(y,m,d):""}<div class="day-markers">${isAdj?`<span class="day-marker adjusted" title="${lang==="zh"?"已調班":"Adjusted"}">${uiIcon("refresh",10)}</span>`:''}${d===pd5?`<span class="day-marker pay" title="${lang==="zh"?"發薪":"Gaji"}">${studioIcon("money",11)}</span>`:''}${d===pd20?`<span class="day-marker award" title="${lang==="zh"?"績效獎金":"Bonus"}">${studioIcon("award",11)}</span>`:''}${he?`<span class="day-count event-count">${ev.length}</span>`:''}${hol?'<span class="day-dot holiday-dot"></span>':''}${dayAL?'<span class="day-dot annual-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d)),n=new Set(lc.map(x=>x.uid)).size;return n?`<span class="day-count leave-count">${n}</span>`:""})()}</div></div>`}
+    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}${dw===0||dw===6?' weekend':''}" data-a="open" data-d="${d}" role="button" aria-current="${td?'date':'false'}" aria-label="${td?(lang==='zh'?'今天 ':'Today '):''}${d} ${esc(studioShiftLabel(s))}"><div class="day-top"><span class="num">${d}</span>${td?`<span class="today-label">${lang==="zh"?"今天":"TODAY"}</span>`:''}</div><span class="shift-code">${s||'—'}</span>${S.showLunar?lunarCellText(y,m,d):""}<div class="day-markers">${isAdj?`<span class="day-marker adjusted" title="${lang==="zh"?"已調班":"Adjusted"}">${uiIcon("refresh",10)}</span>`:''}${d===pd5?`<span class="day-marker pay" title="${lang==="zh"?"發薪":"Gaji"}">${studioIcon("money",11)}</span>`:''}${d===pd20?`<span class="day-marker award" title="${lang==="zh"?"績效獎金":"Bonus"}">${studioIcon("award",11)}</span>`:''}${he?`<span class="day-count event-count">${ev.length}</span>`:''}${hol?'<span class="day-dot holiday-dot"></span>':''}${dayAL?'<span class="day-dot annual-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d)),n=new Set(lc.map(x=>x.uid)).size;return n?`<span class="day-count leave-count">${n}</span>`:""})()}</div></div>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(y,m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<section class="calendar-notice holiday"><span class="notice-icon">${studioIcon("calendar",18)}</span><div><strong>${lang==="zh"?"即將到來的假日":"Hari libur mendatang"}</strong><span>${mh.join("　")}</span></div></section>`:"";
@@ -7303,8 +7308,8 @@ function rCal(){
     const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
     todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
   const topMeta=`${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}`;
-  const monthHeading=uiScreenHeading(ml,lang==="zh"?"點選日期可查看班別、請假與標記事項":"Ketuk tanggal untuk detail",`<button class="text-action" data-a="today">${lang==="zh"?"回到本月":"Bulan ini"}</button>`);
-  const calendarPanel=`${monthHeading}${studioCalendarLegendHtml()}<section class="calendar-shell studio-calendar" aria-label="${ml}"><div class="mnav"><button class="mnav-btn" data-a="prev" aria-label="${lang==="zh"?"上個月":"Previous month"}">${uiIcon("chevron",18)}</button><div class="mnav-title"><span>${ml}</span><small>${lang==="zh"?"輪班月曆":"Shift calendar"}</small></div><button class="mnav-btn next" data-a="next" aria-label="${lang==="zh"?"下個月":"Next month"}">${uiIcon("chevron",18)}</button></div>${S.showLunar?lunarTodayStrip():""}<div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?" we":""}">${w}</div>`).join("")}</div><div class="cal fi">${cells}</div></section>${holH}${remH}${monthSummaryH}`;
+  const monthHeading=uiScreenHeading(ml,lang==="zh"?"日期、班別、請假與標記事項集中顯示":"Tanggal, shift, cuti, dan catatan dalam satu tampilan",`<button class="text-action" data-a="today">${lang==="zh"?"定位今天":"Hari ini"}</button>`);
+  const calendarPanel=`${monthHeading}${uiCalendarTodayAnchorHtml()}${studioCalendarLegendHtml()}<section class="calendar-shell studio-calendar${ic?' current-month':''}" aria-label="${ml}"><div class="mnav"><button class="mnav-btn" data-a="prev" aria-label="${lang==="zh"?"上個月":"Previous month"}">${uiIcon("chevron",18)}</button><div class="mnav-title"><span>${ml}</span><small>${ic?(lang==="zh"?"本月 · 今天已高亮":"Current month · today highlighted"):(lang==="zh"?"輪班月曆":"Shift calendar")}</small></div><button class="mnav-btn next" data-a="next" aria-label="${lang==="zh"?"下個月":"Next month"}">${uiIcon("chevron",18)}</button></div>${S.showLunar?lunarTodayStrip():""}<div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?" we":""}">${w}</div>`).join("")}</div><div class="cal fi">${cells}</div></section>${holH}${remH}${monthSummaryH}`;
   let tabContent="";
   if(UI_TAB==="calendar"){
     tabContent=calendarPanel;
@@ -7316,7 +7321,7 @@ function rCal(){
   }else if(UI_TAB==="more"){
     tabContent=`${uiScreenHeading(lang==="zh"?"功能與設定":"Fitur & pengaturan",lang==="zh"?"農曆、語言、請假統計、分享與帳號集中管理":"Kalender lunar, bahasa, cuti, berbagi dan akun")}${uiMoreHtml(y,m)}${fbBarHtml()}`;
   }else{
-    tabContent=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${remH}${uiWeatherPreviewHtml()}${uiPayPreviewHtml(y,m)}${todayBarH}`;
+    tabContent=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${remH}${uiWeatherPreviewHtml()}${uiPayPreviewHtml(y,m)}`;
   }
   return `<div class="app-shell" data-screen="${UI_TAB}">${uiHeaderHtml()}<main class="app-main screen-${UI_TAB}">${tabContent}<div class="content-end-space"></div></main>${uiBottomNavHtml()}${instH}</div>`;
 
