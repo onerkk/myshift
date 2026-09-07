@@ -337,7 +337,7 @@ function leaveTypesTabHtml(){
       <button class="btn green" onclick="addLT()" style="width:100%">新增假別</button>
     </div>
     <div style="color:#666;font-size:10px;margin-top:10px;line-height:1.5">
-      說明：新版請假已改為起訖時間，正常工時請假與加班出勤分開計算。otDeduct 只用來相容「沒有起訖時間」的舊請假紀錄；一般假別可填 4，公假／補休填 0。<br>
+      說明：新版只需在「新增請假」選完整班別內的起訖時間，會自動拆分正常請假與未加班時數；全班 12h 只計正常請假 8h，單純未加班不扣假。otDeduct 只用來相容「沒有起訖時間」的舊請假紀錄；一般假別可填 4，公假／補休填 0。<br>
       新紀錄的加班時數以員工每天填寫的實際加班出勤為準。
     </div>
   </div>`;
@@ -411,8 +411,16 @@ function _adminLeaveClock(startMinute,offset){
   return(day>0?'翌日 ':'')+String(Math.floor(mm/60)).padStart(2,'0')+':'+String(mm%60).padStart(2,'0');
 }
 function _adminLeaveRange(l){
-  if(!l||!Number.isFinite(+l.startOffset)||!Number.isFinite(+l.endOffset)||(+l.endOffset)<= (+l.startOffset))return'舊資料：未記錄時段';
+  if(!l||l.startOffset==null||l.endOffset==null||!Number.isFinite(+l.startOffset)||!Number.isFinite(+l.endOffset)||(+l.endOffset)<= (+l.startOffset))return'舊資料：未記錄時段';
   return _adminLeaveClock(l.shiftStartMinute,+l.startOffset)+'–'+_adminLeaveClock(l.shiftStartMinute,+l.endOffset);
+}
+
+function _adminLeaveLabel(l){
+  const lt=CFG.leaveTypes.find(x=>x.id===l.leaveType),name=lt?lt.name:(l.leaveType||"未知"),hours=Math.max(0,+l.hours||0);
+  if((+l.schemaVersion||1)<3)return name+" "+hours+"h";
+  const regular=Math.min(8,+l.shiftHours||12)*60,limit=(+l.shiftHours||12)*60;
+  const missed=Math.max(0,Math.min(limit,+l.endOffset||0)-Math.max(regular,+l.startOffset||0))/60;
+  return[hours>0?name+" "+hours+"h":"",missed>0?"未加班 "+missed+"h":""].filter(Boolean).join(" · ")||name+" 0h";
 }
 
 function _renderLeavesList(container){
@@ -439,11 +447,11 @@ function _renderLeavesList(container){
     const isToday=d===today;
     const isFuture=d>today;
     const dateBg=isToday?'#1565c0':(isFuture?'#2e7d32':'#555');
-    const totalHrs=byDate[d].reduce((s,l)=>s+(l.hours||0),0),people=new Set(byDate[d].map(l=>l.uid)).size;
+    const totalHrs=byDate[d].reduce((s,l)=>s+(l.hours||0),0),people=new Set(byDate[d].filter(l=>(+l.hours||0)>0).map(l=>l.uid)).size;
     html+=`<div style="margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${dateBg};border-radius:6px;color:#fff;margin-bottom:6px">
         <span style="font-size:14px;font-weight:800">${d.slice(5)} (${wk})${isToday?' 今天':''}</span>
-        <span style="font-size:11px;opacity:0.85">${people} 人 · 共 ${totalHrs}h</span>
+        <span style="font-size:11px;opacity:0.85">${people} 人請假 · 正常 ${totalHrs}h</span>
       </div>`;
     byDate[d].forEach(l=>{
       const lt=CFG.leaveTypes.find(x=>x.id===l.leaveType);
@@ -459,7 +467,7 @@ function _renderLeavesList(container){
         <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;flex-wrap:wrap">
           <div style="flex:1;min-width:0">
             <div style="font-size:14px;font-weight:700;color:#fff">${esc(l.name||"未知")} <span style="font-size:11px;font-weight:500;color:#aaa">${esc(l.unit||"無單位")}</span></div>
-            <div style="font-size:12px;color:#ccc;margin-top:2px"><span style="color:${esc(color)};font-weight:600">${esc(ltName)}</span> · ${l.hours||0}h · 🕒 ${esc(_adminLeaveRange(l))}${timeStr?' · <span style="color:#888">提交於 '+timeStr+'</span>':''}</div>
+            <div style="font-size:12px;color:#ccc;margin-top:2px"><span style="color:${esc(color)};font-weight:600">${esc(_adminLeaveLabel(l))}</span> · 🕒 ${esc(_adminLeaveRange(l))}${timeStr?' · <span style="color:#888">提交於 '+timeStr+'</span>':''}</div>
           </div>
         </div>
         ${reasonRow}
