@@ -531,7 +531,7 @@ function loadLeaves(){
       if(S.unit&&S.unit!=="__all"&&v.unit&&v.unit!==S.unit)return;
       const k=v.date;
       if(!d[k])d[k]=[];
-      d[k].push({docId:doc.id,uid:v.uid,name:v.name,type:v.type,leaveType:v.leaveType||"",hours:+v.hours||0,reason:v.reason||"",ts:v.ts,unit:v.unit||"",startOffset:Number.isFinite(+v.startOffset)?+v.startOffset:null,endOffset:Number.isFinite(+v.endOffset)?+v.endOffset:null,shiftStartMinute:Number.isFinite(+v.shiftStartMinute)?+v.shiftStartMinute:null,shiftHours:Number.isFinite(+v.shiftHours)?+v.shiftHours:null,shiftCode:v.shiftCode||"",schemaVersion:+v.schemaVersion||1});
+      d[k].push({docId:doc.id,uid:v.uid,name:v.name,type:v.type,leaveType:v.leaveType||"",hours:+v.hours||0,reason:v.reason||"",ts:v.ts,unit:v.unit||"",startOffset:leaveNumber(v.startOffset),endOffset:leaveNumber(v.endOffset),shiftStartMinute:leaveNumber(v.shiftStartMinute),shiftHours:leaveNumber(v.shiftHours),shiftCode:v.shiftCode||"",schemaVersion:+v.schemaVersion||1});
     });
     leavesCache=d;
     _syncAnnualToALD();
@@ -554,29 +554,34 @@ function addLeave(date,leaveTypeId,hours,reason,detail){
   detail=detail&&typeof detail==="object"?detail:{};
   const segmentId=detail.segmentId||_newLeaveSegmentId();
   const docId=fbUser.uid+"_"+date+"_"+leaveTypeId+"_"+segmentId;
-  const entry={docId,uid:fbUser.uid,name:fbUser.displayName||fbUser.email,type:"leave",leaveType:leaveTypeId,hours:Math.max(0,+hours||0),reason:reason,ts:{seconds:Math.floor(Date.now()/1000)},unit:S.unit||"",startOffset:Number.isFinite(+detail.startOffset)?+detail.startOffset:null,endOffset:Number.isFinite(+detail.endOffset)?+detail.endOffset:null,shiftStartMinute:Number.isFinite(+detail.shiftStartMinute)?+detail.shiftStartMinute:null,shiftHours:Number.isFinite(+detail.shiftHours)?+detail.shiftHours:null,shiftCode:detail.shiftCode||"",schemaVersion:2};
+  const precise=hasPreciseLeaveTime(detail),regularHours=precise?splitLeaveMinutes(detail.startOffset,detail.endOffset,detail.shiftHours).regularHours:Math.max(0,+hours||0);
+  const entry={docId,uid:fbUser.uid,name:fbUser.displayName||fbUser.email,type:"leave",leaveType:leaveTypeId,hours:regularHours,reason:reason,ts:{seconds:Math.floor(Date.now()/1000)},unit:S.unit||"",startOffset:leaveNumber(detail.startOffset),endOffset:leaveNumber(detail.endOffset),shiftStartMinute:leaveNumber(detail.shiftStartMinute),shiftHours:leaveNumber(detail.shiftHours),shiftCode:detail.shiftCode||"",schemaVersion:precise?3:1};
   if(!leavesCache[date])leavesCache[date]=[];
   leavesCache[date].push(entry);
-  if(_isAnnualLT(leaveTypeId))_syncAnnualDateToALD(date);
+  if(_isAnnualLT(leaveTypeId)&&entry.hours>0)_syncAnnualDateToALD(date);
   S.modal=null;
   render();
   return fsEnqueue(async()=>{
     const payload={
-      uid:fbUser.uid,name:fbUser.displayName||fbUser.email,date:date,ym:date.slice(0,7),
-      type:"leave",leaveType:leaveTypeId,hours:entry.hours,unit:S.unit||"",schemaVersion:2,
+      uid:entry.uid,name:entry.name,date:date,ym:date.slice(0,7),
+      type:"leave",leaveType:leaveTypeId,hours:entry.hours,unit:entry.unit,schemaVersion:entry.schemaVersion,
       startOffset:entry.startOffset,endOffset:entry.endOffset,shiftStartMinute:entry.shiftStartMinute,
       shiftHours:entry.shiftHours,shiftCode:entry.shiftCode,
       ts:firebase.firestore.FieldValue.serverTimestamp()
     };
     if(reason)payload.reason=reason;
     await fbDb.collection("leaves").doc(docId).set(payload);
-  },"addLeave").then(()=>loadLeaves()).catch(e=>{
+  },"addLeave").then(()=>{
+    // 寫入成功才退役此日舊加班覆寫；失敗時仍保留原本的薪資資料。
+    if(entry.schemaVersion>=3&&Object.prototype.hasOwnProperty.call(OTD,date)){delete OTD[date];sOTD()}
+    return loadLeaves();
+  }).catch(e=>{
     if(!/INTERNAL ASSERTION/i.test(e&&e.message||"")){
       if(leavesCache[date]){
         leavesCache[date]=leavesCache[date].filter(l=>l.docId!==docId);
         if(!leavesCache[date].length)delete leavesCache[date];
       }
-      if(_isAnnualLT(leaveTypeId))_syncAnnualDateToALD(date);
+      if(_isAnnualLT(leaveTypeId)&&entry.hours>0)_syncAnnualDateToALD(date);
       render();
       alert((lang==="zh"?"請假失敗: ":"Leave failed: ")+(e&&e.message||""));
     }
@@ -597,7 +602,7 @@ function removeLeave(date,leaveTypeId,docId){
       leavesCache[date]=leavesCache[date].filter(l=>l!==target);
     }else leavesCache[date]=leavesCache[date].filter(l=>l.uid!==fbUser.uid);
     if(!leavesCache[date].length)delete leavesCache[date];
-    _syncAnnualDateToALD(date);
+    if(backup.some(l=>_isAnnualLT(l.leaveType)&&l.hours>0&&!(leavesCache[date]||[]).includes(l)))_syncAnnualDateToALD(date);
   }
   render();
   return fsEnqueue(async()=>{
@@ -699,7 +704,7 @@ function _renderLeavesOvList(container){
     const isToday=d===today;
     const isFuture=d>today;
     const dateBg=isToday?'#1565c0':(isFuture?'#2e7d32':'#666');
-    const totalHrs=byDate[d].reduce((s,l)=>s+(l.hours||0),0),people=new Set(byDate[d].map(l=>l.uid)).size;
+    const totalHrs=byDate[d].reduce((s,l)=>s+(l.hours||0),0),people=new Set(byDate[d].filter(isRegularLeave).map(l=>l.uid)).size;
     html+='<div style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:'+dateBg+';border-radius:6px;color:#fff;margin-bottom:6px"><span style="font-size:13px;font-weight:800">'+d.slice(5)+' ('+wkS+')'+(isToday?(isZh?" 今天":" Hari ini"):"")+'</span><span style="font-size:11px;opacity:0.85">'+people+(isZh?" 人 · 共 ":" org · ")+totalHrs+'h</span></div>';
     byDate[d].forEach(l=>{
       const lt=lts.find(x=>x.id===l.leaveType);
@@ -711,7 +716,7 @@ function _renderLeavesOvList(container){
         timeStr=(dt.getMonth()+1)+"/"+dt.getDate()+" "+String(dt.getHours()).padStart(2,"0")+":"+String(dt.getMinutes()).padStart(2,"0");
       }
       const reasonRow=l.reason?'<div style="margin-top:5px;padding:6px 8px;background:rgba(33,150,243,0.12);border-left:3px solid #2196f3;border-radius:4px;font-size:12px;color:#1565c0">💬 '+esc(l.reason)+'</div>':'';
-      html+='<div style="background:rgba(0,0,0,0.04);border-radius:6px;padding:8px 10px;margin-bottom:5px;border-left:4px solid '+esc(color)+'"><div style="display:flex;justify-content:space-between;align-items:start;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--tx)">'+esc(l.name||(isZh?"未知":"?"))+' <span style="font-size:11px;font-weight:500;color:var(--tx3)">'+esc(l.unit||(isZh?"無單位":"-"))+'</span></div><div style="font-size:12px;color:var(--tx2);margin-top:2px"><span style="color:'+esc(color)+';font-weight:600">'+esc(ltName)+'</span> · '+(l.hours||0)+'h · 🕒 '+esc(formatLeaveRange(l,d))+(timeStr?' · <span style="color:var(--tx3)">'+(isZh?"提交於 ":"")+timeStr+'</span>':'')+'</div></div></div>'+reasonRow+'</div>';
+      html+='<div style="background:rgba(0,0,0,0.04);border-radius:6px;padding:8px 10px;margin-bottom:5px;border-left:4px solid '+esc(color)+'"><div style="display:flex;justify-content:space-between;align-items:start;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--tx)">'+esc(l.name||(isZh?"未知":"?"))+' <span style="font-size:11px;font-weight:500;color:var(--tx3)">'+esc(l.unit||(isZh?"無單位":"-"))+'</span></div><div style="font-size:12px;color:var(--tx2);margin-top:2px"><span style="color:'+esc(color)+';font-weight:600">'+esc(leaveRecordLabel(l))+'</span> · 🕒 '+esc(formatLeaveRange(l,d))+(timeStr?' · <span style="color:var(--tx3)">'+(isZh?"提交於 ":"")+timeStr+'</span>':'')+'</div></div></div>'+reasonRow+'</div>';
     });
     html+='</div>';
   });
@@ -787,7 +792,7 @@ zh:{app:"我的班表",sub:"My Shift",desc:"選擇輪班制度，三步自動排
   instT:"安裝到主畫面",instS:"一鍵安裝",instSi:"Safari→分享→加入主畫面",instB:"安裝",
   aSet:"✅ 鬧鐘：#m#/#d# 07:00\n⚠️ 需保持瀏覽器開啟",aNow:"✅ 已提醒！",aBlock:"通知被封鎖",aNoPerm:"需開啟通知",aNo:"不支援通知",sRem:"班表提醒",
   helpT:"📖 使用說明",
-  h:["初始設定|首次使用回答三個問題（上班或休假→班別→第幾天），系統自動排出整年班表。若管理員已在後台鎖定你的輪班規則，只需設定今天是哪一班即可。可隨時點底部「重設」重新設定。","查看班表|左右箭頭切換月份，點「今天」立刻回到本月。每日格子以顏色區分：藍色＝早班、紫色＝晚班、黃色＝中班、灰色＝休假。點擊任一日期可查看詳情、請假或標記事項。今天的日期會以橘色粗框顯示。","請假系統|點擊日期後可新增請假：先選假別，再選正常工時內的開始與結束時間。12 小時早班正常工時為 08:00–16:00、16:00–20:00 為加班；晚班正常工時為 20:00–翌日04:00、04:00–08:00 為加班。加班沒做不用請假，請在「加班出勤」另外記錄實際時數。同單位同事只看到當天請假人數（不知道是誰、不知道原因），管理員可查看完整名單、假別、時數與原因。已請的假可隨時點 ✕ 取消。","標記事項與颱風假|每日可標記：📚上課、🚗公出、💰發薪日、🌴特休、🌀颱風假、📝自訂備註（最多 50 字）。天災假可指定時數，依本期薪資條視為給薪時數，不扣加班與本薪。管理員可額外設定 📋班股會議與 🏥體檢日期，全體使用者可見。","特休管理|在請假彈窗下方輸入年度特休總時數與已使用時數（0.5 小時為單位）。日曆上勾選特休的日期會自動扣除並計算剩餘時數。特休年度為每年 12/26 到隔年 12/25（華新麗華制度）。","統計功能|點擊「統計」按鈕查看年度出勤統計：各班別總天數、每月工時長條圖、加班時數、特休使用率（含剩餘時數）。12 小時制每日另有 4 小時加班；正常工時請假與加班出勤分開記錄。請假只扣正常 8 小時，加班費依每天實際加班時數計算。可按上方箭頭切換年度查看。","薪資預估|月曆下方薪資卡片可設定薪資條完整欄位：職能俸、伙食津貼、交通津貼、崗位津貼、夜點費、勞健保自付、工會、福利金、其他固定扣款。系統自動估算當月實領金額，包含：前 2h 與後段加班費（不同倍率，公司 HR System 1.33340 / 1.66670）、免稅約 46.67h 切點、晚班次數 × 夜點費（可本期總額覆寫）、病假與事假扣款；天災假不扣加班。薪資資料同步至你個人雲端帳號（只有你看得到），換手機登入即可復原。","薪資計算週期|每月薪資計算區間為上月 26 日至當月 25 日。例如 3 月薪水計算的是 2/26 至 3/25 的出勤與加班時數。每月 5 日發放薪資（💰），每月 20 日發放績效獎金（🏆）。遇國定假日或週末自動提前至前一個工作日，日曆上直接標示實際發放日。","7 日天氣預報|自動偵測位置顯示 7 日天氣，點選可看逐時詳情（溫度、降雨機率、陣風、濕度）。資料每小時自動更新，可在個人設定 ⚙️ 點「重新抓取」強制立即更新。降雨機率優先採中央氣象署鄉鎮區間預報，溫度/濕度/風速採 Open-Meteo；即時雨量站只顯示實況，不會改寫預報。","9 種天氣警報|系統自動偵測並顯示警報橫幅，共 9 種：🌍地震、🌀颱風、⛈雷雨、🌧豪大雨/高降雨、🌂一般降雨、💨強風、🥵高溫、🥶低溫、🌫濃霧。地震使用中央氣象署有感地震報告；優先採所在地觀測震度，尚無所在地震度時才以規模＋震源距離保守判斷，且舊報告不補推。颱風與其他警特報以 CWA 官方有效時間、GPS 鄉鎮／CAP 範圍為準。每種警報的觸發門檻可由管理員在後台調整。","下雨提醒|上班日出門時段（早班/中班/晚班各自上班前 1 至 2 小時）若降雨機率 ≥ 40%，會在日曆下方顯示醒目橘色提醒「☔ 出門記得帶雨具」。可在個人設定 ⚙️ 中關閉。","個人設定 ⚙️|點天氣卡片右上 ⚙️ 進入，包含：①目前狀況診斷（即時溫度、降雨、警報數量）②總開關（警報橫幅與手機通知 兩個獨立）③9 種警報個別開關（橫幅與系統通知分開控制）④動畫/音效總開關與分類開關（天氣、動物、季節、音效）⑤通知權限狀態與「測試通知」「重新抓取天氣」按鈕。所有設定即時生效並雲端同步。","手機系統通知|啟用通知權限後，App 開啟時約每 30 秒查一次官方資料；關閉 App 後則由手機的背景同步或伺服器 Web Push 決定，純前端無法保證秒級到達。靜音時段內（管理員可設定，預設 22:00 至 07:00）不通知，保護休息。iOS 必須先「分享 → 加入主畫面」並從主畫面開啟才能啟用通知。","潮汐預報|自動偵測位置，顯示最近海岸測站的 7 日潮汐（滿潮/乾潮時間與潮位高度）。點選任一日可查看當日逐時詳細資料。資料來源為中央氣象署 CWA 開放資料。可點卡片上方箭頭收合節省空間。","季節動畫與環境音效|搭配四季與天氣自動變化：春花蝶舞與青蛙吐舌、夏夜螢火與蟬鳴、秋楓飄落與蜻蜓、冬霜結晶與寒鴉、雨天雨滴水花與雷電閃光、颱風雲卷、晴天陽光暈與鳥鳴、夜晚星空與蟋蟀。可在個人設定 ⚙️ 中關閉以省電。","暗夜模式自動切換|19:00 至 05:00 自動切換為暗色 UI（黑底白字），05:00 至 19:00 自動恢復白天模式，不再使用漸暗遮罩。系統依手機時間自動判斷，無需手動切換。可保護夜間視力、省電、夜班使用不刺眼。","雲端同步|登入 Google 帳號後，班表設定、標記事項、請假紀錄、備註、特休額度、颱風假時數、語言偏好、個人警報設定全部自動同步至雲端 Firestore。更換手機或清除資料後重新登入即可完整恢復，無需備份碼。薪資設定也會同步，但僅限你本人帳號可讀取（Firestore 規則鎖定 uid），其他人與管理員都看不到。","單位與輪班管理|管理員可在後台建立單位（如「研磨股 A 班/B 班/C 班」）與多種輪班規則（如四休二、兩早兩晚循環等），並鎖定使用者的單位和輪班類型。鎖定後使用者無法自行更改，確保全員資料一致。管理員亦可設定假別、發薪日、體檢、會議、警報門檻、靜音時段、視覺特效開關等。","多單位查看|管理員可在頂部選擇「全部單位」一次查看所有單位請假人數，方便整廠人力調度。一般使用者只看到自己所屬單位的資料。","節慶與假日|自動顯示台灣國定假日（含補假、調整放假）與印尼節慶（開齋節、宰牲節、寧靜日、衛塞節等），假日以紅色頂部標線標示。語言隨中文/印尼文切換自動翻譯。同時顯示固定節慶（情人節、母親節、雙 11 等，不影響休假但便於記憶）。","分享班表|點擊「分享」按鈕可產生當月班表 PNG 圖片，包含班別、假日、標記、節日等完整資訊。支援系統分享面板（直接分享到 LINE、WhatsApp 等），或自動下載到相簿，方便傳送給同事或家人。","安裝到桌面|底部安裝按鈕可將 App 加到手機桌面，如同原生 App 全螢幕使用，離線也能查看本月班表。右上角可切換中文（中）/印尼文（ID）。iOS 請用 Safari 開啟後「分享 → 加入主畫面」。Android 用 Chrome 自動跳出安裝提示。","桌面今日捷徑|想不開 App 一眼看今天什麼班？在瀏覽器網址列把 ?w=1 加在網址結尾（例：…/myshift/?w=1），打開後選「加入主畫面」，命名為「今日班別」。從此桌面上會多一個專屬捷徑，點開就是巨型今日班別顯示，完全離線、秒開。"],
+  h:["初始設定|首次使用回答三個問題（上班或休假→班別→第幾天），系統自動排出整年班表。若管理員已在後台鎖定你的輪班規則，只需設定今天是哪一班即可。可隨時點底部「重設」重新設定。","查看班表|左右箭頭切換月份，點「今天」立刻回到本月。每日格子以顏色區分：藍色＝早班、紫色＝晚班、黃色＝中班、灰色＝休假。點擊任一日期可查看詳情、請假或標記事項。今天的日期會以橘色粗框顯示。","請假系統|點擊日期 → 選假別 → 選開始與結束 → 確認。可自訂完整班別內的時間（半小時刻度），也可選「全班 12h」「正常 8h」「只不加班」。早班 08:00–20:00、晚班 20:00–翌日08:00；前 8h 是正常工時，後 4h 是加班。全班未出勤只扣 8h 假，後 4h 自動減少加班；只選加班時段不扣假、不扣本薪。病假、事假等正常請假依設定單位檢查。送出前顯示扣假、當日加班與薪資估算，無需另填加班。同事僅看正常工時請假人數，管理員可看明細與原因。可取消紀錄恢復計算。","標記事項與颱風假|每日可標記：📚上課、🚗公出、💰發薪日、🌴特休、🌀颱風假、📝自訂備註（最多 50 字）。天災假可指定時數，依本期薪資條視為給薪時數，不扣加班與本薪。管理員可額外設定 📋班股會議與 🏥體檢日期，全體使用者可見。","特休管理|在請假彈窗下方輸入年度特休總時數與已使用時數（0.5 小時為單位）。日曆上勾選特休的日期會自動扣除並計算剩餘時數。特休年度為每年 12/26 到隔年 12/25（華新麗華制度）。","統計功能|點擊「統計」查看各班別天數、月工時、加班時數與特休使用率。12h 班由正常 8h＋加班 4h 組成；新增請假的完整時段會自動拆分，特休與請假統計只計正常工時。加班費按每天剩餘加班時數拆分前 2h／後段倍率。可切換年度。","薪資預估|月曆下方薪資卡片可設定薪資條完整欄位：職能俸、伙食津貼、交通津貼、崗位津貼、夜點費、勞健保自付、工會、福利金、其他固定扣款。系統自動估算當月實領金額，包含：前 2h 與後段加班費（不同倍率，公司 HR System 1.33340 / 1.66670）、免稅約 46.67h 切點、晚班次數 × 夜點費（可本期總額覆寫）、病假與事假扣款；天災假不扣加班。薪資資料同步至你個人雲端帳號（只有你看得到），換手機登入即可復原。","薪資計算週期|每月薪資計算區間為上月 26 日至當月 25 日。例如 3 月薪水計算的是 2/26 至 3/25 的出勤與加班時數。每月 5 日發放薪資（💰），每月 20 日發放績效獎金（🏆）。遇國定假日或週末自動提前至前一個工作日，日曆上直接標示實際發放日。","7 日天氣預報|自動偵測位置顯示 7 日天氣，點選可看逐時詳情（溫度、降雨機率、陣風、濕度）。資料每小時自動更新，可在個人設定 ⚙️ 點「重新抓取」強制立即更新。降雨機率優先採中央氣象署鄉鎮區間預報，溫度/濕度/風速採 Open-Meteo；即時雨量站只顯示實況，不會改寫預報。","9 種天氣警報|系統自動偵測並顯示警報橫幅，共 9 種：🌍地震、🌀颱風、⛈雷雨、🌧豪大雨/高降雨、🌂一般降雨、💨強風、🥵高溫、🥶低溫、🌫濃霧。地震使用中央氣象署有感地震報告；優先採所在地觀測震度，尚無所在地震度時才以規模＋震源距離保守判斷，且舊報告不補推。颱風與其他警特報以 CWA 官方有效時間、GPS 鄉鎮／CAP 範圍為準。每種警報的觸發門檻可由管理員在後台調整。","下雨提醒|上班日出門時段（早班/中班/晚班各自上班前 1 至 2 小時）若降雨機率 ≥ 40%，會在日曆下方顯示醒目橘色提醒「☔ 出門記得帶雨具」。可在個人設定 ⚙️ 中關閉。","個人設定 ⚙️|點天氣卡片右上 ⚙️ 進入，包含：①目前狀況診斷（即時溫度、降雨、警報數量）②總開關（警報橫幅與手機通知 兩個獨立）③9 種警報個別開關（橫幅與系統通知分開控制）④動畫/音效總開關與分類開關（天氣、動物、季節、音效）⑤通知權限狀態與「測試通知」「重新抓取天氣」按鈕。所有設定即時生效並雲端同步。","手機系統通知|啟用通知權限後，App 開啟時約每 30 秒查一次官方資料；關閉 App 後則由手機的背景同步或伺服器 Web Push 決定，純前端無法保證秒級到達。靜音時段內（管理員可設定，預設 22:00 至 07:00）不通知，保護休息。iOS 必須先「分享 → 加入主畫面」並從主畫面開啟才能啟用通知。","潮汐預報|自動偵測位置，顯示最近海岸測站的 7 日潮汐（滿潮/乾潮時間與潮位高度）。點選任一日可查看當日逐時詳細資料。資料來源為中央氣象署 CWA 開放資料。可點卡片上方箭頭收合節省空間。","季節動畫與環境音效|搭配四季與天氣自動變化：春花蝶舞與青蛙吐舌、夏夜螢火與蟬鳴、秋楓飄落與蜻蜓、冬霜結晶與寒鴉、雨天雨滴水花與雷電閃光、颱風雲卷、晴天陽光暈與鳥鳴、夜晚星空與蟋蟀。可在個人設定 ⚙️ 中關閉以省電。","暗夜模式自動切換|19:00 至 05:00 自動切換為暗色 UI（黑底白字），05:00 至 19:00 自動恢復白天模式，不再使用漸暗遮罩。系統依手機時間自動判斷，無需手動切換。可保護夜間視力、省電、夜班使用不刺眼。","雲端同步|登入 Google 帳號後，班表設定、標記事項、請假紀錄、備註、特休額度、颱風假時數、語言偏好、個人警報設定全部自動同步至雲端 Firestore。更換手機或清除資料後重新登入即可完整恢復，無需備份碼。薪資設定也會同步，但僅限你本人帳號可讀取（Firestore 規則鎖定 uid），其他人與管理員都看不到。","單位與輪班管理|管理員可在後台建立單位（如「研磨股 A 班/B 班/C 班」）與多種輪班規則（如四休二、兩早兩晚循環等），並鎖定使用者的單位和輪班類型。鎖定後使用者無法自行更改，確保全員資料一致。管理員亦可設定假別、發薪日、體檢、會議、警報門檻、靜音時段、視覺特效開關等。","多單位查看|管理員可在頂部選擇「全部單位」一次查看所有單位請假人數，方便整廠人力調度。一般使用者只看到自己所屬單位的資料。","節慶與假日|自動顯示台灣國定假日（含補假、調整放假）與印尼節慶（開齋節、宰牲節、寧靜日、衛塞節等），假日以紅色頂部標線標示。語言隨中文/印尼文切換自動翻譯。同時顯示固定節慶（情人節、母親節、雙 11 等，不影響休假但便於記憶）。","分享班表|點擊「分享」按鈕可產生當月班表 PNG 圖片，包含班別、假日、標記、節日等完整資訊。支援系統分享面板（直接分享到 LINE、WhatsApp 等），或自動下載到相簿，方便傳送給同事或家人。","安裝到桌面|底部安裝按鈕可將 App 加到手機桌面，如同原生 App 全螢幕使用，離線也能查看本月班表。右上角可切換中文（中）/印尼文（ID）。iOS 請用 Safari 開啟後「分享 → 加入主畫面」。Android 用 Chrome 自動跳出安裝提示。","桌面今日捷徑|想不開 App 一眼看今天什麼班？在瀏覽器網址列把 ?w=1 加在網址結尾（例：…/myshift/?w=1），打開後選「加入主畫面」，命名為「今日班別」。從此桌面上會多一個專屬捷徑，點開就是巨型今日班別顯示，完全離線、秒開。"],
   wk:["日","一","二","三","四","五","六"]},
 id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis setahun",s12:"12 jam",s8:"8 jam",cyc:"hari",
   today:"Hari ini",reset:"Reset",help:"Info",lang:"ZH",work:"Kerja",off:"Libur",
@@ -800,7 +805,7 @@ id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis seta
   instT:"Pasang di HP",instS:"Satu klik",instSi:"Safari→Bagikan→Layar Utama",instB:"Pasang",
   aSet:"✅ Alarm: #m#/#d# 07:00",aNow:"✅ Terkirim!",aBlock:"Diblokir",aNoPerm:"Perlu izin",aNo:"Tidak mendukung",sRem:"Pengingat",
   helpT:"📖 Panduan",
-  h:["Pengaturan Awal|Pertama kali pakai, jawab 3 pertanyaan (kerja/libur → shift apa → hari ke berapa), jadwal setahun otomatis dibuat. Jika admin sudah mengunci aturan shift Anda, cukup pilih hari ini shift apa. Bisa tekan 'Reset' di bawah untuk atur ulang kapan saja.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, tekan 'Hari ini' untuk kembali ke bulan ini. Warna kotak: biru = Pagi, ungu = Malam, kuning = Siang, abu-abu = Libur. Tekan tanggal mana saja untuk lihat detail, ajukan cuti, atau tandai acara. Tanggal hari ini ditandai garis oranye tebal.","Sistem Cuti|Tekan tanggal lalu pilih jenis cuti dan waktu mulai/selesai hanya dalam 8 jam kerja normal. Lembur dicatat terpisah dan tidak perlu diajukan sebagai cuti. Bisa isi Alasan Cuti (opsional, maks 50 huruf, hanya admin yang lihat), lalu konfirmasi. Rekan satu unit hanya lihat jumlah orang cuti hari itu (tidak tahu siapa, tidak tahu alasan). Admin bisa lihat nama lengkap, jenis, jam, dan alasan. Cuti bisa dibatalkan kapan saja dengan tekan ✕.","Tanda Acara & Libur Topan|Tandai harian: 📚Kelas, 🚗Dinas, 💰Gajian, 🌴Cuti Tahunan, 🌀Libur Topan, 📝Catatan bebas (maks 50 huruf). Jam libur bencana dapat dicatat; sesuai slip periode ini tidak mengurangi lembur atau gaji pokok. Admin bisa tambah 📋Rapat dan 🏥Cek Kesehatan untuk semua user.","Kelola Cuti Tahunan|Di bawah jendela cuti, isi total jam cuti tahunan dan jam terpakai (per 0.5 jam). Tanggal yang ditandai cuti tahunan otomatis dikurangi dan sisa dihitung. Tahun cuti: 26 Desember tahun ini sampai 25 Desember tahun depan (aturan Walsin Lihwa).","Statistik|Tekan 'Stat' untuk lihat statistik tahunan: jumlah hari per shift, grafik jam per bulan, total lembur, persentase cuti tahunan (dengan sisa jam). Shift 12 jam memiliki 8 jam normal dan 4 jam lembur. Cuti hanya mengurangi jam normal; jam lembur dihitung dari kehadiran lembur harian. Tekan panah di atas untuk ganti tahun.","Estimasi Gaji|Kartu gaji di bawah kalender, atur semua kolom slip gaji: Gaji Pokok, Tunjangan Makan, Transport, Posisi, Tunjangan Malam (per shift malam), BPJS Tenaga Kerja, BPJS Kesehatan, Iuran Serikat, Tunjangan Kesejahteraan, Potongan Lain. Sistem otomatis hitung perkiraan gaji bersih, termasuk: lembur 2 jam awal dan sisanya (tarif berbeda, default 1.34 dan 1.67), batas bebas pajak 46 jam, jumlah shift malam × tunjangan malam (bisa override total per periode), potongan sakit/izin; libur bencana tidak mengurangi lembur. Data hanya di HP, tidak ke cloud (lindungi privasi gaji). Disarankan foto sebagai cadangan.","Periode Perhitungan Gaji|Periode gaji dihitung dari tanggal 26 bulan lalu sampai tanggal 25 bulan ini. Contoh: gaji Maret dihitung dari 26 Februari sampai 25 Maret. Gaji dibayar tanggal 5 setiap bulan (💰), bonus kinerja tanggal 20 (🏆). Jika jatuh di hari libur nasional atau weekend, otomatis dimajukan ke hari kerja sebelumnya. Tanggal pembayaran asli ditampilkan di kalender.","Prakiraan Cuaca 7 Hari|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Tekan untuk detail per jam (suhu, kemungkinan hujan, kecepatan angin, kelembaban). Data diperbarui otomatis setiap jam. Bisa tekan ⚙️ Pengaturan lalu 'Reload' untuk update segera. Probabilitas hujan mengutamakan prakiraan interval CWA; suhu/kelembapan/angin memakai Open-Meteo. Observasi stasiun hujan tidak mengubah prakiraan.","9 Jenis Peringatan Cuaca|Sistem otomatis deteksi dan tampilkan banner peringatan, total 9 jenis: 🌍Gempa Bumi, 🌀Topan, ⛈Badai Petir, 🌧Hujan Lebat, 🌂Hujan Biasa, 💨Angin Kencang, 🥵Panas Ekstrem, 🥶Dingin Ekstrem, 🌫Kabut Tebal. Gempa pakai data realtime CWA Taiwan dengan ambang magnitudo, intensitas, jarak, dan waktu (salah satu lewat ambang langsung peringatan). Topan utamakan peringatan resmi CWA. Ambang setiap peringatan bisa diatur admin.","Pengingat Bawa Payung|Pada hari kerja, di jam berangkat (1 sampai 2 jam sebelum shift Pagi/Siang/Malam) jika kemungkinan hujan ≥ 40%, banner oranye 'Bawa payung' akan muncul di bawah kalender. Bisa dimatikan di Pengaturan ⚙️.","Pengaturan Pribadi ⚙️|Tekan ikon ⚙️ di pojok kanan atas kartu cuaca untuk masuk: ①Status saat ini (suhu, hujan, jumlah peringatan aktif) ②Saklar utama (Banner Peringatan dan Notifikasi HP — dua saklar terpisah) ③Saklar individu 9 peringatan (Banner dan Notifikasi diatur terpisah) ④Animasi cuaca dan suara on/off ⑤Status izin notifikasi dan tombol 'Test Notifikasi' dan 'Reload cuaca'. Semua pengaturan langsung aktif dan tersinkron ke cloud.","Notifikasi HP|Setelah izin notifikasi diaktifkan, peringatan serius seperti Topan, Hujan Lebat, Angin Kencang, Gempa akan muncul sebagai notifikasi sistem HP (bahkan saat App ditutup). Pada jam tenang (default 22:00 sampai 07:00, bisa diatur admin) tidak ada notifikasi, lindungi istirahat. iOS wajib 'Bagikan → Tambah ke Layar Utama' dan buka dari layar utama dulu, baru bisa aktifkan notifikasi.","Pasang Surut|Deteksi lokasi otomatis, tampilkan pasang surut 7 hari dari stasiun pantai terdekat (waktu pasang/surut dan ketinggian air). Tekan tanggal mana saja untuk detail per jam hari itu. Sumber data: CWA Taiwan open data. Tekan panah di atas kartu untuk lipat dan hemat ruang.","Animasi Musim dan Suara Alam|Berubah otomatis sesuai musim dan cuaca: musim semi (bunga, kupu-kupu, katak), musim panas malam (kunang-kunang, suara jangkrik), musim gugur (daun maple, capung), musim dingin (kristal es, burung gagak), hari hujan (tetesan, kilat petir), topan (awan bergulung), hari cerah (cahaya matahari, kicau burung), malam (langit berbintang, jangkrik). Bisa dimatikan di Pengaturan ⚙️ untuk hemat baterai.","Mode Gelap Otomatis|Pukul 19:00 sampai 05:00 otomatis ganti tampilan gelap (latar hitam, tulisan putih), 18:00 sampai 19:00 masa transisi (warna siang dengan layer gelap perlahan). Sistem otomatis berdasarkan jam HP, tidak perlu ganti manual. Melindungi mata di malam hari, hemat baterai, nyaman untuk shift malam.","Sinkronisasi Cloud|Login akun Google, semua pengaturan jadwal, tanda acara, riwayat cuti, catatan, kuota cuti tahunan, jam Libur Topan, bahasa, dan pengaturan peringatan pribadi otomatis tersimpan ke cloud Firestore. Ganti HP atau hapus data App, cukup login lagi untuk pulih lengkap, tanpa kode cadangan. Pengecualian: Data Gaji hanya di HP, tidak ke cloud (lindungi privasi).","Unit dan Aturan Shift|Admin bisa buat unit (contoh: Grinding Shift A/B/C) dan berbagai aturan shift (4 kerja 2 libur, 2 Pagi 2 Malam, dll) di panel admin, lalu kunci unit dan jenis shift setiap user. Setelah dikunci, user tidak bisa ubah sendiri agar data konsisten. Admin juga bisa atur jenis cuti, tanggal gajian, cek kesehatan, rapat, ambang peringatan, jam tenang, on/off animasi.","Lihat Semua Unit|Admin bisa pilih 'Semua Unit' di atas untuk lihat jumlah cuti semua unit sekaligus, memudahkan pengaturan tenaga kerja seluruh pabrik. User biasa hanya lihat data unitnya sendiri.","Hari Libur dan Perayaan|Otomatis tampilkan hari libur nasional Taiwan (termasuk pengganti, libur sambung) dan perayaan Indonesia (Idul Fitri, Idul Adha, Nyepi, Waisak, dll). Hari libur ditandai garis merah di atas tanggal. Terjemahan otomatis sesuai bahasa 中文/Indonesia. Perayaan tetap (Valentine, Hari Ibu, 11.11, dll) juga ditampilkan untuk diingat (tidak mempengaruhi libur).","Bagikan Jadwal|Tekan 'Share' untuk buat gambar PNG jadwal bulan ini, lengkap dengan shift, hari libur, tanda acara, dan perayaan. Mendukung panel berbagi sistem (langsung ke LINE, WhatsApp, dll) atau otomatis simpan ke galeri foto, mudah dikirim ke teman atau keluarga.","Pasang ke Layar|Tombol pasang di bawah untuk tambah App ke layar utama HP, seperti app asli — layar penuh, bisa offline. Ganti bahasa 中/ID di pojok kanan atas. iOS: buka di Safari → Bagikan → Tambah ke Layar Utama. Android: Chrome akan otomatis muncul tombol pasang.","Pintasan Hari Ini|Mau lihat shift hari ini tanpa buka App? Di browser, tambahkan ?w=1 di akhir URL (contoh: …/myshift/?w=1), lalu pilih 'Tambah ke Layar Utama', beri nama 'Shift Hari Ini'. Akan ada pintasan baru di layar HP — buka langsung tampil shift hari ini ukuran besar, offline, instan."],
+  h:["Pengaturan Awal|Pertama kali pakai, jawab 3 pertanyaan (kerja/libur → shift apa → hari ke berapa), jadwal setahun otomatis dibuat. Jika admin sudah mengunci aturan shift Anda, cukup pilih hari ini shift apa. Bisa tekan 'Reset' di bawah untuk atur ulang kapan saja.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, tekan 'Hari ini' untuk kembali ke bulan ini. Warna kotak: biru = Pagi, ungu = Malam, kuning = Siang, abu-abu = Libur. Tekan tanggal mana saja untuk lihat detail, ajukan cuti, atau tandai acara. Tanggal hari ini ditandai garis oranye tebal.","Sistem Cuti|Tekan tanggal → pilih jenis cuti → pilih waktu mulai/selesai → simpan. Waktu dapat dipilih setiap 30 menit sepanjang shift, termasuk lewat tengah malam. Tombol cepat: Penuh 12h, Normal 8h, Tanpa lembur. Shift pagi 08:00–20:00; malam 20:00–besok 08:00. Delapan jam awal adalah jam normal, empat jam akhir lembur. Absen penuh memakai 8h cuti dan mengurangi 4h lembur. Hanya absen pada jam lembur tidak memotong cuti atau gaji pokok. Minimum jam cuti mengikuti jenisnya. Pratinjau menampilkan cuti, sisa lembur, dan estimasi gaji; tidak perlu input lembur terpisah. Rekan hanya melihat jumlah orang cuti normal, admin dapat melihat rincian dan alasan. Data dapat dibatalkan.","Tanda Acara & Libur Topan|Tandai harian: 📚Kelas, 🚗Dinas, 💰Gajian, 🌴Cuti Tahunan, 🌀Libur Topan, 📝Catatan bebas (maks 50 huruf). Jam libur bencana dapat dicatat; sesuai slip periode ini tidak mengurangi lembur atau gaji pokok. Admin bisa tambah 📋Rapat dan 🏥Cek Kesehatan untuk semua user.","Kelola Cuti Tahunan|Di bawah jendela cuti, isi total jam cuti tahunan dan jam terpakai (per 0.5 jam). Tanggal yang ditandai cuti tahunan otomatis dikurangi dan sisa dihitung. Tahun cuti: 26 Desember tahun ini sampai 25 Desember tahun depan (aturan Walsin Lihwa).","Statistik|Tekan Stat untuk statistik tahunan: hari per shift, jam per bulan, lembur dan sisa cuti tahunan. Shift 12h terdiri dari 8h normal + 4h lembur. Waktu absen otomatis dipisah; kuota cuti hanya berkurang pada jam normal. Upah lembur dihitung per hari dari sisa jam lembur, dengan tarif 2h awal dan sisanya. Gunakan panah untuk mengganti tahun.","Estimasi Gaji|Kartu gaji di bawah kalender, atur semua kolom slip gaji: Gaji Pokok, Tunjangan Makan, Transport, Posisi, Tunjangan Malam (per shift malam), BPJS Tenaga Kerja, BPJS Kesehatan, Iuran Serikat, Tunjangan Kesejahteraan, Potongan Lain. Sistem otomatis hitung perkiraan gaji bersih, termasuk: lembur 2 jam awal dan sisanya (tarif berbeda, default 1.33340 dan 1.66670), batas bebas pajak sekitar 46,67 jam, jumlah shift malam × tunjangan malam (bisa override total per periode), potongan sakit/izin; libur bencana tidak mengurangi lembur. Data gaji disinkronkan ke akun cloud pribadi dan hanya dapat dilihat oleh Anda.","Periode Perhitungan Gaji|Periode gaji dihitung dari tanggal 26 bulan lalu sampai tanggal 25 bulan ini. Contoh: gaji Maret dihitung dari 26 Februari sampai 25 Maret. Gaji dibayar tanggal 5 setiap bulan (💰), bonus kinerja tanggal 20 (🏆). Jika jatuh di hari libur nasional atau weekend, otomatis dimajukan ke hari kerja sebelumnya. Tanggal pembayaran asli ditampilkan di kalender.","Prakiraan Cuaca 7 Hari|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Tekan untuk detail per jam (suhu, kemungkinan hujan, kecepatan angin, kelembaban). Data diperbarui otomatis setiap jam. Bisa tekan ⚙️ Pengaturan lalu 'Reload' untuk update segera. Probabilitas hujan mengutamakan prakiraan interval CWA; suhu/kelembapan/angin memakai Open-Meteo. Observasi stasiun hujan tidak mengubah prakiraan.","9 Jenis Peringatan Cuaca|Sistem otomatis deteksi dan tampilkan banner peringatan, total 9 jenis: 🌍Gempa Bumi, 🌀Topan, ⛈Badai Petir, 🌧Hujan Lebat, 🌂Hujan Biasa, 💨Angin Kencang, 🥵Panas Ekstrem, 🥶Dingin Ekstrem, 🌫Kabut Tebal. Gempa pakai data realtime CWA Taiwan dengan ambang magnitudo, intensitas, jarak, dan waktu (salah satu lewat ambang langsung peringatan). Topan utamakan peringatan resmi CWA. Ambang setiap peringatan bisa diatur admin.","Pengingat Bawa Payung|Pada hari kerja, di jam berangkat (1 sampai 2 jam sebelum shift Pagi/Siang/Malam) jika kemungkinan hujan ≥ 40%, banner oranye 'Bawa payung' akan muncul di bawah kalender. Bisa dimatikan di Pengaturan ⚙️.","Pengaturan Pribadi ⚙️|Tekan ikon ⚙️ di pojok kanan atas kartu cuaca untuk masuk: ①Status saat ini (suhu, hujan, jumlah peringatan aktif) ②Saklar utama (Banner Peringatan dan Notifikasi HP — dua saklar terpisah) ③Saklar individu 9 peringatan (Banner dan Notifikasi diatur terpisah) ④Animasi cuaca dan suara on/off ⑤Status izin notifikasi dan tombol 'Test Notifikasi' dan 'Reload cuaca'. Semua pengaturan langsung aktif dan tersinkron ke cloud.","Notifikasi HP|Setelah izin notifikasi diaktifkan, peringatan serius seperti Topan, Hujan Lebat, Angin Kencang, Gempa akan muncul sebagai notifikasi sistem HP (bahkan saat App ditutup). Pada jam tenang (default 22:00 sampai 07:00, bisa diatur admin) tidak ada notifikasi, lindungi istirahat. iOS wajib 'Bagikan → Tambah ke Layar Utama' dan buka dari layar utama dulu, baru bisa aktifkan notifikasi.","Pasang Surut|Deteksi lokasi otomatis, tampilkan pasang surut 7 hari dari stasiun pantai terdekat (waktu pasang/surut dan ketinggian air). Tekan tanggal mana saja untuk detail per jam hari itu. Sumber data: CWA Taiwan open data. Tekan panah di atas kartu untuk lipat dan hemat ruang.","Animasi Musim dan Suara Alam|Berubah otomatis sesuai musim dan cuaca: musim semi (bunga, kupu-kupu, katak), musim panas malam (kunang-kunang, suara jangkrik), musim gugur (daun maple, capung), musim dingin (kristal es, burung gagak), hari hujan (tetesan, kilat petir), topan (awan bergulung), hari cerah (cahaya matahari, kicau burung), malam (langit berbintang, jangkrik). Bisa dimatikan di Pengaturan ⚙️ untuk hemat baterai.","Mode Gelap Otomatis|Pukul 19:00 sampai 05:00 otomatis ganti tampilan gelap (latar hitam, tulisan putih), 18:00 sampai 19:00 masa transisi (warna siang dengan layer gelap perlahan). Sistem otomatis berdasarkan jam HP, tidak perlu ganti manual. Melindungi mata di malam hari, hemat baterai, nyaman untuk shift malam.","Sinkronisasi Cloud|Login akun Google, semua pengaturan jadwal, tanda acara, riwayat cuti, catatan, kuota cuti tahunan, jam Libur Topan, bahasa, dan pengaturan peringatan pribadi otomatis tersimpan ke cloud Firestore. Ganti HP atau hapus data App, cukup login lagi untuk pulih lengkap, tanpa kode cadangan. Pengecualian: Data Gaji hanya di HP, tidak ke cloud (lindungi privasi).","Unit dan Aturan Shift|Admin bisa buat unit (contoh: Grinding Shift A/B/C) dan berbagai aturan shift (4 kerja 2 libur, 2 Pagi 2 Malam, dll) di panel admin, lalu kunci unit dan jenis shift setiap user. Setelah dikunci, user tidak bisa ubah sendiri agar data konsisten. Admin juga bisa atur jenis cuti, tanggal gajian, cek kesehatan, rapat, ambang peringatan, jam tenang, on/off animasi.","Lihat Semua Unit|Admin bisa pilih 'Semua Unit' di atas untuk lihat jumlah cuti semua unit sekaligus, memudahkan pengaturan tenaga kerja seluruh pabrik. User biasa hanya lihat data unitnya sendiri.","Hari Libur dan Perayaan|Otomatis tampilkan hari libur nasional Taiwan (termasuk pengganti, libur sambung) dan perayaan Indonesia (Idul Fitri, Idul Adha, Nyepi, Waisak, dll). Hari libur ditandai garis merah di atas tanggal. Terjemahan otomatis sesuai bahasa 中文/Indonesia. Perayaan tetap (Valentine, Hari Ibu, 11.11, dll) juga ditampilkan untuk diingat (tidak mempengaruhi libur).","Bagikan Jadwal|Tekan 'Share' untuk buat gambar PNG jadwal bulan ini, lengkap dengan shift, hari libur, tanda acara, dan perayaan. Mendukung panel berbagi sistem (langsung ke LINE, WhatsApp, dll) atau otomatis simpan ke galeri foto, mudah dikirim ke teman atau keluarga.","Pasang ke Layar|Tombol pasang di bawah untuk tambah App ke layar utama HP, seperti app asli — layar penuh, bisa offline. Ganti bahasa 中/ID di pojok kanan atas. iOS: buka di Safari → Bagikan → Tambah ke Layar Utama. Android: Chrome akan otomatis muncul tombol pasang.","Pintasan Hari Ini|Mau lihat shift hari ini tanpa buka App? Di browser, tambahkan ?w=1 di akhir URL (contoh: …/myshift/?w=1), lalu pilih 'Tambah ke Layar Utama', beri nama 'Shift Hari Ini'. Akan ada pintasan baru di layar HP — buka langsung tampil shift hari ini ukuran besar, offline, instan."],
   wk:["Min","Sen","Sel","Rab","Kam","Jum","Sab"]}
 };
 let RN={zh:{"4on2off":"做4休2","2on2off":"做2休2"},id:{"4on2off":"4K 2L","2on2off":"2K 2L"}};
@@ -1378,7 +1383,27 @@ function leaveWageDeductRate(lt){
   if(id==="personal"||nm.indexOf("事假")>=0){const r=Number(SAL.personalRate);return Number.isFinite(r)?Math.max(0,r):1;}
   return 0;
 }
-function hasPreciseLeaveTime(l){return !!l&&Number.isFinite(+l.startOffset)&&Number.isFinite(+l.endOffset)&&(+l.endOffset)>(+l.startOffset)}
+function leaveNumber(v){return v!==null&&v!==undefined&&v!==""&&Number.isFinite(+v)?+v:null}
+function hasPreciseLeaveTime(l){return !!l&&leaveNumber(l.startOffset)!==null&&leaveNumber(l.endOffset)!==null&&(+l.endOffset)>(+l.startOffset)}
+// v3 的 hours 永遠只存正常工時；完整未出勤範圍由起訖分鐘保存，避免特休被扣 12h。
+function splitLeaveMinutes(start,end,shiftHours){
+  const limit=Math.max(0,Math.round((+shiftHours||0)*60)),regular=Math.min(480,limit);
+  const st=Math.max(0,Math.min(limit,Math.round(+start||0))),en=Math.max(st,Math.min(limit,Math.round(+end||0)));
+  const regularMinutes=Math.max(0,Math.min(en,regular)-Math.min(st,regular));
+  return{regularHours:regularMinutes/60,overtimeHours:Math.max(0,en-Math.max(st,regular))/60,totalHours:(en-st)/60};
+}
+function leaveHoursDetail(l){
+  if((+l.schemaVersion||1)>=3&&hasPreciseLeaveTime(l))return splitLeaveMinutes(l.startOffset,l.endOffset,leaveNumber(l.shiftHours)||12);
+  const hours=Math.max(0,+l.hours||0);return{regularHours:hours,overtimeHours:0,totalHours:hours};
+}
+function isRegularLeave(l){return String(l.uid||"").startsWith("admin_")||leaveHoursDetail(l).regularHours>0}
+function leaveRecordLabel(l){
+  const lt=getLT(l.leaveType),name=lt?(lang==="zh"?lt.name:(lt.nameId||lt.name)):l.leaveType;
+  const h=leaveHoursDetail(l),parts=[];
+  if(h.regularHours>0)parts.push(name+" "+h.regularHours+"h");
+  if(h.overtimeHours>0)parts.push((lang==="zh"?"未加班 ":"Tidak lembur ")+h.overtimeHours+"h");
+  return parts.join(" · ")||name+" 0h";
+}
 // 班別時間基準：12h 早班 08-20、晚班 20-翌日08；正常工時固定前 8h，後 4h 為加班。
 // 8h 輪班沒有班內加班：早 08-16、中 16-24、晚 00-08。
 function getShiftWorkRule(y,m,d){
@@ -1397,8 +1422,8 @@ function formatShiftOffset(rule,offset){
 }
 function formatLeaveRange(l,dateKey){
   if(!hasPreciseLeaveTime(l))return lang==="zh"?"舊資料：未記錄時段":"Data lama: tanpa waktu";
-  let rule={startMinute:Number.isFinite(+l.shiftStartMinute)?+l.shiftStartMinute:0};
-  if(!Number.isFinite(+l.shiftStartMinute)&&dateKey){const a=dateKey.split("-").map(Number);rule=getShiftWorkRule(a[0],a[1],a[2])}
+  let rule={startMinute:leaveNumber(l.shiftStartMinute)||0};
+  if(leaveNumber(l.shiftStartMinute)===null&&dateKey){const a=dateKey.split("-").map(Number);rule=getShiftWorkRule(a[0],a[1],a[2])}
   return formatShiftOffset(rule,+l.startOffset)+"–"+formatShiftOffset(rule,+l.endOffset);
 }
 // 同一天的正常工時請假採分鐘聯集，避免多筆/重疊資料重複扣薪。
@@ -1434,25 +1459,34 @@ function leaveOtDeductForDay(leaves,dailyOT,shiftHours,uid){
   }
   return Math.min(dailyOT,total);
 }
-function getActualOTForDay(dateKey,dailyOT,shiftHours,uid){
+function getActualOTForDay(dateKey,dailyOT,shiftHours,uid,previewLeaves){
   dailyOT=Math.max(0,+dailyOT||0);
   if(!(dailyOT>0))return 0;
-  // 每日加班出勤是最高優先權：明確填 0 也必須保留，不能被請假推定蓋掉。
-  if(Object.prototype.hasOwnProperty.call(OTD,dateKey))return Math.max(0,Math.min(dailyOT,+OTD[dateKey]||0));
-  const leaves=getPayrollLeaves(dateKey);
-  const regularH=summarizeRegularLeaveForDay(leaves,shiftHours,uid).totalHours;
-  const fullRegularH=Math.min(8,Math.max(0,+shiftHours||0));
-  // 公司實際核薪規則：正常 8 小時整段請假時，若沒有另填加班出勤，預設當日未做後段加班。
-  // 部分請假不武斷扣除加班；需要不同結果時，直接在「加班出勤」記錄實際時數。
-  if(fullRegularH>0&&regularH>=fullRegularH-1e-7)return 0;
-  const legacyDed=leaveOtDeductForDay(leaves,dailyOT,shiftHours,uid);
-  return Math.max(0,dailyOT-legacyDed);
+  const leaves=(previewLeaves||getPayrollLeaves(dateKey)).filter(l=>!uid||l.uid===uid);
+  const unified=leaves.some(l=>(+l.schemaVersion||1)>=3&&hasPreciseLeaveTime(l));
+  if(!unified){
+    // 舊月份保留原計薪結果；新紀錄則完全以選取的時段換算。
+    if(Object.prototype.hasOwnProperty.call(OTD,dateKey))return Math.max(0,Math.min(dailyOT,+OTD[dateKey]||0));
+    const regularH=summarizeRegularLeaveForDay(leaves,shiftHours,uid).totalHours;
+    const fullRegularH=Math.min(8,Math.max(0,+shiftHours||0));
+    if(fullRegularH>0&&regularH>=fullRegularH-1e-7)return 0;
+    return Math.max(0,dailyOT-leaveOtDeductForDay(leaves,dailyOT,shiftHours,uid));
+  }
+  const regularMinutes=Math.min(8,Math.max(0,+shiftHours||0))*60;
+  const missed=new Uint8Array(Math.round(dailyOT*60));
+  for(const l of leaves){
+    if(!hasPreciseLeaveTime(l))continue;
+    const st=Math.max(0,Math.min(missed.length,Math.round(+l.startOffset-regularMinutes)));
+    const en=Math.max(st,Math.min(missed.length,Math.round(+l.endOffset-regularMinutes)));
+    for(let i=st;i<en;i++)missed[i]=1;
+  }
+  return Math.max(0,dailyOT-missed.reduce((a,b)=>a+b,0)/60);
 }
 function getPayrollLeaves(dateKey){
   const uid=fbUser&&fbUser.uid;
   const out=uid?(getLeaves(dateKey)||[]).filter(l=>l.uid===uid).map(l=>Object.assign({},l)):[];
   const legacyH=Math.max(0,+ALD[dateKey]||0);
-  const hasAnnual=out.some(l=>{const lt=getLT(l.leaveType);return _leaveId(lt)==="annual"||_leaveName(lt).indexOf("特休")>=0});
+  const hasAnnual=out.some(l=>{const lt=getLT(l.leaveType);return isRegularLeave(l)&&(_leaveId(lt)==="annual"||_leaveName(lt).indexOf("特休")>=0)});
   if(legacyH>0&&!hasAnnual)out.push({uid:uid||"",leaveType:"annual",hours:legacyH,_legacy:true});
   return out;
 }
@@ -1614,8 +1648,8 @@ function payCardHtml(y,m){
 // 薪資預估計算（用 SAL 設定 + calcPayPeriod 資料）
 // 公式：固定應領、加班、請假可使用各自的月薪基數 ÷ 240
 //       12h 班每天加班 4h：前 2h ×1.33340、後 2h ×1.66670
-//       每日加班出勤優先；整段正常工時請假且未填加班時數時，預設當日無加班
-//       加班總額只進位一次；公司薪資條的免稅／應稅分項僅供核對，不回寫總額
+//       新版依完整請假時段扣除未做加班；舊月份保留既有紀錄的計薪結果
+//       加班總額只取整一次；公司薪資條的免稅／應稅分項僅供核對，不回寫總額
 //       夜點費 = 晚班次數 × 每次夜點費；提案與其他加項按薪資月保存
 // ═══════════════════════════════════════════════════════════════
 function calcSalaryEst(y,m){
@@ -1648,7 +1682,7 @@ function calcSalaryEst(y,m){
   const autoOtH=autoFront+autoBack;
   let totalFront=autoFront,totalBack=autoBack;
   if(period.otHoursOverride>0){
-    // 只有總時數而沒有每日紀錄時才採平均拆分；正常情況一律使用每日加班出勤，避免前後段倍率被算錯。
+    // 只有總時數而沒有每日紀錄時才採平均拆分；正常情況一律依每日請假時段自動換算，避免前後段倍率被算錯。
     totalFront=period.otHoursOverride/2;
     totalBack=period.otHoursOverride-totalFront;
   }
@@ -1776,7 +1810,7 @@ function rSalary(){
       ${num("sal_nightTotalOverride",isZh?"本期夜點費總額覆寫（0=自動）":"Override total tunjangan malam",period.nightTotalOverride,isZh?"本期薪資條為 5,286 時直接填 5286；優先於單價×次數。":"","5286")}
       ${num("sal_proposal",isZh?"本期提案獎金":"Bonus proposal periode ini",period.proposal,isZh?"只在本期生效。":"","500")}
       ${num("sal_otherIncome",isZh?"本期其他加項合計":"Pendapatan lain periode ini",period.otherIncome,isZh?"公司薪資條有多筆「其他加項」時請填合計；2026/07 為 338＋1,075＝1,413。":"","1413")}
-      ${num("sal_otHoursOverride",isZh?"本期加班總時數覆寫（0=每日自動）":"Override total lembur (0=harian)",period.otHoursOverride,isZh?"只有每日加班出勤資料不完整時才填；正常應保持 0，讓系統逐日拆分前 2h／後 2h。":"","60")}
+      ${num("sal_otHoursOverride",isZh?"本期加班總時數覆寫（0=每日自動）":"Override total lembur (0=harian)",period.otHoursOverride,isZh?"只有舊紀錄不完整時才填；正常保持 0，讓系統依請假時間自動換算每日加班及前後段倍率。":"","60")}
       <div style="font-size:11px;font-weight:800;color:#00695c;margin:12px 0 8px;padding-top:8px;border-top:1px dashed rgba(0,105,92,.25)">🔎 ${isZh?"公司薪資條核對值（不參與公式）":"Nilai pembanding slip (tidak mengubah rumus)"}</div>
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
         ${num("sal_reportedTaxFree",isZh?"薪資條免稅加班費":"Lembur bebas pajak di slip",period.reportedTaxFree,isZh?"只用來比對分項；不會改寫公式算出的加班總額。":"","11657")}
@@ -1854,7 +1888,7 @@ function render(){
 function _overlayView(){
   if(wxDetailShow)return{kind:"wx",html:wxDetailHtml()};
   if(tideDetailShow)return{kind:"tide",html:tideDetailHtml()};
-  if(S.modal)return{kind:"day",html:rMod()};
+  if(S.modal){const v=S.modal,rule=getShiftWorkRule(v.y,v.m,v.d);return{kind:"day:"+ek(v.y,v.m,v.d)+":"+rule.shift+":"+rule.shiftHours,html:rMod()}};
   if(typeof showUserPrefs!=="undefined"&&showUserPrefs)return{kind:"prefs",html:userPrefsModalHtml()};
   if(S.showH)return{kind:"help",html:rHelp()};
   if(S.showStats)return{kind:"stats",html:rStats()};
@@ -1951,11 +1985,16 @@ function _doRender(){
       _lastOverlayHtml=ov.html;
       _lastOverlayKind=ov.kind;
       _bindActions(mr);
+      if(document.getElementById("leaveTypeSel")&&S.modal){
+        const type=saved&&saved.fields.find(x=>x.id==="leaveTypeSel");
+        if(type)document.getElementById("leaveTypeSel").value=type.value;
+        updateLeaveTimeOptions(ek(S.modal.y,S.modal.m,S.modal.d));
+      }
       if(saved)_restoreReplaceState(mr,saved);
     }
     _setModalLock(overlayOpen||!!document.querySelector(".modal-bg,.wx-detail"));
 
-    if(document.getElementById("leaveTypeSel")&&S.modal)try{updateLeaveTimeOptions(ek(S.modal.y,S.modal.m,S.modal.d))}catch(e){}
+    if(document.getElementById("leaveTypeSel")&&S.modal)try{updateLeaveTimePreview(ek(S.modal.y,S.modal.m,S.modal.d))}catch(e){}
     // 請假總覽 modal：渲染列表內容（rLeavesOv 只生成空 container，列表內容需在這裡填入）
     if(S.showLeavesOv&&isAdmin()&&!leavesOvLoading){
       const list=document.getElementById("leavesOvListBody");
@@ -2079,7 +2118,7 @@ function uiTodayHeroHtml(){
   let nextOff="";
   if(s&&s!=="休")for(let i=1;i<=30;i++){const d=new Date(TY,TM-1,TD+i);if(gs(d.getFullYear(),d.getMonth()+1,d.getDate())==="休"){nextOff=lang==="zh"?`${i} 天後休假`:`Libur dalam ${i} hari`;break}}
   const todayKey=ek(TY,TM,TD),eventCount=(EVS[todayKey]||[]).length+(getAdminEv(todayKey)||[]).length;
-  const leaveCount=new Set(getLeaves(todayKey).map(x=>x.uid).filter(Boolean)).size;
+  const leaveCount=new Set(getLeaves(todayKey).filter(isRegularLeave).map(x=>x.uid).filter(Boolean)).size;
   return `<section class="today-hero shift-${uiShiftClass(s)}"><div class="hero-noise"></div><div class="today-hero-top"><span class="eyebrow">${dateLabel}</span><span class="shift-pill">${uiShiftShort(s)}</span></div><div class="today-hero-main"><div><h1>${status}</h1><p>${sub}</p></div><div class="shift-monogram">${s||"—"}</div></div><div class="shift-progress"><span style="width:${progress.toFixed(1)}%"></span></div><div class="today-hero-meta"><span>${nextOff|| (lang==="zh"?"本月班表已同步":"Jadwal tersinkron")}</span><span>${eventCount?`${eventCount} ${lang==="zh"?"項行程":"agenda"}`:leaveCount?`${leaveCount} ${lang==="zh"?"人請假":"cuti"}`:(lang==="zh"?"今日無待辦":"Tidak ada agenda")}</span></div></section>`;
 }
 function uiWeekStripHtml(){
@@ -2111,7 +2150,8 @@ function uiLeaveSummaryHtml(y,m){
   for(let d=1;d<=dm;d++){
     const date=ek(y,m,d),mine=myLeave(date);
     mine.forEach(l=>{
-      const h=Math.max(0,+l.hours||0),lt=getLT(l.leaveType)||{};
+      const h=leaveHoursDetail(l).regularHours,lt=getLT(l.leaveType)||{};
+      if(!(h>0))return;
       total+=h;days.add(date);entries.push({date,h,leaveType:l.leaveType,lt});
       const key=l.leaveType||"other";if(!byType[key])byType[key]={h:0,lt};byType[key].h+=h;
       const ts=new Date(date+"T00:00:00+08:00").getTime();
@@ -2142,11 +2182,11 @@ function rCal(){
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
   const pd5=getPayDay(y,m,5),pd20=getPayDay(y,m,20);
   for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(y,m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||isTWOff(y,m,d)),isPay=(d===pd5||d===pd20),isAdj=!!SHIFT_OV[ek(y,m,d)];
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${S.showLunar?lunarCellText(y,m,d):""}${isAdj?'<span style="position:absolute;top:1px;right:2px;font-size:9px;line-height:1" title="已調班">🔄</span>':''}${td?`<span class="td">${lang==="zh"?"今天":"TODAY"}</span>`:''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d)),n=new Set(lc.map(x=>x.uid)).size;return n?`<span class="leave-badge">${n}</span>`:""})()}</div>`}
+    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}" data-a="open" data-d="${d}"><span class="num">${d}</span><span class="sn">${sf(s)}</span>${S.showLunar?lunarCellText(y,m,d):""}${isAdj?'<span style="position:absolute;top:1px;right:2px;font-size:9px;line-height:1" title="已調班">🔄</span>':''}${td?`<span class="td">${lang==="zh"?"今天":"TODAY"}</span>`:''}${d===pd5?'<span class="pay-tag">💰</span>':''}${d===pd20?'<span class="pay-tag">🏆</span>':''}${he?`<div class="evb">${ev.length}</div>`:''}${isOff?'<span class="hol-dot"></span>':''}${dayAL?'<span class="al-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d)),n=new Set(lc.filter(isRegularLeave).map(x=>x.uid)).size;return n?`<span class="leave-badge">${n}</span>`:""})()}</div>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(y,m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<div class="hol-strip">🎌 ${mh.join("　")}</div>`:"";
-  let lvParts=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const lv=getLeaves(ek(y,m,d)),n=new Set(lv.map(x=>x.uid)).size;if(n)lvParts.push(`${m}/${d} ${n}${lang==="zh"?"人請假":" cuti"}`)}
+  let lvParts=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const lv=getLeaves(ek(y,m,d)),n=new Set(lv.filter(isRegularLeave).map(x=>x.uid)).size;if(n)lvParts.push(`${m}/${d} ${n}${lang==="zh"?"人請假":" cuti"}`)}
   let adParts=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const ae=getAdminEv(ek(y,m,d));if(ae.length)ae.forEach(t=>adParts.push(`${m}/${d} ${en(t)}`))}
   if(adParts.length)holH+=`<div class="hol-strip" style="background:rgba(198,40,40,.06);border-left-color:var(--red);color:var(--red)">📢 ${adParts.join("　")}</div>`;
   if(lvParts.length)holH+=`<div class="hol-strip" style="background:var(--amber-l);border-left-color:var(--amber);color:#b36b00;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px">📋 ${lvParts.map(p=>`<span style="white-space:nowrap">${p}</span>`).join("")}</div>`;
@@ -2265,7 +2305,7 @@ function rMod(){
   const hasCust=ev.includes("custom");const custTxt=NOTES[ek(y,m,d)]||"";
   let custP="";if(hasCust){custP=`<div class="al-pick" style="border-color:var(--pri)"><label>📝 ${lang==="zh"?"備註內容":"Isi catatan"}</label><input type="text" id="custIn" value="${esc(custTxt)}" placeholder="${lang==="zh"?"輸入備註...":"Tulis catatan..."}" maxlength="50" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:4px" oninput="NOTES['${ek(y,m,d)}']=this.value;sNotes()"></div>`}
   const hasTy=ev.includes("typhoon");const dayTy=TYD[ek(y,m,d)]||0;
-  let tyP="";if(hasTy){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayTy?' selected':''}>${h} ${t("hr")}</option>`}tyP=`<div class="al-pick" style="border-color:#0288d1;background:rgba(2,136,209,.05)"><label style="color:#01579b">🌀 ${lang==="zh"?"颱風假時數":"Jam Libur Topan"}</label><select id="tySel" data-a="tyh" style="margin-top:4px">${opts}</select><div style="font-size:10px;color:var(--tx3);margin-top:4px;line-height:1.4">${lang==="zh"?"依公告自行記錄天災假時數；目前依薪資條規則不扣正常薪資，也不自動扣加班。實際加班仍以上方「加班出勤」為準。":"Sesuai pengumuman: seharian=12h, sore=6h, dll."}</div></div>`}
+  let tyP="";if(hasTy){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayTy?' selected':''}>${h} ${t("hr")}</option>`}tyP=`<div class="al-pick" style="border-color:#0288d1;background:rgba(2,136,209,.05)"><label style="color:#01579b">🌀 ${lang==="zh"?"颱風假時數":"Jam Libur Topan"}</label><select id="tySel" data-a="tyh" style="margin-top:4px">${opts}</select><div style="font-size:10px;color:var(--tx3);margin-top:4px;line-height:1.4">${lang==="zh"?"依公告自行記錄天災假時數；目前依薪資條規則不扣正常薪資，也不自動扣加班。其他未出勤時段可用「新增請假」記錄並自動換算。":"Sesuai pengumuman: seharian=12h, sore=6h, dll."}</div></div>`}
   return`<div class="modal-bg" data-a="close"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
   <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${shiftAdjHtml(y,m,d)}${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${tyP}${custP}${S.showLunar?lunarModalBlock(y,m,d):""}
   <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
@@ -2315,9 +2355,9 @@ function fbBarHtml(){
 }
 function modalLeaveHtml(y,m,d){
   const date=ek(y,m,d),leaves=getLeaves(date),myLeaves=leaves.filter(l=>l.uid===(fbUser&&fbUser.uid)),rule=getShiftWorkRule(y,m,d);
-  const uniqueCount=a=>new Set((a||[]).map(l=>l.uid).filter(Boolean)).size;
+  const uniqueCount=a=>new Set((a||[]).filter(isRegularLeave).map(l=>l.uid).filter(Boolean)).size;
   let html="";
-  const realLeaves=leaves.filter(l=>!String(l.uid||"").startsWith("admin_"));
+  const realLeaves=leaves.filter(l=>isRegularLeave(l)&&!String(l.uid||"").startsWith("admin_"));
   if(leaves.length){
     const people=uniqueCount(leaves),realPeople=uniqueCount(realLeaves);
     if(isAdmin()&&realLeaves.length){
@@ -2325,9 +2365,9 @@ function modalLeaveHtml(y,m,d){
         let timeStr="";const lt=getLT(l.leaveType);const ltName=lt?(lang==="zh"?lt.name:lt.nameId):l.leaveType;
         if(l.ts&&l.ts.toDate){const dt=l.ts.toDate();timeStr=` ${String(dt.getMonth()+1)}/${dt.getDate()} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`}
         const reasonStr=l.reason?`<br><small style="color:var(--pri);font-weight:600">💬 ${esc(l.reason)}</small>`:"";
-        return`<span style="border-left:3px solid ${lt?lt.color:'#999'};padding-left:4px">${esc(l.name)} ${esc(ltName)} ${l.hours}h<br><small style="color:var(--tx2)">🕒 ${esc(formatLeaveRange(l,date))}</small>${l.unit&&l.unit!==S.unit?' ['+esc(l.unit)+']':''}${timeStr?'<br><small style="color:var(--tx3)">'+timeStr+'</small>':''}${reasonStr}</span>`
+        return`<span style="border-left:3px solid ${lt?lt.color:'#999'};padding-left:4px">${esc(l.name)} ${esc(leaveRecordLabel(l))}<br><small style="color:var(--tx2)">🕒 ${esc(formatLeaveRange(l,date))}</small>${l.unit&&l.unit!==S.unit?' ['+esc(l.unit)+']':''}${timeStr?'<br><small style="color:var(--tx3)">'+timeStr+'</small>':''}${reasonStr}</span>`
       }).join("")}</div></div>`;
-    }else if(leaves.length)html+=`<div class="leave-info">${lang==="zh"?"📋 今日 "+people+" 人請假":"📋 "+people+" orang cuti"}</div>`;
+    }else if(people)html+=`<div class="leave-info">${lang==="zh"?"📋 今日 "+people+" 人請假":"📋 "+people+" orang cuti"}</div>`;
   }
   if(fbUser&&myLeaves.length){
     html+=`<div style="margin:6px 0"><div style="font-size:11px;font-weight:700;margin-bottom:4px">${lang==="zh"?"我的請假":"Cuti saya"}</div>`;
@@ -2335,31 +2375,26 @@ function modalLeaveHtml(y,m,d){
       const lt=getLT(l.leaveType),ltName=lt?(lang==="zh"?lt.name:lt.nameId):l.leaveType;
       const reasonRow=l.reason?`<div style="font-size:11px;color:var(--tx2);padding:3px 8px 0;font-style:italic">💬 ${esc(l.reason)}</div>`:"";
       const legacy=!hasPreciseLeaveTime(l)?`<div style="font-size:9px;color:#e65100;padding:0 8px 4px">⚠️ ${lang==="zh"?"舊紀錄沒有起訖時間；薪資暫沿用舊推算。建議取消後重登。":"Data lama tanpa waktu; masukkan ulang untuk akurat."}</div>`:"";
-      html+=`<div style="background:var(--card);border-radius:6px;margin-bottom:3px;border-left:3px solid ${lt?lt.color:'#999'};padding-bottom:${l.reason||legacy?'4px':'0'}"><div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;gap:8px"><span style="font-size:12px;font-weight:600">${ltName} ${l.hours}h<br><small style="color:var(--tx2);font-weight:500">🕒 ${esc(formatLeaveRange(l,date))}</small></span><button onclick="removeLeave('${date}','${l.leaveType}','${l.docId||''}')" style="background:var(--red);color:#fff;border:none;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer">${lang==="zh"?"取消":"Batal"}</button></div>${reasonRow}${legacy}</div>`;
+      html+=`<div style="background:var(--card);border-radius:6px;margin-bottom:3px;border-left:3px solid ${lt?lt.color:'#999'};padding-bottom:${l.reason||legacy?'4px':'0'}"><div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;gap:8px"><span style="font-size:12px;font-weight:600">${esc(leaveRecordLabel(l))}<br><small style="color:var(--tx2);font-weight:500">🕒 ${esc(formatLeaveRange(l,date))}</small></span><button onclick="removeLeave('${date}','${l.leaveType}','${l.docId||''}')" style="background:var(--red);color:#fff;border:none;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer">${lang==="zh"?"取消":"Batal"}</button></div>${reasonRow}${legacy}</div>`;
     });
     html+=`</div>`;
   }
-  if(rule.isWork&&rule.overtimeMinutes>0&&fbUser){
-    const has=Object.prototype.hasOwnProperty.call(OTD,date),scheduled=rule.overtimeMinutes/60,val=has?String(OTD[date]):"";
-    let otOpts=`<option value=""${!has?' selected':''}>${lang==="zh"?"未設定（依排班 "+scheduled+"h）":"Belum diatur (jadwal "+scheduled+"h)"}</option>`;
-    for(let h=0;h<=scheduled+1e-9;h+=0.5)otOpts+=`<option value="${h}"${val===String(h)?' selected':''}>${h}h</option>`;
-    html+=`<div style="margin:8px 0;padding:10px;background:rgba(255,152,0,.08);border:1.5px solid #ffb74d;border-radius:8px">
-      <div style="font-size:12px;font-weight:800;color:#e65100;margin-bottom:5px">⏱️ ${lang==="zh"?"加班出勤（不是請假）":"Kehadiran lembur (bukan cuti)"}</div>
-      <div style="font-size:10px;color:var(--tx2);line-height:1.5;margin-bottom:7px">${lang==="zh"?`正常工時 ${formatShiftOffset(rule,0)}–${formatShiftOffset(rule,rule.regularMinutes)}；加班 ${formatShiftOffset(rule,rule.regularMinutes)}–${formatShiftOffset(rule,rule.regularMinutes+rule.overtimeMinutes)}。加班沒做不用請假，只要記錄實際做幾小時。`:`Jam normal ${formatShiftOffset(rule,0)}–${formatShiftOffset(rule,rule.regularMinutes)}; lembur dicatat terpisah.`}</div>
-      <div style="display:flex;gap:6px;align-items:center"><select id="actualOtSel" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px">${otOpts}</select><button onclick="saveActualOT('${date}')" style="padding:8px 12px;background:#ef6c00;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700">${lang==="zh"?"儲存":"Simpan"}</button></div>
-      <div style="display:flex;gap:5px;margin-top:6px"><button onclick="setActualOTQuick('${date}',0)" style="flex:1;padding:6px;border:1px solid #ffb74d;background:var(--card);border-radius:5px;font-size:10px">${lang==="zh"?"今天不加班 0h":"Tidak lembur 0h"}</button><button onclick="setActualOTQuick('${date}',${scheduled})" style="flex:1;padding:6px;border:1px solid #ffb74d;background:var(--card);border-radius:5px;font-size:10px">${lang==="zh"?"加班做滿 "+scheduled+"h":"Lembur penuh "+scheduled+"h"}</button></div>
-    </div>`;
+  if(fbUser&&Object.prototype.hasOwnProperty.call(OTD,date)){
+    html+=`<div class="leave-legacy-note">${lang==="zh"?"舊紀錄：當日加班 ":"Data lama: lembur hari ini "}${Math.max(0,+OTD[date]||0)}h <button onclick="clearLegacyOT('${date}')">${lang==="zh"?"取消舊紀錄":"Hapus data lama"}</button></div>`;
   }
   if(fbUser&&rule.isWork){
-    html+=`<div style="margin:8px 0;padding:10px;background:var(--pri-l);border-radius:8px;border:1.5px dashed var(--pri)">
-      <div style="font-size:12px;font-weight:700;margin-bottom:6px">${lang==="zh"?"➕ 新增請假（只選正常工時）":"➕ Tambah Cuti (jam normal saja)"}</div>
-      <select id="leaveTypeSel" onchange="updateLeaveTimeOptions('${date}')" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:6px">${getLeaveTypes().map(lt=>`<option value="${lt.id}" data-step="${lt.step}">${lang==="zh"?lt.name:lt.nameId}</option>`).join('')}</select>
-      <div style="font-size:10px;color:var(--tx2);margin-bottom:5px">${lang==="zh"?`正常工時：${formatShiftOffset(rule,0)}–${formatShiftOffset(rule,rule.regularMinutes)}；後面的加班時段不列入請假。`:`Jam normal: ${formatShiftOffset(rule,0)}–${formatShiftOffset(rule,rule.regularMinutes)}.`}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px"><div><label style="font-size:10px;color:var(--tx2)">${lang==="zh"?"開始":"Mulai"}</label><select id="leaveStartSel" onchange="updateLeaveTimePreview('${date}')" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px"></select></div><div><label style="font-size:10px;color:var(--tx2)">${lang==="zh"?"結束":"Selesai"}</label><select id="leaveEndSel" onchange="updateLeaveTimePreview('${date}')" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px"></select></div></div>
-      <div style="display:flex;gap:4px;margin-bottom:6px"><button onclick="setLeavePreset('${date}','full')" style="flex:1;padding:5px;border:1px solid var(--pri);background:var(--card);border-radius:5px;font-size:10px">${lang==="zh"?"全日 8h":"Penuh 8h"}</button><button onclick="setLeavePreset('${date}','first')" style="flex:1;padding:5px;border:1px solid var(--pri);background:var(--card);border-radius:5px;font-size:10px">${lang==="zh"?"前 4h":"4h awal"}</button><button onclick="setLeavePreset('${date}','last')" style="flex:1;padding:5px;border:1px solid var(--pri);background:var(--card);border-radius:5px;font-size:10px">${lang==="zh"?"後 4h":"4h akhir"}</button></div>
-      <div id="leaveTimePreview" style="font-size:10px;font-weight:700;color:var(--pri);padding:6px 8px;background:var(--card);border-radius:5px;margin-bottom:6px"></div>
-      <input type="text" id="leaveReasonIn" maxlength="50" placeholder="${lang==="zh"?"請假原因（選填，僅管理員可見）":"Alasan cuti (opsional, hanya admin lihat)"}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:6px;box-sizing:border-box">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:10px;color:var(--tx3);flex:1">${lang==="zh"?"🔒 薪資只扣正常工時；加班依上方另外計算":"🔒 Gaji normal dan lembur dihitung terpisah"}</span><button onclick="submitLeave('${date}')" style="padding:8px 18px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">${lang==="zh"?"確認":"OK"}</button></div>
+    const full=rule.regularMinutes+rule.overtimeMinutes,isZh=lang==="zh";
+    const oldOT=Object.prototype.hasOwnProperty.call(OTD,date)?`<div class="leave-legacy-note">${isZh?`此日舊加班紀錄為 ${OTD[date]}h；新增後改依請假時段自動計算。`:`Lembur lama ${OTD[date]}h; setelah simpan dihitung dari waktu cuti.`}</div>`:"";
+    html+=`<div class="leave-entry">
+      <div class="leave-entry-title">${isZh?"➕ 新增請假":"➕ Tambah cuti"}</div>
+      <select id="leaveTypeSel" aria-label="${isZh?"假別":"Jenis cuti"}" onchange="updateLeaveTimeOptions('${date}')">${getLeaveTypes().map(lt=>`<option value="${esc(lt.id)}">${esc(isZh?lt.name:(lt.nameId||lt.name))}</option>`).join('')}</select>
+      <div class="leave-shift-hint">${isZh?`班別 ${formatShiftOffset(rule,0)}–${formatShiftOffset(rule,full)} · 正常 ${rule.regularMinutes/60}h${rule.overtimeMinutes?`＋加班 ${rule.overtimeMinutes/60}h`:""}`:`Shift ${formatShiftOffset(rule,0)}–${formatShiftOffset(rule,full)} · Normal ${rule.regularMinutes/60}h${rule.overtimeMinutes?` + lembur ${rule.overtimeMinutes/60}h`:""}`}</div>
+      <div class="leave-time-grid"><label for="leaveStartSel">${isZh?"開始":"Mulai"}<select id="leaveStartSel" onchange="updateLeaveTimePreview('${date}')"></select></label><label for="leaveEndSel">${isZh?"結束":"Selesai"}<select id="leaveEndSel" onchange="updateLeaveTimePreview('${date}')"></select></label></div>
+      <div class="leave-presets"><button onclick="setLeavePreset('${date}','full')">${isZh?`全班 ${rule.shiftHours}h`:`Penuh ${rule.shiftHours}h`}</button><button onclick="setLeavePreset('${date}','regular')">${isZh?`正常 ${rule.regularMinutes/60}h`:`Normal ${rule.regularMinutes/60}h`}</button>${rule.overtimeMinutes?`<button onclick="setLeavePreset('${date}','overtime')">${isZh?"只不加班":"Tanpa lembur"}</button>`:""}</div>
+      <div id="leaveTimePreview" class="leave-time-preview" role="status" aria-live="polite"></div>
+      ${oldOT}
+      <input type="text" id="leaveReasonIn" maxlength="50" aria-label="${isZh?"請假原因（選填）":"Alasan (opsional)"}" placeholder="${isZh?"原因（選填，僅管理員可見）":"Alasan (opsional, hanya admin)"}">
+      <button id="leaveSubmitBtn" class="leave-submit" onclick="submitLeave('${date}')">${isZh?"確認新增":"Simpan"}</button>
     </div>`;
   }else if(fbUser&&!rule.isWork)html+=`<div style="margin:8px 0;padding:9px;background:var(--green-l);border-radius:7px;font-size:11px;color:var(--green)">${lang==="zh"?"此日為休假日，沒有正常工時，不建立請假紀錄。":"Hari libur, tidak perlu cuti."}</div>`;
   if(isAdmin()){
@@ -2375,7 +2410,7 @@ function adminSetLeave(date){
   const n=parseInt(inp.value)||0;
   const current=getLeaves(date);
   const adminEntries=current.filter(l=>String(l.uid||"").startsWith("admin_"));
-  const realCount=new Set(current.filter(l=>!String(l.uid||"").startsWith("admin_")).map(l=>l.uid)).size;
+  const realCount=new Set(current.filter(l=>isRegularLeave(l)&&!String(l.uid||"").startsWith("admin_")).map(l=>l.uid)).size;
   const need=n-realCount;
   if(need<0){alert(lang==="zh"?"已有 "+realCount+" 人實際請假，無法設低於此數":realCount+" orang sudah cuti, tidak bisa kurang");loadLeaves();return Promise.resolve();}
   return fsEnqueue(async()=>{
@@ -2585,55 +2620,77 @@ function rW(sh,day){const c=cyc();for(let i=0;i<c.length;i++){if(c[i]!==sh)conti
 function rO(nx,day){const c=cyc();for(let i=0;i<c.length;i++){if(c[i]!=="休")continue;let j=i;while(j<c.length&&c[j]==="休")j++;if(c[j%c.length]!==nx)continue;let n=1;for(let k=i-1;k>=0;k--){if(c[k]==="休")n++;else break}if(n===day)return i}return 0}
 
 // ═══ LEAVE HELPERS ═══
+function leaveStepMinutes(lt){return Math.max(30,Math.round(((lt&&lt.step)||0.5)*60))}
 function updateLeaveTimeOptions(date){
   const tSel=document.getElementById("leaveTypeSel"),sSel=document.getElementById("leaveStartSel"),eSel=document.getElementById("leaveEndSel");
   if(!tSel||!sSel||!eSel)return;
-  const a=String(date||"").split("-").map(Number),rule=getShiftWorkRule(a[0],a[1],a[2]),lt=getLT(tSel.value),stepMin=Math.max(30,Math.round(((lt&&lt.step)||0.5)*60));
+  const a=String(date||"").split("-").map(Number),rule=getShiftWorkRule(a[0],a[1],a[2]),max=rule.regularMinutes+rule.overtimeMinutes;
+  const st=sSel.value,en=eSel.value;
   let starts="",ends="";
-  for(let off=0;off<rule.regularMinutes;off+=stepMin)starts+=`<option value="${off}">${formatShiftOffset(rule,off)}</option>`;
-  for(let off=stepMin;off<=rule.regularMinutes;off+=stepMin)ends+=`<option value="${off}"${off===rule.regularMinutes?' selected':''}>${formatShiftOffset(rule,off)}</option>`;
-  sSel.innerHTML=starts;eSel.innerHTML=ends;updateLeaveTimePreview(date);
+  // 起訖都能自訂到半小時；假別的最低單位以實際正常請假時數檢查。
+  for(let off=0;off<max;off+=30)starts+=`<option value="${off}">${formatShiftOffset(rule,off)}</option>`;
+  for(let off=30;off<=max;off+=30)ends+=`<option value="${off}">${formatShiftOffset(rule,off)}</option>`;
+  sSel.innerHTML=starts;eSel.innerHTML=ends;
+  sSel.value=st!==""&&+st<max?st:"0";eSel.value=en!==""&&+en<=max?en:String(max);
+  updateLeaveTimePreview(date);
+}
+function leaveSelection(date){
+  const tSel=document.getElementById("leaveTypeSel"),sSel=document.getElementById("leaveStartSel"),eSel=document.getElementById("leaveEndSel");
+  if(!tSel||!sSel||!eSel)return null;
+  const a=String(date||"").split("-").map(Number),rule=getShiftWorkRule(a[0],a[1],a[2]),lt=getLT(tSel.value);
+  const st=leaveNumber(sSel.value),en=leaveNumber(eSel.value),full=rule.regularMinutes+rule.overtimeMinutes,isZh=lang==="zh";
+  let error="";
+  if(!rule.isWork)error=isZh?"休假日不需要請假。":"Hari libur tidak perlu cuti.";
+  else if(!lt)error=isZh?"請選擇假別。":"Pilih jenis cuti.";
+  else if(st===null||en===null||!Number.isInteger(st)||!Number.isInteger(en)||st<0||en>full||st%30!==0||en%30!==0)error=isZh?"請選擇班別內有效的起訖時間。":"Pilih waktu yang valid dalam shift.";
+  else if(en<=st)error=isZh?"結束時間必須晚於開始時間。":"Waktu selesai harus sesudah mulai.";
+  const h=splitLeaveMinutes(st,en,rule.shiftHours),step=leaveStepMinutes(lt);
+  if(!error&&Math.round(h.regularHours*60)%step!==0)error=isZh?`此假別的正常請假須以 ${step/60} 小時為單位。`:`Cuti normal harus kelipatan ${step/60} jam.`;
+  const mine=getPayrollLeaves(date);
+  if(!error&&mine.some(l=>hasPreciseLeaveTime(l)&&Math.max(st,+l.startOffset)<Math.min(en,+l.endOffset)))error=isZh?"此時段與已有紀錄重疊，請調整時間或取消舊紀錄。":"Waktu bertumpuk; ubah waktu atau batalkan data lama.";
+  const used=summarizeRegularLeaveForDay(mine,rule.shiftHours,fbUser&&fbUser.uid).totalHours;
+  if(!error&&used+h.regularHours>rule.regularMinutes/60+1e-7)error=isZh?"加入後超過當日正常工時，請先檢查舊請假或特休標記。":"Total cuti melebihi jam normal; periksa data lama.";
+  const entry={uid:fbUser&&fbUser.uid,leaveType:tSel.value,hours:h.regularHours,startOffset:st,endOffset:en,shiftStartMinute:rule.startMinute,shiftHours:rule.shiftHours,shiftCode:rule.shift,schemaVersion:3};
+  return{rule,lt,st,en,h,error,entry,mine};
 }
 function submitLeave(date){
-  const tSel=document.getElementById("leaveTypeSel"),sSel=document.getElementById("leaveStartSel"),eSel=document.getElementById("leaveEndSel"),rIn=document.getElementById("leaveReasonIn"),otSel=document.getElementById("actualOtSel");
-  if(!tSel||!sSel||!eSel)return;
-  const a=date.split("-").map(Number),rule=getShiftWorkRule(a[0],a[1],a[2]);
-  if(!rule.isWork)return alert(lang==="zh"?"休假日沒有正常工時，不需要請假。":"Hari libur tidak perlu cuti.");
-  const st=+sSel.value,en=+eSel.value,lt=getLT(tSel.value),stepMin=Math.max(30,Math.round(((lt&&lt.step)||0.5)*60));
-  if(!(en>st))return alert(lang==="zh"?"結束時間必須晚於開始時間。":"Waktu selesai harus sesudah mulai.");
-  const mins=en-st;
-  if(mins%stepMin!==0)return alert(lang==="zh"?"此假別須以 "+(stepMin/60)+" 小時為單位。":"Jenis cuti ini harus kelipatan "+(stepMin/60)+" jam.");
-  const mine=myLeave(date);
-  const overlap=mine.some(l=>hasPreciseLeaveTime(l)&&Math.max(st,+l.startOffset)<Math.min(en,+l.endOffset));
-  if(overlap)return alert(lang==="zh"?"這個請假時段與既有紀錄重疊，請先修改或取消舊紀錄。":"Waktu cuti bertumpuk dengan data lama.");
-  const legacyH=mine.filter(l=>!hasPreciseLeaveTime(l)).reduce((n,l)=>n+Math.max(0,+l.hours||0),0);
-  if(legacyH>0&&legacyH+mins/60>rule.regularMinutes/60)return alert(lang==="zh"?"舊請假紀錄沒有時段，新增後會超過正常 8 小時。請先取消舊紀錄再重新輸入。":"Data lama tanpa waktu akan melebihi jam normal.");
-  if(rule.overtimeMinutes>0&&otSel&&otSel.value==="")return alert(lang==="zh"?"請先選擇並儲存「當日實際加班時數」。加班不是請假，但會影響薪資。":"Pilih jam lembur aktual terlebih dahulu.");
-  if(rule.overtimeMinutes>0&&otSel&&otSel.value!==""){OTD[date]=Math.max(0,Math.min(rule.overtimeMinutes/60,+otSel.value||0));sOTD()}
-  const reason=rIn?rIn.value.trim():"";
-  addLeave(date,tSel.value,mins/60,reason,{startOffset:st,endOffset:en,shiftStartMinute:rule.startMinute,shiftHours:rule.shiftHours,shiftCode:rule.shift});
+  const selected=leaveSelection(date);if(!selected)return;
+  if(selected.error)return alert(selected.error);
+  const rIn=document.getElementById("leaveReasonIn"),button=document.getElementById("leaveSubmitBtn");
+  if(button&&button.dataset.saving==="1")return;
+  if(button){button.dataset.saving="1";button.disabled=true}
+  return addLeave(date,selected.entry.leaveType,selected.h.regularHours,rIn?rIn.value.trim():"",selected.entry);
 }
 function updateLeaveTimePreview(date){
-  const sSel=document.getElementById("leaveStartSel"),eSel=document.getElementById("leaveEndSel"),box=document.getElementById("leaveTimePreview");
-  if(!sSel||!eSel||!box)return;
-  const a=String(date||"").split("-").map(Number),rule=getShiftWorkRule(a[0],a[1],a[2]),st=+sSel.value,en=+eSel.value,h=Math.max(0,en-st)/60;
-  box.textContent=h>0?(lang==="zh"?`本次請假 ${h}h：${formatShiftOffset(rule,st)}–${formatShiftOffset(rule,en)}（只扣正常工時）`:`Cuti ${h}h: ${formatShiftOffset(rule,st)}–${formatShiftOffset(rule,en)}`):(lang==="zh"?"請選擇有效時段":"Pilih waktu yang benar");
+  const box=document.getElementById("leaveTimePreview"),button=document.getElementById("leaveSubmitBtn"),v=leaveSelection(date);
+  if(!box||!v)return;
+  if(button)button.disabled=!!v.error||button.dataset.saving==="1";
+  box.classList.toggle("invalid",!!v.error);
+  if(v.error){box.textContent=v.error;return}
+  const isZh=lang==="zh",hours=v.h,ltName=isZh?v.lt.name:(v.lt.nameId||v.lt.name);
+  const afterOT=getActualOTForDay(date,v.rule.overtimeMinutes/60,v.rule.shiftHours,fbUser&&fbUser.uid,v.mine.concat(v.entry));
+  let lines=[];
+  lines.push(isZh?`${ltName} ${hours.regularHours}h${hours.overtimeHours?` · 未加班 ${hours.overtimeHours}h`:""}`:`${ltName} ${hours.regularHours}h${hours.overtimeHours?` · Tidak lembur ${hours.overtimeHours}h`:""}`);
+  if(!hours.regularHours)lines[0]=isZh?`未加班 ${hours.overtimeHours}h · 不扣假、不扣本薪`:`Tidak lembur ${hours.overtimeHours}h · Cuti & gaji pokok tidak dipotong`;
+  if(v.rule.overtimeMinutes)lines.push(isZh?`儲存後當日加班 ${afterOT}h`:`Lembur hari ini setelah simpan: ${afterOT}h`);
+  if(SAL.enabled&&SAL.base){
+    const base=SAL.base+SAL.meal+SAL.transport+SAL.position,otHourly=(SAL.otWageBase>0?SAL.otWageBase:base)/240,leaveHourly=(SAL.leaveWageBase>0?SAL.leaveWageBase:base)/240;
+    const deduction=hours.regularHours*leaveHourly*leaveWageDeductRate(v.lt),otPay=(Math.min(2,afterOT)*SAL.otTier1Rate+Math.max(0,afterOT-2)*SAL.otTier2Rate)*otHourly;
+    lines.push(isZh?`本次扣薪約 $${deduction.toFixed(2)}${v.rule.overtimeMinutes?` · 當日加班費約 $${otPay.toFixed(2)}`:""}`:`Potongan ini ±$${deduction.toFixed(2)}${v.rule.overtimeMinutes?` · Upah lembur hari ini ±$${otPay.toFixed(2)}`:""}`);
+  }else if(hours.regularHours){
+    const rate=leaveWageDeductRate(v.lt);
+    lines.push(isZh?(rate>0?`正常請假依扣薪時薪 × ${hours.regularHours}h × ${rate} 計算。`:"正常請假不扣本薪；加班依所選時段自動換算。"):(rate>0?`Potongan: tarif cuti × ${hours.regularHours}h × ${rate}.`:"Gaji pokok tetap; lembur dihitung dari waktu yang dipilih."));
+  }
+  box.textContent=lines.join("\n");
 }
 function setLeavePreset(date,type){
   const sSel=document.getElementById("leaveStartSel"),eSel=document.getElementById("leaveEndSel");if(!sSel||!eSel)return;
-  const a=date.split("-").map(Number),rule=getShiftWorkRule(a[0],a[1],a[2]),half=Math.min(240,rule.regularMinutes);
-  if(type==="first"){sSel.value="0";eSel.value=String(half)}
-  else if(type==="last"){sSel.value=String(Math.max(0,rule.regularMinutes-half));eSel.value=String(rule.regularMinutes)}
-  else{sSel.value="0";eSel.value=String(rule.regularMinutes)}
+  const a=date.split("-").map(Number),rule=getShiftWorkRule(a[0],a[1],a[2]),full=rule.regularMinutes+rule.overtimeMinutes;
+  sSel.value=String(type==="overtime"?rule.regularMinutes:0);
+  eSel.value=String(type==="regular"?rule.regularMinutes:full);
   updateLeaveTimePreview(date);
 }
-function saveActualOT(date){
-  const sel=document.getElementById("actualOtSel");if(!sel)return;
-  const a=date.split("-").map(Number),rule=getShiftWorkRule(a[0],a[1],a[2]),max=rule.overtimeMinutes/60;
-  if(sel.value==="")delete OTD[date];else OTD[date]=Math.max(0,Math.min(max,+sel.value||0));
-  sOTD();render();
-}
-function setActualOTQuick(date,h){OTD[date]=Math.max(0,+h||0);sOTD();render()}
+function clearLegacyOT(date){if(!fbUser)return;delete OTD[date];sOTD();render()}
 // 請假彈窗渲染後，由 render() 初始化起訖時間選單。
 // ═══ ADMIN PANEL ═══
 let showAdmin=false;
@@ -7142,7 +7199,7 @@ function uiTodayHeroHtml(){
     else{status=lang==='zh'?'本班工作已完成':'Shift selesai';phaseLabel=lang==='zh'?'今日班次完成':'Selesai hari ini';progress=100}
   }
   let nextOff='';if(s&&s!=='休')for(let i=1;i<=30;i++){const d=new Date(TY,TM-1,TD+i);if(gs(d.getFullYear(),d.getMonth()+1,d.getDate())==='休'){nextOff=lang==='zh'?`${i} 天後休假`:`Libur dalam ${i} hari`;break}}
-  const todayKey=ek(TY,TM,TD),eventCount=(EVS[todayKey]||[]).length+(getAdminEv(todayKey)||[]).length,leaveCount=new Set(getLeaves(todayKey).map(x=>x.uid).filter(Boolean)).size;
+  const todayKey=ek(TY,TM,TD),eventCount=(EVS[todayKey]||[]).length+(getAdminEv(todayKey)||[]).length,leaveCount=new Set(getLeaves(todayKey).filter(isRegularLeave).map(x=>x.uid).filter(Boolean)).size;
   const taskText=eventCount?`${eventCount} ${lang==='zh'?'項行程':'agenda'}`:leaveCount?`${leaveCount} ${lang==='zh'?'人請假':'cuti'}`:(lang==='zh'?'今日無待辦':'Tidak ada agenda');
   return `<section class="today-hero studio-hero nova-hero shift-${uiShiftClass(s)}"><div class="nova-hero-glow" aria-hidden="true"></div><div class="nova-hero-grid"><div class="nova-date-block"><span class="nova-today-flag"><i></i>${lang==='zh'?'今天':'TODAY'}</span><strong>${TD}</strong><small>${lang==='zh'?`${TM}月 · 星期${WK[dw]}`:`${WK[dw]} · ${TM}/${TY}`}</small></div><div class="nova-status-block"><span class="nova-shift-badge"><i></i>${studioShiftLabel(s)}</span><span class="nova-phase">${phaseLabel}</span><h1>${status}</h1><p>${rule.isWork?shiftTime.range:(lang==='zh'?'今日不需出勤':'Tidak perlu bekerja')}</p></div></div><div class="nova-timeline" aria-label="${lang==='zh'?'班次進度':'Shift progress'}"><div class="nova-track"><span style="width:${progress.toFixed(1)}%"></span><i style="left:${Math.max(1,Math.min(99,progress)).toFixed(1)}%"></i></div><div class="nova-time-labels"><span>${rule.isWork?shiftTime.start:(lang==='zh'?'休息':'Libur')}</span><strong>${Math.round(progress)}%</strong><span>${rule.isWork?shiftTime.end:(lang==='zh'?'充電':'Istirahat')}</span></div></div><div class="nova-hero-footer"><span>${studioIcon('vacation',15)} ${nextOff||(lang==='zh'?'班表已同步':'Jadwal tersinkron')}</span><span>${studioIcon('event',15)} ${taskText}</span></div></section>`;
 }
@@ -7280,11 +7337,11 @@ function rCal(){
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
   const pd5=getPayDay(y,m,5),pd20=getPayDay(y,m,20);
   for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(y,m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||isTWOff(y,m,d)),isPay=(d===pd5||d===pd20),isAdj=!!SHIFT_OV[ek(y,m,d)];
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}${dw===0||dw===6?' weekend':''}" data-a="open" data-d="${d}" role="button" aria-current="${td?'date':'false'}" aria-label="${td?(lang==='zh'?'今天 ':'Today '):''}${d} ${esc(studioShiftLabel(s))}"><div class="day-top"><span class="num">${d}</span>${td?`<span class="today-label">${lang==="zh"?"今天":"TODAY"}</span>`:''}</div><span class="shift-code">${s||'—'}</span>${S.showLunar?lunarCellText(y,m,d):""}<div class="day-markers">${isAdj?`<span class="day-marker adjusted" title="${lang==="zh"?"已調班":"Adjusted"}">${uiIcon("refresh",10)}</span>`:''}${d===pd5?`<span class="day-marker pay" title="${lang==="zh"?"發薪":"Gaji"}">${studioIcon("money",11)}</span>`:''}${d===pd20?`<span class="day-marker award" title="${lang==="zh"?"績效獎金":"Bonus"}">${studioIcon("award",11)}</span>`:''}${he?`<span class="day-count event-count">${ev.length}</span>`:''}${hol?'<span class="day-dot holiday-dot"></span>':''}${dayAL?'<span class="day-dot annual-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d)),n=new Set(lc.map(x=>x.uid)).size;return n?`<span class="day-count leave-count">${n}</span>`:""})()}</div></div>`}
+    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}${dw===0||dw===6?' weekend':''}" data-a="open" data-d="${d}" role="button" aria-current="${td?'date':'false'}" aria-label="${td?(lang==='zh'?'今天 ':'Today '):''}${d} ${esc(studioShiftLabel(s))}"><div class="day-top"><span class="num">${d}</span>${td?`<span class="today-label">${lang==="zh"?"今天":"TODAY"}</span>`:''}</div><span class="shift-code">${s||'—'}</span>${S.showLunar?lunarCellText(y,m,d):""}<div class="day-markers">${isAdj?`<span class="day-marker adjusted" title="${lang==="zh"?"已調班":"Adjusted"}">${uiIcon("refresh",10)}</span>`:''}${d===pd5?`<span class="day-marker pay" title="${lang==="zh"?"發薪":"Gaji"}">${studioIcon("money",11)}</span>`:''}${d===pd20?`<span class="day-marker award" title="${lang==="zh"?"績效獎金":"Bonus"}">${studioIcon("award",11)}</span>`:''}${he?`<span class="day-count event-count">${ev.length}</span>`:''}${hol?'<span class="day-dot holiday-dot"></span>':''}${dayAL?'<span class="day-dot annual-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d)),n=new Set(lc.filter(isRegularLeave).map(x=>x.uid)).size;return n?`<span class="day-count leave-count">${n}</span>`:""})()}</div></div>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(y,m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<section class="calendar-notice holiday"><span class="notice-icon">${studioIcon("calendar",18)}</span><div><strong>${lang==="zh"?"即將到來的假日":"Hari libur mendatang"}</strong><span>${mh.join("　")}</span></div></section>`:"";
-  let lvParts=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const lv=getLeaves(ek(y,m,d)),n=new Set(lv.map(x=>x.uid)).size;if(n)lvParts.push(`${m}/${d} ${n}${lang==="zh"?"人請假":" cuti"}`)}
+  let lvParts=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const lv=getLeaves(ek(y,m,d)),n=new Set(lv.filter(isRegularLeave).map(x=>x.uid)).size;if(n)lvParts.push(`${m}/${d} ${n}${lang==="zh"?"人請假":" cuti"}`)}
   let adParts=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const ae=getAdminEv(ek(y,m,d));if(ae.length)ae.forEach(t=>adParts.push(`${m}/${d} ${en(t)}`))}
   if(adParts.length)holH+=`<section class="calendar-notice event"><span class="notice-icon">${studioIcon("event",18)}</span><div><strong>${lang==="zh"?"單位公告":"Pengumuman unit"}</strong><span>${adParts.join("　")}</span></div></section>`;
   if(lvParts.length)holH+=`<section class="calendar-notice leave"><span class="notice-icon">${studioIcon("leave",18)}</span><div><strong>${lang==="zh"?"請假動態":"Status cuti"}</strong><span>${lvParts.join("　")}</span></div></section>`;

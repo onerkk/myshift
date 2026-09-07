@@ -2529,3 +2529,20 @@ body.apex-ui.nova-v300 .studio-calendar .day.today{animation:novaTodayPulse 2.8s
 @media(prefers-reduced-motion:reduce){
   body.apex-ui.nova-v300 .studio-calendar .day.today{animation:none!important}
 }
+
+/* Unified full-shift leave form */
+.leave-entry{margin:10px 0;padding:14px;background:var(--pri-l);border:1px solid var(--pri);border-radius:14px}
+.leave-entry-title{font-size:15px;font-weight:800;margin-bottom:10px}
+.leave-entry select,.leave-entry input{width:100%;min-width:0;min-height:44px;padding:10px 8px;border:1px solid var(--tx3);border-radius:8px;background:var(--card);color:var(--tx);font-size:14px;box-sizing:border-box}
+.leave-shift-hint{font-size:12px;line-height:1.6;color:var(--tx2);margin:8px 0}
+.leave-time-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.leave-time-grid label{min-width:0;font-size:12px;color:var(--tx2)}
+.leave-time-grid select{display:block;margin-top:4px}
+.leave-presets{display:flex;gap:6px;margin:10px 0}
+.leave-presets button{flex:1;min-width:0;min-height:40px;padding:6px 4px;border:1px solid var(--pri);border-radius:8px;background:var(--card);color:var(--pri);font-size:12px;font-weight:700;cursor:pointer}
+.leave-time-preview{white-space:pre-line;overflow-wrap:anywhere;padding:10px;background:var(--card);border-radius:8px;color:var(--pri);font-size:12px;font-weight:650;line-height:1.8;margin-bottom:10px}
+.leave-time-preview.invalid{color:var(--red)}
+.leave-entry .leave-submit{width:100%;min-height:44px;border:0;border-radius:9px;background:var(--pri);color:white;font-size:14px;font-weight:750;margin-top:10px;cursor:pointer}
+.leave-entry .leave-submit:disabled{opacity:.5;cursor:default}
+.leave-legacy-note{font-size:11px;color:var(--tx2);line-height:1.6;margin:8px 0}
+.leave-legacy-note button{padding:6px 8px;border:1px solid var(--tx3);border-radius:6px;background:var(--card);color:var(--tx);cursor:pointer}
