@@ -1,4 +1,5 @@
 'use strict';
+process.env.TZ='Asia/Taipei';
 // Production presenters + real action dispatcher. No browser or network required.
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
@@ -12,12 +13,12 @@ function presenter(name){
   const b=source.indexOf('\nfunction ',a+9);
   return source.slice(a,b<0?source.length:b);
 }
-const names=['uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
+const names=['salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
 const fixed=Date.parse('2026-09-10T10:10:00Z');
 class Clock extends Date{constructor(...args){super(...(args.length?args:[fixed]))}static now(){return fixed}}
 function env(lang='zh'){
   const store=new Map();
-  const c={Date:Clock,Math,Number,String,Array,Object,Set,console,lang,TY:2026,TM:9,TD:10,
+  const c={Date:Clock,Math,Number,String,Array,Object,Set,console,Payroll:require('../payroll.js'),lang,TY:2026,TM:9,TD:10,
     S:{step:'cal',yr:2026,mo:9,rt:'4on2off',unit:'測試單位',showLunar:false,instH:true},UI_TAB:'today',PAY_VIEW:{y:2026,m:8},
     RN:{zh:{'4on2off':'四休二'},id:{'4on2off':'4 kerja 2 libur'}},SC:{早:'e',晚:'n',中:'m',休:'o'},
     EVS:{},NOTES:{},TYD:{},ALD:{},SHIFT_OV:{},DP:null,IMG:{icon:'./icons/icon-192x192.png'},
@@ -40,7 +41,7 @@ function env(lang='zh'){
     en:v=>v,sf:s=>s,lunarTodayStrip:()=>'<div class="alm-strip">農曆</div>',lunarCellText:()=>'<span class="lun-mini">初十</span>',
     latestClosedSalaryMonth:()=>({y:2026,m:8}),
     calcPayPeriod:()=>({wd:22,tH:264,oH:64,rawOH:88}),
-    estimate:{net:55344,income:61485,deduction:6141,baseSum:44000,otH:64,fixedDed:6141,hourly:180,otHourly:180,leaveHourly:180},
+    estimate:{net:27700,income:29000,deduction:1300,baseSum:24000,otH:64,fixedDed:1000,hourly:180,otHourly:180,leaveHourly:180},
     errors:[],alert:message=>c.errors.push(message),
   };
   c.t=key=>key==='wk'?(lang==='zh'?['日','一','二','三','四','五','六']:['Min','Sen','Sel','Rab','Kam','Jum','Sab']):({app:lang==='zh'?'我的班表':'Jadwal Saya',hr:lang==='zh'?'小時':'jam',alRem:lang==='zh'?'特休餘額':'Sisa cuti',rem:lang==='zh'?'接下來的行程':'Agenda'})[key]||key;
@@ -81,9 +82,9 @@ test('shift console displays the actual remaining duration and no fabricated pro
   c.shift='休';const rest=c.uiTodayHeroHtml();assert.match(rest,/今天休息/);assert.doesNotMatch(rest,/role="progressbar"|班表已同步|連休第 1/);
 });
 test('salary shows configured amounts and only claims verification when the difference is zero',()=>{
-  const c=env();let h=c.uiSalaryDashboardHtml(2026,8);assert.match(h,/\$55,344/);assert.match(h,/2026\/07\/26 – 2026\/08\/25/);assert.match(h,/較原排少 24h/);
+  const c=env();let h=c.uiSalaryDashboardHtml(2026,8);assert.match(h,/\$27,700/);assert.match(h,/2026\/07\/26 – 2026\/08\/25/);assert.match(h,/扣假後工時/);
   c.estimate.verified=true;c.estimate.verificationDelta=100;h=c.uiSalaryDashboardHtml(2026,8);assert.doesNotMatch(h,/已核對實領|與公司薪資條一致/);
-  c.estimate.verificationDelta=0;assert.match(c.uiSalaryDashboardHtml(2026,8),/已核對實領/);
+  c.estimate.verificationDelta=0;assert.doesNotMatch(c.uiSalaryDashboardHtml(2026,8),/已核對實領|公司實領/); // A totals-only flag is never a complete slip.
   c.estimate=null;assert.match(c.uiSalaryDashboardHtml(2026,8),/data-a="salOpen"/);
 });
 test('live weather retains chosen location, source time, refresh, daily detail and radar actions',()=>{
@@ -94,4 +95,20 @@ test('more screen preserves account and role restrictions without duplicate admi
   const c=env();c.UI_TAB='more';let h=c.rCal();assert.match(h,/id="loginBtn"/);assert.doesNotMatch(h,/data-a="leavesOv"/);
   c.fbUser={uid:'me',displayName:'測試 <名字>'};c.admin=true;h=c.rCal();assert.match(h,/測試 &lt;名字&gt;/);assert.equal((h.match(/data-a="leavesOv"/g)||[]).length,1);assert.equal((h.match(/role="switch"/g)||[]).length,2);
   const toggle=c._miniSwitch(true,'setUserPref()',true,'#fff','警報通知');assert.match(toggle,/role="switch" aria-checked="true" aria-label="警報通知" disabled/);
+});
+
+test('saved company records display consistently while the independent estimate and difference remain visible',()=>{
+  const c=env();const slip={baseSum:24000,proposal:400,otherIncome:0,otTaxFree:1800,otTaxable:600,holidayPay:1000,nightPay:1200,fixedDed:1000,leaveDed:400,laborPensionSelf:0,income:29000,deduction:1400,net:27600,weekdayH:16,holidayH:8,sickH:8,disasterH:0,payDate:'2026-09-05'};
+  Object.assign(c.estimate,{baseSum:24000,otPay:3000,holidayPay:0,nightPay:2000,proposal:0,otherIncome:0,fixedDed:1000,leaveDed:300,laborPensionSelf:0,hasSlip:true,official:slip,notes:[]});
+  c.estimate.reconciliation=c.Payroll.reconcile(c.estimate,slip);
+  const h=c.uiSalaryDashboardHtml(2026,8);assert.match(h,/<strong class="salary-net">\$27,600<\/strong>/);assert.match(h,/公司實領 · 既有薪資條/);
+  assert.match(h,/班表自動計算與公司差額/);assert.match(h,/班表估算實領<strong>\$27,700/);assert.match(h,/\+\$100/);assert.doesNotMatch(h,/公司實領 · 薪資條記錄|加入薪資條|undefined|NaN/);
+  const home=c.uiPayPreviewHtml();assert.match(home,/\$27,600/);assert.doesNotMatch(home,/\$27,700/);
+});
+test('unknown night components and loading never masquerade as a complete net',()=>{
+  const c=env();Object.assign(c.estimate,{net:25000,nightPay:0,missingComponents:true,incomplete:true,notes:['nightRate']});
+  let h=c.uiSalaryDashboardHtml(2026,8);assert.match(h,/已算項目小計 · 尚有缺項/);assert.match(h,/待計算/);assert.doesNotMatch(h,/自動預估實領|加入薪資條/);
+  assert.match(c.uiPayPreviewHtml(),/小計/);
+  c.estimate.dataPending=true;h=c.uiSalaryDashboardHtml(2026,8);assert.match(h,/同步中/);assert.doesNotMatch(h,/\$25,000/);
+  assert.doesNotMatch(c.uiPayPreviewHtml(),/\$25,000/);assert.match(h,/v306 · 自動計算/);
 });
