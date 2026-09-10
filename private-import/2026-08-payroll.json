@@ -1,0 +1,49 @@
+{
+  "kind": "myshift-payroll",
+  "month": "2026-08",
+  "slip": {
+    "baseSum": 39590,
+    "proposal": 800,
+    "otherIncome": 0,
+    "otTaxFree": 8688,
+    "otTaxable": 2200,
+    "holidayPay": 5664,
+    "nightPay": 3525,
+    "fixedDed": 2540,
+    "leaveDed": 4289,
+    "laborPensionSelf": 0,
+    "income": 60467,
+    "deduction": 6829,
+    "net": 53638,
+    "weekdayH": 44,
+    "holidayH": 19,
+    "sickH": 52,
+    "personalH": null,
+    "annualH": null,
+    "disasterH": 12,
+    "generalH": 4,
+    "payDate": "2026-09-04"
+  },
+  "inputs": {
+    "proposal": 800,
+    "sickHoursOverride": 52
+  },
+  "sourceDetails": {
+    "fixedIncome": {
+      "base": 35090,
+      "meal": 3000,
+      "transport": 1000,
+      "position": 500
+    },
+    "fixedDeduction": {
+      "union": 88,
+      "welfare": 178,
+      "laborIns": 1145,
+      "healthIns": 1129
+    },
+    "employerPension": 4368,
+    "fixedPayEffectiveDate": "2026-07-01",
+    "attendancePeriodConfirmed": false
+  },
+  "note": "依提供的 2026/08 薪資條轉錄。匯入前可預覽。只套用本期提案獎金及病假扣薪時數；不改請假日期、班表、全域計薪基數或夜點單價。原表「一般加班 4h」不當作全部加班時數。"
+}
