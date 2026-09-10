@@ -43,7 +43,26 @@
     },
     "employerPension": 4368,
     "fixedPayEffectiveDate": "2026-07-01",
-    "attendancePeriodConfirmed": false
+    "attendancePeriodConfirmed": false,
+    "fixedIncomeHistory": [
+      {
+        "effectiveFrom": "2026-05-26",
+        "base": 34190,
+        "meal": 3000,
+        "transport": 1000,
+        "position": 500,
+        "union": 85,
+        "welfare": 173,
+        "laborIns": 1145,
+        "healthIns": 1129,
+        "otherDed": 0
+      }
+    ],
+    "nightEstimate": {
+      "rate": 489,
+      "verified": false,
+      "source": "先前已使用的估算單價；不是公司已證實規則"
+    }
   },
-  "note": "依提供的 2026/08 薪資條轉錄。匯入前可預覽。只套用本期提案獎金及病假扣薪時數；不改請假日期、班表、全域計薪基數或夜點單價。原表「一般加班 4h」不當作全部加班時數。"
+  "note": "依已提供的2026/08薪資條轉錄；自動讀取歷史記錄，不把核定總額當作班表公式。6月固定薪資取自當時薪資核對紀錄，7/1生效薪資取自公司截圖。"
 }
