@@ -366,3 +366,11 @@ html[data-theme="dark"] .bottom-nav{box-shadow:inset 0 1px 0 #ffffff16,0 3px 0 #
 .payroll-reconciliation .payroll-total th,.payroll-reconciliation .payroll-total td{font-weight:750;background:var(--surface-2)}
 .payroll-audit-row{padding:12px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:5px 10px;font-size:.875rem}.payroll-audit-row small{grid-column:1/-1;color:var(--ink-2);font-size:.8125rem}
 @media(max-width:360px){.payroll-form-section{padding:12px}.payroll-form-grid{grid-template-columns:1fr}.payroll-net-compare strong{font-size:1.125rem}}
+
+/* v305 automatic payroll, shared day / night color tokens. */
+.payroll-auto-badge{display:flex;align-items:center;gap:8px;font-size:.75rem;font-weight:700;color:var(--ink-2);margin:0 0 14px;letter-spacing:.04em}
+.payroll-auto-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.payroll-incomplete .salary-net{font-size:clamp(2rem,9vw,3.25rem)}
+.payroll-confirm{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:12px 0;font-size:.875rem;line-height:1.6}
+.payroll-confirm input{flex:0 0 auto;width:20px;height:20px;margin:2px 0;accent-color:var(--accent)}
+.payroll-form select{min-height:44px;max-width:100%;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:9px;padding:9px;font:inherit;width:100%}

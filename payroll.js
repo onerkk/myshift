@@ -1,4 +1,4 @@
-/* Payroll v304. Pure calculations; no network, identity or bundled personal records. */
+/* Payroll v305. Deterministic forecast; recorded payslips never drive the estimate. */
 (function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -33,7 +33,26 @@
         s.monthly[key]=p;
       }
     }
-    s.schemaVersion=5;
+    if(old<6){
+      // The v304 migration erased the rate. This exact old profile had a documented
+      // pre-calibration setting of 489, before v303 inferred 553 from one month's total.
+      // Restore the setting, but do NOT call it a verified company rate.
+      const retired=s.retiredCalibration;
+      if(retired&&Number(retired.night)===553&&Number(retired.otWageBase)===39530&&Number(retired.leaveWageBase)===39280&&
+          Number(s.night)===0&&Number(s.base)===35090&&Number(s.meal)===3000&&Number(s.transport)===1000&&Number(s.position)===500){
+        s.night=489;s.nightRateSource='legacy-unverified';
+      }
+      for(const [key,value] of Object.entries(s.monthly)){
+        const p=Object.assign({},value),backup={};
+        for(const k of optionalKeys.concat(['otHoursOverride','otTaxFreeOverride','otTaxableOverride','leaveDedOverride'])){
+          if(number(p[k])!==null)backup[k]=p[k];
+          delete p[k];
+        }
+        if(Object.keys(backup).length)p.manualEstimateBackup=Object.assign({},p.manualEstimateBackup,backup);
+        p.inputVersion=3;s.monthly[key]=p;
+      }
+    }
+    s.schemaVersion=6;
     return s;
   }
   function period(source){
@@ -79,6 +98,15 @@
     return{weekdayH:h,holidayH:0,front:Math.min(h,2),back:Math.max(0,h-2),
       ordinary:hourly*(Math.min(h,2)*r1+Math.max(0,h-2)*r2),holiday:0};
   }
+  function nightUnits(worked,shiftHours,policy){
+    worked=Math.max(0,Math.min(shiftHours,number(worked)||0));
+    if(!worked||!(shiftHours>0))return{units:0,unknown:false};
+    if(policy==='attendance')return{units:1,unknown:false};
+    if(policy==='prorated')return{units:worked/shiftHours,unknown:false};
+    if(policy==='full')return{units:worked>=shiftHours-1e-7?1:0,unknown:false};
+    return{units:worked>=shiftHours-1e-7?1:0,unknown:worked<shiftHours-1e-7};
+  }
+  function roundPay(value,policy){return policy==='floor'?Math.floor(value+1e-7):Math.round(value+1e-7);}
   function reconcile(est,official){
     const checked=slip(official),s=checked.data;
     const rows=incomeKeys.concat(deductionKeys).map(key=>{
@@ -91,5 +119,5 @@
     const deltas={};for(const k of totalKeys)deltas[k]=s[k]===null?null:est[k]-s[k];
     return{...checked,rows,deltas,matched:checked.valid&&!est.incomplete&&rows.every(r=>r.delta===0)};
   }
-  return{number,money,migrate,period,slip,parseImport,dailyOT,reconcile,incomeKeys,deductionKeys,totalKeys,hourKeys,optionalKeys};
+  return{number,money,migrate,period,slip,parseImport,dailyOT,nightUnits,roundPay,reconcile,incomeKeys,deductionKeys,totalKeys,hourKeys,optionalKeys};
 });
