@@ -330,3 +330,39 @@ html[data-theme="dark"] .bottom-nav{box-shadow:inset 0 1px 0 #ffffff16,0 3px 0 #
 @media(forced-colors:active){
   .hero-orb,.hero-shift-tag,.today-hero,.salary-hero,.weather-current,.day,.bottom-nav-item.active{border:1px solid CanvasText}.hero-track{border:1px solid CanvasText}.hero-track>span{background:Highlight}.bottom-nav-item.active{outline:2px solid Highlight}.status-switch i{background:ButtonText}
 }
+/* v304 payroll: shared light/dark surfaces, readable reconciliation and forms. */
+.payroll-form{max-width:580px!important;color:var(--ink);font-size:1rem}
+.payroll-form-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.payroll-form-heading h2{font-size:1.25rem;margin:0;line-height:1.5}
+.payroll-form p,.payroll-help,.payroll-reconciliation p{font-size:.875rem;line-height:1.75;color:var(--ink-2);margin:8px 0 14px}
+.payroll-form-section{margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface-2);min-width:0}
+.payroll-form-section h3,.payroll-reconciliation h3{font-size:1rem;margin:0 0 10px}
+.payroll-form-section summary{min-height:44px;cursor:pointer;font-weight:700;font-size:1rem;line-height:1.5;padding:8px 0}
+.payroll-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
+.payroll-field,.payroll-day label{display:flex;flex-direction:column;gap:6px;font-size:.875rem;line-height:1.5;min-width:0}
+.payroll-form input:not([type="file"]),.payroll-form select{width:100%;min-width:0;min-height:46px;padding:10px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit;font-size:1rem;box-shadow:var(--inset)}
+.payroll-form input:disabled{opacity:.5}.payroll-form input:focus,.payroll-form select:focus{outline:2px solid var(--brand);outline-offset:2px}
+.payroll-form input::placeholder{color:var(--ink-3);font-size:.8125rem}
+.payroll-field small{font-size:.8125rem;color:var(--ink-2)}
+.payroll-file-label{position:relative;cursor:pointer;text-align:center;overflow:hidden}
+.payroll-file-label input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.payroll-file-label:focus-within{outline:2px solid var(--brand);outline-offset:3px}
+.payroll-callout{border:1px solid var(--line-strong);border-left:3px solid var(--amber);border-radius:12px;background:var(--surface-2);padding:13px;margin:12px 0;font-size:.875rem;line-height:1.75;color:var(--ink-2)}
+.payroll-callout strong{color:var(--ink)}.payroll-callout ul{margin:8px 0;padding-left:20px}.payroll-callout li+li{margin-top:6px}
+.payroll-callout .text-action{display:block;min-height:44px;font-size:.875rem;padding:8px 0}
+.payroll-day{border-top:1px solid var(--line);padding:15px 0;display:grid;gap:10px}.payroll-day>strong{font-size:.9375rem}
+.payroll-form-actions{display:grid;grid-template-columns:1fr 2fr;gap:12px;position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:14px 0}
+.payroll-form-actions button{min-height:48px;border-radius:12px;font-size:.875rem}.payroll-form-actions .soft-btn{background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2)}
+.payroll-import-preview{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.payroll-reconciliation{margin:18px 0;border-top:1px solid var(--line);padding-top:18px;min-width:0}
+.payroll-reconciliation-title{display:flex;align-items:center;justify-content:space-between;gap:8px}.payroll-reconciliation-title h3{margin:0}
+.payroll-net-compare{display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);box-shadow:var(--inset);border-radius:12px;padding:15px 12px;gap:12px;margin:12px 0}
+.payroll-net-compare span{font-size:.8125rem;color:var(--ink-2)}.payroll-net-compare strong{display:block;font-size:1.25rem;color:var(--ink);margin-top:5px;font-variant-numeric:tabular-nums}
+.payroll-reconciliation table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:.875rem;font-variant-numeric:tabular-nums}
+.payroll-reconciliation caption{text-align:left;font-weight:650;padding:12px 0;color:var(--ink)}
+.payroll-reconciliation th,.payroll-reconciliation td{border-bottom:1px solid var(--line);padding:12px 3px;text-align:right;vertical-align:top;overflow-wrap:anywhere;line-height:1.5}
+.payroll-reconciliation th:first-child{width:42%;text-align:left;font-weight:550}.payroll-reconciliation th small{display:block;font-size:.8125rem;color:var(--ink-3);margin-top:4px}
+.payroll-reconciliation thead th{font-weight:550;font-size:.8125rem;color:var(--ink-2)}.payroll-reconciliation .payroll-difference{color:var(--amber)}
+.payroll-reconciliation .payroll-total th,.payroll-reconciliation .payroll-total td{font-weight:750;background:var(--surface-2)}
+.payroll-audit-row{padding:12px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:5px 10px;font-size:.875rem}.payroll-audit-row small{grid-column:1/-1;color:var(--ink-2);font-size:.8125rem}
+@media(max-width:360px){.payroll-form-section{padding:12px}.payroll-form-grid{grid-template-columns:1fr}.payroll-net-compare strong{font-size:1.125rem}}
