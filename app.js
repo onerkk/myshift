@@ -1943,6 +1943,7 @@ function _bindActions(root){
 }
 function _doRender(){
   _renderRAF=null;
+  document.documentElement.lang=lang==='zh'?'zh-Hant':'id';
   const a=document.getElementById("app"),mr=document.getElementById("mr");
   // ═══ WIDGET MODE：URL ?w=1 → 只渲染巨型今日顯示 ═══
   // 不等 Firebase，直接從 localStorage 讀本地班別設定渲染
@@ -2094,9 +2095,8 @@ function uiBottomNavHtml(){
   ];
   return `<nav class="bottom-nav" aria-label="${lang==="zh"?"主要導覽":"Main navigation"}">${defs.map(([tab,action,icon,label])=>`<button class="bottom-nav-item${UI_TAB===tab?" active":""}" data-a="${action}" aria-current="${UI_TAB===tab?"page":"false"}"><span class="bottom-nav-icon">${uiIcon(icon,21)}</span><span>${label}</span><i class="nav-active-mark" aria-hidden="true"></i></button>`).join("")}</nav>`;
 }
-function uiScreenHeading(title,sub,actionHtml=""){
-  const overline={calendar:lang==="zh"?"輪班月曆":"SHIFT CALENDAR",pay:lang==="zh"?"薪資與工時":"PAY & HOURS",weather:lang==="zh"?"即時環境資訊":"LIVE CONDITIONS",more:lang==="zh"?"個人控制台":"CONTROL CENTER"}[UI_TAB]||"MY SHIFT";
-  return `<div class="screen-heading"><div class="screen-heading-copy"><span class="screen-overline"><i></i>${overline}</span><h2>${title}</h2>${sub?`<p>${sub}</p>`:""}</div>${actionHtml}</div>`;
+function uiScreenHeading(title,sub,actionHtml=''){
+  return `<div class="screen-heading"><div><h1>${title}</h1>${sub?`<p>${sub}</p>`:''}</div>${actionHtml}</div>`;
 }
 function uiTodayHeroHtml(){
   const s=gs(TY,TM,TD),rule=getShiftWorkRule(TY,TM,TD),WK=t("wk"),dw=new Date(TY,TM-1,TD).getDay();
@@ -2166,13 +2166,12 @@ function uiLeaveSummaryHtml(y,m){
   }).join("")||`<span class="leave-none">${isZh?"本月尚無請假紀錄":"Belum ada cuti bulan ini"}</span>`;
   const a=getAL(),annual=a.total>0?`${Math.round(alRem()*10)/10}h`:(isZh?"未設定":"Belum diatur");
   const nextText=next?`${next.date.slice(5).replace('-', '/')} · ${esc(isZh?(next.lt.name||next.leaveType):(next.lt.nameId||next.lt.name||next.leaveType))}`:(isZh?"目前沒有":"Tidak ada");
-  return `<section class="leave-center"><div class="leave-center-head"><div><span class="section-label">${isZh?"請假中心":"Pusat cuti"}</span><h3>${monthLabel}</h3></div><button class="leave-calendar-link" data-a="tabCalendar">${isZh?"查看班表":"Lihat jadwal"} ${uiIcon("chevron",15)}</button></div><div class="leave-metrics"><div><strong>${Math.round(total*10)/10}<small>h</small></strong><span>${isZh?"請假時數":"Jam cuti"}</span></div><div><strong>${days.size}</strong><span>${isZh?"請假天數":"Hari cuti"}</span></div><div><strong>${annual}</strong><span>${isZh?"特休餘額":"Sisa tahunan"}</span></div></div><div class="leave-type-list">${typeChips}</div><div class="leave-next"><span>${isZh?"下一筆請假":"Cuti berikutnya"}</span><strong>${nextText}</strong></div>${isAdmin()?`<button class="leave-admin-button" data-a="leavesOv">${uiIcon("calendar",18)}<span><b>${isZh?"單位請假總覽":"Ringkasan cuti unit"}</b><small>${isZh?"查看名單、假別、時數與人力":"Lihat nama, jenis, jam dan tenaga"}</small></span>${uiIcon("chevron",17)}</button>`:""}</section>`;
+  return `<section class="leave-center"><div class="leave-center-head"><div><span class="section-label">${isZh?"請假中心":"Pusat cuti"}</span><h3>${monthLabel}</h3></div><button class="leave-calendar-link" data-a="tabCalendar">${isZh?"查看班表":"Lihat jadwal"} ${uiIcon("chevron",15)}</button></div><div class="leave-metrics"><div><strong>${Math.round(total*10)/10}<small>h</small></strong><span>${isZh?"請假時數":"Jam cuti"}</span></div><div><strong>${days.size}</strong><span>${isZh?"請假天數":"Hari cuti"}</span></div><div><strong>${annual}</strong><span>${isZh?"特休餘額":"Sisa tahunan"}</span></div></div><div class="leave-type-list">${typeChips}</div><div class="leave-next"><span>${isZh?"下一筆請假":"Cuti berikutnya"}</span><strong>${nextText}</strong></div></section>`;
 }
 function uiMoreHtml(y,m){
-  const isZh=lang==="zh";
-  const row=(action,icon,title,sub,trail="")=>`<button class="settings-row" data-a="${action}"><span class="settings-row-icon">${uiIcon(icon,20)}</span><span class="settings-row-copy"><strong>${title}</strong><small>${sub}</small></span>${trail||uiIcon("chevron",18)}</button>`;
-  const lunarOn=!!S.showLunar,soundOn=!WxSfx.isMuted();
-  return `<section class="quick-controls" aria-label="${isZh?"快速設定":"Pengaturan cepat"}"><div class="quick-control-card language-control"><span class="quick-control-label">${isZh?"顯示語言":"Bahasa"}</span><div class="segmented-language" role="group"><button class="${lang==="zh"?"active":""}" data-a="lzh">中文</button><button class="${lang==="id"?"active":""}" data-a="lid">Indonesia</button></div></div><button class="quick-control-card" data-a="lunar"><span class="quick-control-icon">${uiIcon("moon",20)}</span><span><b>${isZh?"農曆與宜忌":"Kalender lunar"}</b><small>${lunarOn?(isZh?"月曆中顯示":"Ditampilkan"):(isZh?"目前隱藏":"Disembunyikan")}</small></span><span class="status-switch${lunarOn?" on":""}"><i></i></span></button><button class="quick-control-card" data-a="sfx"><span class="quick-control-icon">${uiIcon("sound",20)}</span><span><b>${isZh?"提示音與環境音":"Suara"}</b><small>${soundOn?(isZh?"目前開啟":"Aktif"):(isZh?"目前靜音":"Dimatikan")}</small></span><span class="status-switch${soundOn?" on":""}"><i></i></span></button></section>${uiLeaveSummaryHtml(y,m)}<section class="settings-panel"><div class="settings-group"><div class="settings-group-title">${isZh?"班表工具":"Alat jadwal"}</div>${row("stats","chart",isZh?"年度統計":"Statistik tahunan",isZh?"班別、工時、加班、請假與特休":"Shift, jam, lembur dan cuti")}${row("share","share",isZh?"分享班表":"Bagikan jadwal",isZh?"輸出目前月份的完整班表圖片":"Ekspor gambar kalender bulan ini")}${row("help","help",isZh?"使用說明":"Bantuan",isZh?"查看全部功能、標記與資料來源":"Fitur, tanda dan sumber data")}</div><div class="settings-group"><div class="settings-group-title">${isZh?"天氣與系統":"Cuaca & sistem"}</div>${row("prefs","settings",isZh?"天氣、警報與特效設定":"Cuaca, peringatan & efek",isZh?"通知、定位、警報類型、動畫與音效":"Notifikasi, lokasi, peringatan dan efek")}${row("lang","language",isZh?"快速切換語言":"Ganti bahasa",isZh?"目前為繁體中文，點擊切換 Indonesia":"Saat ini Indonesia, ketuk untuk 中文",`<span class="settings-value">${lang==="zh"?"中文":"ID"}</span>`)}</div>${isAdmin()?`<div class="settings-group"><div class="settings-group-title">${isZh?"管理員":"Admin"}</div>${row("leavesOv","calendar",isZh?"單位請假總覽":"Ringkasan cuti unit",isZh?"查看請假名單、原因、時數與人力":"Nama, alasan, jam dan tenaga")}</div>`:""}<div class="settings-group danger-zone">${row("reset","refresh",isZh?"重新設定輪班":"Atur ulang shift",isZh?"保留帳號，重新選擇班制與今日位置":"Pilih ulang pola shift")}</div></section>`;
+  const zh=lang==='zh',lunarOn=!!S.showLunar,soundOn=!WxSfx.isMuted();
+  const row=(action,icon,title,sub)=>`<button class="settings-row" data-a="${action}"><span class="settings-row-icon">${uiIcon(icon,20)}</span><span class="settings-row-copy"><strong>${title}</strong><small>${sub}</small></span>${uiIcon('chevron',17)}</button>`;
+  return `<section class="quick-controls"><h2 class="settings-group-title">${zh?'偏好設定':'Preferensi'}</h2><div class="quick-control-card language-control"><span class="quick-control-label">${zh?'顯示語言':'Bahasa'}</span><div class="segmented-language" role="group" aria-label="${zh?'顯示語言':'Bahasa'}"><button class="${lang==='zh'?'active':''}" data-a="lzh" aria-pressed="${lang==='zh'}">中文</button><button class="${lang==='id'?'active':''}" data-a="lid" aria-pressed="${lang==='id'}">Indonesia</button></div></div><button class="quick-control-card" data-a="lunar" role="switch" aria-checked="${lunarOn}"><span class="quick-control-icon">${uiIcon('moon',20)}</span><span class="quick-control-copy"><b>${zh?'農曆與宜忌':'Kalender lunar'}</b><small>${lunarOn?(zh?'在班表中顯示':'Tampil di kalender'):(zh?'目前隱藏':'Disembunyikan')}</small></span><span class="status-switch${lunarOn?' on':''}" aria-hidden="true"><i></i></span></button><button class="quick-control-card" data-a="sfx" role="switch" aria-checked="${soundOn}"><span class="quick-control-icon">${uiIcon('sound',20)}</span><span class="quick-control-copy"><b>${zh?'提示音與環境音':'Suara'}</b><small>${soundOn?(zh?'已開啟':'Aktif'):(zh?'已靜音':'Dimatikan')}</small></span><span class="status-switch${soundOn?' on':''}" aria-hidden="true"><i></i></span></button></section>${uiLeaveSummaryHtml(y,m)}<section class="settings-panel"><div class="settings-group"><h2 class="settings-group-title">${zh?'班表工具':'Alat jadwal'}</h2>${row('stats','chart',zh?'年度統計':'Statistik tahunan',zh?'班別、工時、加班與請假':'Shift, jam, lembur dan cuti')}${row('share','share',zh?'分享班表':'Bagikan jadwal',zh?'儲存目前月份的班表圖片':'Ekspor gambar kalender bulan ini')}${row('help','help',zh?'使用說明':'Bantuan',zh?'功能、標記與資料來源':'Fitur, tanda dan sumber data')}</div><div class="settings-group"><h2 class="settings-group-title">${zh?'天氣與通知':'Cuaca & notifikasi'}</h2>${row('prefs','settings',zh?'天氣與警報設定':'Cuaca & peringatan',zh?'定位、通知、動畫與音效':'Lokasi, notifikasi, animasi dan suara')}</div>${isAdmin()?`<div class="settings-group"><h2 class="settings-group-title">${zh?'單位管理':'Administrasi unit'}</h2>${row('leavesOv','calendar',zh?'單位請假總覽':'Ringkasan cuti unit',zh?'請假名單、時數與人力':'Nama, jam cuti dan tenaga')}</div>`:''}<div class="settings-group danger-zone">${row('reset','refresh',zh?'重新設定輪班':'Atur ulang shift',zh?'重新選擇班制與輪班位置':'Pilih kembali pola dan posisi shift')}</div></section>`;
 }
 function rCal(){
   const r=rot(),c=cyc(),y=S.yr,m=S.mo,dm=dim(y,m),fd=fdw(y,m),ic=y===TY&&m===TM;
@@ -2306,7 +2305,7 @@ function rMod(){
   let custP="";if(hasCust){custP=`<div class="al-pick" style="border-color:var(--pri)"><label>📝 ${lang==="zh"?"備註內容":"Isi catatan"}</label><input type="text" id="custIn" value="${esc(custTxt)}" placeholder="${lang==="zh"?"輸入備註...":"Tulis catatan..."}" maxlength="50" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:4px" oninput="NOTES['${ek(y,m,d)}']=this.value;sNotes()"></div>`}
   const hasTy=ev.includes("typhoon");const dayTy=TYD[ek(y,m,d)]||0;
   let tyP="";if(hasTy){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayTy?' selected':''}>${h} ${t("hr")}</option>`}tyP=`<div class="al-pick" style="border-color:#0288d1;background:rgba(2,136,209,.05)"><label style="color:#01579b">🌀 ${lang==="zh"?"颱風假時數":"Jam Libur Topan"}</label><select id="tySel" data-a="tyh" style="margin-top:4px">${opts}</select><div style="font-size:10px;color:var(--tx3);margin-top:4px;line-height:1.4">${lang==="zh"?"依公告自行記錄天災假時數；目前依薪資條規則不扣正常薪資，也不自動扣加班。其他未出勤時段可用「新增請假」記錄並自動換算。":"Sesuai pengumuman: seharian=12h, sore=6h, dll."}</div></div>`}
-  return`<div class="modal-bg" data-a="close"><div class="modal-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
+  return`<div class="modal-bg" data-a="close"><div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="day-dialog-title" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title" id="day-dialog-title">${ds}</div><div class="modal-date">${y}/${String(m).padStart(2,'0')}/${String(d).padStart(2,'0')}</div>
   <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${shiftAdjHtml(y,m,d)}${holL}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${tyP}${custP}${S.showLunar?lunarModalBlock(y,m,d):""}
   <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
 
@@ -2341,17 +2340,10 @@ function doShiftAdj(key,val){
 }
 
 function fbBarHtml(){
-  if(!firebase||!fbAuth)return"";
-  if(!fbUser)return`<div class="fb-bar fi" style="background:linear-gradient(135deg,#fff3e0,#fbe9e7);border:1.5px solid #ff8f00;border-radius:10px;padding:12px 14px;margin:0 0 6px">
-    <div style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:6px">⚠️ ${lang==="zh"?"尚未登入 — 清除快取將遺失所有資料":"Belum login — data hilang jika cache dihapus"}</div>
-    <button onclick="fbLogin()" id="loginBtn" style="width:100%;background:#fff;border:1px solid #ddd;padding:10px;border-radius:8px;font-size:13px;font-weight:700;color:var(--tx);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
-      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:18px;height:18px">
-      ${fbLoginPending?(lang==="zh"?"⏳ 登入中...":"⏳ Logging in..."):(lang==="zh"?"Google 登入保護資料":"Login Google untuk lindungi data")}
-    </button>
-  </div>`;
-  const pic=fbUser.photoURL?`<img class="fb-avatar" src="${fbUser.photoURL}" referrerpolicy="no-referrer">`:"";
-  const name=fbUser.displayName||fbUser.email||"";
-  return`<div class="fb-bar fi"><div class="fb-user">${pic}<span>${esc(name)}</span></div><button onclick="fbLogout()" style="background:var(--tx3)">${lang==="zh"?"登出":"Logout"}</button></div>${S.unit?"":`<div style="margin:4px 0;padding:8px 10px;background:#fff3e0;border-radius:8px;border:1px solid #ffcc80;font-size:11px;color:#e65100;font-weight:600">⚠️ ${lang==="zh"?"請先選擇單位（重設後可設定）":"Pilih unit terlebih dahulu (reset untuk setting)"}</div>`}`;
+  const zh=lang==='zh';
+  if(!fbUser)return `<section class="account-card signed-out"><span class="account-avatar">${uiIcon('user',23)}</span><span class="account-copy"><strong>${zh?'讓班表隨你同步':'Sinkronkan jadwal Anda'}</strong><small>${zh?'登入以備份班表與請假資料':'Login untuk mencadangkan jadwal dan cuti'}</small></span><button class="account-login" onclick="fbLogin()" id="loginBtn" ${fbLoginPending?'disabled':''}>${fbLoginPending?(zh?'登入中…':'Memuat…'):(zh?'Google 登入':'Login Google')}</button></section>`;
+  const name=fbUser.displayName||fbUser.email||'',pic=fbUser.photoURL?`<img src="${esc(fbUser.photoURL)}" alt="" referrerpolicy="no-referrer">`:uiIcon('user',23);
+  return `<section class="account-card"><span class="account-avatar">${pic}</span><span class="account-copy"><strong>${esc(name)}</strong><small>${S.unit?esc(S.unit==='__all'?(zh?'全部單位':'Semua unit'):S.unit):(zh?'尚未選擇單位':'Unit belum dipilih')}</small></span><button class="account-logout" onclick="fbLogout()">${zh?'登出':'Keluar'}</button></section>`;
 }
 function modalLeaveHtml(y,m,d){
   const date=ek(y,m,d),leaves=getLeaves(date),myLeaves=leaves.filter(l=>l.uid===(fbUser&&fbUser.uid)),rule=getShiftWorkRule(y,m,d);
@@ -4360,33 +4352,15 @@ async function checkAndNotifyAlerts(){
 
 // 在前台顯示「啟用通知」提示卡（若未授權）
 function notifyCtaHtml(){
-  if(typeof Notification==='undefined') return "";
-  if(S.step!=="cal") return "";
-  const cfg=APP_CFG.wxAlerts||{};
-  if(cfg.master===false||cfg.notifyEnabled===false) return "";
-  // 用戶層：自己關掉就不提示
-  const up=USER_PREFS||{};
-  if(up.wxMaster===false||up.wxNotify===false) return "";
-  // 已決定要做（granted/denied）就不再提示
-  const p=Notification.permission;
-  if(p==='granted') return "";
-  // 使用者過去 7 天內手動關掉提示就不再顯示
-  let dismissed=0;
-  try{dismissed=parseInt(localStorage.getItem('_wxNotifyCtaDismiss'))||0}catch(e){}
-  if(dismissed&&(Date.now()-dismissed)<7*24*3600*1000) return "";
-  const isZh=lang==='zh';
-  const text=p==='denied'
-    ? (isZh?'通知已被瀏覽器封鎖，請到系統設定開啟':'Notification blocked, enable in system settings')
-    : (isZh?'啟用系統通知：App 開啟時約 30 秒檢查官方資料；App 關閉後即時性由手機背景機制或伺服器推播決定':'Enable notifications; foreground checks official data about every 30 seconds');
-  const btn=p==='denied'
-    ? ''
-    : `<button onclick="requestNotifyPermission();event.stopPropagation()" style="background:#fff;color:#00695c;border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;margin-top:6px">${isZh?'啟用通知':'Enable'}</button>`;
-  return `<div onclick="(function(){try{localStorage.setItem('_wxNotifyCtaDismiss',Date.now())}catch(e){};render()})()" style="margin:6px 0;padding:10px 12px;background:linear-gradient(135deg,#00897b,#00695c);color:#fff;border-radius:8px;font-size:11px;line-height:1.5;cursor:pointer">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-      <div style="flex:1"><div style="font-weight:700;font-size:12px">🔔 ${isZh?'災防警報通知':'Disaster Alerts'}</div><div style="margin-top:2px;opacity:0.92">${text}</div>${btn}</div>
-      <div style="font-size:14px;opacity:0.7;flex-shrink:0">✕</div>
-    </div></div>`;
+  if(typeof Notification==='undefined'||S.step!=='cal')return'';
+  const cfg=APP_CFG.wxAlerts||{},up=USER_PREFS||{};
+  if(cfg.master===false||cfg.notifyEnabled===false||up.wxMaster===false||up.wxNotify===false||Notification.permission==='granted')return'';
+  let dismissed=0;try{dismissed=parseInt(localStorage.getItem('_wxNotifyCtaDismiss'))||0}catch(e){}
+  if(dismissed&&Date.now()-dismissed<7*24*3600*1000)return'';
+  const zh=lang==='zh',denied=Notification.permission==='denied';
+  return `<section class="notify-cta"><div class="notify-cta-title">${uiIcon('bell',19)}<h2>${zh?'天氣與災防通知':'Notifikasi cuaca'}</h2><button type="button" onclick="dismissWxNotifyCta()" aria-label="${zh?'暫時隱藏通知提示':'Tutup saran notifikasi'}">✕</button></div><p>${denied?(zh?'通知已被瀏覽器封鎖，可到手機系統設定開啟。':'Notifikasi diblokir. Aktifkan di pengaturan perangkat.'):(zh?'接收所在地的天氣與災防提醒；背景通知依裝置支援。':'Terima peringatan lokal. Notifikasi latar belakang bergantung pada perangkat.')}</p>${denied?'':`<button type="button" class="notify-enable" onclick="requestNotifyPermission()">${zh?'啟用通知':'Aktifkan notifikasi'}${uiIcon('arrow',16)}</button>`}</section>`;
 }
+function dismissWxNotifyCta(){try{localStorage.setItem('_wxNotifyCtaDismiss',Date.now())}catch(e){}render()}
 
 // ═══════════════════════════════════════════════════════════════
 // 用戶個人設定面板（前台 modal）
@@ -4412,11 +4386,8 @@ const _USR_ALERTS=[
 ];
 
 // 暗色模式友善的迷你開關 — 可選自訂 ON 顏色
-function _miniSwitch(checked,onclickStr,disabled,onColor){
-  const dis=disabled?'opacity:0.35;pointer-events:none':'';
-  const bg=checked?(onColor||'#00897b'):'var(--tx3)';
-  const left=checked?'21px':'3px';
-  return `<span onclick="${onclickStr}" style="display:inline-block;position:relative;width:42px;height:24px;background:${bg};border-radius:12px;cursor:pointer;transition:.2s;flex-shrink:0;border:1px solid rgba(0,0,0,0.1);${dis}"><span style="position:absolute;width:18px;height:18px;left:${left};top:2px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.35)"></span></span>`;
+function _miniSwitch(checked,onclickStr,disabled,onColor,label){
+  return `<button type="button" class="pref-switch" role="switch" aria-checked="${!!checked}" aria-label="${esc(label||(lang==='zh'?'切換設定':'Ubah pengaturan'))}" ${disabled?'disabled':''} onclick="${onclickStr}"><span class="status-switch${checked?' on':''}" aria-hidden="true"><i></i></span></button>`;
 }
 
 function userPrefsModalHtml(){
@@ -4494,8 +4465,8 @@ function userPrefsModalHtml(){
         <div style="flex:1;font-size:14px;font-weight:700;color:var(--tx)">${title}</div>
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;padding-left:42px">
-        <div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:${adminBlocked?'var(--tx3)':'var(--tx2)'};font-weight:600">${isZh?'橫幅':'Banner'}</span>${_miniSwitch(userItemOn&&!adminBlocked,"setUserPref('wxItems."+a.id+"',!USER_PREFS.wxItems."+a.id+")",adminBlocked,a.color)}</div>
-        <div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:${adminNotifyBlocked?'var(--tx3)':'var(--tx2)'};font-weight:600">${isZh?'通知':'Push'}</span>${_miniSwitch(userNotifyOn&&!adminNotifyBlocked,"setUserPref('wxNotifyItems."+a.id+"',!USER_PREFS.wxNotifyItems."+a.id+")",adminNotifyBlocked,a.color)}</div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:${adminBlocked?'var(--tx3)':'var(--tx2)'};font-weight:600">${isZh?'橫幅':'Banner'}</span>${_miniSwitch(userItemOn&&!adminBlocked,"setUserPref('wxItems."+a.id+"',!USER_PREFS.wxItems."+a.id+")",adminBlocked,a.color,(isZh?a.titleZh:a.titleId)+(isZh?'橫幅':' banner'))}</div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:${adminNotifyBlocked?'var(--tx3)':'var(--tx2)'};font-weight:600">${isZh?'通知':'Push'}</span>${_miniSwitch(userNotifyOn&&!adminNotifyBlocked,"setUserPref('wxNotifyItems."+a.id+"',!USER_PREFS.wxNotifyItems."+a.id+")",adminNotifyBlocked,a.color,(isZh?a.titleZh:a.titleId)+(isZh?'通知':' notifikasi'))}</div>
       </div>
       ${(adminBlocked||adminNotifyBlocked)?`<div style="padding-left:42px;margin-top:6px;font-size:10px;color:var(--amber);font-weight:600">⚠ ${isZh?'管理員已停用此項':'Admin disabled'}</div>`:''}
     </div>`;
@@ -4518,7 +4489,7 @@ function userPrefsModalHtml(){
           <div style="font-size:10px;color:var(--tx2);margin-top:2px;line-height:1.35">${isZh?item.descZh:item.descId}</div>
         </div>
       </div>
-      ${_miniSwitch(fxDetail[item.key]!==false,`setUserPref('fxDetail.${item.key}',!USER_PREFS.fxDetail.${item.key})`,visualBlocked,item.color)}
+      ${_miniSwitch(fxDetail[item.key]!==false,`setUserPref('fxDetail.${item.key}',!USER_PREFS.fxDetail.${item.key})`,visualBlocked,item.color,isZh?'切換此類動畫或音效':'Ubah kategori efek')}
     </div>`).join('');
   const visualSection=`<div style="padding:12px;background:rgba(155,89,182,0.12);border-radius:8px;border-left:4px solid #9b59b6">
     <div style="display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:8px">
@@ -4526,7 +4497,7 @@ function userPrefsModalHtml(){
         <div style="font-size:22px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:#9b59b6;border-radius:50%;flex-shrink:0">🎨</div>
         <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--tx)">${isZh?'動畫與音效':'Animasi & Suara'}</div><div style="font-size:10px;color:var(--tx2);margin-top:2px;line-height:1.4">${isZh?'日夜模式直接切換，不再漸暗；下方可分開控制各類效果':'Mode siang/malam langsung ganti; kategori efek dipisah'}</div></div>
       </div>
-      ${_miniSwitch(userVisualOn&&!visualBlocked,"setUserPref('visualFx',!USER_PREFS.visualFx)",visualBlocked,'#9b59b6')}
+      ${_miniSwitch(userVisualOn&&!visualBlocked,"setUserPref('visualFx',!USER_PREFS.visualFx)",visualBlocked,'#9b59b6',isZh?'動畫與音效':'Animasi dan suara')}
     </div>
     <div style="font-size:10px;color:var(--tx3);margin:0 0 8px 42px">${isZh?(userVisualOn?'總開關已開啟，可再細分控制。':'總開關已關閉，下列分類暫不生效。'):(userVisualOn?'Master aktif, kategori bisa diatur terpisah.':'Master nonaktif, kategori di bawah tidak berjalan.')}</div>
     <div style="display:grid;gap:8px">${fxRows}</div>
@@ -4553,7 +4524,7 @@ function userPrefsModalHtml(){
         <div style="font-size:18px">🚨</div>
         <div style="font-size:11px;font-weight:700;line-height:1.2">${isZh?'警報橫幅':'Banner'}</div>
       </div>
-      <div style="display:flex;justify-content:flex-end">${_miniSwitch(up.wxMaster!==false&&adminWxOn,"setUserPref('wxMaster',!USER_PREFS.wxMaster)",!adminWxOn,'#fff')}</div>
+      <div style="display:flex;justify-content:flex-end">${_miniSwitch(up.wxMaster!==false&&adminWxOn,"setUserPref('wxMaster',!USER_PREFS.wxMaster)",!adminWxOn,'#fff',isZh?'警報橫幅':'Banner peringatan')}</div>
       ${!adminWxOn?`<div style="margin-top:4px;font-size:9px;font-weight:600;opacity:0.9">⚠ ${isZh?'管理員停用':'Admin off'}</div>`:''}
     </div>
     <div style="padding:12px;background:linear-gradient(135deg,#2980b9,#1f5d8a);border-radius:8px;color:#fff;${!adminNotifyOn?'opacity:0.4':''}">
@@ -4561,7 +4532,7 @@ function userPrefsModalHtml(){
         <div style="font-size:18px">📱</div>
         <div style="font-size:11px;font-weight:700;line-height:1.2">${isZh?'手機通知':'Push'}</div>
       </div>
-      <div style="display:flex;justify-content:flex-end">${_miniSwitch(up.wxNotify!==false&&adminNotifyOn,"setUserPref('wxNotify',!USER_PREFS.wxNotify)",!adminNotifyOn,'#fff')}</div>
+      <div style="display:flex;justify-content:flex-end">${_miniSwitch(up.wxNotify!==false&&adminNotifyOn,"setUserPref('wxNotify',!USER_PREFS.wxNotify)",!adminNotifyOn,'#fff',isZh?'手機通知':'Notifikasi perangkat')}</div>
       ${!adminNotifyOn?`<div style="margin-top:4px;font-size:9px;font-weight:600;opacity:0.9">⚠ ${isZh?'管理員停用':'Admin off'}</div>`:''}
     </div>
   </div>`;
@@ -7116,7 +7087,7 @@ try{window.WxSfx=WxSfx}catch(e){}
       else document.documentElement.removeAttribute('data-theme');
     }
     const mt=document.querySelector('meta[name="theme-color"]');
-    if(mt) mt.setAttribute('content',darkUI?'#071113':'#007a6e');
+    if(mt) mt.setAttribute('content',darkUI?'#0c1424':'#eef2f8');
     const dim=document.getElementById('_dim');
     if(dim) dim.remove();
   }
@@ -7172,7 +7143,7 @@ function studioIcon(name,size=22){
   return `<svg class="ui-icon" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
 }
 function studioWeatherIcon(code,size=34){
-  const c=Number(code)||0;
+  const c=code===null||code===undefined?NaN:Number(code);
   const name=c===0?'sun':c<=3?'cloud':c>=95?'storm':c>=51?'rain':'cloud';
   return studioIcon(name,size);
 }
@@ -7185,37 +7156,38 @@ function studioShiftTime(rule){
   return{start,end,range:`${start}–${end}`};
 }
 function uiHeaderHtml(){
-  const meta=`${(RN[lang]&&RN[lang][S.rt])||S.rt||''}${S.unit&&S.unit!=='__all'?' · '+S.unit:S.unit==='__all'?' · '+(lang==='zh'?'全部單位':'All Units'):''}`;
-  const muted=WxSfx.isMuted(),WK=t('wk'),dw=new Date(TY,TM-1,TD).getDay();
-  return `<header class="app-header studio-app-header nova-header"><button class="brand-lockup" data-a="tabToday" aria-label="${lang==='zh'?'回到今天':'Go to today'}"><img src="${IMG.icon}" alt="" class="brand-mark"><span class="brand-copy"><strong>${t('app')}</strong><span>${esc(meta)}</span></span></button><button class="header-date-chip" data-a="tabToday" aria-label="${lang==='zh'?`${TM}月${TD}日，星期${WK[dw]}`:`${WK[dw]}, ${TD}/${TM}`}"><span>${TM}/${TD}</span><small>${lang==='zh'?`週${WK[dw]}`:WK[dw]}</small></button><div class="header-actions"><div class="header-utility" role="group" aria-label="${lang==='zh'?'快速控制':'Quick controls'}"><button class="utility-mini" data-a="sfx" aria-label="${lang==='zh'?'切換提示音':'Toggle sound'}" aria-pressed="${muted?'false':'true'}">${uiIcon('sound',18)}<i class="utility-dot${muted?' muted':''}"></i></button><button class="utility-mini utility-language" data-a="lang" aria-label="${lang==='zh'?'切換為印尼文':'Ganti ke 中文'}">${lang==='zh'?'中':'ID'}</button></div><button class="icon-button header-settings" data-a="tabMore" aria-label="${lang==='zh'?'功能與設定':'Tools and settings'}">${uiIcon('settings',19)}</button></div></header>`;
+  const WK=t('wk'),dw=new Date(TY,TM-1,TD).getDay();
+  const date=lang==='zh'?`${TM}月${TD}日 · 週${WK[dw]}`:`${WK[dw]} · ${TD}/${TM}/${TY}`;
+  return `<header class="app-header"><button class="brand-lockup" data-a="tabToday" aria-label="${lang==='zh'?'回到今天':'Kembali ke hari ini'}"><span class="brand-mark">${uiIcon('today',24)}</span><span class="brand-copy"><strong>${t('app')}</strong><span>${date}</span></span></button><div class="header-actions"><button class="icon-button header-language" data-a="lang" aria-label="${lang==='zh'?'切換為印尼文':'Ganti ke bahasa Mandarin'}">${lang==='zh'?'中 / ID':'ID / 中'}</button><button class="icon-button" data-a="tabMore" aria-label="${lang==='zh'?'功能與設定':'Fitur dan pengaturan'}">${uiIcon('settings',21)}</button></div></header>`;
 }
 function uiTodayHeroHtml(){
-  const s=gs(TY,TM,TD),rule=getShiftWorkRule(TY,TM,TD),WK=t('wk'),dw=new Date(TY,TM-1,TD).getDay();
-  let status=lang==='zh'?'今日尚未設定班別':'Belum ada shift',progress=0,phaseLabel=lang==='zh'?'今日狀態':'Status hari ini';
-  const shiftTime=studioShiftTime(rule);
+  const zh=lang==='zh',s=gs(TY,TM,TD),rule=getShiftWorkRule(TY,TM,TD),time=studioShiftTime(rule);
+  let lead=zh?'今日狀態':'Status hari ini',value=zh?'尚未排班':'Belum ada shift',phase=zh?'設定班表後顯示':'Atur jadwal Anda',progress=0;
   if(s==='休'){
     let streak=1;for(let i=1;i<=14;i++){const d=new Date(TY,TM-1,TD+i);if(gs(d.getFullYear(),d.getMonth()+1,d.getDate())==='休')streak++;else break}
-    status=lang==='zh'?'今天是休息日':'Hari libur';phaseLabel=streak>1?(lang==='zh'?`連休第 1／${streak} 天`:`Hari 1 dari ${streak}`):(lang==='zh'?'為下一班補充體力':'Istirahat untuk shift berikutnya');progress=100;
+    lead=zh?'把時間留給自己':'Waktu untuk diri sendiri';value=zh?'今天休息':'Hari libur';
+    phase=streak>1?(zh?`接下來連休 ${streak} 天`:`Libur ${streak} hari mulai hari ini`):(zh?'今日不需出勤':'Tidak perlu bekerja hari ini');
   }else if(rule.isWork){
-    const now=new Date(),nowMin=now.getHours()*60+now.getMinutes();let current=nowMin;
+    const now=new Date();let current=now.getHours()*60+now.getMinutes();
     if(rule.startMinute>=1200&&current<720)current+=1440;
     const end=rule.startMinute+rule.shiftHours*60;
-    if(current<rule.startMinute){status=lang==='zh'?`距離上班 ${uiFormatDuration(rule.startMinute-current)}`:`Mulai dalam ${uiFormatDuration(rule.startMinute-current)}`;phaseLabel=lang==='zh'?'尚未上班':'Belum mulai';progress=0}
-    else if(current<end){status=lang==='zh'?`距離下班 ${uiFormatDuration(end-current)}`:`Selesai dalam ${uiFormatDuration(end-current)}`;phaseLabel=lang==='zh'?'班次進行中':'Shift berlangsung';progress=Math.max(3,Math.min(100,(current-rule.startMinute)/(rule.shiftHours*60)*100))}
-    else{status=lang==='zh'?'本班工作已完成':'Shift selesai';phaseLabel=lang==='zh'?'今日班次完成':'Selesai hari ini';progress=100}
+    if(current<rule.startMinute){lead=zh?'距離上班':'Mulai dalam';value=uiFormatDuration(rule.startMinute-current);phase=zh?'準備迎接下一班':'Bersiap untuk shift'}
+    else if(current<end){lead=zh?'距離下班':'Selesai dalam';value=uiFormatDuration(end-current);phase=zh?'班次進行中':'Shift berlangsung';progress=Math.max(0,Math.min(100,(current-rule.startMinute)/(rule.shiftHours*60)*100))}
+    else{lead=zh?'辛苦了，今天':'Terima kasih, hari ini';value=zh?'班次已完成':'Shift selesai';phase=zh?'今日班次完成':'Selesai hari ini';progress=100}
   }
-  let nextOff='';if(s&&s!=='休')for(let i=1;i<=30;i++){const d=new Date(TY,TM-1,TD+i);if(gs(d.getFullYear(),d.getMonth()+1,d.getDate())==='休'){nextOff=lang==='zh'?`${i} 天後休假`:`Libur dalam ${i} hari`;break}}
-  const todayKey=ek(TY,TM,TD),eventCount=(EVS[todayKey]||[]).length+(getAdminEv(todayKey)||[]).length,leaveCount=new Set(getLeaves(todayKey).filter(isRegularLeave).map(x=>x.uid).filter(Boolean)).size;
-  const taskText=eventCount?`${eventCount} ${lang==='zh'?'項行程':'agenda'}`:leaveCount?`${leaveCount} ${lang==='zh'?'人請假':'cuti'}`:(lang==='zh'?'今日無待辦':'Tidak ada agenda');
-  return `<section class="today-hero studio-hero nova-hero shift-${uiShiftClass(s)}"><div class="nova-hero-glow" aria-hidden="true"></div><div class="nova-hero-grid"><div class="nova-date-block"><span class="nova-today-flag"><i></i>${lang==='zh'?'今天':'TODAY'}</span><strong>${TD}</strong><small>${lang==='zh'?`${TM}月 · 星期${WK[dw]}`:`${WK[dw]} · ${TM}/${TY}`}</small></div><div class="nova-status-block"><span class="nova-shift-badge"><i></i>${studioShiftLabel(s)}</span><span class="nova-phase">${phaseLabel}</span><h1>${status}</h1><p>${rule.isWork?shiftTime.range:(lang==='zh'?'今日不需出勤':'Tidak perlu bekerja')}</p></div></div><div class="nova-timeline" aria-label="${lang==='zh'?'班次進度':'Shift progress'}"><div class="nova-track"><span style="width:${progress.toFixed(1)}%"></span><i style="left:${Math.max(1,Math.min(99,progress)).toFixed(1)}%"></i></div><div class="nova-time-labels"><span>${rule.isWork?shiftTime.start:(lang==='zh'?'休息':'Libur')}</span><strong>${Math.round(progress)}%</strong><span>${rule.isWork?shiftTime.end:(lang==='zh'?'充電':'Istirahat')}</span></div></div><div class="nova-hero-footer"><span>${studioIcon('vacation',15)} ${nextOff||(lang==='zh'?'班表已同步':'Jadwal tersinkron')}</span><span>${studioIcon('event',15)} ${taskText}</span></div></section>`;
+  let nextOff='';if(s&&s!=='休')for(let i=1;i<=30;i++){const d=new Date(TY,TM-1,TD+i);if(gs(d.getFullYear(),d.getMonth()+1,d.getDate())==='休'){nextOff=zh?`${i} 天後休假`:`Libur dalam ${i} hari`;break}}
+  const key=ek(TY,TM,TD),eventCount=(EVS[key]||[]).length+(getAdminEv(key)||[]).length,leaveCount=new Set(getLeaves(key).filter(isRegularLeave).map(x=>x.uid).filter(Boolean)).size;
+  const taskText=eventCount?(zh?`${eventCount} 項行程`:`${eventCount} agenda`):leaveCount?(zh?`${leaveCount} 人請假`:`${leaveCount} cuti`):(zh?'今日行程':'Agenda hari ini');
+  const open=`data-a="openDate" data-y="${TY}" data-m="${TM}" data-d="${TD}"`;
+  return `<section class="today-hero shift-${uiShiftClass(s)}" aria-label="${zh?'今日班次':'Shift hari ini'}"><div class="hero-topline"><span class="hero-shift-tag"><i></i>${studioShiftLabel(s)}</span><span class="hero-phase">${phase}</span></div><div class="hero-main"><div class="hero-countdown"><span>${lead}</span><h1>${value}</h1></div><div class="hero-orb" aria-hidden="true">${studioIcon(s==='休'?'vacation':s==='晚'?'moon':'sun',34)}</div></div>${rule.isWork?`<div class="hero-timeline"><div class="hero-time-labels"><span>${time.start}</span><span>${zh?'班次進度':'Progres'} ${Math.round(progress)}%</span><span>${time.end}</span></div><div class="hero-track" role="progressbar" aria-label="${zh?'班次進度':'Progres shift'}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(progress)}"><span style="width:${progress.toFixed(1)}%"></span></div></div>`:`<p class="hero-rest-note">${zh?'點選日期，可查看行程與請假紀錄。':'Pilih tanggal untuk melihat agenda dan cuti.'}</p>`}<div class="hero-footer"><span>${studioIcon('vacation',16)}${nextOff||(s==='休'?(zh?'好好休息':'Selamat beristirahat'):(zh?'依目前輪班設定':'Sesuai pengaturan shift'))}</span><button ${open}>${studioIcon('event',16)}${taskText}${uiIcon('chevron',14)}</button></div></section>`;
 }
 function uiWeekStripHtml(){
   const WK=t('wk');let items='';
   for(let i=0;i<7;i++){
     const dt=new Date(TY,TM-1,TD+i),y=dt.getFullYear(),m=dt.getMonth()+1,d=dt.getDate(),s=gs(y,m,d),key=ek(y,m,d),has=(EVS[key]||[]).length+(getAdminEv(key)||[]).length>0;
-    items+=`<button class="schedule-day shift-${uiShiftClass(s)}${i===0?' current':''}" data-a="openDate" data-y="${y}" data-m="${m}" data-d="${d}" aria-current="${i===0?'date':'false'}" aria-label="${i===0?(lang==='zh'?'今天 ':'Today '):''}${WK[dt.getDay()]} ${d} ${studioShiftLabel(s)}"><span class="schedule-week">${i===0?(lang==='zh'?'今天':'TODAY'):WK[dt.getDay()]}</span><span class="schedule-date"><strong>${d}</strong>${(i===0||d===1)?`<small>${m}${lang==='zh'?'月':''}</small>`:''}</span><span class="schedule-shift">${s||'—'}</span>${has?'<i class="schedule-event-dot"></i>':''}<b class="schedule-accent"></b></button>`;
+    items+=`<button class="schedule-day shift-${uiShiftClass(s)}${i===0?' current':''}" data-a="openDate" data-y="${y}" data-m="${m}" data-d="${d}" aria-current="${i===0?'date':'false'}" aria-label="${y}/${m}/${d} ${studioShiftLabel(s)}${has?(lang==='zh'?'，有行程':', ada agenda'):''}"><span class="schedule-week">${i===0?(lang==='zh'?'今天':'Kini'):WK[dt.getDay()]}</span><strong class="schedule-date">${d}</strong><span class="schedule-shift">${uiShiftShort(s)}</span>${has?'<i class="schedule-event-dot" aria-hidden="true"></i>':''}</button>`;
   }
-  return `<section class="week-overview studio-week"><div class="section-kicker"><span>${lang==='zh'?'未來七天':'7 hari ke depan'}</span><button data-a="tabCalendar">${lang==='zh'?'完整月曆':'Kalender'} ${uiIcon('arrow',14)}</button></div><div class="schedule-strip">${items}</div></section>`;
+  return `<section class="week-overview"><div class="section-kicker"><h2>${lang==='zh'?'接下來 7 天':'7 hari ke depan'}</h2><button data-a="tabCalendar">${lang==='zh'?'完整班表':'Kalender'}${uiIcon('arrow',16)}</button></div><div class="schedule-strip">${items}</div></section>`;
 }
 function uiWeatherPreviewHtml(){
   if(!wxData)return `<button class="insight-row" data-a="tabWeather"><span class="insight-icon weather">${studioIcon('cloud',22)}</span><span class="insight-copy"><small>${lang==='zh'?'目前天氣':'Cuaca sekarang'}</small><strong>${_wxLoading?(lang==='zh'?'正在取得天氣':'Memuat cuaca'):(lang==='zh'?'查看天氣與位置':'Lihat cuaca dan lokasi')}</strong></span>${uiIcon('chevron',18)}</button>`;
@@ -7226,7 +7198,7 @@ function uiPayPreviewHtml(y,m){
   const pv=latestClosedSalaryMonth();y=pv.y;m=pv.m;
   const est=calcSalaryEst(y,m),pp=calcPayPeriod(y,m);if(!pp)return'';
   const value=est?`$${Math.round(est.net).toLocaleString()}`:`${pp.tH}h`,meta=est?`${est.otH}h ${lang==='zh'?'加班':'lembur'}`:`${pp.oH}h ${lang==='zh'?'加班':'lembur'}`;
-  return `<button class="insight-row" data-a="tabPay"><span class="insight-icon pay">${studioIcon('money',23)}</span><span class="insight-copy"><small>${est?(lang==='zh'?'本期預估實領':'Estimasi bersih'):(lang==='zh'?'本期工時':'Jam periode')}</small><strong>${value} <em>· ${meta}</em></strong></span><span class="insight-meta">${lang==='zh'?'薪資週期':'Periode'}</span>${uiIcon('chevron',18)}</button>`;
+  return `<button class="insight-row" data-a="tabPay"><span class="insight-icon pay">${studioIcon('money',23)}</span><span class="insight-copy"><small>${est?(lang==='zh'?`${m} 月預估實領`:`Estimasi bulan ${m}`):(lang==='zh'?'本期工時':'Jam periode')}</small><strong>${value} <em>· ${meta}</em></strong></span>${uiIcon('chevron',18)}</button>`;
 }
 function studioMoney(n){return '$'+Math.round(Number(n)||0).toLocaleString()}
 function studioSalaryRows(est){
@@ -7244,33 +7216,32 @@ function studioSalaryRows(est){
 }
 function uiSalaryDashboardHtml(y,m){
   const isZh=lang==='zh',pp=calcPayPeriod(y,m);if(!pp||!rot())return'';
-  const pm=m===1?12:m-1,py=m===1?y-1:y;
-  const payMY=m===12?{y:y+1,m:1}:{y,m:m+1};
+  const pm=m===1?12:m-1,py=m===1?y-1:y,payMY=m===12?{y:y+1,m:1}:{y,m:m+1};
   const pay5=getPayDay(payMY.y,payMY.m,5),pay20=getPayDay(payMY.y,payMY.m,20);
-  const salaryLabel=isZh?`${y}/${String(m).padStart(2,'0')} 薪資`:`Gaji ${String(m).padStart(2,'0')}/${y}`;
-  const pLabel=`${py}/${String(pm).padStart(2,'0')}/26–${y}/${String(m).padStart(2,'0')}/25`;
-  const nav=`<div style="display:flex;align-items:center;gap:4px"><button class="icon-action" data-a="payPrev" aria-label="${isZh?'上個薪資月':'Bulan gaji sebelumnya'}">${uiIcon('chevron',17)}</button><button class="text-action" data-a="payLatest" style="font-size:11px;padding:6px 8px">${isZh?'最新':'Terbaru'}</button><button class="icon-action" data-a="payNext" aria-label="${isZh?'下個薪資月':'Bulan gaji berikutnya'}" style="transform:rotate(180deg)">${uiIcon('chevron',17)}</button></div>`;
+  const label=isZh?`${y} 年 ${m} 月`:`${String(m).padStart(2,'0')} / ${y}`;
+  const period=`${py}/${String(pm).padStart(2,'0')}/26 – ${y}/${String(m).padStart(2,'0')}/25`;
+  const head=`<div class="salary-dashboard-head"><div class="period-navigation"><button class="icon-action previous" data-a="payPrev" aria-label="${isZh?'上個薪資月':'Bulan gaji sebelumnya'}">${uiIcon('chevron',18)}</button><h2>${label}</h2><button class="icon-action" data-a="payNext" aria-label="${isZh?'下個薪資月':'Bulan gaji berikutnya'}">${uiIcon('chevron',18)}</button></div><div class="period-caption"><span>${period}</span><button class="text-action" data-a="payLatest">${isZh?'最新':'Terbaru'}</button></div></div>`;
+  const metrics=(ot,missing=0)=>`<div class="salary-metrics"><div><strong>${pp.wd}<small>${isZh?'天':'hri'}</small></strong><span>${isZh?'出勤':'Kerja'}</span></div><div><strong>${pp.tH}<small>h</small></strong><span>${isZh?'總工時':'Total jam'}</span></div><div><strong>${ot}<small>h</small></strong><span>${isZh?'加班':'Lembur'}</span>${missing?`<small class="hours-adjustment">${isZh?'較原排少':'Berkurang'} ${missing}h</small>`:''}</div></div>`;
   const est=calcSalaryEst(y,m);
-  if(!est)return `<section class="salary-dashboard salary-empty"><div class="salary-dashboard-head"><div><span>${salaryLabel}</span><h3>${pLabel}</h3></div>${nav}</div><p>${isZh?'輸入薪資條中的固定應領、扣款與加班規則，即可產生本期實領預估與明細。':'Masukkan pendapatan, potongan, dan aturan lembur.'}</p><button class="salary-primary-action" data-a="salOpen">${studioIcon('money',18)} ${isZh?'設定薪資資料':'Atur data gaji'}</button><div class="salary-metrics"><div><strong>${pp.wd}</strong><span>${isZh?'出勤日':'Hari kerja'}</span></div><div><strong>${pp.tH}h</strong><span>${isZh?'總工時':'Total jam'}</span></div><div><strong>${pp.oH}h</strong><span>${isZh?'加班':'Lembur'}</span></div></div></section>`;
+  if(!est)return `<section class="salary-dashboard salary-empty">${head}<div class="salary-empty-copy">${studioIcon('money',34)}<h3>${isZh?'先設定，再掌握薪資':'Atur data gaji Anda'}</h3><p>${isZh?'填入固定應領、扣款與加班規則，即可查看預估實領。':'Masukkan pendapatan, potongan, dan aturan lembur untuk menghitung estimasi.'}</p><button class="salary-primary-action" data-a="salOpen">${isZh?'設定薪資資料':'Atur data gaji'}${uiIcon('arrow',17)}</button></div>${metrics(pp.oH)}</section>`;
   const gross=Math.max(1,est.income),netPct=Math.max(0,Math.min(100,est.net/gross*100)),dedPct=100-netPct;
-  const circumference=2*Math.PI*44,dash=(netPct/100*circumference).toFixed(2),gap=(circumference-dash).toFixed(2);
-  const actualOtMissing=Math.max(0,Math.round((pp.rawOH-est.otH)*10)/10);
-  const verifiedBadge=est.verified&&est.verificationDelta===0?`<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(46,125,50,.12);color:#2e7d32;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:800">✓ ${isZh?'公司薪資條已核對':'Slip terverifikasi'}</span>`:'';
-  const leaveMeta=(est.officialAnnualH||est.officialSickH||est.officialDisasterH)?`<div style="margin:10px 0 0;padding:9px 10px;border-radius:8px;background:rgba(0,121,107,.07);font-size:11px;color:var(--tx2);display:flex;gap:12px;flex-wrap:wrap"><b style="color:#00695c">${isZh?'公司請假時數':'Jam cuti resmi'}</b>${est.officialAnnualH?`<span>${isZh?'特休':'Tahunan'} ${est.officialAnnualH}h</span>`:''}${est.officialSickH?`<span>${isZh?'病假':'Sakit'} ${est.officialSickH}h</span>`:''}${est.officialDisasterH?`<span>${isZh?'天災假':'Bencana'} ${est.officialDisasterH}h</span>`:''}</div>`:'';
-  return `<section class="salary-dashboard"><div class="salary-dashboard-head"><div><span>${salaryLabel}</span><h3>${pLabel}</h3></div>${nav}</div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-2px 0 10px"><button class="icon-action" data-a="salOpen" aria-label="${isZh?'薪資設定':'Pengaturan gaji'}">${uiIcon('settings',18)}</button>${verifiedBadge}</div><div class="salary-hero"><div class="salary-amount"><small>${est.verified?(isZh?'公式實領':'Gaji bersih terhitung'):(isZh?'預估實領':'Estimasi bersih')}</small><strong>${studioMoney(est.net)}</strong><span>${est.verified?(isZh?'公式結果與公司薪資條一致':'Rumus cocok dengan slip resmi'):(isZh?'依目前班表與薪資設定':'Berdasarkan jadwal dan pengaturan')}</span></div><div class="salary-ring"><svg viewBox="0 0 104 104" aria-hidden="true"><circle class="ring-base" cx="52" cy="52" r="44"/><circle class="ring-value" cx="52" cy="52" r="44" stroke-dasharray="${dash} ${gap}"/></svg><div><strong>${Math.round(netPct)}%</strong><span>${isZh?'實領率':'bersih'}</span></div></div></div><div class="salary-flow"><div class="salary-flow-label"><span>${isZh?'應領':'Pendapatan'} <b>${studioMoney(est.income)}</b></span><span>${isZh?'應扣':'Potongan'} <b>${studioMoney(est.deduction)}</b></span></div><div class="salary-flow-track"><i style="width:${netPct}%"></i><b style="width:${dedPct}%"></b></div></div><div class="salary-metrics"><div><strong>${pp.wd}</strong><span>${isZh?'出勤日':'Hari kerja'}</span></div><div><strong>${pp.tH}h</strong><span>${isZh?'總工時':'Total jam'}</span></div><div><strong>${est.otH}h</strong><span>${isZh?'加班':'Lembur'}${actualOtMissing?`<small>−${actualOtMissing}h</small>`:''}</span></div></div>${leaveMeta}<div class="pay-calendar-row"><div>${studioIcon('money',17)}<span>${payMY.m}/${pay5}</span><small>${isZh?'發薪':'Gaji'}</small></div><div>${studioIcon('award',17)}<span>${payMY.m}/${pay20}</span><small>${isZh?'績效獎金':'Bonus'}</small></div></div><details class="salary-breakdown"><summary><span>${studioIcon('trend',17)} ${isZh?'查看薪資明細':'Lihat rincian'}</span>${uiIcon('chevron',17)}</summary><div class="salary-detail-list">${studioSalaryRows(est)}<div class="salary-detail-meta"><span>${isZh?'固定時薪':'Per jam'} $${est.hourly.toFixed(2)}</span><span>${isZh?'加班基數時薪':'Basis lembur'} $${est.otHourly.toFixed(2)}</span><span>${isZh?'請假基數時薪':'Basis cuti'} $${est.leaveHourly.toFixed(2)}</span></div></div></details><div class="salary-disclaimer">${studioIcon('info',14)} ${est.verified?(isZh?'本期已與公司薪資條完全對帳':'Periode ini cocok dengan slip resmi'):(isZh?'未結算期間仍屬估算，結算後可輸入公司核定項目校正':'Periode terbuka masih estimasi')}</div></section>`;
+  const missing=Math.max(0,Math.round((pp.rawOH-est.otH)*10)/10),verified=est.verified&&est.verificationDelta===0;
+  const leaveMeta=(est.officialAnnualH||est.officialSickH||est.officialDisasterH)?`<div class="salary-leave-meta"><b>${isZh?'公司請假時數':'Jam cuti resmi'}</b>${est.officialAnnualH?`<span>${isZh?'特休':'Tahunan'} ${est.officialAnnualH}h</span>`:''}${est.officialSickH?`<span>${isZh?'病假':'Sakit'} ${est.officialSickH}h</span>`:''}${est.officialDisasterH?`<span>${isZh?'天災假':'Bencana'} ${est.officialDisasterH}h</span>`:''}</div>`:'';
+  return `<section class="salary-dashboard">${head}<div class="salary-hero"><div class="salary-hero-label"><span>${verified?(isZh?'已核對實領':'Bersih terverifikasi'):(isZh?'預估實領':'Estimasi bersih')}</span><span class="salary-hero-seal" aria-hidden="true">${studioIcon(verified?'shield':'money',23)}</span></div><strong class="salary-net">${studioMoney(est.net)}</strong><p>${verified?(isZh?'與公司薪資條一致':'Sesuai slip resmi'):(isZh?'依目前班表與薪資設定':'Berdasarkan jadwal dan pengaturan')}</p></div><div class="salary-flow"><div class="salary-flow-label"><span>${isZh?'應領':'Pendapatan'}<b>${studioMoney(est.income)}</b></span><span>${isZh?'應扣':'Potongan'}<b>${studioMoney(est.deduction)}</b></span></div><div class="salary-flow-track" aria-hidden="true"><i style="width:${netPct}%"></i><b style="width:${dedPct}%"></b></div></div>${metrics(est.otH,missing)}${leaveMeta}<div class="pay-calendar-row"><div>${studioIcon('money',20)}<span><small>${isZh?'發薪日':'Tanggal gaji'}</small><strong>${payMY.m}<em> / </em>${pay5}</strong></span></div><div>${studioIcon('award',20)}<span><small>${isZh?'績效獎金':'Bonus kinerja'}</small><strong>${payMY.m}<em> / </em>${pay20}</strong></span></div></div><details class="salary-breakdown"><summary><span>${studioIcon('trend',18)}${isZh?'薪資明細':'Rincian gaji'}</span>${uiIcon('chevron',18)}</summary><div class="salary-detail-list">${studioSalaryRows(est)}<div class="salary-detail-meta"><span>${isZh?'固定時薪':'Per jam'} $${est.hourly.toFixed(2)}</span><span>${isZh?'加班基數時薪':'Basis lembur'} $${est.otHourly.toFixed(2)}</span><span>${isZh?'請假基數時薪':'Basis cuti'} $${est.leaveHourly.toFixed(2)}</span></div></div></details><p class="salary-disclaimer">${studioIcon('info',16)}<span>${verified?(isZh?'本期已與公司薪資條核對。':'Periode ini sudah dicocokkan dengan slip resmi.'):(isZh?'未結算金額為估算；結算後可依公司薪資條校正。':'Periode terbuka masih estimasi; sesuaikan dengan slip resmi setelah penutupan.')}</span></p></section>`;
 }
 function uiPrecipChartHtml(d){
   if(!d||!Array.isArray(d.hTime)||!Array.isArray(d.hPrec))return'';
   let start=_wxHourIndex();if(start<0)start=0;const pts=[];
   for(let i=start;i<d.hTime.length&&new Date(d.hTime[i]).getTime()<Date.now()+12*3600000&&pts.length<12;i++){
     const p=_normalPop(d.hPrec[i]);if(p===null)continue;
-    const hour=String(d.hTime[i]).slice(11,13);pts.push({p,hour,src:_popSourceAt(d,i)});
+    pts.push({p,hour:String(d.hTime[i]).slice(11,13),src:_popSourceAt(d,i)});
   }
   if(pts.length<3)return'';
-  const W=300,H=74,padX=8,base=52,barW=14,gap=(W-padX*2-barW*pts.length)/Math.max(1,pts.length-1),max=Math.max(...pts.map(x=>x.p));
-  const bars=pts.map((x,i)=>{const h=Math.max(2,x.p/100*42),px=padX+i*(barW+gap),y=base-h,hot=x.p>=70?' high':x.p>=40?' mid':'';return `<g class="precip-bar${hot}"><rect x="${px.toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" rx="4"/><text x="${(px+barW/2).toFixed(1)}" y="68" text-anchor="middle">${i===0||i===Math.floor(pts.length/2)||i===pts.length-1?x.hour:''}</text></g>`}).join('');
-  const source=pts.some(x=>x.src==='cwa')?(lang==='zh'?'CWA 官方區間':'CWA resmi'):(lang==='zh'?'模式備援':'Model');
-  return `<section class="precip-visual"><div class="precip-head"><div><span>${lang==='zh'?'未來 12 小時降雨機率':'Hujan 12 jam'}</span><strong>${max}%</strong></div><small>${source}</small></div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${lang==='zh'?'未來十二小時降雨機率圖':'Grafik kemungkinan hujan'}"><line x1="8" y1="52" x2="292" y2="52"/>${bars}</svg></section>`;
+  const W=320,H=100,padX=12,base=74,barW=14,gap=(W-padX*2-barW*pts.length)/Math.max(1,pts.length-1),max=Math.max(...pts.map(x=>x.p));
+  const bars=pts.map((x,i)=>{const h=Math.max(1,x.p/100*58),px=padX+i*(barW+gap),y=base-h,hot=x.p>=70?' high':x.p>=40?' mid':'';return `<g class="precip-bar${hot}"><rect x="${px.toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" rx="3"/><text x="${(px+barW/2).toFixed(1)}" y="96" text-anchor="middle">${i===0||i===Math.floor(pts.length/2)||i===pts.length-1?x.hour+':00':''}</text></g>`}).join('');
+  const source=pts.some(x=>x.src==='cwa')?(lang==='zh'?'CWA 區間預報':'Interval CWA'):(lang==='zh'?'模式預報':'Model');
+  const values=pts.map(x=>`${x.hour}:00 ${x.p}%`).join('、');
+  return `<section class="precip-visual"><div class="precip-head"><div><h3>${lang==='zh'?'未來 12 小時降雨機率':'Hujan 12 jam'}</h3><p>${lang==='zh'?'最高':'Maks.'} <strong>${max}<small>%</small></strong></p></div><span class="source-badge">${source}</span></div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${lang==='zh'?'降雨機率':'Kemungkinan hujan'}：${values}"><line x1="12" y1="16" x2="308" y2="16" class="precip-guide"/><line x1="12" y1="45" x2="308" y2="45" class="precip-guide"/><line x1="12" y1="74" x2="308" y2="74"/>${bars}</svg></section>`;
 }
 function rainObsHtml(){
   const m=_rainObsMeta();if(!m)return'';
@@ -7306,11 +7277,11 @@ function _wxStatusHtml(){
 }
 function wxHtml(){
   const zh=lang==='zh';
-  if(!wxData)return `<section class="weather-dashboard weather-unavailable" aria-busy="${_wxLoading}"><div class="weather-empty-icon">${_wxLoading?'<span class="weather-loader"></span>':studioIcon('cloud',30)}</div><strong>${_wxLoading?(zh?'正在取得天氣':'Memuat cuaca'):(zh?'暫時無法取得天氣':'Cuaca belum tersedia')}</strong><p>${_wxLoading?(zh?'正在查詢可用位置與免費天氣資料。':'Mencari lokasi dan data cuaca gratis.'):_wxErrorText()}</p><div class="wx-empty-actions"><button type="button" data-a="wxR" ${_wxLoading?'disabled':''}>${uiIcon('refresh',16)} ${zh?'重新載入':'Muat ulang'}</button><button type="button" onclick="openWxLocation()">${zh?'選擇地點':'Pilih tempat'}</button></div></section>`;
+  if(!wxData)return `<section class="weather-dashboard weather-unavailable" aria-busy="${_wxLoading}"><div class="weather-empty-icon">${_wxLoading?'<span class="weather-loader"></span>':studioIcon('cloud',30)}</div><strong>${_wxLoading?(zh?'正在取得天氣':'Memuat cuaca'):(zh?'暫時無法取得天氣':'Cuaca belum tersedia')}</strong><p>${_wxLoading?(zh?'正在取得所在地的最新預報。':'Mencari lokasi dan data cuaca gratis.'):_wxErrorText()}</p><div class="wx-empty-actions"><button type="button" data-a="wxR" ${_wxLoading?'disabled':''}>${uiIcon('refresh',16)} ${zh?'重新載入':'Muat ulang'}</button><button type="button" onclick="openWxLocation()">${zh?'選擇地點':'Pilih tempat'}</button></div></section>`;
   const d=wxData,wk=t('wk'),desc=zh?WXZ:WXD,updated=_wxTimeLabel(d.sourceTime||d.updatedAt);
-  const fc=d.days.map((f,i)=>{const dt=new Date(f.date+'T12:00:00'),dw=dt.getDay(),today=f.date===_nowHourKey().slice(0,10);return `<button class="forecast-day${today?' today':''}" onclick="wxDetailShow=true;wxDetailDay=${i};render();event.stopPropagation()"><span>${today?(zh?'今天':'Hari ini'):wk[dw]}</span><i>${studioWeatherIcon(f.code,20)}</i><strong>${f.hi}°</strong><small>${f.lo}°</small></button>`}).join('');
+  const fc=d.days.map((f,i)=>{const dt=new Date(f.date+'T12:00:00'),dw=dt.getDay(),today=f.date===_nowHourKey().slice(0,10);return `<button class="forecast-day${today?' today':''}" aria-label="${f.date} ${esc(desc[f.code]||'')} ${f.lo}–${f.hi}°C" onclick="wxDetailShow=true;wxDetailDay=${i};render();event.stopPropagation()"><span>${today?(zh?'今天':'Hari ini'):wk[dw]}</span><i>${studioWeatherIcon(f.code,20)}</i><strong>${f.hi}°</strong><small>${f.lo}°</small></button>`}).join('');
   const sourceLink=d.provider==='met-no'?'https://www.met.no/en':'https://open-meteo.com/';
-  return `<section class="weather-dashboard" aria-busy="${_wxLoading}"><button class="weather-settings" onclick="openUserPrefs();event.stopPropagation()" aria-label="${zh?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',18)}</button><button class="weather-current" onclick="showWxDetail()"><span class="weather-current-icon">${studioWeatherIcon(d.code,42)}</span><span class="weather-current-copy"><small>${_wxStale()?(zh?'上次模式天氣':'Cuaca model tersimpan'):(zh?'目前模式天氣':'Cuaca model')}</small><strong>${d.temp}°C</strong><em>${esc(desc[d.code]||'')}</em></span><span class="weather-source"><b>${esc(d.source||'Open-Meteo')}</b><small>${zh?'資料時間':'Waktu data'}<br>${updated}</small></span></button>${_wxStatusHtml()}${uiPrecipChartHtml(d)}${rainObsHtml()}<div class="forecast-strip">${fc}</div>${d.dayRangeEstimated?`<div class="wx-source-credit">${zh?'備援高低溫取自可用預報時段；較遠日期未提供的逐時欄位保持空白。':'Suhu min/maks dari jam prakiraan tersedia; jam tanpa data tetap kosong.'}</div>`:''}<div class="wx-source-credit"><a href="${sourceLink}" target="_blank" rel="noopener noreferrer">${esc(d.source||'Open-Meteo')}</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a> · ${zh?'模式預報；數值已四捨五入':'Prakiraan model; angka dibulatkan'}</div><a class="radar-action" href="radar2.html">${studioIcon('shield',19)}<span><b>${zh?'即時雷達與降雨':'Radar & hujan langsung'}</b><small>${zh?'查看回波、雨區移動與所在地':'Lihat radar dan lokasi'}</small></span>${uiIcon('chevron',18)}</a></section>${tideHtml()}`;
+  return `<section class="weather-dashboard" aria-busy="${_wxLoading}"><button class="weather-current" onclick="showWxDetail()"><span class="weather-current-icon">${studioWeatherIcon(d.code,42)}</span><span class="weather-current-copy"><small>${_wxStale()?(zh?'上次模式天氣':'Cuaca model tersimpan'):(zh?'目前模式天氣':'Cuaca model')}</small><strong>${d.temp}<span>°C</span></strong><em>${esc(desc[d.code]||'')}</em></span><span class="weather-source"><b>${esc(d.source||'Open-Meteo')}</b><small>${zh?'資料時間':'Waktu data'}<br>${updated}</small></span></button>${_wxStatusHtml()}${uiPrecipChartHtml(d)}${rainObsHtml()}<div class="forecast-heading"><h3>${zh?d.days.length+' 日預報':'Prakiraan '+d.days.length+' hari'}</h3><span>${zh?'點選查看逐時':'Ketuk untuk per jam'}</span></div><div class="forecast-strip">${fc}</div>${d.dayRangeEstimated?`<div class="wx-source-credit">${zh?'備援高低溫取自可用預報時段；較遠日期未提供的逐時欄位保持空白。':'Suhu min/maks dari jam prakiraan tersedia; jam tanpa data tetap kosong.'}</div>`:''}<div class="wx-source-credit"><a href="${sourceLink}" target="_blank" rel="noopener noreferrer">${esc(d.source||'Open-Meteo')}</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a> · ${zh?'模式預報；數值已四捨五入':'Prakiraan model; angka dibulatkan'}</div><a class="radar-action" href="radar2.html">${studioIcon('shield',19)}<span><b>${zh?'即時雷達與降雨':'Radar & hujan langsung'}</b><small>${zh?'查看回波、雨區移動與所在地':'Lihat radar dan lokasi'}</small></span>${uiIcon('chevron',18)}</a></section>${tideHtml()}`;
 }
 function closeWxLocation(){_wxSearchVersion++;document.getElementById('wx-location-dialog')?.remove()}
 function openWxLocation(){
@@ -7351,37 +7322,39 @@ function uiTideCurveHtml(){
   const W=320,H=112,padX=14,padY=14,minT=pts[0].ts,maxT=pts[pts.length-1].ts,minH=Math.min(...pts.map(x=>x.h)),maxH=Math.max(...pts.map(x=>x.h)),spanH=Math.max(1,maxH-minH),xOf=t=>padX+(t-minT)/(maxT-minT)*(W-padX*2),yOf=h=>padY+(maxH-h)/spanH*(H-padY*2-22);
   const p=pts.map(x=>({x:xOf(x.ts),y:yOf(x.h),...x}));let path=`M ${p[0].x.toFixed(1)} ${p[0].y.toFixed(1)}`;for(let i=1;i<p.length;i++){const prev=p[i-1],cur=p[i],mx=(prev.x+cur.x)/2;path+=` C ${mx.toFixed(1)} ${prev.y.toFixed(1)}, ${mx.toFixed(1)} ${cur.y.toFixed(1)}, ${cur.x.toFixed(1)} ${cur.y.toFixed(1)}`}
   let current=null;if(now>=minT&&now<=maxT){const a=all[Math.max(0,idx-1)],b=all[Math.min(all.length-1,idx)];if(a&&b&&b.ts>a.ts){const q=(now-a.ts)/(b.ts-a.ts),smooth=(1-Math.cos(Math.PI*q))/2,h=a.h+(b.h-a.h)*smooth;current={x:xOf(now),y:yOf(h)}}}
-  const area=`${path} L ${p[p.length-1].x.toFixed(1)} ${H-20} L ${p[0].x.toFixed(1)} ${H-20} Z`,labels=p.map((x,i)=>`<g class="tide-point ${x.item.type==='滿潮'?'high':'low'}"><circle cx="${x.x.toFixed(1)}" cy="${x.y.toFixed(1)}" r="3"/><text x="${x.x.toFixed(1)}" y="${H-5}" text-anchor="middle">${String(x.item.time).slice(11,16)}</text></g>`).join('');
-  return `<div class="tide-curve"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${lang==='zh'?'潮位趨勢曲線':'Grafik pasang surut'}"><defs><linearGradient id="tideArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".28"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs><path class="tide-area" d="${area}"/><path class="tide-line" d="${path}"/>${labels}${current?`<g class="tide-current-point"><line x1="${current.x.toFixed(1)}" y1="10" x2="${current.x.toFixed(1)}" y2="92"/><circle cx="${current.x.toFixed(1)}" cy="${current.y.toFixed(1)}" r="5"/><text x="${current.x.toFixed(1)}" y="9" text-anchor="middle">NOW</text></g>`:''}</svg></div>`;
+  const area=`${path} L ${p[p.length-1].x.toFixed(1)} ${H-20} L ${p[0].x.toFixed(1)} ${H-20} Z`,labels=p.map((x,i)=>`<g class="tide-point ${x.item.type==='滿潮'?'high':'low'}"><circle cx="${x.x.toFixed(1)}" cy="${x.y.toFixed(1)}" r="3"/><text x="${x.x.toFixed(1)}" y="${H-5}" text-anchor="${i===0?'start':i===p.length-1?'end':'middle'}">${i===0||i===Math.floor(p.length/2)||i===p.length-1?String(x.item.time).slice(11,16):''}</text></g>`).join('');
+  return `<div class="tide-curve"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${lang==='zh'?'潮位趨勢曲線':'Grafik pasang surut'}"><defs><linearGradient id="tideArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".28"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs><path class="tide-area" d="${area}"/><path class="tide-line" d="${path}"/>${labels}${current?`<g class="tide-current-point"><line x1="${current.x.toFixed(1)}" y1="10" x2="${current.x.toFixed(1)}" y2="92"/><circle cx="${current.x.toFixed(1)}" cy="${current.y.toFixed(1)}" r="5"/><text x="${current.x.toFixed(1)}" y="9" text-anchor="middle">${lang==='zh'?'現在':'Kini'}</text></g>`:''}</svg></div>`;
 }
 function tideHtml(){
   if(tideErr)return'';if(wxData&&!tideData&&!tideErr)return `<section class="tide-instrument tide-loading">${studioIcon('wave',21)}<span>${lang==='zh'?'潮汐資料載入中':'Memuat pasang surut'}</span></section>`;if(!tideData||!tideData.tides||!tideData.tides.length)return'';
   const wk=t('wk'),phase=tidePhaseInfo(),byDate={};tideData.tides.forEach(x=>{if(!byDate[x.date])byDate[x.date]=[];byDate[x.date].push(x)});const dates=Object.keys(byDate).sort().slice(0,7),target=phase&&phase.target,targetTime=target&&target.item.time?target.item.time.slice(11,16):'--:--',targetHeight=target&&Number.isFinite(+target.item.height)?`${target.item.height}cm`:'—',phaseDetail=phase&&target?(phase.key==='high'||phase.key==='low'?(lang==='zh'?`${phase.targetLabel}時刻附近 · ${targetTime}`:`Sekitar ${phase.targetLabel} · ${targetTime}`):(lang==='zh'?`距${phase.targetLabel}約 ${phase.duration}`:`Menuju ${phase.targetLabel} ${phase.duration}`)):'',progress=phase&&phase.progress!==null?Math.round(phase.progress*100):50;
-  const fc=dates.map((date,i)=>{const dt=new Date(date+'T00:00:00+08:00'),items=byDate[date],hi=items.filter(x=>x.type==='滿潮').sort((a,b)=>b.height-a.height)[0],lo=items.filter(x=>x.type==='乾潮').sort((a,b)=>a.height-b.height)[0];return `<button class="tide-day${i===0?' today':''}" onclick="showTideDetail('${date}');event.stopPropagation()"><span>${i===0?(lang==='zh'?'今天':'Hari ini'):wk[dt.getDay()]}</span><div><b class="tide-high">${hi?hi.time.slice(11,16):'--:--'}</b><small>${lang==='zh'?'滿':'P'}</small></div><div><b class="tide-low">${lo?lo.time.slice(11,16):'--:--'}</b><small>${lang==='zh'?'乾':'S'}</small></div></button>`}).join('');
-  return `<section class="tide-instrument"><button class="tide-instrument-head" onclick="toggleTide();event.stopPropagation()"><span class="tide-title-icon">${studioIcon('wave',21)}</span><span><strong>${esc(tideData.station)} ${lang==='zh'?'潮汐':'Pasut'}</strong><small>${lang==='zh'?'中央氣象署潮位預報':'Prakiraan CWA'}</small></span><em>${tideCollapsed?(lang==='zh'?'展開':'Buka'):(lang==='zh'?'收合':'Tutup')} ${uiIcon('chevron',15)}</em></button><button class="tide-status" onclick="showTideDetail('${dates[0]||''}');event.stopPropagation()"><span class="tide-status-icon ${phase?phase.key:''}">${phase&&phase.key==='rising'?'↗':phase&&phase.key==='falling'?'↘':phase&&phase.key==='high'?'▲':'▼'}</span><span class="tide-status-copy"><small>${lang==='zh'?'目前潮況':'Kondisi saat ini'}</small><strong>${phase?phase.state:(lang==='zh'?'計算中':'Menghitung')}</strong><em>${phaseDetail}</em></span><span class="tide-next"><strong>${targetHeight}</strong><small>${lang==='zh'?'下一潮位':'Berikutnya'} ${targetTime}</small></span><i class="tide-progress"><b style="width:${progress}%"></b></i></button>${tideCollapsed?'':`${uiTideCurveHtml()}<div class="tide-days">${fc}</div><button class="tide-detail-link" onclick="showTideDetail('${dates[0]||''}');event.stopPropagation()">${lang==='zh'?'查看七日完整潮位':'Lihat detail 7 hari'} ${uiIcon('arrow',14)}</button>`}</section>`;
+  const fc=dates.map((date,i)=>{const dt=new Date(date+'T00:00:00+08:00'),items=byDate[date],hi=items.filter(x=>x.type==='滿潮').sort((a,b)=>b.height-a.height)[0],lo=items.filter(x=>x.type==='乾潮').sort((a,b)=>a.height-b.height)[0];return `<button class="tide-day${i===0?' today':''}" onclick="showTideDetail('${date}');event.stopPropagation()"><span>${date===_nowHourKey().slice(0,10)?(lang==='zh'?'今天':'Hari ini'):wk[dt.getDay()]}</span><div><b class="tide-high">${hi?hi.time.slice(11,16):'--:--'}</b><small>${lang==='zh'?'滿':'P'}</small></div><div><b class="tide-low">${lo?lo.time.slice(11,16):'--:--'}</b><small>${lang==='zh'?'乾':'S'}</small></div></button>`}).join('');
+  return `<section class="tide-instrument"><button class="tide-instrument-head" aria-expanded="${!tideCollapsed}" onclick="toggleTide();event.stopPropagation()"><span class="tide-title-icon">${studioIcon('wave',21)}</span><span><strong>${esc(tideData.station)} ${lang==='zh'?'潮汐':'Pasut'}</strong><small>${lang==='zh'?'中央氣象署潮位預報':'Prakiraan CWA'}</small></span><em>${tideCollapsed?(lang==='zh'?'展開':'Buka'):(lang==='zh'?'收合':'Tutup')} ${uiIcon('chevron',15)}</em></button><button class="tide-status" onclick="showTideDetail('${dates[0]||''}');event.stopPropagation()"><span class="tide-status-icon ${phase?phase.key:''}">${phase&&phase.key==='rising'?'↗':phase&&phase.key==='falling'?'↘':phase&&phase.key==='high'?'▲':'▼'}</span><span class="tide-status-copy"><small>${lang==='zh'?'目前預報潮況':'Prakiraan saat ini'}</small><strong>${phase?phase.state:(lang==='zh'?'計算中':'Menghitung')}</strong><em>${phaseDetail}</em></span><span class="tide-next"><strong>${targetHeight}</strong><small>${lang==='zh'?'下一潮位':'Berikutnya'} ${targetTime}</small></span><i class="tide-progress"><b style="width:${progress}%"></b></i></button>${tideCollapsed?'':`${uiTideCurveHtml()}<div class="tide-days">${fc}</div><button class="tide-detail-link" onclick="showTideDetail('${dates[0]||''}');event.stopPropagation()">${lang==='zh'?'查看七日完整潮位':'Lihat detail 7 hari'} ${uiIcon('arrow',14)}</button>`}</section>`;
 }
 function studioCalendarLegendHtml(){
   const isZh=lang==='zh';
   return `<div class="calendar-legend" aria-label="${isZh?'班別與日期圖例':'Legenda shift dan tanggal'}"><span class="legend-today"><i></i>${isZh?'今天':'Hari ini'}</span><span class="legend-early"><i></i>${isZh?'早班':'Pagi'}</span><span class="legend-night"><i></i>${isZh?'晚班':'Malam'}</span><span class="legend-mid"><i></i>${isZh?'中班':'Siang'}</span><span class="legend-off"><i></i>${isZh?'休假':'Libur'}</span></div>`;
 }
 function uiCalendarTodayAnchorHtml(){
-  const isZh=lang==='zh',s=gs(TY,TM,TD),WK=t('wk'),dw=new Date(TY,TM-1,TD).getDay(),inView=S.yr===TY&&S.mo===TM;
-  const rule=getShiftWorkRule(TY,TM,TD),time=studioShiftTime(rule);
-  return `<button class="calendar-today-anchor shift-${uiShiftClass(s)}${inView?' is-visible-month':''}" data-a="today" aria-label="${isZh?'回到今天':'Go to today'}"><span class="today-anchor-date"><small>${TM}${isZh?'月':''}</small><strong>${TD}</strong></span><span class="today-anchor-copy"><b><i></i>${isZh?`今天 · 星期${WK[dw]}`:`Today · ${WK[dw]}`}</b><small>${studioShiftLabel(s)}${rule&&rule.isWork&&time.range?` · ${time.range}`:''}</small></span><span class="today-anchor-action">${inView?(isZh?'已在本月':'This month'):(isZh?'回到今天':'Go today')} ${uiIcon('arrow',15)}</span></button>`;
+  const zh=lang==='zh',s=gs(TY,TM,TD),rule=getShiftWorkRule(TY,TM,TD),time=studioShiftTime(rule);
+  return `<button class="calendar-today-anchor" data-a="openDate" data-y="${TY}" data-m="${TM}" data-d="${TD}"><span class="today-anchor-date">${TM}/${TD}</span><span><b>${zh?'今天':'Hari ini'} · ${studioShiftLabel(s)}</b>${rule.isWork?`<small>${time.range}</small>`:''}</span>${uiIcon('chevron',17)}</button>`;
 }
 function uiMonthSummaryHtml(st,workDays){
-  const isZh=lang==='zh';
-  const defs=[
-    {key:'早',tone:'early',label:isZh?'早班':'Pagi',value:Number(st['早']||0)},
-    {key:'休',tone:'off',label:isZh?'休假':'Libur',value:Number(st['休']||0)},
-    {key:'晚',tone:'night',label:isZh?'晚班':'Malam',value:Number(st['晚']||0)}
-  ];
-  if(Number(st['中']||0)>0)defs.splice(2,0,{key:'中',tone:'mid',label:isZh?'中班':'Siang',value:Number(st['中']||0)});
-  const days=defs.reduce((sum,x)=>sum+x.value,0);
-  return `<section class="month-summary-v300" aria-label="${isZh?'本月班別統計':'Ringkasan shift bulan ini'}"><div class="month-summary-head"><span><small>${isZh?'MONTH OVERVIEW':'MONTH OVERVIEW'}</small><b>${isZh?'本月輪班概覽':'Ringkasan bulan'}</b></span><strong>${workDays}<small>${isZh?'工作天':'hari kerja'}</small></strong></div><div class="month-summary-grid">${defs.map(x=>`<div class="month-summary-item tone-${x.tone}"><span><i></i>${x.label}</span><strong>${x.value}</strong></div>`).join('')}</div><div class="month-summary-foot"><span>${isZh?'本月排程':'Jadwal bulan ini'}</span><b>${days} ${isZh?'天':'hari'}</b></div></section>`;
+  const zh=lang==='zh',defs=[{key:'早',tone:'early',label:zh?'早班':'Pagi'},{key:'晚',tone:'night',label:zh?'晚班':'Malam'},...(Number(st['中']||0)>0?[{key:'中',tone:'mid',label:zh?'中班':'Siang'}]:[]),{key:'休',tone:'off',label:zh?'休假':'Libur'}];
+  return `<section class="month-summary-v300"><div class="month-summary-head"><h2>${zh?'本月概覽':'Ringkasan bulan'}</h2><span>${zh?'出勤':'Kerja'} <strong>${workDays}</strong> ${zh?'天':'hari'}</span></div><div class="month-summary-grid">${defs.map(x=>`<div class="month-summary-item tone-${x.tone}"><span><i></i>${x.label}</span><strong>${Number(st[x.key]||0)}</strong></div>`).join('')}</div></section>`;
 }
-
-function rCal(){
+function uiUpcomingEventsHtml(y,m){
+  const WK=t('wk'),items=[];
+  for(let d=1;d<=dim(y,m);d++){
+    if(y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&d<TD))continue;
+    const key=ek(y,m,d),events=EVS[key]||[];
+    events.forEach(eid=>{const name=eid==='custom'&&NOTES[key]?esc(NOTES[key]):eid==='typhoon'&&TYD[key]?`${en(eid)} ${TYD[key]}h`:en(eid);
+      items.push(`<button class="rem-item" data-a="openDate" data-y="${y}" data-m="${m}" data-d="${d}"><span class="rem-date"><strong>${d}</strong><small>${m}${lang==='zh'?'月':''}</small></span><span class="rem-info"><strong>${name}</strong><small>${WK[new Date(y,m-1,d).getDay()]} · ${studioShiftLabel(gs(y,m,d))}</small></span>${uiIcon('chevron',17)}</button>`);
+    });
+  }
+  return items.length?`<section class="rem-sec"><h2 class="rem-title">${t('rem')}</h2><div class="rem-list">${items.join('')}</div></section>`:'';
+}
+function uiCalendarPageHtml(){
   const r=rot(),c=cyc(),y=S.yr,m=S.mo,dm=dim(y,m),fd=fdw(y,m),ic=y===TY&&m===TM;
   const st={};for(let d=1;d<=dm;d++){const s=gs(y,m,d);if(s)st[s]=(st[s]||0)+1}
   const wk=Object.entries(st).filter(([s])=>s!=="休").reduce((a,[,v])=>a+v,0);
@@ -7389,7 +7362,7 @@ function rCal(){
   let cells="";for(let i=0;i<fd;i++)cells+=`<div></div>`;
   const pd5=getPayDay(y,m,5),pd20=getPayDay(y,m,20);
   for(let d=1;d<=dm;d++){const s=gs(y,m,d),td=ic&&d===TD,hol=gh(y,m,d),ev=EVS[ek(y,m,d)]||[],he=ev.length>0,dayAL=ALD[ek(y,m,d)],aev=hasAdminEv(ek(y,m,d)),dw=new Date(y,m-1,d).getDay(),isOff=(dw===0||dw===6||isTWOff(y,m,d)),isPay=(d===pd5||d===pd20),isAdj=!!SHIFT_OV[ek(y,m,d)];
-    cells+=`<div class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}${dw===0||dw===6?' weekend':''}" data-a="open" data-d="${d}" role="button" aria-current="${td?'date':'false'}" aria-label="${td?(lang==='zh'?'今天 ':'Today '):''}${d} ${esc(studioShiftLabel(s))}"><div class="day-top"><span class="num">${d}</span>${td?`<span class="today-label">${lang==="zh"?"今天":"TODAY"}</span>`:''}</div><span class="shift-code">${s||'—'}</span>${S.showLunar?lunarCellText(y,m,d):""}<div class="day-markers">${isAdj?`<span class="day-marker adjusted" title="${lang==="zh"?"已調班":"Adjusted"}">${uiIcon("refresh",10)}</span>`:''}${d===pd5?`<span class="day-marker pay" title="${lang==="zh"?"發薪":"Gaji"}">${studioIcon("money",11)}</span>`:''}${d===pd20?`<span class="day-marker award" title="${lang==="zh"?"績效獎金":"Bonus"}">${studioIcon("award",11)}</span>`:''}${he?`<span class="day-count event-count">${ev.length}</span>`:''}${hol?'<span class="day-dot holiday-dot"></span>':''}${dayAL?'<span class="day-dot annual-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d)),n=new Set(lc.filter(isRegularLeave).map(x=>x.uid)).size;return n?`<span class="day-count leave-count">${n}</span>`:""})()}</div></div>`}
+    cells+=`<button type="button" class="day ${SC[s]}${td?' today':''}${he?' has-ev':''}${aev?' admin-ev':''}${isPay?' pay-day':''}${dw===0||dw===6?' weekend':''}" data-a="open" data-d="${d}" aria-current="${td?'date':'false'}" aria-label="${td?(lang==='zh'?'今天 ':'Today '):''}${d} ${esc(studioShiftLabel(s))}${hol?', '+esc(hol):''}${he?(lang==='zh'?', 有行程':', ada agenda'):''}"><div class="day-top"><span class="num">${d}</span>${td?`<span class="today-label" aria-hidden="true"></span>`:''}</div><span class="shift-code">${uiShiftShort(s)}</span>${S.showLunar?lunarCellText(y,m,d):""}<div class="day-markers">${isAdj?`<span class="day-marker adjusted" title="${lang==="zh"?"已調班":"Adjusted"}">${uiIcon("refresh",10)}</span>`:''}${d===pd5?`<span class="day-marker pay" title="${lang==="zh"?"發薪":"Gaji"}">${studioIcon("money",11)}</span>`:''}${d===pd20?`<span class="day-marker award" title="${lang==="zh"?"績效獎金":"Bonus"}">${studioIcon("award",11)}</span>`:''}${he?`<span class="day-count event-count">${ev.length}</span>`:''}${hol?'<span class="day-dot holiday-dot"></span>':''}${dayAL?'<span class="day-dot annual-dot"></span>':''}${(()=>{const lc=getLeaves(ek(y,m,d)),n=new Set(lc.filter(isRegularLeave).map(x=>x.uid)).size;return n?`<span class="day-count leave-count">${n}</span>`:""})()}</div></button>`}
   const isPast=(dd)=>y<TY||(y===TY&&m<TM)||(y===TY&&m===TM&&dd<TD);
   const mh=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const h=gh(y,m,d);if(h)mh.push(`${m}/${d} ${h}`)}
   let holH=mh.length?`<section class="calendar-notice holiday"><span class="notice-icon">${studioIcon("calendar",18)}</span><div><strong>${lang==="zh"?"即將到來的假日":"Hari libur mendatang"}</strong><span>${mh.join("　")}</span></div></section>`:"";
@@ -7397,46 +7370,29 @@ function rCal(){
   let adParts=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const ae=getAdminEv(ek(y,m,d));if(ae.length)ae.forEach(t=>adParts.push(`${m}/${d} ${en(t)}`))}
   if(adParts.length)holH+=`<section class="calendar-notice event"><span class="notice-icon">${studioIcon("event",18)}</span><div><strong>${lang==="zh"?"單位公告":"Pengumuman unit"}</strong><span>${adParts.join("　")}</span></div></section>`;
   if(lvParts.length)holH+=`<section class="calendar-notice leave"><span class="notice-icon">${studioIcon("leave",18)}</span><div><strong>${lang==="zh"?"請假動態":"Status cuti"}</strong><span>${lvParts.join("　")}</span></div></section>`;
-  const rems=[];for(let d=1;d<=dm;d++){if(isPast(d))continue;const evs=EVS[ek(y,m,d)];if(evs&&evs.length){const s=gs(y,m,d),dw=new Date(y,m-1,d).getDay();evs.forEach(eid=>rems.push({d,dw,shift:sf(s),eid}))}}
-  let remH="";if(rems.length){remH=`<div class="rem-sec"><div class="rem-title">${t("rem")}</div><div class="rem-list">${rems.map(r=>{const nm=r.eid==="custom"&&NOTES[ek(y,m,r.d)]?esc(NOTES[ek(y,m,r.d)]):r.eid==="typhoon"&&TYD[ek(y,m,r.d)]?`${en(r.eid)} ${TYD[ek(y,m,r.d)]}h`:en(r.eid);return`<div class="rem-item" data-a="open" data-d="${r.d}"><div class="rem-date"><div class="d">${r.d}</div><div class="w">${WK[r.dw]}</div></div><div class="rem-info"><div class="rem-name">${nm}</div><div class="rem-shift">${r.shift}</div></div><div style="font-size:16px">${EE[r.eid]||"📌"}</div></div>`}).join("")}</div></div>`}
-  const monthSummaryH=uiMonthSummaryHtml(st,wk);
-  const hH="";
-  const alH=getAL().total>0?`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer"><span class="al-bar-label">${studioIcon("leave",16)} ${t("alRem")} (${alYRange(curALY())})</span><span class="al-bar-val">${alRem()} ${t("hr")}</span></div>`:`<div class="al-bar fi" data-a="alEdit" style="cursor:pointer;background:rgba(76,175,80,.08);color:var(--green);font-weight:600;justify-content:center;text-align:center"><span>${studioIcon("leave",16)} ${lang==="zh"?`點此設定 ${curALY()+1} 年度特休時數`:`Atur cuti tahun ${curALY()+1}`}</span></div>`;
-  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent),showI=(!!DP||isIOS)&&!S.instH;
-  let instH="";if(showI){instH=`<div class="install-wrap"><div class="install-card"><img class="install-icon" src="${IMG.icon}"><div class="install-info"><div class="install-title">${t("instT")}</div><div class="install-sub">${DP?t("instS"):t("instSi")}</div></div>${DP?`<button class="install-btn" data-a="inst">${t("instB")}</button>`:''}<button class="install-x" data-a="hideI">✕</button></div></div>`}
-  const ml=lang==="zh"?`${y}年${m}月`:`${m}/${y}`;
-  let todayBarH="";if(ic){const ts=gs(TY,TM,TD);if(ts){const tImg=SI[ts]||"";const tsName=sf(ts);
-    let restInfo="",restDays=0;
-    const _isOff=(y2,m2,d2)=>{if(gs(y2,m2,d2)==="休")return true;const ml2=myLeave(ek(y2,m2,d2));let lh=0;ml2.forEach(l=>lh+=l.hours||0);return lh>=8};
-    if(!_isOff(TY,TM,TD)){for(let dd=1;dd<=30;dd++){const fd=new Date(TY,TM-1,TD+dd);if(_isOff(fd.getFullYear(),fd.getMonth()+1,fd.getDate())){restDays=dd;restInfo=(lang==="zh"?`${dd}天後休`:`${dd} hari lagi libur`);break}}}
-    else{let streak=0;for(let dd=0;dd<=14;dd++){const fd=new Date(TY,TM-1,TD+dd);if(_isOff(fd.getFullYear(),fd.getMonth()+1,fd.getDate()))streak++;else break}if(streak>1)restInfo=(lang==="zh"?"連休 "+streak+" 天":"Libur "+streak+" hari");else restInfo=(lang==="zh"?"今天休假":"Hari ini libur")}
-    let apd5=getPayDay(TY,TM,5),apd20=getPayDay(TY,TM,20);
-    let payDay5=apd5-TD,payDay20=apd20-TD;
-    if(payDay5<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay5=getPayDay(ny,nm,5)+dim(TY,TM)-TD}
-    if(payDay20<0){const nm=TM===12?1:TM+1,ny=TM===12?TY+1:TY;payDay20=getPayDay(ny,nm,20)+dim(TY,TM)-TD}
-    const payInfo=payDay5<=7?(lang==="zh"?`💰 ${payDay5===0?"今天發薪":payDay5+"天後發薪"}`:`💰 ${payDay5===0?"Gaji hari ini":payDay5+" hari lagi gaji"}`):(payDay20<=7?(lang==="zh"?`🏆 ${payDay20===0?"今天績效獎金":payDay20+"天後績效獎金"}`:`🏆 ${payDay20===0?"Bonus hari ini":payDay20+" hari lagi bonus"}`):"");
-    todayBarH=`<div class="today-bar fi"><div class="today-bar-main"><div class="today-bar-shift"><img src="${tImg}"><span>${TM}/${TD} ${tsName}</span></div><div class="today-bar-rest">${restInfo}</div></div>${payInfo?`<div class="today-bar-pay">${payInfo}</div>`:""}</div>`}}
-  const topMeta=`${(RN[lang]&&RN[lang][S.rt])||S.rt||""}${S.unit&&S.unit!=="__all"?" · "+S.unit:S.unit==="__all"?" · "+(lang==="zh"?"全部單位":"All Units"):""}`;
-  const monthHeading=uiScreenHeading(ml,lang==="zh"?"日期、班別、請假與標記事項集中顯示":"Tanggal, shift, cuti, dan catatan dalam satu tampilan",`<button class="text-action" data-a="today">${lang==="zh"?"定位今天":"Hari ini"}</button>`);
-  const calendarPanel=`${monthHeading}${uiCalendarTodayAnchorHtml()}${studioCalendarLegendHtml()}<section class="calendar-shell studio-calendar${ic?' current-month':''}" aria-label="${ml}"><div class="mnav"><button class="mnav-btn" data-a="prev" aria-label="${lang==="zh"?"上個月":"Previous month"}">${uiIcon("chevron",18)}</button><div class="mnav-title"><span>${ml}</span><small>${ic?(lang==="zh"?"本月 · 今天已高亮":"Current month · today highlighted"):(lang==="zh"?"輪班月曆":"Shift calendar")}</small></div><button class="mnav-btn next" data-a="next" aria-label="${lang==="zh"?"下個月":"Next month"}">${uiIcon("chevron",18)}</button></div>${S.showLunar?lunarTodayStrip():""}<div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?" we":""}">${w}</div>`).join("")}</div><div class="cal fi">${cells}</div></section>${holH}${remH}${monthSummaryH}`;
-  let tabContent="";
-  if(UI_TAB==="calendar"){
-    tabContent=calendarPanel;
-  }else if(UI_TAB==="pay"){
-    const py=PAY_VIEW.y,pm=PAY_VIEW.m;
-    tabContent=`${uiScreenHeading(lang==="zh"?"薪資中心":"Pusat gaji",lang==="zh"?"依公司薪資年月顯示已結算週期，不再誤算尚未結束的本期":"Mengikuti bulan gaji resmi dan periode yang sudah ditutup")}${uiSalaryDashboardHtml(py,pm)}${alH}`;
-  }else if(UI_TAB==="weather"){
-    tabContent=`${uiScreenHeading(lang==="zh"?"天氣與災防":"Cuaca & peringatan",lang==="zh"?"官方警特報、即時雨量、預報與潮汐":"Peringatan resmi, hujan, prakiraan, pasang",`<button class="icon-action" data-a="prefs">${uiIcon("settings",18)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${typeof wxHtml==='function'?wxHtml():''}`;
-  }else if(UI_TAB==="more"){
-    tabContent=`${uiScreenHeading(lang==="zh"?"功能與設定":"Fitur & pengaturan",lang==="zh"?"農曆、語言、請假統計、分享與帳號集中管理":"Kalender lunar, bahasa, cuti, berbagi dan akun")}${uiMoreHtml(y,m)}${fbBarHtml()}`;
-  }else{
-    tabContent=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${remH}${uiWeatherPreviewHtml()}${uiPayPreviewHtml(y,m)}`;
-  }
-  return `<div class="app-shell" data-screen="${UI_TAB}">${uiHeaderHtml()}<main class="app-main screen-${UI_TAB}">${tabContent}<div class="content-end-space"></div></main>${uiBottomNavHtml()}${instH}</div>`;
 
+  const ml=lang==='zh'?`${y} 年 ${m} 月`:`${String(m).padStart(2,'0')} / ${y}`;
+  const context=[(RN[lang]&&RN[lang][S.rt])||S.rt||'',S.unit&&S.unit!=='__all'?S.unit:S.unit==='__all'?(lang==='zh'?'全部單位':'Semua unit'):''].filter(Boolean).join(' · ');
+  return `${uiScreenHeading(lang==='zh'?'班表':'Jadwal',esc(context),`<button class="text-action" data-a="today">${studioIcon('event',16)}${lang==='zh'?'今天':'Hari ini'}</button>`)}<section class="calendar-shell" aria-label="${ml}"><div class="mnav"><button class="mnav-btn previous" data-a="prev" aria-label="${lang==='zh'?'上個月':'Bulan sebelumnya'}">${uiIcon('chevron',18)}</button><h2 class="mnav-title">${ml}</h2><button class="mnav-btn" data-a="next" aria-label="${lang==='zh'?'下個月':'Bulan berikutnya'}">${uiIcon('chevron',18)}</button></div>${S.showLunar?lunarTodayStrip():''}<div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join('')}</div><div class="cal">${cells}</div>${studioCalendarLegendHtml()}${uiCalendarTodayAnchorHtml()}</section>${uiMonthSummaryHtml(st,wk)}${holH}${uiUpcomingEventsHtml(y,m)}`;
 }
-
-
+function rCal(){
+  let content='';
+  if(UI_TAB==='calendar')content=uiCalendarPageHtml();
+  else if(UI_TAB==='pay'){
+    const al=getAL(),label=al.total>0?t('alRem'):(lang==='zh'?'設定年度特休':'Atur cuti tahunan');
+    const annual=`<button class="al-bar" data-a="alEdit"><span class="insight-icon leave">${studioIcon('leave',22)}</span><span class="al-bar-copy"><strong>${label}</strong><small>${alYRange(curALY())}</small></span><b>${al.total>0?alRem()+' '+t('hr'):uiIcon('chevron',18)}</b></button>`;
+    content=`${uiScreenHeading(lang==='zh'?'薪資':'Gaji',lang==='zh'?'工時、加班與每一筆明細':'Jam kerja, lembur dan rincian',`<button class="icon-action" data-a="salOpen" aria-label="${lang==='zh'?'薪資設定':'Pengaturan gaji'}">${uiIcon('settings',20)}</button>`)}${uiSalaryDashboardHtml(PAY_VIEW.y,PAY_VIEW.m)}${annual}`;
+  }else if(UI_TAB==='weather'){
+    content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${wxHtml()}`;
+  }else if(UI_TAB==='more'){
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v303</p>`;
+  }else{
+    content=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
+  }
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent),showI=(!!DP||isIOS)&&!S.instH;
+  const install=showI?`<aside class="install-wrap"><div class="install-card"><img class="install-icon" src="${IMG.icon}" alt=""><span class="install-info"><b>${t('instT')}</b><small>${DP?t('instS'):t('instSi')}</small></span>${DP?`<button class="install-btn" data-a="inst">${t('instB')}</button>`:''}<button class="install-x" data-a="hideI" aria-label="${lang==='zh'?'關閉安裝提示':'Tutup saran instalasi'}">✕</button></div></aside>`:'';
+  return `<div class="app-shell" data-screen="${UI_TAB}">${uiHeaderHtml()}<main class="app-main screen-${UI_TAB}" id="main-content">${content}${install}</main>${uiBottomNavHtml()}</div>`;
+}
 function studioAlertVisual(id){
   if(id==='earthquake')return uiIcon('alert',22);
   if(id==='heavyRain'||id==='rain')return studioIcon('rain',22);
