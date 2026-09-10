@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v301-unified-leave';
+const CACHE_NAME = 'myshift-v302-weather-live';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -8,6 +8,10 @@ self.addEventListener('install', event => {
 self.addEventListener('message', event => {
   const data = event.data;
   if (data === 'SKIP_WAITING') { self.skipWaiting(); return; }
+  if (data && data.type === 'WX_CLEAR_POS') {
+    event.waitUntil(caches.open(NOTIFY_STATE_CACHE).then(cache=>cache.delete('lastPos')));
+    return;
+  }
   // App 端寫入最後位置與個人通知設定；Service Worker 背景檢查必須服從同一套開關。
   if (data && data.type === 'WX_POS' && data.lat && data.lon) {
     event.waitUntil(swPutWxCache('lastPos', {
@@ -49,9 +53,16 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // API caching belongs to each data client, where coordinates and data age are known.
+  // Never strip API query parameters or return HTML/weather for a different location.
   const url = new URL(event.request.url);
-  url.search = '';
-  const cacheKey = url.toString();
+  if(event.request.method!=='GET'||url.origin!==self.location.origin)return;
+  const isNavigation=event.request.mode==='navigate';
+  const isAsset=/\.(?:js|html|css|json|png|jpe?g|svg|webp|ico|woff2?)$/i.test(url.pathname);
+  if(!isNavigation&&!isAsset)return;
+  // Only shell navigations ignore UI query parameters; versioned assets keep theirs.
+  if(isNavigation)url.search='';
+  const cacheKey=url.toString();
 
   // 對 app 核心檔（.js / .html / .css）強制 bypass HTTP cache，避免 GitHub Pages 10 分鐘 cache 鎖住舊版
   const path = url.pathname;
@@ -63,14 +74,16 @@ self.addEventListener('fetch', event => {
       .then(response => {
         if (!response || response.status !== 200) return response;
         const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(cacheKey, clone);
-        });
+        event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.put(cacheKey,clone)).catch(()=>{}));
         return response;
       })
       .catch(() => {
-        return caches.match(cacheKey)
-          .then(cached => cached || caches.match(url.origin + url.pathname.replace(/[^\/]*$/, 'index.html')));
+        return caches.open(CACHE_NAME).then(async cache=>{
+          const cached=await cache.match(cacheKey);
+          if(cached)return cached;
+          if(isNavigation){const shell=await cache.match(new URL('index.html',self.registration.scope).href);if(shell)return shell;}
+          return Response.error();
+        });
       })
   );
 });

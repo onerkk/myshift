@@ -369,13 +369,12 @@ function _autoLocateOnLogin(){
   try{
     if(navigator.permissions&&navigator.permissions.query){
       navigator.permissions.query({name:'geolocation'}).then(ps=>{
-        // 已授權 → 清掉可能過期的位置快取，強制用當下 GPS 重抓一次
+        // 已授權 → 更新定位；失敗時保留最後有效的位置
         if(ps.state==='granted'){
-          try{localStorage.removeItem('_wxPos')}catch(e){}
-          loadWx({force:true});
+          if(!_readWxManual())loadWx({relocate:true});
         }
         // 權限變動時（使用者後來才允許）自動重抓
-        ps.onchange=function(){if(this.state==='granted'){try{localStorage.removeItem('_wxPos')}catch(e){}loadWx({force:true})}};
+        ps.onchange=function(){if(this.state==='granted'&&!_readWxManual())loadWx({force:true,relocate:true})};
       }).catch(()=>{});
     }
   }catch(e){}
@@ -792,7 +791,7 @@ zh:{app:"我的班表",sub:"My Shift",desc:"選擇輪班制度，三步自動排
   instT:"安裝到主畫面",instS:"一鍵安裝",instSi:"Safari→分享→加入主畫面",instB:"安裝",
   aSet:"✅ 鬧鐘：#m#/#d# 07:00\n⚠️ 需保持瀏覽器開啟",aNow:"✅ 已提醒！",aBlock:"通知被封鎖",aNoPerm:"需開啟通知",aNo:"不支援通知",sRem:"班表提醒",
   helpT:"📖 使用說明",
-  h:["初始設定|首次使用回答三個問題（上班或休假→班別→第幾天），系統自動排出整年班表。若管理員已在後台鎖定你的輪班規則，只需設定今天是哪一班即可。可隨時點底部「重設」重新設定。","查看班表|左右箭頭切換月份，點「今天」立刻回到本月。每日格子以顏色區分：藍色＝早班、紫色＝晚班、黃色＝中班、灰色＝休假。點擊任一日期可查看詳情、請假或標記事項。今天的日期會以橘色粗框顯示。","請假系統|點擊日期 → 選假別 → 選開始與結束 → 確認。可自訂完整班別內的時間（半小時刻度），也可選「全班 12h」「正常 8h」「只不加班」。早班 08:00–20:00、晚班 20:00–翌日08:00；前 8h 是正常工時，後 4h 是加班。全班未出勤只扣 8h 假，後 4h 自動減少加班；只選加班時段不扣假、不扣本薪。病假、事假等正常請假依設定單位檢查。送出前顯示扣假、當日加班與薪資估算，無需另填加班。同事僅看正常工時請假人數，管理員可看明細與原因。可取消紀錄恢復計算。","標記事項與颱風假|每日可標記：📚上課、🚗公出、💰發薪日、🌴特休、🌀颱風假、📝自訂備註（最多 50 字）。天災假可指定時數，依本期薪資條視為給薪時數，不扣加班與本薪。管理員可額外設定 📋班股會議與 🏥體檢日期，全體使用者可見。","特休管理|在請假彈窗下方輸入年度特休總時數與已使用時數（0.5 小時為單位）。日曆上勾選特休的日期會自動扣除並計算剩餘時數。特休年度為每年 12/26 到隔年 12/25（華新麗華制度）。","統計功能|點擊「統計」查看各班別天數、月工時、加班時數與特休使用率。12h 班由正常 8h＋加班 4h 組成；新增請假的完整時段會自動拆分，特休與請假統計只計正常工時。加班費按每天剩餘加班時數拆分前 2h／後段倍率。可切換年度。","薪資預估|月曆下方薪資卡片可設定薪資條完整欄位：職能俸、伙食津貼、交通津貼、崗位津貼、夜點費、勞健保自付、工會、福利金、其他固定扣款。系統自動估算當月實領金額，包含：前 2h 與後段加班費（不同倍率，公司 HR System 1.33340 / 1.66670）、免稅約 46.67h 切點、晚班次數 × 夜點費（可本期總額覆寫）、病假與事假扣款；天災假不扣加班。薪資資料同步至你個人雲端帳號（只有你看得到），換手機登入即可復原。","薪資計算週期|每月薪資計算區間為上月 26 日至當月 25 日。例如 3 月薪水計算的是 2/26 至 3/25 的出勤與加班時數。每月 5 日發放薪資（💰），每月 20 日發放績效獎金（🏆）。遇國定假日或週末自動提前至前一個工作日，日曆上直接標示實際發放日。","7 日天氣預報|自動偵測位置顯示 7 日天氣，點選可看逐時詳情（溫度、降雨機率、陣風、濕度）。資料每小時自動更新，可在個人設定 ⚙️ 點「重新抓取」強制立即更新。降雨機率優先採中央氣象署鄉鎮區間預報，溫度/濕度/風速採 Open-Meteo；即時雨量站只顯示實況，不會改寫預報。","9 種天氣警報|系統自動偵測並顯示警報橫幅，共 9 種：🌍地震、🌀颱風、⛈雷雨、🌧豪大雨/高降雨、🌂一般降雨、💨強風、🥵高溫、🥶低溫、🌫濃霧。地震使用中央氣象署有感地震報告；優先採所在地觀測震度，尚無所在地震度時才以規模＋震源距離保守判斷，且舊報告不補推。颱風與其他警特報以 CWA 官方有效時間、GPS 鄉鎮／CAP 範圍為準。每種警報的觸發門檻可由管理員在後台調整。","下雨提醒|上班日出門時段（早班/中班/晚班各自上班前 1 至 2 小時）若降雨機率 ≥ 40%，會在日曆下方顯示醒目橘色提醒「☔ 出門記得帶雨具」。可在個人設定 ⚙️ 中關閉。","個人設定 ⚙️|點天氣卡片右上 ⚙️ 進入，包含：①目前狀況診斷（即時溫度、降雨、警報數量）②總開關（警報橫幅與手機通知 兩個獨立）③9 種警報個別開關（橫幅與系統通知分開控制）④動畫/音效總開關與分類開關（天氣、動物、季節、音效）⑤通知權限狀態與「測試通知」「重新抓取天氣」按鈕。所有設定即時生效並雲端同步。","手機系統通知|啟用通知權限後，App 開啟時約每 30 秒查一次官方資料；關閉 App 後則由手機的背景同步或伺服器 Web Push 決定，純前端無法保證秒級到達。靜音時段內（管理員可設定，預設 22:00 至 07:00）不通知，保護休息。iOS 必須先「分享 → 加入主畫面」並從主畫面開啟才能啟用通知。","潮汐預報|自動偵測位置，顯示最近海岸測站的 7 日潮汐（滿潮/乾潮時間與潮位高度）。點選任一日可查看當日逐時詳細資料。資料來源為中央氣象署 CWA 開放資料。可點卡片上方箭頭收合節省空間。","季節動畫與環境音效|搭配四季與天氣自動變化：春花蝶舞與青蛙吐舌、夏夜螢火與蟬鳴、秋楓飄落與蜻蜓、冬霜結晶與寒鴉、雨天雨滴水花與雷電閃光、颱風雲卷、晴天陽光暈與鳥鳴、夜晚星空與蟋蟀。可在個人設定 ⚙️ 中關閉以省電。","暗夜模式自動切換|19:00 至 05:00 自動切換為暗色 UI（黑底白字），05:00 至 19:00 自動恢復白天模式，不再使用漸暗遮罩。系統依手機時間自動判斷，無需手動切換。可保護夜間視力、省電、夜班使用不刺眼。","雲端同步|登入 Google 帳號後，班表設定、標記事項、請假紀錄、備註、特休額度、颱風假時數、語言偏好、個人警報設定全部自動同步至雲端 Firestore。更換手機或清除資料後重新登入即可完整恢復，無需備份碼。薪資設定也會同步，但僅限你本人帳號可讀取（Firestore 規則鎖定 uid），其他人與管理員都看不到。","單位與輪班管理|管理員可在後台建立單位（如「研磨股 A 班/B 班/C 班」）與多種輪班規則（如四休二、兩早兩晚循環等），並鎖定使用者的單位和輪班類型。鎖定後使用者無法自行更改，確保全員資料一致。管理員亦可設定假別、發薪日、體檢、會議、警報門檻、靜音時段、視覺特效開關等。","多單位查看|管理員可在頂部選擇「全部單位」一次查看所有單位請假人數，方便整廠人力調度。一般使用者只看到自己所屬單位的資料。","節慶與假日|自動顯示台灣國定假日（含補假、調整放假）與印尼節慶（開齋節、宰牲節、寧靜日、衛塞節等），假日以紅色頂部標線標示。語言隨中文/印尼文切換自動翻譯。同時顯示固定節慶（情人節、母親節、雙 11 等，不影響休假但便於記憶）。","分享班表|點擊「分享」按鈕可產生當月班表 PNG 圖片，包含班別、假日、標記、節日等完整資訊。支援系統分享面板（直接分享到 LINE、WhatsApp 等），或自動下載到相簿，方便傳送給同事或家人。","安裝到桌面|底部安裝按鈕可將 App 加到手機桌面，如同原生 App 全螢幕使用，離線也能查看本月班表。右上角可切換中文（中）/印尼文（ID）。iOS 請用 Safari 開啟後「分享 → 加入主畫面」。Android 用 Chrome 自動跳出安裝提示。","桌面今日捷徑|想不開 App 一眼看今天什麼班？在瀏覽器網址列把 ?w=1 加在網址結尾（例：…/myshift/?w=1），打開後選「加入主畫面」，命名為「今日班別」。從此桌面上會多一個專屬捷徑，點開就是巨型今日班別顯示，完全離線、秒開。"],
+  h:["初始設定|首次使用回答三個問題（上班或休假→班別→第幾天），系統自動排出整年班表。若管理員已在後台鎖定你的輪班規則，只需設定今天是哪一班即可。可隨時點底部「重設」重新設定。","查看班表|左右箭頭切換月份，點「今天」立刻回到本月。每日格子以顏色區分：藍色＝早班、紫色＝晚班、黃色＝中班、灰色＝休假。點擊任一日期可查看詳情、請假或標記事項。今天的日期會以橘色粗框顯示。","請假系統|點擊日期 → 選假別 → 選開始與結束 → 確認。可自訂完整班別內的時間（半小時刻度），也可選「全班 12h」「正常 8h」「只不加班」。早班 08:00–20:00、晚班 20:00–翌日08:00；前 8h 是正常工時，後 4h 是加班。全班未出勤只扣 8h 假，後 4h 自動減少加班；只選加班時段不扣假、不扣本薪。病假、事假等正常請假依設定單位檢查。送出前顯示扣假、當日加班與薪資估算，無需另填加班。同事僅看正常工時請假人數，管理員可看明細與原因。可取消紀錄恢復計算。","標記事項與颱風假|每日可標記：📚上課、🚗公出、💰發薪日、🌴特休、🌀颱風假、📝自訂備註（最多 50 字）。天災假可指定時數，依本期薪資條視為給薪時數，不扣加班與本薪。管理員可額外設定 📋班股會議與 🏥體檢日期，全體使用者可見。","特休管理|在請假彈窗下方輸入年度特休總時數與已使用時數（0.5 小時為單位）。日曆上勾選特休的日期會自動扣除並計算剩餘時數。特休年度為每年 12/26 到隔年 12/25（華新麗華制度）。","統計功能|點擊「統計」查看各班別天數、月工時、加班時數與特休使用率。12h 班由正常 8h＋加班 4h 組成；新增請假的完整時段會自動拆分，特休與請假統計只計正常工時。加班費按每天剩餘加班時數拆分前 2h／後段倍率。可切換年度。","薪資預估|月曆下方薪資卡片可設定薪資條完整欄位：職能俸、伙食津貼、交通津貼、崗位津貼、夜點費、勞健保自付、工會、福利金、其他固定扣款。系統自動估算當月實領金額，包含：前 2h 與後段加班費（不同倍率，公司 HR System 1.33340 / 1.66670）、免稅約 46.67h 切點、晚班次數 × 夜點費（可本期總額覆寫）、病假與事假扣款；天災假不扣加班。薪資資料同步至你個人雲端帳號（只有你看得到），換手機登入即可復原。","薪資計算週期|每月薪資計算區間為上月 26 日至當月 25 日。例如 3 月薪水計算的是 2/26 至 3/25 的出勤與加班時數。每月 5 日發放薪資（💰），每月 20 日發放績效獎金（🏆）。遇國定假日或週末自動提前至前一個工作日，日曆上直接標示實際發放日。","7 日天氣預報|自動偵測位置顯示 7 日天氣，點選可看逐時詳情（溫度、降雨機率、陣風、濕度）。App 開啟時每 5 分鐘檢查更新，回到畫面或恢復連線時補抓；來源資料依各機構更新週期提供。可在個人設定 ⚙️ 點「重新抓取」強制立即更新。降雨機率優先採中央氣象署鄉鎮區間預報，溫度/濕度/風速採 Open-Meteo；即時雨量站只顯示實況，不會改寫預報。","9 種天氣警報|系統自動偵測並顯示警報橫幅，共 9 種：🌍地震、🌀颱風、⛈雷雨、🌧豪大雨/高降雨、🌂一般降雨、💨強風、🥵高溫、🥶低溫、🌫濃霧。地震使用中央氣象署有感地震報告；優先採所在地觀測震度，尚無所在地震度時才以規模＋震源距離保守判斷，且舊報告不補推。颱風與其他警特報以 CWA 官方有效時間、GPS 鄉鎮／CAP 範圍為準。每種警報的觸發門檻可由管理員在後台調整。","下雨提醒|上班日出門時段（早班/中班/晚班各自上班前 1 至 2 小時）若降雨機率 ≥ 40%，會在日曆下方顯示醒目橘色提醒「☔ 出門記得帶雨具」。可在個人設定 ⚙️ 中關閉。","個人設定 ⚙️|點天氣卡片右上 ⚙️ 進入，包含：①目前狀況診斷（即時溫度、降雨、警報數量）②總開關（警報橫幅與手機通知 兩個獨立）③9 種警報個別開關（橫幅與系統通知分開控制）④動畫/音效總開關與分類開關（天氣、動物、季節、音效）⑤通知權限狀態與「測試通知」「重新抓取天氣」按鈕。所有設定即時生效並雲端同步。","手機系統通知|啟用通知權限後，App 開啟時約每 30 秒查一次官方資料；關閉 App 後則由手機的背景同步或伺服器 Web Push 決定，純前端無法保證秒級到達。靜音時段內（管理員可設定，預設 22:00 至 07:00）不通知，保護休息。iOS 必須先「分享 → 加入主畫面」並從主畫面開啟才能啟用通知。","潮汐預報|自動偵測位置，顯示最近海岸測站的 7 日潮汐（滿潮/乾潮時間與潮位高度）。點選任一日可查看當日逐時詳細資料。資料來源為中央氣象署 CWA 開放資料。可點卡片上方箭頭收合節省空間。","季節動畫與環境音效|搭配四季與天氣自動變化：春花蝶舞與青蛙吐舌、夏夜螢火與蟬鳴、秋楓飄落與蜻蜓、冬霜結晶與寒鴉、雨天雨滴水花與雷電閃光、颱風雲卷、晴天陽光暈與鳥鳴、夜晚星空與蟋蟀。可在個人設定 ⚙️ 中關閉以省電。","暗夜模式自動切換|19:00 至 05:00 自動切換為暗色 UI（黑底白字），05:00 至 19:00 自動恢復白天模式，不再使用漸暗遮罩。系統依手機時間自動判斷，無需手動切換。可保護夜間視力、省電、夜班使用不刺眼。","雲端同步|登入 Google 帳號後，班表設定、標記事項、請假紀錄、備註、特休額度、颱風假時數、語言偏好、個人警報設定全部自動同步至雲端 Firestore。更換手機或清除資料後重新登入即可完整恢復，無需備份碼。薪資設定也會同步，但僅限你本人帳號可讀取（Firestore 規則鎖定 uid），其他人與管理員都看不到。","單位與輪班管理|管理員可在後台建立單位（如「研磨股 A 班/B 班/C 班」）與多種輪班規則（如四休二、兩早兩晚循環等），並鎖定使用者的單位和輪班類型。鎖定後使用者無法自行更改，確保全員資料一致。管理員亦可設定假別、發薪日、體檢、會議、警報門檻、靜音時段、視覺特效開關等。","多單位查看|管理員可在頂部選擇「全部單位」一次查看所有單位請假人數，方便整廠人力調度。一般使用者只看到自己所屬單位的資料。","節慶與假日|自動顯示台灣國定假日（含補假、調整放假）與印尼節慶（開齋節、宰牲節、寧靜日、衛塞節等），假日以紅色頂部標線標示。語言隨中文/印尼文切換自動翻譯。同時顯示固定節慶（情人節、母親節、雙 11 等，不影響休假但便於記憶）。","分享班表|點擊「分享」按鈕可產生當月班表 PNG 圖片，包含班別、假日、標記、節日等完整資訊。支援系統分享面板（直接分享到 LINE、WhatsApp 等），或自動下載到相簿，方便傳送給同事或家人。","安裝到桌面|底部安裝按鈕可將 App 加到手機桌面，如同原生 App 全螢幕使用，離線也能查看本月班表。右上角可切換中文（中）/印尼文（ID）。iOS 請用 Safari 開啟後「分享 → 加入主畫面」。Android 用 Chrome 自動跳出安裝提示。","桌面今日捷徑|想不開 App 一眼看今天什麼班？在瀏覽器網址列把 ?w=1 加在網址結尾（例：…/myshift/?w=1），打開後選「加入主畫面」，命名為「今日班別」。從此桌面上會多一個專屬捷徑，點開就是巨型今日班別顯示，完全離線、秒開。"],
   wk:["日","一","二","三","四","五","六"]},
 id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis setahun",s12:"12 jam",s8:"8 jam",cyc:"hari",
   today:"Hari ini",reset:"Reset",help:"Info",lang:"ZH",work:"Kerja",off:"Libur",
@@ -805,7 +804,7 @@ id:{app:"My Shift",sub:"Jadwal Kerja",desc:"Pilih shift, 3 langkah otomatis seta
   instT:"Pasang di HP",instS:"Satu klik",instSi:"Safari→Bagikan→Layar Utama",instB:"Pasang",
   aSet:"✅ Alarm: #m#/#d# 07:00",aNow:"✅ Terkirim!",aBlock:"Diblokir",aNoPerm:"Perlu izin",aNo:"Tidak mendukung",sRem:"Pengingat",
   helpT:"📖 Panduan",
-  h:["Pengaturan Awal|Pertama kali pakai, jawab 3 pertanyaan (kerja/libur → shift apa → hari ke berapa), jadwal setahun otomatis dibuat. Jika admin sudah mengunci aturan shift Anda, cukup pilih hari ini shift apa. Bisa tekan 'Reset' di bawah untuk atur ulang kapan saja.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, tekan 'Hari ini' untuk kembali ke bulan ini. Warna kotak: biru = Pagi, ungu = Malam, kuning = Siang, abu-abu = Libur. Tekan tanggal mana saja untuk lihat detail, ajukan cuti, atau tandai acara. Tanggal hari ini ditandai garis oranye tebal.","Sistem Cuti|Tekan tanggal → pilih jenis cuti → pilih waktu mulai/selesai → simpan. Waktu dapat dipilih setiap 30 menit sepanjang shift, termasuk lewat tengah malam. Tombol cepat: Penuh 12h, Normal 8h, Tanpa lembur. Shift pagi 08:00–20:00; malam 20:00–besok 08:00. Delapan jam awal adalah jam normal, empat jam akhir lembur. Absen penuh memakai 8h cuti dan mengurangi 4h lembur. Hanya absen pada jam lembur tidak memotong cuti atau gaji pokok. Minimum jam cuti mengikuti jenisnya. Pratinjau menampilkan cuti, sisa lembur, dan estimasi gaji; tidak perlu input lembur terpisah. Rekan hanya melihat jumlah orang cuti normal, admin dapat melihat rincian dan alasan. Data dapat dibatalkan.","Tanda Acara & Libur Topan|Tandai harian: 📚Kelas, 🚗Dinas, 💰Gajian, 🌴Cuti Tahunan, 🌀Libur Topan, 📝Catatan bebas (maks 50 huruf). Jam libur bencana dapat dicatat; sesuai slip periode ini tidak mengurangi lembur atau gaji pokok. Admin bisa tambah 📋Rapat dan 🏥Cek Kesehatan untuk semua user.","Kelola Cuti Tahunan|Di bawah jendela cuti, isi total jam cuti tahunan dan jam terpakai (per 0.5 jam). Tanggal yang ditandai cuti tahunan otomatis dikurangi dan sisa dihitung. Tahun cuti: 26 Desember tahun ini sampai 25 Desember tahun depan (aturan Walsin Lihwa).","Statistik|Tekan Stat untuk statistik tahunan: hari per shift, jam per bulan, lembur dan sisa cuti tahunan. Shift 12h terdiri dari 8h normal + 4h lembur. Waktu absen otomatis dipisah; kuota cuti hanya berkurang pada jam normal. Upah lembur dihitung per hari dari sisa jam lembur, dengan tarif 2h awal dan sisanya. Gunakan panah untuk mengganti tahun.","Estimasi Gaji|Kartu gaji di bawah kalender, atur semua kolom slip gaji: Gaji Pokok, Tunjangan Makan, Transport, Posisi, Tunjangan Malam (per shift malam), BPJS Tenaga Kerja, BPJS Kesehatan, Iuran Serikat, Tunjangan Kesejahteraan, Potongan Lain. Sistem otomatis hitung perkiraan gaji bersih, termasuk: lembur 2 jam awal dan sisanya (tarif berbeda, default 1.33340 dan 1.66670), batas bebas pajak sekitar 46,67 jam, jumlah shift malam × tunjangan malam (bisa override total per periode), potongan sakit/izin; libur bencana tidak mengurangi lembur. Data gaji disinkronkan ke akun cloud pribadi dan hanya dapat dilihat oleh Anda.","Periode Perhitungan Gaji|Periode gaji dihitung dari tanggal 26 bulan lalu sampai tanggal 25 bulan ini. Contoh: gaji Maret dihitung dari 26 Februari sampai 25 Maret. Gaji dibayar tanggal 5 setiap bulan (💰), bonus kinerja tanggal 20 (🏆). Jika jatuh di hari libur nasional atau weekend, otomatis dimajukan ke hari kerja sebelumnya. Tanggal pembayaran asli ditampilkan di kalender.","Prakiraan Cuaca 7 Hari|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Tekan untuk detail per jam (suhu, kemungkinan hujan, kecepatan angin, kelembaban). Data diperbarui otomatis setiap jam. Bisa tekan ⚙️ Pengaturan lalu 'Reload' untuk update segera. Probabilitas hujan mengutamakan prakiraan interval CWA; suhu/kelembapan/angin memakai Open-Meteo. Observasi stasiun hujan tidak mengubah prakiraan.","9 Jenis Peringatan Cuaca|Sistem otomatis deteksi dan tampilkan banner peringatan, total 9 jenis: 🌍Gempa Bumi, 🌀Topan, ⛈Badai Petir, 🌧Hujan Lebat, 🌂Hujan Biasa, 💨Angin Kencang, 🥵Panas Ekstrem, 🥶Dingin Ekstrem, 🌫Kabut Tebal. Gempa pakai data realtime CWA Taiwan dengan ambang magnitudo, intensitas, jarak, dan waktu (salah satu lewat ambang langsung peringatan). Topan utamakan peringatan resmi CWA. Ambang setiap peringatan bisa diatur admin.","Pengingat Bawa Payung|Pada hari kerja, di jam berangkat (1 sampai 2 jam sebelum shift Pagi/Siang/Malam) jika kemungkinan hujan ≥ 40%, banner oranye 'Bawa payung' akan muncul di bawah kalender. Bisa dimatikan di Pengaturan ⚙️.","Pengaturan Pribadi ⚙️|Tekan ikon ⚙️ di pojok kanan atas kartu cuaca untuk masuk: ①Status saat ini (suhu, hujan, jumlah peringatan aktif) ②Saklar utama (Banner Peringatan dan Notifikasi HP — dua saklar terpisah) ③Saklar individu 9 peringatan (Banner dan Notifikasi diatur terpisah) ④Animasi cuaca dan suara on/off ⑤Status izin notifikasi dan tombol 'Test Notifikasi' dan 'Reload cuaca'. Semua pengaturan langsung aktif dan tersinkron ke cloud.","Notifikasi HP|Setelah izin notifikasi diaktifkan, peringatan serius seperti Topan, Hujan Lebat, Angin Kencang, Gempa akan muncul sebagai notifikasi sistem HP (bahkan saat App ditutup). Pada jam tenang (default 22:00 sampai 07:00, bisa diatur admin) tidak ada notifikasi, lindungi istirahat. iOS wajib 'Bagikan → Tambah ke Layar Utama' dan buka dari layar utama dulu, baru bisa aktifkan notifikasi.","Pasang Surut|Deteksi lokasi otomatis, tampilkan pasang surut 7 hari dari stasiun pantai terdekat (waktu pasang/surut dan ketinggian air). Tekan tanggal mana saja untuk detail per jam hari itu. Sumber data: CWA Taiwan open data. Tekan panah di atas kartu untuk lipat dan hemat ruang.","Animasi Musim dan Suara Alam|Berubah otomatis sesuai musim dan cuaca: musim semi (bunga, kupu-kupu, katak), musim panas malam (kunang-kunang, suara jangkrik), musim gugur (daun maple, capung), musim dingin (kristal es, burung gagak), hari hujan (tetesan, kilat petir), topan (awan bergulung), hari cerah (cahaya matahari, kicau burung), malam (langit berbintang, jangkrik). Bisa dimatikan di Pengaturan ⚙️ untuk hemat baterai.","Mode Gelap Otomatis|Pukul 19:00 sampai 05:00 otomatis ganti tampilan gelap (latar hitam, tulisan putih), 18:00 sampai 19:00 masa transisi (warna siang dengan layer gelap perlahan). Sistem otomatis berdasarkan jam HP, tidak perlu ganti manual. Melindungi mata di malam hari, hemat baterai, nyaman untuk shift malam.","Sinkronisasi Cloud|Login akun Google, semua pengaturan jadwal, tanda acara, riwayat cuti, catatan, kuota cuti tahunan, jam Libur Topan, bahasa, dan pengaturan peringatan pribadi otomatis tersimpan ke cloud Firestore. Ganti HP atau hapus data App, cukup login lagi untuk pulih lengkap, tanpa kode cadangan. Pengecualian: Data Gaji hanya di HP, tidak ke cloud (lindungi privasi).","Unit dan Aturan Shift|Admin bisa buat unit (contoh: Grinding Shift A/B/C) dan berbagai aturan shift (4 kerja 2 libur, 2 Pagi 2 Malam, dll) di panel admin, lalu kunci unit dan jenis shift setiap user. Setelah dikunci, user tidak bisa ubah sendiri agar data konsisten. Admin juga bisa atur jenis cuti, tanggal gajian, cek kesehatan, rapat, ambang peringatan, jam tenang, on/off animasi.","Lihat Semua Unit|Admin bisa pilih 'Semua Unit' di atas untuk lihat jumlah cuti semua unit sekaligus, memudahkan pengaturan tenaga kerja seluruh pabrik. User biasa hanya lihat data unitnya sendiri.","Hari Libur dan Perayaan|Otomatis tampilkan hari libur nasional Taiwan (termasuk pengganti, libur sambung) dan perayaan Indonesia (Idul Fitri, Idul Adha, Nyepi, Waisak, dll). Hari libur ditandai garis merah di atas tanggal. Terjemahan otomatis sesuai bahasa 中文/Indonesia. Perayaan tetap (Valentine, Hari Ibu, 11.11, dll) juga ditampilkan untuk diingat (tidak mempengaruhi libur).","Bagikan Jadwal|Tekan 'Share' untuk buat gambar PNG jadwal bulan ini, lengkap dengan shift, hari libur, tanda acara, dan perayaan. Mendukung panel berbagi sistem (langsung ke LINE, WhatsApp, dll) atau otomatis simpan ke galeri foto, mudah dikirim ke teman atau keluarga.","Pasang ke Layar|Tombol pasang di bawah untuk tambah App ke layar utama HP, seperti app asli — layar penuh, bisa offline. Ganti bahasa 中/ID di pojok kanan atas. iOS: buka di Safari → Bagikan → Tambah ke Layar Utama. Android: Chrome akan otomatis muncul tombol pasang.","Pintasan Hari Ini|Mau lihat shift hari ini tanpa buka App? Di browser, tambahkan ?w=1 di akhir URL (contoh: …/myshift/?w=1), lalu pilih 'Tambah ke Layar Utama', beri nama 'Shift Hari Ini'. Akan ada pintasan baru di layar HP — buka langsung tampil shift hari ini ukuran besar, offline, instan."],
+  h:["Pengaturan Awal|Pertama kali pakai, jawab 3 pertanyaan (kerja/libur → shift apa → hari ke berapa), jadwal setahun otomatis dibuat. Jika admin sudah mengunci aturan shift Anda, cukup pilih hari ini shift apa. Bisa tekan 'Reset' di bawah untuk atur ulang kapan saja.","Lihat Jadwal|Geser bulan dengan panah kiri/kanan, tekan 'Hari ini' untuk kembali ke bulan ini. Warna kotak: biru = Pagi, ungu = Malam, kuning = Siang, abu-abu = Libur. Tekan tanggal mana saja untuk lihat detail, ajukan cuti, atau tandai acara. Tanggal hari ini ditandai garis oranye tebal.","Sistem Cuti|Tekan tanggal → pilih jenis cuti → pilih waktu mulai/selesai → simpan. Waktu dapat dipilih setiap 30 menit sepanjang shift, termasuk lewat tengah malam. Tombol cepat: Penuh 12h, Normal 8h, Tanpa lembur. Shift pagi 08:00–20:00; malam 20:00–besok 08:00. Delapan jam awal adalah jam normal, empat jam akhir lembur. Absen penuh memakai 8h cuti dan mengurangi 4h lembur. Hanya absen pada jam lembur tidak memotong cuti atau gaji pokok. Minimum jam cuti mengikuti jenisnya. Pratinjau menampilkan cuti, sisa lembur, dan estimasi gaji; tidak perlu input lembur terpisah. Rekan hanya melihat jumlah orang cuti normal, admin dapat melihat rincian dan alasan. Data dapat dibatalkan.","Tanda Acara & Libur Topan|Tandai harian: 📚Kelas, 🚗Dinas, 💰Gajian, 🌴Cuti Tahunan, 🌀Libur Topan, 📝Catatan bebas (maks 50 huruf). Jam libur bencana dapat dicatat; sesuai slip periode ini tidak mengurangi lembur atau gaji pokok. Admin bisa tambah 📋Rapat dan 🏥Cek Kesehatan untuk semua user.","Kelola Cuti Tahunan|Di bawah jendela cuti, isi total jam cuti tahunan dan jam terpakai (per 0.5 jam). Tanggal yang ditandai cuti tahunan otomatis dikurangi dan sisa dihitung. Tahun cuti: 26 Desember tahun ini sampai 25 Desember tahun depan (aturan Walsin Lihwa).","Statistik|Tekan Stat untuk statistik tahunan: hari per shift, jam per bulan, lembur dan sisa cuti tahunan. Shift 12h terdiri dari 8h normal + 4h lembur. Waktu absen otomatis dipisah; kuota cuti hanya berkurang pada jam normal. Upah lembur dihitung per hari dari sisa jam lembur, dengan tarif 2h awal dan sisanya. Gunakan panah untuk mengganti tahun.","Estimasi Gaji|Kartu gaji di bawah kalender, atur semua kolom slip gaji: Gaji Pokok, Tunjangan Makan, Transport, Posisi, Tunjangan Malam (per shift malam), BPJS Tenaga Kerja, BPJS Kesehatan, Iuran Serikat, Tunjangan Kesejahteraan, Potongan Lain. Sistem otomatis hitung perkiraan gaji bersih, termasuk: lembur 2 jam awal dan sisanya (tarif berbeda, default 1.33340 dan 1.66670), batas bebas pajak sekitar 46,67 jam, jumlah shift malam × tunjangan malam (bisa override total per periode), potongan sakit/izin; libur bencana tidak mengurangi lembur. Data gaji disinkronkan ke akun cloud pribadi dan hanya dapat dilihat oleh Anda.","Periode Perhitungan Gaji|Periode gaji dihitung dari tanggal 26 bulan lalu sampai tanggal 25 bulan ini. Contoh: gaji Maret dihitung dari 26 Februari sampai 25 Maret. Gaji dibayar tanggal 5 setiap bulan (💰), bonus kinerja tanggal 20 (🏆). Jika jatuh di hari libur nasional atau weekend, otomatis dimajukan ke hari kerja sebelumnya. Tanggal pembayaran asli ditampilkan di kalender.","Prakiraan Cuaca 7 Hari|Deteksi lokasi otomatis, tampilkan cuaca 7 hari. Tekan untuk detail per jam (suhu, kemungkinan hujan, kecepatan angin, kelembaban). Saat aplikasi terbuka, data diperiksa setiap 5 menit dan saat kembali online; pembaruan sumber mengikuti jadwal penyedia. Bisa tekan ⚙️ Pengaturan lalu 'Reload' untuk update segera. Probabilitas hujan mengutamakan prakiraan interval CWA; suhu/kelembapan/angin memakai Open-Meteo. Observasi stasiun hujan tidak mengubah prakiraan.","9 Jenis Peringatan Cuaca|Sistem otomatis deteksi dan tampilkan banner peringatan, total 9 jenis: 🌍Gempa Bumi, 🌀Topan, ⛈Badai Petir, 🌧Hujan Lebat, 🌂Hujan Biasa, 💨Angin Kencang, 🥵Panas Ekstrem, 🥶Dingin Ekstrem, 🌫Kabut Tebal. Gempa pakai data realtime CWA Taiwan dengan ambang magnitudo, intensitas, jarak, dan waktu (salah satu lewat ambang langsung peringatan). Topan utamakan peringatan resmi CWA. Ambang setiap peringatan bisa diatur admin.","Pengingat Bawa Payung|Pada hari kerja, di jam berangkat (1 sampai 2 jam sebelum shift Pagi/Siang/Malam) jika kemungkinan hujan ≥ 40%, banner oranye 'Bawa payung' akan muncul di bawah kalender. Bisa dimatikan di Pengaturan ⚙️.","Pengaturan Pribadi ⚙️|Tekan ikon ⚙️ di pojok kanan atas kartu cuaca untuk masuk: ①Status saat ini (suhu, hujan, jumlah peringatan aktif) ②Saklar utama (Banner Peringatan dan Notifikasi HP — dua saklar terpisah) ③Saklar individu 9 peringatan (Banner dan Notifikasi diatur terpisah) ④Animasi cuaca dan suara on/off ⑤Status izin notifikasi dan tombol 'Test Notifikasi' dan 'Reload cuaca'. Semua pengaturan langsung aktif dan tersinkron ke cloud.","Notifikasi HP|Setelah izin notifikasi diaktifkan, peringatan serius seperti Topan, Hujan Lebat, Angin Kencang, Gempa akan muncul sebagai notifikasi sistem HP (bahkan saat App ditutup). Pada jam tenang (default 22:00 sampai 07:00, bisa diatur admin) tidak ada notifikasi, lindungi istirahat. iOS wajib 'Bagikan → Tambah ke Layar Utama' dan buka dari layar utama dulu, baru bisa aktifkan notifikasi.","Pasang Surut|Deteksi lokasi otomatis, tampilkan pasang surut 7 hari dari stasiun pantai terdekat (waktu pasang/surut dan ketinggian air). Tekan tanggal mana saja untuk detail per jam hari itu. Sumber data: CWA Taiwan open data. Tekan panah di atas kartu untuk lipat dan hemat ruang.","Animasi Musim dan Suara Alam|Berubah otomatis sesuai musim dan cuaca: musim semi (bunga, kupu-kupu, katak), musim panas malam (kunang-kunang, suara jangkrik), musim gugur (daun maple, capung), musim dingin (kristal es, burung gagak), hari hujan (tetesan, kilat petir), topan (awan bergulung), hari cerah (cahaya matahari, kicau burung), malam (langit berbintang, jangkrik). Bisa dimatikan di Pengaturan ⚙️ untuk hemat baterai.","Mode Gelap Otomatis|Pukul 19:00 sampai 05:00 otomatis ganti tampilan gelap (latar hitam, tulisan putih), 18:00 sampai 19:00 masa transisi (warna siang dengan layer gelap perlahan). Sistem otomatis berdasarkan jam HP, tidak perlu ganti manual. Melindungi mata di malam hari, hemat baterai, nyaman untuk shift malam.","Sinkronisasi Cloud|Login akun Google, semua pengaturan jadwal, tanda acara, riwayat cuti, catatan, kuota cuti tahunan, jam Libur Topan, bahasa, dan pengaturan peringatan pribadi otomatis tersimpan ke cloud Firestore. Ganti HP atau hapus data App, cukup login lagi untuk pulih lengkap, tanpa kode cadangan. Pengecualian: Data Gaji hanya di HP, tidak ke cloud (lindungi privasi).","Unit dan Aturan Shift|Admin bisa buat unit (contoh: Grinding Shift A/B/C) dan berbagai aturan shift (4 kerja 2 libur, 2 Pagi 2 Malam, dll) di panel admin, lalu kunci unit dan jenis shift setiap user. Setelah dikunci, user tidak bisa ubah sendiri agar data konsisten. Admin juga bisa atur jenis cuti, tanggal gajian, cek kesehatan, rapat, ambang peringatan, jam tenang, on/off animasi.","Lihat Semua Unit|Admin bisa pilih 'Semua Unit' di atas untuk lihat jumlah cuti semua unit sekaligus, memudahkan pengaturan tenaga kerja seluruh pabrik. User biasa hanya lihat data unitnya sendiri.","Hari Libur dan Perayaan|Otomatis tampilkan hari libur nasional Taiwan (termasuk pengganti, libur sambung) dan perayaan Indonesia (Idul Fitri, Idul Adha, Nyepi, Waisak, dll). Hari libur ditandai garis merah di atas tanggal. Terjemahan otomatis sesuai bahasa 中文/Indonesia. Perayaan tetap (Valentine, Hari Ibu, 11.11, dll) juga ditampilkan untuk diingat (tidak mempengaruhi libur).","Bagikan Jadwal|Tekan 'Share' untuk buat gambar PNG jadwal bulan ini, lengkap dengan shift, hari libur, tanda acara, dan perayaan. Mendukung panel berbagi sistem (langsung ke LINE, WhatsApp, dll) atau otomatis simpan ke galeri foto, mudah dikirim ke teman atau keluarga.","Pasang ke Layar|Tombol pasang di bawah untuk tambah App ke layar utama HP, seperti app asli — layar penuh, bisa offline. Ganti bahasa 中/ID di pojok kanan atas. iOS: buka di Safari → Bagikan → Tambah ke Layar Utama. Android: Chrome akan otomatis muncul tombol pasang.","Pintasan Hari Ini|Mau lihat shift hari ini tanpa buka App? Di browser, tambahkan ?w=1 di akhir URL (contoh: …/myshift/?w=1), lalu pilih 'Tambah ke Layar Utama', beri nama 'Shift Hari Ini'. Akan ada pintasan baru di layar HP — buka langsung tampil shift hari ini ukuran besar, offline, instan."],
   wk:["Min","Sen","Sel","Rab","Kam","Jum","Sab"]}
 };
 let RN={zh:{"4on2off":"做4休2","2on2off":"做2休2"},id:{"4on2off":"4K 2L","2on2off":"2K 2L"}};
@@ -1248,6 +1247,7 @@ try{
 function setUiTab(tab){
   if(!["today","calendar","pay","weather","more"].includes(tab))tab="today";
   UI_TAB=tab;
+  if(tab==="weather")loadWx({resume:true});
   try{localStorage.setItem("myshift_ui_tab",tab)}catch(e){}
   window.scrollTo({top:0,behavior:(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)?"auto":"smooth"});
 }
@@ -2524,13 +2524,13 @@ function wxDetailHtml(){
   for(let h=0;h<24;h++){
     const k=today+"T"+String(h).padStart(2,"0")+":00";
     const i=wxData.hTime.indexOf(k);if(i<0)continue;
-    const tmp=wxData.hTemp&&Number.isFinite(Number(wxData.hTemp[i]))?Math.round(Number(wxData.hTemp[i])):"--";
+    const tmp=wxData.hTemp&&WeatherData.num(wxData.hTemp[i])!==null?Math.round(Number(wxData.hTemp[i])):"--";
     const pop=_normalPop(wxData.hPrec&&wxData.hPrec[i]);
     const src=_popSourceAt(wxData,i);
-    const popBadge=src==='cwa'?(isZh?`官方${windowH?` ${windowH}h`:''}`:`CWA${windowH?` ${windowH}h`:''}`):(src==='open-meteo'?(isZh?'模式':'Model'):'');
+    const popBadge=src==='cwa'?(isZh?`官方${windowH?` ${windowH}h`:''}`:`CWA${windowH?` ${windowH}h`:''}`):(src==='open-meteo'||src==='met-no'?(isZh?'模式':'Model'):'');
     const prec=pop===null?'--':`<div class="wx-pop-value">${pop}%</div>${popBadge?`<div class="wx-pop-badge ${src==='cwa'?'official':'model'}">${popBadge}</div>`:''}`;
-    const wind=wxData.hGust&&Number.isFinite(Number(wxData.hGust[i]))?Math.round(Number(wxData.hGust[i]))+"km/h":"--";
-    const hum=wxData.hHum&&Number.isFinite(Number(wxData.hHum[i]))?Math.round(Number(wxData.hHum[i]))+"%":"--";
+    const wind=wxData.hGust&&WeatherData.num(wxData.hGust[i])!==null?Math.round(Number(wxData.hGust[i]))+"km/h":"--";
+    const hum=wxData.hHum&&WeatherData.num(wxData.hHum[i])!==null?Math.round(Number(wxData.hHum[i]))+"%":"--";
     const code=wxData.hCode?wxData.hCode[i]:0;
     rows+=`<div class="cell">${String(h).padStart(2,"0")}:00</div><div class="cell">${WXI[code]||""} ${tmp}°</div><div class="cell wx-pop-cell">${prec}</div><div class="cell">${wind}</div><div class="cell">${hum}</div>`;
   }
@@ -2538,9 +2538,9 @@ function wxDetailHtml(){
   const hasCwa=Array.isArray(wxData.hPopSource)&&wxData.hPopSource.some((v,i)=>v==='cwa'&&String(wxData.hTime[i]||'').startsWith(today));
   const sourceNote=hasCwa
     ?(isZh?`降雨機率採中央氣象署鄉鎮預報原始${windowH?windowH+' 小時':'區間'}值；雨量站只顯示實況，不會改寫預報。`:`Rain probability uses original CWA interval values; station observations never overwrite the forecast.`)
-    :(isZh?'本日 CWA 降雨機率暫無資料，暫用 Open-Meteo 模式備援；不與其他來源取最大值。':'CWA probability unavailable; Open-Meteo is used as a clearly marked fallback.');
+    :(isZh?`本日 CWA 降雨機率暫無資料，採 ${esc(wxData.source||'Open-Meteo')} 模式；未提供的機率保持空白，不視為 0%。`:`CWA probability unavailable; using ${esc(wxData.source||'Open-Meteo')}. Missing probability stays blank, never 0%.`);
   const place=(wxData.place&&wxData.place.display)||_gpsPlaceText();
-  const updated=wxData.updatedAt?new Date(wxData.updatedAt).toLocaleString([], {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'--';
+  const updated=_wxTimeLabel(wxData.sourceTime||wxData.updatedAt);
   return`<div class="wx-detail" onclick="closeWxDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">${isZh?'⛅ 逐時天氣與降雨區間':'⛅ Hourly weather & rain intervals'}</div>
     <div class="wx-source-panel"><div><b>${isZh?'位置':'Location'}：</b>${esc(place||'GPS')}</div><div><b>${isZh?'資料更新':'Updated'}：</b>${esc(updated)}</div><div class="wx-source-note">${sourceNote}</div></div>
     ${rainObsHtml()}
@@ -2828,7 +2828,7 @@ function handle(e){
       setAL(total,0);
       return;
     }
-    case "wxR":wxErr=false;wxData=null;try{localStorage.removeItem('_wxPos')}catch(e){}render();loadWx({force:true});return;
+    case "wxR":loadWx({force:true});return;
   }
   render();
   }catch(err){
@@ -2877,8 +2877,35 @@ let geoState={status:'unknown',code:null,msg:'',source:'',accuracy:null,ts:0}; /
 let wxPlace=null; // GPS 反查所在地：{county,town,display,source,lat,lon,ts}
 const WX_POS_MAX_AGE_MS=30*60*1000;   // 位置快取最多 30 分鐘；避免人在移動後仍抓舊格點
 const WX_PLACE_MAX_AGE_MS=30*60*1000; // 所在地反查快取最多 30 分鐘；與 GPS 位置同壽命
-const WX_CACHE_MAX_AGE_MS=20*60*1000;  // 天氣快取最多 20 分鐘；app 開著時會盡量取新資料，舊資料避免誤導
+const WX_CACHE_MAX_AGE_MS=20*60*1000; // 逾時資料保留但明確標示，不能冒充即時。
+const WX_OFFLINE_MAX_AGE_MS=6*60*60*1000;
+const WX_REFRESH_MS=5*60*1000;
 const WX_API_TIMEOUT_MS=12000;
+const _wxClient=WeatherData.createClient();
+let _wxPromise=null,_wxLoading=false,_wxErrorCode='',_wxLastAttemptAt=0,_wxRetryAt=0,_wxFailures=0;
+let _wxRevision=0,_wxFlightRevision=0,_wxAuxPromise=null,_wxTideAt=0;
+let _wxLocationResults=[],_wxSearchVersion=0;
+function _readWxJson(key){try{return JSON.parse(localStorage.getItem(key))}catch(e){return null}}
+function _readWxManual(){const p=_readWxJson('_wxManual');return WeatherData.validPosition(p)?p:null}
+function _wxStale(){return !!wxData&&(!wxData.updatedAt||Date.now()-wxData.updatedAt>WX_CACHE_MAX_AGE_MS||Date.now()-(wxData.sourceTime||wxData.updatedAt)>90*60000)}
+function _saveWxCache(){if(WeatherData.validWeather(wxData))try{localStorage.setItem('_wxCache',JSON.stringify({schema:302,ts:wxData.updatedAt,d:wxData}))}catch(e){}}
+function _restoreWxCache(){
+  if(wxData)return;
+  const c=_readWxJson('_wxCache'),manual=_readWxManual(),pos=manual||_readWxJson('_wxPos');
+  // Reject old service-worker caches with stripped location parameters, malformed arrays and future timestamps.
+  if(!c||c.schema!==302||!WeatherData.validWeather(c.d)||!c.ts||Date.now()-c.ts<0||Date.now()-c.ts>WX_OFFLINE_MAX_AGE_MS)return;
+  if(!!manual!==(c.d.locationSource==='manual'))return;
+  if(WeatherData.validPosition(pos)&&_geoDistKm(pos.lat,pos.lon,c.d.lat,c.d.lon)>2)return;
+  wxData=c.d;wxData._cached=true;wxErr=false;_rebuildForecastPop(wxData);
+}
+function _wxErrorText(){
+  const zh=lang==='zh';
+  if(_wxErrorCode==='location'||_wxErrorCode==='denied')return zh?'無法取得位置；請開啟定位，或自行選擇地點。':'Lokasi tidak tersedia. Aktifkan lokasi atau pilih tempat.';
+  if(_wxErrorCode==='offline')return zh?'目前沒有網路，連線恢復後會自動更新。':'Sedang offline. Cuaca diperbarui saat tersambung.';
+  if(_wxErrorCode==='rate-limit')return zh?'免費來源暫時限制請求，系統會稍後自動重試。':'Sumber sedang membatasi permintaan; akan dicoba otomatis.';
+  if(_wxErrorCode==='stale')return zh?'來源資料尚未更新，稍後會自動重試。':'Data sumber belum terbaru; akan dicoba otomatis.';
+  return zh?'天氣來源暫時無法連線，系統會自動重試。':'Sumber cuaca belum terhubung; akan dicoba otomatis.';
+}
 const WX_REVERSE_TIMEOUT_MS=4500;
 
 function _nNum(v){v=parseFloat(v);return Number.isFinite(v)?v:null}
@@ -2947,28 +2974,24 @@ async function reverseGeocodeGps(lat,lon,force){
     try{
       const c=JSON.parse(localStorage.getItem('_wxPlace'));
       const d=c&&_geoDistKm(lat,lon,c.lat,c.lon);
-      if(c&&c.county&&c.ts&&(Date.now()-c.ts)<WX_PLACE_MAX_AGE_MS&&d!==null&&d<2&&(_isValidTwCounty(c.county)||_isValidTwTown(c.town))){wxPlace=c;return c}
+      if(c&&c.county&&c.ts&&(Date.now()-c.ts)<WX_PLACE_MAX_AGE_MS&&d!==null&&d<2&&(_isValidTwCounty(c.county)||_isValidTwTown(c.town))){return c}
     }catch(e){}
   }
   // 完全以 GPS 經緯度反查目前行政區；反查失敗時不使用鹽水或任何固定地點頂替。
   const url=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=18&addressdetails=1&accept-language=zh-TW`;
   try{
-    const resp=await Promise.race([fetch(url,{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('reverse-timeout')),WX_REVERSE_TIMEOUT_MS))]);
-    if(!resp.ok)throw new Error('reverse '+resp.status);
-    const data=await resp.json();
+    const {data}=await WeatherData.json(url,{timeout:WX_REVERSE_TIMEOUT_MS});
     const a=data&&data.address||{};
     const place=_extractGpsPlaceFromAddress(a);
     if(!place.county&&!place.town)return null;
     const out={county:place.county||'',town:place.town||'',display:[place.county,place.town].filter(Boolean).join(' '),source:'gps-reverse',lat,lon,ts:Date.now()};
     try{localStorage.setItem('_wxPlace',JSON.stringify(out))}catch(e){}
-    wxPlace=out;
     return out;
   }catch(e){
     try{
       const u2=`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&localityLanguage=zh`;
-      const r2=await Promise.race([fetch(u2,{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('reverse2-timeout')),WX_REVERSE_TIMEOUT_MS))]);
-      if(r2.ok){
-        const d2=await r2.json();
+      const {data:d2}=await WeatherData.json(u2,{timeout:WX_REVERSE_TIMEOUT_MS});
+      if(d2){
         const admin=d2.localityInfo&&d2.localityInfo.administrative||[];
         const pick=admin.find(x=>/區|鎮|鄉|District|Township/i.test(x.description||''));
         const county=_pickValidCounty(d2.principalSubdivision,d2.city,d2.localityInfo?.administrative?.find(x=>/縣|市|County|City/i.test(x.description||''))?.name);
@@ -2976,12 +2999,10 @@ async function reverseGeocodeGps(lat,lon,force){
         if(county||town){
           const out={county:county||'',town:town&&town!==county?town:'',display:[county,town&&town!==county?town:''].filter(Boolean).join(' '),source:'gps-reverse-bdc',lat,lon,ts:Date.now()};
           try{localStorage.setItem('_wxPlace',JSON.stringify(out))}catch(e2){}
-          wxPlace=out;
           return out;
         }
       }
     }catch(e2){}
-    wxPlace=null;
     return null;
   }
 }
@@ -3024,9 +3045,11 @@ async function getGeoPosition(opts){
   geoState={status:'locating',code:null,msg:'',source:force?'gps-force':'gps',accuracy:null,ts:Date.now()};
   try{
     const pos=await new Promise((ok,no)=>{
-      navigator.geolocation.getCurrentPosition(ok,no,{
-        enableHighAccuracy:force||permState==='granted',
-        timeout:force?25000:(permState==='granted'?18000:12000),
+      const timer=setTimeout(()=>no({code:3}),force?12500:8500);
+      const yes=p=>{clearTimeout(timer);ok(p)},bad=e=>{clearTimeout(timer);no(e)};
+      navigator.geolocation.getCurrentPosition(yes,bad,{
+        enableHighAccuracy:force,
+        timeout:force?12000:8000,
         maximumAge:force?0:WX_POS_MAX_AGE_MS
       });
     });
@@ -3069,6 +3092,16 @@ function _wxHourIndex(){
 // 國外或 GPS 反查不到台灣縣市鄉鎮時，完全不覆蓋，維持 Open-Meteo。
 const CWA_FCST_URL='https://cwa-forecast.onerkk.workers.dev'; // CWA 鄉鎮預報 worker（內含你的 CWA 授權碼）
 
+function _cwaForecastMatchesPlace(data,place){
+  if(!place)return false;
+  const p=data.place||data.location||{},clean=s=>String(s||'').replace(/台/g,'臺').replace(/\s/g,'');
+  const county=_pickValidCounty(data.county,data.city,data.town,p.county,p.city,p.town);
+  const town=_pickValidTown(data.town,p.town,p.district);
+  if(county&&clean(county)!==clean(place.county))return false;
+  if(town&&clean(town)!==clean(place.town))return false;
+  // County forecasts must not be labelled as a township-specific forecast.
+  return !!town&&clean(town)===clean(place.town);
+}
 async function _fetchCwaForecast(lat,lon,place,force){
   try{
     const u=new URL(CWA_FCST_URL);
@@ -3077,13 +3110,8 @@ async function _fetchCwaForecast(lat,lon,place,force){
     if(place&&place.county)u.searchParams.set('county',place.county);
     if(place&&place.town)u.searchParams.set('town',place.town);
     if(force)u.searchParams.set('_',String(Date.now()));
-    const resp=await Promise.race([
-      fetch(u.toString(),{cache:'no-store'}),
-      new Promise((_,r)=>setTimeout(()=>r(new Error('cwa-fcst-timeout')),7000))
-    ]);
-    if(!resp.ok)return null;
-    const d=await resp.json();
-    if(d&&d.ok&&d.hourly&&typeof d.hourly==='object')return d;
+    const {data:d}=await WeatherData.json(u.toString(),{timeout:7000});
+    if(d&&d.ok&&d.hourly&&typeof d.hourly==='object'&&_cwaForecastMatchesPlace(d,place))return d;
     return null;
   }catch(e){return null}
 }
@@ -3109,12 +3137,12 @@ function _rebuildForecastPop(wx){
     const cp=_normalPop(cwa[i]);
     const mp=_normalPop(model[i]);
     if(cp!==null){out[i]=cp;src[i]='cwa';cwaHits++;}
-    else if(mp!==null){out[i]=mp;src[i]='open-meteo';modelHits++;}
+    else if(mp!==null){out[i]=mp;src[i]=wx.provider||'open-meteo';modelHits++;}
     else{out[i]=null;src[i]='none';}
   }
   wx.hPrec=out;
   wx.hPopSource=src;
-  wx._popSource=cwaHits>0?(modelHits>0?'cwa-mixed':'cwa'):'open-meteo';
+  wx._popSource=cwaHits>0?(modelHits>0?'cwa-mixed':'cwa'):(wx.provider||'open-meteo');
   wx._cwaPopHours=cwaHits;
   return cwaHits>0;
 }
@@ -3126,7 +3154,8 @@ function _popSourceAt(wx,i){
 }
 function _popSourceLabel(src,isZh){
   if(src==='cwa')return isZh?'中央氣象署鄉鎮預報':'CWA township forecast';
-  if(src==='open-meteo')return isZh?'Open-Meteo 模式備援':'Open-Meteo model fallback';
+  if(src==='open-meteo')return isZh?'Open-Meteo 模式預報':'Open-Meteo model forecast';
+  if(src==='met-no')return isZh?'MET Norway 模式備援':'MET Norway model fallback';
   return isZh?'無資料':'No data';
 }
 try{window._recomputeEffectivePop=_recomputeEffectivePop;window._rebuildForecastPop=_rebuildForecastPop}catch(e){}
@@ -3139,7 +3168,8 @@ function _mergeCwaForecast(wx,fc){
   wx.hPopCwa=new Array(wx.hTime.length).fill(null);
   wx.hPopCwaMeta=new Array(wx.hTime.length).fill(null);
   for(let i=0;i<wx.hTime.length;i++){
-    const k=String(wx.hTime[i]).slice(0,13);
+    const dt=new Date(wx.hTime[i]);
+    const k=new Date(dt.getTime()+8*3600000).toISOString().slice(0,13); // CWA keys are always Taiwan local time.
     const c=H[k];if(!c)continue;
     const pop=_normalPop(c.pop);
     if(pop!==null){
@@ -3150,8 +3180,8 @@ function _mergeCwaForecast(wx,fc){
         windowHours:Number(c.windowHours||fc.popWindowHours)||null
       };
     }
-    const wmo=Number(c.wmo);
-    if(Number.isFinite(wmo)&&Array.isArray(wx.hCode))wx.hCode[i]=wmo;
+    const wmo=WeatherData.num(c.wmo);
+    if(wmo!==null&&Array.isArray(wx.hCode))wx.hCode[i]=wmo;
   }
   wx._popWindowH=Number(fc.popWindowHours)||null;
   wx._cwaForecastReceivedAt=Date.now();
@@ -3184,7 +3214,7 @@ function _syncWeatherFx(){
   try{
     const fx=window.WxFx;
     if(!fx||typeof fx.update!=='function')return;
-    if(!wxData){fx.update(null,0,0,0);return}
+    if(!wxData||_wxStale()){fx.update(null,0,0,0);return}
 
     // 先找目前小時；若 API 小時字串因時區或更新延遲沒有完全對上，改抓距離現在最近的逐時資料。
     let hi=_wxHourIndex();
@@ -3250,109 +3280,99 @@ function _syncWeatherFx(){
 }
 try{window._syncWeatherFx=_syncWeatherFx}catch(e){}
 
-async function loadWx(arg,retries){
-  let force=false;
-  if(typeof arg==='number'){retries=arg;}
-  else if(typeof arg==='boolean'){force=arg;}
-  else if(arg&&typeof arg==='object'){force=!!arg.force;retries=arg.retries||0;}
-  retries=retries||0;
-
-  // ── Cache-first，但只接受 60 分鐘內資料；強制重抓時完全跳過快取 ──
-  if(retries===0&&!wxData&&!force){
-    try{
-      const c=JSON.parse(localStorage.getItem('_wxCache'));
-      if(c&&c.d&&c.ts&&(Date.now()-c.ts)<WX_CACHE_MAX_AGE_MS){
-        wxData=c.d;if(!Array.isArray(wxData.hPrecModel))wxData.hPrecModel=Array.isArray(wxData.hPrec)?wxData.hPrec.slice():[];_rebuildForecastPop(wxData);wxData._cached=true;wxData._cacheAgeMin=Math.round((Date.now()-c.ts)/60000);wxErr=false;render();
-        _syncWeatherFx();
-      }
-    }catch(e){}
+// Single flight: automatic updates, focus, login and manual reload share the same request.
+function loadWx(arg){
+  const opts=typeof arg==='boolean'?{force:arg}:(arg&&typeof arg==='object'?arg:{});
+  if(_wxPromise){
+    if(_wxFlightRevision!==_wxRevision)return _wxPromise.then(()=>loadWx(opts));
+    return _wxPromise;
   }
-
-  // ── Then try fresh data from API ──
-  try{
-    let lat,lon,posAccuracy=null,locSource='fallback';
-    // 1) 非強制模式下，30 分鐘內有效位置快取可用，降低耗電
-    if(!force){
-      try{
-        const c=JSON.parse(localStorage.getItem('_wxPos'));
-        if(c&&c.lat&&c.lon&&c.ts&&(Date.now()-c.ts)<WX_POS_MAX_AGE_MS){
-          lat=c.lat;lon=c.lon;posAccuracy=c.accuracy||null;locSource='cache';
-          if(geoState.status==='unknown')geoState={status:'ok',code:null,msg:'',source:'cache',accuracy:posAccuracy,ts:c.ts};
+  _restoreWxCache();
+  const now=Date.now();
+  if(navigator.onLine===false){_wxErrorCode='offline';wxErr=!wxData;render();return Promise.resolve(false)}
+  if(!opts.force&&!opts.relocate&&now<_wxRetryAt)return Promise.resolve(false);
+  const minAge=opts.force?10000:(opts.resume?60000:WX_REFRESH_MS);
+  if(!opts.relocate&&_wxLastAttemptAt&&now-_wxLastAttemptAt<minAge)return Promise.resolve(false);
+  _wxLastAttemptAt=now;_wxLoading=true;_wxErrorCode='';wxErr=false;
+  const revision=_wxRevision;_wxFlightRevision=revision;render();
+  _wxPromise=(async()=>{
+    try{
+      let pos=_readWxManual(),locSource=pos?'manual':'cache';
+      if(!pos){
+        const cached=_readWxJson('_wxPos');
+        if(!opts.relocate&&WeatherData.validPosition(cached)&&cached.ts&&now-cached.ts>=0&&now-cached.ts<WX_POS_MAX_AGE_MS)pos=cached;
+        if(!pos){
+          const g=await getGeoPosition({force:!!opts.relocate});
+          if(revision!==_wxRevision)return false;
+          if(WeatherData.validPosition(g)){
+            pos={...g,ts:Date.now()};locSource='gps';
+            try{localStorage.setItem('_wxPos',JSON.stringify(pos))}catch(e){}
+          }else if(WeatherData.validPosition(cached)){pos=cached;locSource='last-known'}
+          else throw Object.assign(new Error('Location unavailable'),{code:'location'});
         }
-      }catch(e){}
-    }
-    // 2) 無有效快取或使用者按「重新抓取」→ 重新定位
-    if(!lat){
-      const g=await getGeoPosition({force});
-      if(g){
-        lat=g.lat;lon=g.lon;posAccuracy=g.accuracy||null;locSource=force?'gps-force':'gps';
-        try{localStorage.setItem('_wxPos',JSON.stringify({lat,lon,accuracy:posAccuracy,ts:Date.now()}))}catch(e){}
-      }else{
-        // 定位失敗 → 只允許使用最後一次 GPS 已知位置；完全沒有 GPS 時不使用固定預設地點。
-        try{const c=JSON.parse(localStorage.getItem('_wxPos'));if(c&&c.lat&&c.lon){lat=c.lat;lon=c.lon;posAccuracy=c.accuracy||null;locSource='last-known'}}catch(e){}
-        if(!lat){wxErr=true;render();return}
       }
+      if(revision!==_wxRevision)return false;
+      const oldPlace=pos.place||_readWxJson('_wxPlace');
+      const place=oldPlace&&_geoDistKm(pos.lat,pos.lon,oldPlace.lat,oldPlace.lon)<2?oldPlace:null;
+      if(wxData&&_geoDistKm(pos.lat,pos.lon,wxData.lat,wxData.lon)>2){wxData=null;wxPlace=null;tideData=null;_wxTideAt=0;typhoonData=null;earthquakeData=null;render();}
+      const fresh=await _wxClient.get(pos);
+      if(revision!==_wxRevision)return false;
+      wxData={...fresh,locationSource:locSource,positionAt:pos.ts,posAccuracy:pos.accuracy||null,place};
+      wxPlace=place;wxErr=false;_wxErrorCode='';_wxFailures=0;_wxRetryAt=0;_rebuildForecastPop(wxData);_saveWxCache();
+      // Temperature and forecast are visible immediately; optional services run independently.
+      render();_syncWeatherFx();
+      _refreshWxExtras(wxData,pos,revision);
+      return true;
+    }catch(e){
+      if(revision!==_wxRevision)return false;
+      _wxErrorCode=e.code||'network';wxErr=!wxData;
+      if(wxData)wxData._cached=true;
+      _wxFailures++;_wxRetryAt=Math.max(e.retryAt||0,Date.now()+Math.min(WX_REFRESH_MS,15000*2**Math.min(_wxFailures-1,5)));
+      return false;
+    }finally{
+      _wxLoading=false;_wxPromise=null;render();
+      try{_syncWeatherFx();checkAndNotifyAlerts()}catch(e){}
     }
-    // GPS → 反查目前縣市/鄉鎮；失敗時不再鎖死任何預設地點
-    const canUseGpsPlace=(locSource==='gps'||locSource==='gps-force'||locSource==='cache'||locSource==='last-known');
-    wxPlace=canUseGpsPlace?await reverseGeocodeGps(lat,lon,force):null;
-
-    // 把 GPS 位置與反查所在地交給 Service Worker（背景同步抓天氣/警報時要用）
-    try{
-      if(navigator.serviceWorker&&navigator.serviceWorker.controller){
-        navigator.serviceWorker.controller.postMessage({type:'WX_POS',lat:parseFloat(lat),lon:parseFloat(lon),accuracy:posAccuracy,place:wxPlace||null,ts:Date.now()});
+  })();
+  return _wxPromise;
+}
+async function _refreshWxExtras(wx,pos,revision){
+  if(_wxAuxPromise)return;
+  _wxAuxPromise=(async()=>{
+    const locationJob=(async()=>{
+      const place=wx.locationSource==='manual'?wx.place:await reverseGeocodeGps(pos.lat,pos.lon,false);
+      if(revision!==_wxRevision||wxData!==wx)return;
+      if(place){wx.place=place;wxPlace=place;render()}
+      // Manual places and old GPS fixes are not sent as a fresh physical GPS location.
+      if(wx.locationSource!=='manual'&&pos.ts&&Date.now()-pos.ts<WX_POS_MAX_AGE_MS){
+        try{navigator.serviceWorker?.controller?.postMessage({type:'WX_POS',lat:Number(pos.lat),lon:Number(pos.lon),accuracy:pos.accuracy,place,ts:pos.ts})}catch(e){}
       }
-    }catch(e){}
-
-    const hourlyVars='precipitation_probability,precipitation,rain,showers,temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m';
-    const currentVars='temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m,precipitation';
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=${currentVars}&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=${hourlyVars}&timezone=auto&forecast_days=7&cell_selection=nearest`;
-    const resp=await Promise.race([fetch(url,{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),WX_API_TIMEOUT_MS))]);
-    if(!resp.ok)throw new Error('API '+resp.status);
-    const data=await resp.json();
-    wxData={
-      temp:Math.round(data.current.temperature_2m),code:data.current.weather_code,lat:lat,lon:lon,
-      source:'Open-Meteo Forecast API',updatedAt:Date.now(),locationSource:locSource,posAccuracy:posAccuracy,place:wxPlace||null,
-      currentPrecip:Number(data.current.precipitation||0),
-      gust:Math.round(Number(data.current.wind_gusts_10m||data.current.wind_speed_10m||0)),
-      days:data.daily.time.map((t,i)=>({date:t,code:data.daily.weather_code[i],hi:Math.round(data.daily.temperature_2m_max[i]),lo:Math.round(data.daily.temperature_2m_min[i])})),
-      hTime:data.hourly.time,
-      hPrecModel:(data.hourly.precipitation_probability||[]).slice(), // Open-Meteo 原始模式機率，只作 CWA 缺值時備援
-      hPrec:(data.hourly.precipitation_probability||[]).slice(),      // 之後由 _rebuildForecastPop 統一選擇來源
-      hPopSource:(data.hourly.time||[]).map(()=> 'open-meteo'),
-      hRain:data.hourly.precipitation||[],                 // 模式預估逐時降水量 mm；絕不反推/灌高機率
-      hRainOnly:data.hourly.rain||[],
-      hShowers:data.hourly.showers||[],
-      hTemp:data.hourly.temperature_2m,hCode:data.hourly.weather_code,hWind:data.hourly.wind_speed_10m,hGust:data.hourly.wind_gusts_10m||data.hourly.wind_speed_10m,hHum:data.hourly.relative_humidity_2m
-    };
-    wxErr=false;delete wxData._cached;delete wxData._cacheAgeMin;_rebuildForecastPop(wxData);
-    // 台灣地區優先套用 CWA 鄉鎮預報；缺值才保留 Open-Meteo 備援。
-    try{await _applyCwaPop(wxData,lat,lon,wxPlace,force);}catch(e){}
-    try{localStorage.setItem('_wxCache',JSON.stringify({ts:Date.now(),d:wxData}))}catch(e){}
-    // Tide
-    try{
-      const tResp=await Promise.race([fetch('https://cwa-tide.onerkk.workers.dev',{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),10000))]);
-      const td=await tResp.json();
-      const forecasts=td.records?.TideForecasts||[];
-      if(forecasts.length){
-        let best=forecasts[0],bD=9999;
-        forecasts.forEach(f=>{const lo=f.Location;if(lo){const d=Math.sqrt((lo.Latitude-lat)**2+(lo.Longitude-lon)**2);if(d<bD){bD=d;best=f}}});
-        const loc=best.Location;const tides=[];
-        (loc.TimePeriods?.Daily||[]).forEach(day=>{(day.Time||[]).forEach(t=>{tides.push({date:day.Date,time:t.DateTime||"",type:t.Tide||"",height:parseInt(t.TideHeights?.AboveTWVD)||0})})});
-        if(tides.length){tideData={station:loc.LocationName||"",tides:tides};tideErr=false}
-        else{tideData=null;tideErr=true}
-      }else{tideData=null;tideErr=true}
-    }catch(e){tideData=null;tideErr=true}
-  }catch(e){
-    if(retries<2){setTimeout(()=>loadWx({force:force,retries:retries+1}),5000);return}
-    if(!wxData){wxErr=true}
-  }
-  render();
-  if(wxData){
-    _syncWeatherFx();
-    try{loadCwaData({force:false})}catch(e){}
-    try{checkAndNotifyAlerts()}catch(e){console.log('notify check err',e)}
-  }else _syncWeatherFx();
+      await _applyCwaPop(wx,pos.lat,pos.lon,place,false);
+      if(revision!==_wxRevision||wxData!==wx)return;
+      _saveWxCache();_syncWeatherFx();render();
+      try{loadCwaData({force:false})}catch(e){}
+    })();
+    const tideJob=(async()=>{
+      if(Date.now()-_wxTideAt<3600000)return;
+      _wxTideAt=Date.now();
+      try{
+        const {data:td}=await WeatherData.json('https://cwa-tide.onerkk.workers.dev',{timeout:10000});
+        const forecasts=td.records?.TideForecasts||[];
+        const ordered=forecasts.filter(f=>WeatherData.validPosition({lat:f.Location?.Latitude,lon:f.Location?.Longitude})).sort((a,b)=>_geoDistKm(pos.lat,pos.lon,a.Location.Latitude,a.Location.Longitude)-_geoDistKm(pos.lat,pos.lon,b.Location.Latitude,b.Location.Longitude));
+        const loc=ordered[0]?.Location,tides=[];
+        (loc?.TimePeriods?.Daily||[]).forEach(day=>(day.Time||[]).forEach(t=>{
+          const height=WeatherData.num(t.TideHeights?.AboveTWVD);
+          const ts=Date.parse(t.DateTime);
+          if(height!==null&&Number.isFinite(ts)&&ts>=Date.now()-24*3600000&&ts<Date.now()+7*24*3600000)tides.push({date:day.Date,time:t.DateTime,type:t.Tide||'',height});
+        }));
+        tides.sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
+        if(revision!==_wxRevision||wxData!==wx)return;
+        tideData=tides.length?{station:loc.LocationName||'',tides}:null;tideErr=!tideData;
+      }catch(e){if(revision===_wxRevision){tideErr=true;_wxTideAt=Date.now()-3600000+WX_REFRESH_MS}}
+      if(revision===_wxRevision)render();
+    })();
+    await Promise.allSettled([locationJob,tideJob]);
+  })().finally(()=>{_wxAuxPromise=null;if(wxData&&wxData!==wx)_refreshWxExtras(wxData,{lat:wxData.lat,lon:wxData.lon,ts:wxData.positionAt},_wxRevision)});
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3373,7 +3393,7 @@ function _getCwaWorkerUrl(){
 }
 
 let _cwaLoadPromise=null;
-let _lastCwaFetchAt=0;
+let _lastCwaFetchAt=0,_lastCwaAttemptAt=0,_cwaRetryAt=0,_cwaFailures=0;
 function _stampCwaPayload(data,receivedAt){
   if(!data||typeof data!=='object')return data;
   data._clientFetchedAt=Number(receivedAt)||Date.now();
@@ -3381,8 +3401,9 @@ function _stampCwaPayload(data,receivedAt){
   return data;
 }
 function _alertCoords(){
+  if(_readWxManual())return null;
   const a=_nNum(wxData&&wxData.lat),b=_nNum(wxData&&wxData.lon);
-  if(a!==null&&b!==null)return{lat:a,lon:b};
+  if(a!==null&&b!==null&&wxData.positionAt&&Date.now()-wxData.positionAt<=WX_POS_MAX_AGE_MS)return{lat:a,lon:b};
   try{
     const c=JSON.parse(localStorage.getItem('_wxPos'));
     if(c&&_nNum(c.lat)!==null&&_nNum(c.lon)!==null&&c.ts&&Date.now()-Number(c.ts)<=WX_POS_MAX_AGE_MS)return{lat:Number(c.lat),lon:Number(c.lon)};
@@ -3397,7 +3418,9 @@ async function loadCwaData(arg){
   if(!coords)return typhoonData||earthquakeData||null;
   if(_cwaLoadPromise)return _cwaLoadPromise;
   const now=Date.now();
-  if(!force&&_lastCwaFetchAt&&now-_lastCwaFetchAt<15000)return typhoonData||earthquakeData||null;
+  if(now<_cwaRetryAt||(_lastCwaAttemptAt&&now-_lastCwaAttemptAt<30000))return typhoonData||earthquakeData||null;
+  _lastCwaAttemptAt=now;
+  const revision=_wxRevision;
   const place=_currentGpsPlace(),cwaKey=[String(coords.lat),String(coords.lon),place&&place.county||'',place&&place.town||''].join('|');
   if(!force){
     try{
@@ -3413,15 +3436,17 @@ async function loadCwaData(arg){
       req.searchParams.set('lat',coords.lat);req.searchParams.set('lon',coords.lon);req.searchParams.set('gps','1');req.searchParams.set('areaMode','gps');
       if(place&&place.county)req.searchParams.set('county',place.county);if(place&&place.town)req.searchParams.set('town',place.town);
       req.searchParams.set('_',String(Date.now()));
-      const resp=await Promise.race([fetch(req.toString(),{cache:'no-store'}),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))]);
-      if(!resp.ok)throw new Error('cwa api '+resp.status);
-      const data=await resp.json();if(!data||!data.ok)throw new Error('cwa payload invalid');
+      const {data}=await WeatherData.json(req.toString(),{timeout:8000});
+      if(!data.ok)throw new Error('cwa payload invalid');
+      const currentCoords=_alertCoords();
+      if(revision!==_wxRevision||!currentCoords||_geoDistKm(coords.lat,coords.lon,currentCoords.lat,currentCoords.lon)>2)return null;
+      _cwaFailures=0;_cwaRetryAt=0;
       const fetchedAt=Date.now();_lastCwaFetchAt=fetchedAt;_stampCwaPayload(data,fetchedAt);
       data._gpsQuery={lat:coords.lat,lon:coords.lon,place:place||null,ts:fetchedAt};
       typhoonData=data;earthquakeData=data;typhoonErr=false;earthquakeErr=false;
       try{localStorage.setItem('_cwaCache',JSON.stringify({ts:fetchedAt,key:cwaKey,place:place||null,d:data}))}catch(e){}
       _syncWeatherFx();render();try{checkAndNotifyAlerts()}catch(e){}return data;
-    }catch(e){typhoonErr=true;earthquakeErr=true;console.log('loadCwaData err',e);return typhoonData||earthquakeData||null}
+    }catch(e){if(revision!==_wxRevision)return null;typhoonErr=true;earthquakeErr=true;_cwaFailures++;_cwaRetryAt=Math.max(e.retryAt||0,Date.now()+Math.min(300000,30000*2**Math.min(_cwaFailures-1,4)));return typhoonData||earthquakeData||null}
     finally{_cwaLoadPromise=null}
   })();
   return _cwaLoadPromise;
@@ -3978,7 +4003,7 @@ function evaluateWxAlerts(){
   if(cfg.earthquake!==false&&userItems.earthquake!==false){const a=evaluateEarthquake(cfg,isZh);if(a)out.push(a)}
   evaluateCwaWeatherWarnings(cfg,isZh).filter(a=>userItems[a.id]!==false).forEach(a=>{if(a.id==='typhoon'&&out.some(x=>x.id==='typhoon'))return;if(!out.some(x=>x.eventKey&&x.eventKey===a.eventKey))out.push(a)});
   const roAlert=_rainObservationAlert(cfg,userItems,isZh);if(roAlert&&!out.some(x=>x.id===roAlert.id||x.id==='storm'||x.id==='typhoon'))out.push(roAlert);
-  if(!wxData)return out;
+  if(!wxData||_wxStale())return out;
 
   // 找出當前小時 index
   const n=new Date();
@@ -4588,34 +4613,10 @@ async function testNotification(){
 // 強制重新抓天氣（用戶從設定面板呼叫）
 // 清掉快取後重抓 → 取得最新資料 → 重新評估警報
 async function forceReloadWx(){
-  try{
-    // 清掉位置與天氣快取（重新定位 + 重新抓 API）
-    try{localStorage.removeItem('_wxPos')}catch(e){}
-    try{localStorage.removeItem('_wxPlace')}catch(e){}
-    try{localStorage.removeItem('_wxCache')}catch(e){}
-    try{localStorage.removeItem('_typhoonCache')}catch(e){}
-    try{localStorage.removeItem('_cwaCache')}catch(e){}
-    // 也清警報冷卻狀態，這樣即使在冷卻期內也能立刻推（除了地震去重）
-    try{
-      const st=JSON.parse(localStorage.getItem('_wxNotifyState'))||{};
-      // 保留地震 EarthquakeNo 去重，其他冷卻清零
-      const eq=st._eqLastNo;
-      localStorage.setItem('_wxNotifyState',JSON.stringify(eq?{_eqLastNo:eq}:{}));
-    }catch(e){}
-    wxData=null;wxErr=false;
-    geoState={status:'locating',code:null,msg:'',source:''};
-    typhoonData=null;earthquakeData=null;
-    render();
-    await loadWx({force:true});
-    try{await loadCwaData({force:true})}catch(e){}
-    // 依定位結果回報，讓使用者知道有沒有抓到真實位置
-    if(geoState.status==='ok'&&(geoState.source==='gps'||geoState.source==='gps-force'))alert(lang==='zh'?'✅ 已高精度定位並抓取最新天氣':'Located & reloaded');
-    else if(geoState.status==='denied')alert(lang==='zh'?'⚠️ 定位權限被拒絕\n請到手機「設定→應用程式/瀏覽器→權限→位置」開啟，再試一次':'Location permission denied');
-    else if(geoState.status==='fallback')alert((lang==='zh'?'⚠️ 定位失敗：':'Location failed: ')+(geoState.msg||'')+(lang==='zh'?'\n官方所在地警特報不會用鹽水或其他固定地點代替。':''));
-    else alert(lang==='zh'?'已重新抓取最新資料':'Reloaded');
-  }catch(e){
-    alert((lang==='zh'?'重新抓取失敗：':'Reload failed: ')+e.message);
-  }
+  const ok=await loadWx({force:true});
+  try{loadCwaData({force:false})}catch(e){}
+  if(ok)alert(lang==='zh'?'已更新天氣；資料時間請見天氣卡。':'Cuaca diperbarui. Waktu data ada di kartu.');
+  else if(!_wxLoading)alert(_wxErrorCode?_wxErrorText():(lang==='zh'?'剛剛已檢查過資料，請稍候再更新。':'Data baru diperiksa. Coba lagi sebentar.'));
 }
 try{window.testNotification=testNotification;window.forceReloadWx=forceReloadWx}catch(e){}
 
@@ -4679,10 +4680,13 @@ try{
     localStorage.setItem('_myshiftWxVer',_ver);
   }
 }catch(e){}
-loadWx({force:true});
+loadWx();
 // 等 loadAppConfig 載入完才知道有沒有 typhoon worker URL
 setTimeout(()=>{try{loadTyphoon()}catch(e){}},3000);
-setInterval(()=>{if(!document.hidden)loadWx();},900000);
+setInterval(()=>{if(!document.hidden&&navigator.onLine!==false){
+  const due=_wxErrorCode?_wxRetryAt:(wxData?wxData.updatedAt+WX_REFRESH_MS:0);
+  if(Date.now()>=due)loadWx({resume:!!_wxErrorCode});
+}},15000);
 const _officialPollMs=Math.max(15000,(parseInt((APP_CFG.wxAlerts||{}).foregroundAlertPollSeconds)||30)*1000);
 setInterval(()=>{if(!document.hidden)try{loadCwaData({force:true})}catch(e){}},_officialPollMs);
 setInterval(()=>{if(!document.hidden){try{checkAndNotifyAlerts()}catch(e){}try{if(typeof render==='function')render()}catch(e){}}},60000);
@@ -4690,10 +4694,12 @@ let _lastWxCheck=Date.now();
 function _requestImmediateAlertCheck(forceWeather){
   if(document.hidden)return;
   const now=Date.now();
-  if(forceWeather||now-_lastWxCheck>600000){_lastWxCheck=now;loadWx()}
+  _lastWxCheck=now;
+  if(forceWeather&&_wxErrorCode!=='rate-limit'){_wxRetryAt=0;_wxLastAttemptAt=0;_wxClient.networkRestored()}
+  loadWx({resume:true});
   try{loadCwaData({force:true})}catch(e){}
   try{checkAndNotifyAlerts()}catch(e){}
-  try{if(navigator.serviceWorker&&navigator.serviceWorker.controller)navigator.serviceWorker.controller.postMessage({type:'CHECK_ALERTS_NOW'})}catch(e){}
+  // The foreground already checks official alerts; do not duplicate that request in the worker.
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)_requestImmediateAlertCheck(false)});
 window.addEventListener('focus',()=>_requestImmediateAlertCheck(false));
@@ -7212,9 +7218,9 @@ function uiWeekStripHtml(){
   return `<section class="week-overview studio-week"><div class="section-kicker"><span>${lang==='zh'?'未來七天':'7 hari ke depan'}</span><button data-a="tabCalendar">${lang==='zh'?'完整月曆':'Kalender'} ${uiIcon('arrow',14)}</button></div><div class="schedule-strip">${items}</div></section>`;
 }
 function uiWeatherPreviewHtml(){
-  if(!wxData)return `<button class="insight-row is-loading" data-a="tabWeather"><span class="insight-icon weather">${studioIcon('cloud',22)}</span><span class="insight-copy"><small>${lang==='zh'?'目前天氣':'Cuaca sekarang'}</small><strong>${lang==='zh'?'取得官方資料中':'Memuat data resmi'}</strong></span><span class="insight-meta">CWA</span>${uiIcon('chevron',18)}</button>`;
-  const d=wxData,desc=(lang==='zh'?WXZ:WXD)[d.code]||'',updated=d.updatedAt?new Date(d.updatedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'';
-  return `<button class="insight-row" data-a="tabWeather"><span class="insight-icon weather">${studioWeatherIcon(d.code,24)}</span><span class="insight-copy"><small>${lang==='zh'?'目前天氣':'Cuaca sekarang'}</small><strong>${d.temp}° <em>${esc(desc)}</em></strong></span><span class="insight-meta">${lang==='zh'?'官方':'Resmi'}<b>${updated}</b></span>${uiIcon('chevron',18)}</button>`;
+  if(!wxData)return `<button class="insight-row" data-a="tabWeather"><span class="insight-icon weather">${studioIcon('cloud',22)}</span><span class="insight-copy"><small>${lang==='zh'?'目前天氣':'Cuaca sekarang'}</small><strong>${_wxLoading?(lang==='zh'?'正在取得天氣':'Memuat cuaca'):(lang==='zh'?'查看天氣與位置':'Lihat cuaca dan lokasi')}</strong></span>${uiIcon('chevron',18)}</button>`;
+  const d=wxData,desc=(lang==='zh'?WXZ:WXD)[d.code]||'',updated=_wxTimeLabel(d.sourceTime||d.updatedAt);
+  return `<button class="insight-row" data-a="tabWeather"><span class="insight-icon weather">${studioWeatherIcon(d.code,24)}</span><span class="insight-copy"><small>${_wxStale()?(lang==='zh'?'上次天氣':'Cuaca tersimpan'):(lang==='zh'?'目前模式天氣':'Cuaca model')}</small><strong>${d.temp}° <em>${esc(desc)}</em></strong></span><span class="insight-meta">${esc(d.source||'Open-Meteo')}<b>${updated}</b></span>${uiIcon('chevron',18)}</button>`;
 }
 function uiPayPreviewHtml(y,m){
   const pv=latestClosedSalaryMonth();y=pv.y;m=pv.m;
@@ -7256,7 +7262,7 @@ function uiSalaryDashboardHtml(y,m){
 function uiPrecipChartHtml(d){
   if(!d||!Array.isArray(d.hTime)||!Array.isArray(d.hPrec))return'';
   let start=_wxHourIndex();if(start<0)start=0;const pts=[];
-  for(let i=start;i<d.hTime.length&&pts.length<12;i++){
+  for(let i=start;i<d.hTime.length&&new Date(d.hTime[i]).getTime()<Date.now()+12*3600000&&pts.length<12;i++){
     const p=_normalPop(d.hPrec[i]);if(p===null)continue;
     const hour=String(d.hTime[i]).slice(11,13);pts.push({p,hour,src:_popSourceAt(d,i)});
   }
@@ -7278,20 +7284,66 @@ function rainObsHtml(){
 }
 function rainWarnHtml(){
   const _dbg=(typeof location!=='undefined'&&location.search.indexOf('raindbg=1')>=0);
-  if(!wxData||!wxData.hPrec||S.step!=='cal')return _dbg?_rainDbgBox('wxData/hPrec 未就緒或非月曆頁'):'';
+  if(!wxData||_wxStale()||!wxData.hPrec||S.step!=='cal')return _dbg?_rainDbgBox('wxData/hPrec 未就緒或非月曆頁'):'';
   const sh=gs(TY,TM,TD);if(!sh||sh==='休')return _dbg?_rainDbgBox(`今天班別=${sh||'無'}，不顯示出勤雨具提醒`):'';
   const hrs=SHIFT_HR[sh];if(!hrs)return'';const ds=`${TY}-${String(TM).padStart(2,'0')}-${String(TD).padStart(2,'0')}`;let mx=0,mxSource='none';
   hrs.forEach(h=>{const i=wxData.hTime.indexOf(ds+'T'+String(h).padStart(2,'0')+':00');if(i>=0){const v=_normalPop(wxData.hPrec[i]);if(v!==null&&v>mx){mx=v;mxSource=_popSourceAt(wxData,i)}}});
   if(mx<40)return'';const sn=lang==='zh'?{早:'早班',中:'中班',晚:'晚班'}[sh]:{早:'Pagi',中:'Siang',晚:'Malam'}[sh],tr=`${String(hrs[0]).padStart(2,'0')}:00–${String(hrs[hrs.length-1]+1).padStart(2,'0')}:00`,src=_popSourceLabel(mxSource,lang==='zh');
   return `<section class="commute-alert ${mx>=70?'high':''}"><div class="commute-alert-icon">${studioIcon('rain',20)}</div><div><strong>${lang==='zh'?`${sn}出門帶雨具`:`${sn}: bawa payung`}</strong><span>${tr} · ${lang==='zh'?'最高降雨機率':'Kemungkinan hujan'} ${mx}% · ${src}</span></div></section>`;
 }
-function wxHtml(){
-  if(wxErr)return `<section class="weather-dashboard weather-error"><div>${studioIcon('cloud',26)}<strong>${lang==='zh'?'天氣載入失敗':'Gagal memuat cuaca'}</strong></div><button data-a="wxR">${uiIcon('refresh',17)} ${lang==='zh'?'重新載入':'Muat ulang'}</button></section>`;
-  if(!wxData)return `<section class="weather-dashboard weather-loading"><div class="weather-loader"></div><span>${lang==='zh'?'取得官方天氣資料中':'Memuat data cuaca resmi'}</span></section>`;
-  const d=wxData,wk=t('wk'),desc=lang==='zh'?WXZ:WXD,src=_popSourceAt(d,_wxHourIndex())==='cwa'?(lang==='zh'?'CWA 鄉鎮預報':'Prakiraan CWA'):(lang==='zh'?'模式備援':'Model fallback'),updated=d.updatedAt?new Date(d.updatedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'--';
-  const fc=d.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();return `<button class="forecast-day${i===0?' today':''}" onclick="showWxDetail();wxDetailDay=${i};event.stopPropagation()"><span>${i===0?(lang==='zh'?'今天':'Hari ini'):wk[dw]}</span><i>${studioWeatherIcon(f.code,20)}</i><strong>${f.hi}°</strong><small>${f.lo}°</small></button>`}).join('');
-  return `<section class="weather-dashboard"><button class="weather-settings" onclick="openUserPrefs();event.stopPropagation()" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',18)}</button><button class="weather-current" onclick="showWxDetail()"><span class="weather-current-icon">${studioWeatherIcon(d.code,42)}</span><span class="weather-current-copy"><small>${lang==='zh'?'目前天氣':'Cuaca sekarang'}</small><strong>${d.temp}°C</strong><em>${esc(desc[d.code]||'')}</em></span><span class="weather-source"><b>${src}</b><small>${lang==='zh'?'更新':'Diperbarui'} ${updated}</small></span></button>${uiPrecipChartHtml(d)}${rainObsHtml()}<div class="forecast-strip">${fc}</div><a class="radar-action" href="radar2.html">${studioIcon('shield',19)}<span><b>${lang==='zh'?'即時雷達與降雨':'Radar & hujan langsung'}</b><small>${lang==='zh'?'查看回波、雨區移動與所在地':'Lihat radar dan lokasi'}</small></span>${uiIcon('chevron',18)}</a></section>${tideHtml()}`;
+function _wxTimeLabel(ts){
+  return ts?new Date(ts).toLocaleString(lang==='zh'?'zh-TW':'id-ID',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'—';
 }
+function _wxStatusHtml(){
+  const zh=lang==='zh',d=wxData,stale=_wxStale(),offline=navigator.onLine===false;
+  const status=_wxLoading?(zh?'更新中…':'Memperbarui…'):
+    offline?(zh?'離線・顯示上次資料':'Offline · data tersimpan'):
+    _wxErrorCode?(zh?'更新未成功・稍後自動重試':'Pembaruan gagal · dicoba otomatis'):
+    stale?(zh?'資料較舊・等候更新':'Data lama · menunggu pembaruan'):(zh?'開啟時每 5 分鐘更新':'Diperbarui setiap 5 menit saat terbuka');
+  const place=d?.place?.display||(d?Number(d.lat).toFixed(3)+', '+Number(d.lon).toFixed(3):'');
+  const mode=d?.locationSource==='manual'?(zh?'手選地點':'Lokasi pilihan'):d?.locationSource==='last-known'?(zh?'最後定位':'Lokasi terakhir'):(zh?'定位':'Lokasi');
+  return `<div class="wx-live-status${stale||offline||_wxErrorCode?' is-stale':''}" role="status" aria-live="polite"><span><i></i>${status}</span><button type="button" data-a="wxR" ${_wxLoading?'disabled':''}>${uiIcon('refresh',14)} ${zh?'更新':'Perbarui'}</button></div><div class="wx-place-row"><span>${place?esc(mode+'：'+place):''}</span><button type="button" onclick="openWxLocation()">${zh?'選擇地點':'Pilih tempat'}</button></div>`;
+}
+function wxHtml(){
+  const zh=lang==='zh';
+  if(!wxData)return `<section class="weather-dashboard weather-unavailable" aria-busy="${_wxLoading}"><div class="weather-empty-icon">${_wxLoading?'<span class="weather-loader"></span>':studioIcon('cloud',30)}</div><strong>${_wxLoading?(zh?'正在取得天氣':'Memuat cuaca'):(zh?'暫時無法取得天氣':'Cuaca belum tersedia')}</strong><p>${_wxLoading?(zh?'正在查詢可用位置與免費天氣資料。':'Mencari lokasi dan data cuaca gratis.'):_wxErrorText()}</p><div class="wx-empty-actions"><button type="button" data-a="wxR" ${_wxLoading?'disabled':''}>${uiIcon('refresh',16)} ${zh?'重新載入':'Muat ulang'}</button><button type="button" onclick="openWxLocation()">${zh?'選擇地點':'Pilih tempat'}</button></div></section>`;
+  const d=wxData,wk=t('wk'),desc=zh?WXZ:WXD,updated=_wxTimeLabel(d.sourceTime||d.updatedAt);
+  const fc=d.days.map((f,i)=>{const dt=new Date(f.date+'T12:00:00'),dw=dt.getDay(),today=f.date===_nowHourKey().slice(0,10);return `<button class="forecast-day${today?' today':''}" onclick="wxDetailShow=true;wxDetailDay=${i};render();event.stopPropagation()"><span>${today?(zh?'今天':'Hari ini'):wk[dw]}</span><i>${studioWeatherIcon(f.code,20)}</i><strong>${f.hi}°</strong><small>${f.lo}°</small></button>`}).join('');
+  const sourceLink=d.provider==='met-no'?'https://www.met.no/en':'https://open-meteo.com/';
+  return `<section class="weather-dashboard" aria-busy="${_wxLoading}"><button class="weather-settings" onclick="openUserPrefs();event.stopPropagation()" aria-label="${zh?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',18)}</button><button class="weather-current" onclick="showWxDetail()"><span class="weather-current-icon">${studioWeatherIcon(d.code,42)}</span><span class="weather-current-copy"><small>${_wxStale()?(zh?'上次模式天氣':'Cuaca model tersimpan'):(zh?'目前模式天氣':'Cuaca model')}</small><strong>${d.temp}°C</strong><em>${esc(desc[d.code]||'')}</em></span><span class="weather-source"><b>${esc(d.source||'Open-Meteo')}</b><small>${zh?'資料時間':'Waktu data'}<br>${updated}</small></span></button>${_wxStatusHtml()}${uiPrecipChartHtml(d)}${rainObsHtml()}<div class="forecast-strip">${fc}</div>${d.dayRangeEstimated?`<div class="wx-source-credit">${zh?'備援高低溫取自可用預報時段；較遠日期未提供的逐時欄位保持空白。':'Suhu min/maks dari jam prakiraan tersedia; jam tanpa data tetap kosong.'}</div>`:''}<div class="wx-source-credit"><a href="${sourceLink}" target="_blank" rel="noopener noreferrer">${esc(d.source||'Open-Meteo')}</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a> · ${zh?'模式預報；數值已四捨五入':'Prakiraan model; angka dibulatkan'}</div><a class="radar-action" href="radar2.html">${studioIcon('shield',19)}<span><b>${zh?'即時雷達與降雨':'Radar & hujan langsung'}</b><small>${zh?'查看回波、雨區移動與所在地':'Lihat radar dan lokasi'}</small></span>${uiIcon('chevron',18)}</a></section>${tideHtml()}`;
+}
+function closeWxLocation(){_wxSearchVersion++;document.getElementById('wx-location-dialog')?.remove()}
+function openWxLocation(){
+  closeWxLocation();const zh=lang==='zh',el=document.createElement('div');el.id='wx-location-dialog';el.className='wx-detail';
+  el.innerHTML=`<section class="wx-detail-sheet wx-location-sheet" role="dialog" aria-modal="true" aria-labelledby="wx-location-title"><div class="wx-detail-title" id="wx-location-title">${zh?'選擇天氣地點':'Pilih lokasi cuaca'}</div><p>${zh?'未開啟定位也能查天氣。手選地點不會當成你目前的 GPS 位置發送災防通知。':'Cuaca dapat dilihat tanpa GPS. Lokasi pilihan tidak dipakai untuk notifikasi lokasi GPS.'}</p><button type="button" class="modal-done" onclick="useWxGps()">${zh?'使用目前定位':'Gunakan GPS saat ini'}</button><form id="wx-location-form"><label for="wx-location-query">${zh?'輸入城市或鄉鎮':'Masukkan kota atau daerah'}</label><div class="wx-search-row"><input id="wx-location-query" type="search" autocomplete="off" maxlength="80" placeholder="${zh?'例如：鹽水、台南、嘉義':'Contoh: Tainan, Yanshui'}" required><button type="submit">${zh?'搜尋':'Cari'}</button></div></form><div id="wx-location-results" role="status" aria-live="polite"></div><div class="wx-source-credit"><a href="https://open-meteo.com/en/docs/geocoding-api" target="_blank" rel="noopener noreferrer">Open-Meteo</a> · <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a></div><button type="button" class="modal-done wx-location-close" onclick="closeWxLocation()">${zh?'關閉':'Tutup'}</button></section>`;
+  el.addEventListener('click',e=>{if(e.target===el)closeWxLocation()});document.body.appendChild(el);
+  document.getElementById('wx-location-form').addEventListener('submit',e=>{e.preventDefault();searchWxLocation()});
+  document.getElementById('wx-location-query').focus();
+}
+async function searchWxLocation(){
+  const input=document.getElementById('wx-location-query'),out=document.getElementById('wx-location-results');
+  if(!input||!out)return;const q=input.value.trim();if(q.length<2)return;
+  const version=++_wxSearchVersion;out.textContent=lang==='zh'?'搜尋中…':'Mencari…';
+  try{
+    const {data}=await WeatherData.json('https://geocoding-api.open-meteo.com/v1/search?'+new URLSearchParams({name:q,count:'10',language:'zh',format:'json'}),{timeout:8000,cache:'default'});
+    if(version!==_wxSearchVersion)return;
+    _wxLocationResults=(data.results||[]).filter(r=>WeatherData.validPosition({lat:r.latitude,lon:r.longitude}));
+    out.innerHTML=_wxLocationResults.length?_wxLocationResults.map((r,i)=>`<button class="wx-place-option" type="button" onclick="chooseWxLocation(${i})"><b>${esc(r.name)}</b><span>${esc([r.admin2,r.admin3,r.admin1,r.country].filter(Boolean).join(' · '))}</span></button>`).join(''):(lang==='zh'?'找不到地點，請改用城市名稱或英文名稱。':'Lokasi tidak ditemukan. Coba nama kota atau ejaan Latin.');
+  }catch(e){if(version===_wxSearchVersion)out.textContent=lang==='zh'?'地點搜尋暫時無法連線，請稍後再試。':'Pencarian belum terhubung. Coba lagi nanti.'}
+}
+function chooseWxLocation(index){
+  const r=_wxLocationResults[index];if(!r)return;
+  const lat=r.latitude,lon=r.longitude,county=_pickValidCounty(r.admin1,r.admin2),town=_pickValidTown(r.admin3,r.admin2),ts=Date.now();
+  const p={lat,lon,ts,place:{lat,lon,ts,county,town,display:[county,town||r.name].filter(Boolean).join(' '),source:'manual-geonames'}};
+  try{localStorage.setItem('_wxManual',JSON.stringify(p))}catch(e){return}
+  try{navigator.serviceWorker?.controller?.postMessage({type:'WX_CLEAR_POS'})}catch(e){}
+  closeWxLocation();_changeWxLocation();loadWx({force:true});
+}
+function _changeWxLocation(){
+  _wxRevision++;_wxLastAttemptAt=0;_wxRetryAt=0;_wxTideAt=0;wxData=null;wxPlace=null;tideData=null;typhoonData=null;earthquakeData=null;
+  try{localStorage.removeItem('_wxCache')}catch(e){}render();
+}
+function useWxGps(){try{localStorage.removeItem('_wxManual')}catch(e){}closeWxLocation();_changeWxLocation();loadWx({force:true,relocate:true})}
 function uiTideCurveHtml(){
   if(!tideData||!Array.isArray(tideData.tides)||tideData.tides.length<3)return'';
   const now=Date.now(),all=tideData.tides.map(item=>({item,ts:new Date(item.time).getTime(),h:Number(item.height)})).filter(x=>Number.isFinite(x.ts)&&Number.isFinite(x.h)).sort((a,b)=>a.ts-b.ts);if(all.length<3)return'';
