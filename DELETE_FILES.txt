@@ -1,0 +1,12 @@
+以下是本次移除的舊版副本與過期教學，保留於 Git 歷史；不屬於網站執行所需檔案。
+
+SHA256SUMS.txt
+START_HERE.md
+site-files/app.js
+site-files/index.html
+site-files/payroll.js
+site-files/styles.css
+site-files/sw.js
+verification/tests/leave-payroll.test.cjs
+verification/tests/payroll.test.cjs
+verification/tests/ui.test.cjs

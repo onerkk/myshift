@@ -363,7 +363,7 @@ function _scheduleCloudSave(){
 }
 
 let _initDone=false;let _cloudLoading=false;
-function _doAuthInit(){if(_initDone)return;_initDone=true;_cloudLoading=true;render();loadAppConfig().then(()=>{cloudLoad().then(()=>{_cloudLoading=false;render();loadLeaves();loadAdminEv();syncALYearLeaves();_autoLocateOnLogin()}).catch(()=>{_cloudLoading=false;render();_autoLocateOnLogin()})})}
+function _doAuthInit(){if(_initDone)return;_initDone=true;_cloudLoading=true;render();loadAppConfig().then(()=>{cloudLoad().then(()=>loadPayrollReference()).then(()=>{_cloudLoading=false;render();loadLeaves();loadAdminEv();syncALYearLeaves();_autoLocateOnLogin()}).catch(()=>{_cloudLoading=false;render();_autoLocateOnLogin()})})}
 // 登入後自動定位：權限已授予就重抓最新位置，確保天氣對應實際所在地
 function _autoLocateOnLogin(){
   try{
@@ -402,7 +402,7 @@ function syncALYearLeaves(){
     if(changed){sAL();render()}
   },"syncALYear").catch(e=>console.log("syncALYear err",e));
 }
-fbAuth.onAuthStateChanged(u=>{fbUser=u;fbAuthReady=true;if(u){
+fbAuth.onAuthStateChanged(u=>{if(SAL.referenceOwnerUid&&(!u||u.uid!==SAL.referenceOwnerUid)){SAL=Object.assign({},SAL_DEFAULT,{monthly:{}});try{localStorage.removeItem("sb_sal")}catch(e){}}fbUser=u;fbAuthReady=true;if(u){
   // Immediately save display name for admin panel
   fsEnqueue(()=>fbDb.collection("users").doc(u.uid).set({displayName:u.displayName||"",email:u.email||"",photoURL:u.photoURL||"",lastLogin:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),"loginTouch").catch(()=>{});
   _doAuthInit()}else{loadAdminEv()}render()});
@@ -514,6 +514,7 @@ let payrollLeaveState={uid:"",loading:false,error:false,months:[]};
 let payrollLeaveRequest=0;
 function loadLeaves(){
   const requestUid=fbUser&&fbUser.uid;
+  if(!requestUid)return Promise.resolve();
   const request=++payrollLeaveRequest;
   payrollLeaveState.loading=true;payrollLeaveState.error=false;
   return fsEnqueue(async()=>{
@@ -530,19 +531,23 @@ function loadLeaves(){
     // Home always previews the latest closed period, even after browsing older pay.
     const latest=latestClosedSalaryMonth();addPair(ymSet,latest.y,latest.m);
     const ymList=Array.from(ymSet).slice(0,10);
-    const snap=await fbDb.collection("leaves").where("ym","in",ymList).get();
-    const d={};
-    snap.forEach(doc=>{
+    const [snap,own]=await Promise.all([
+      fbDb.collection("leaves").where("ym","in",ymList).get(),
+      fbDb.collection("leaves").where("uid","==",requestUid).get()
+    ]);
+    const d={},seen=new Set();
+    const collect=doc=>{
+      if(seen.has(doc.id))return;seen.add(doc.id);
       const v=doc.data();
       // Changing the displayed unit must never drop this user's historical payroll leave.
       if(v.uid!==requestUid&&S.unit&&S.unit!=="__all"&&v.unit&&v.unit!==S.unit)return;
       const k=v.date;
       if(!d[k])d[k]=[];
       d[k].push({docId:doc.id,uid:v.uid,name:v.name,type:v.type,leaveType:v.leaveType||"",hours:+v.hours||0,reason:v.reason||"",ts:v.ts,unit:v.unit||"",startOffset:leaveNumber(v.startOffset),endOffset:leaveNumber(v.endOffset),shiftStartMinute:leaveNumber(v.shiftStartMinute),shiftHours:leaveNumber(v.shiftHours),shiftCode:v.shiftCode||"",schemaVersion:+v.schemaVersion||1});
-    });
+    };snap.forEach(collect);own.forEach(collect);
     if(request!==payrollLeaveRequest||!fbUser||fbUser.uid!==requestUid)return;
     leavesCache=d;
-    payrollLeaveState={uid:requestUid,loading:false,error:false,months:ymList};
+    payrollLeaveState={uid:requestUid,loading:false,error:false,months:ymList,ownHistoryLoaded:true};
     _syncAnnualToALD();
     render();
   },"loadLeaves").catch(e=>{if(request!==payrollLeaveRequest)return;payrollLeaveState.loading=false;payrollLeaveState.error=true;console.log("loadLeaves err",e);render()});
@@ -1289,11 +1294,11 @@ const SAL_DEFAULT={
   // 勞退：自願提繳是員工扣款；公司提繳只顯示，不扣實領。
   laborPensionWage:0,laborPensionSelfRate:0,laborPensionEmployerRate:6,
   otTier1Rate:1.33340,otTier2Rate:1.66670,
-  payRounding:'nearest',nightPolicy:'unconfirmed',dayRuleMode:'unconfirmed',weeklyDayKinds:[],
+  payRounding:'nearest',nightPolicy:'auto',dayRuleMode:'roster',weeklyDayKinds:[],
   sickRate:0.5,personalRate:1,
   // 每期只保存真正會變動的輸入，以及公司薪資條的「核對值」。核對值不得反向覆蓋公式結果。
   monthly:{},
-  schemaVersion:6,
+  schemaVersion:7,
   enabled:false
 };
 let SAL={};
@@ -1468,7 +1473,8 @@ function sSAL(){
   try{localStorage.setItem("sb_sal",JSON.stringify(SAL))}catch(e){}
   // 雲端：只寫到自己的 users 文件 sal 欄位
   if(fbUser){
-    fsEnqueue(()=>fbDb.collection("users").doc(fbUser.uid).set({sal:JSON.stringify(SAL)},{merge:true}),"salSave").catch(e=>{console.log("salSave err",e)});
+    const uid=fbUser.uid,payload={sal:JSON.stringify(SAL)};
+    fsEnqueue(()=>fbDb.collection("users").doc(uid).set(payload,{merge:true}),"salSave").catch(e=>{console.log("salSave err",e)});
   }
 }
 // 登入後從雲端拉回薪資（雲端有就用雲端，並更新本機快取）
@@ -1485,6 +1491,37 @@ function cloudLoadSal(d){
       if(before!==JSON.stringify(SAL)&&fbUser)setTimeout(()=>sSAL(),0);
     }
   }catch(e){console.log("cloudLoadSal err",e)}
+}
+let payrollReferenceState='idle';
+async function loadPayrollReference(){
+  // This reference already exists in the repository. Never apply one person's
+  // statement to another account just because salary amounts happen to match.
+  const user=fbUser;
+  if(!user||user.emailVerified!==true||String(user.email||'').toLowerCase()!=='onerkk@gmail.com')return;
+  if(SAL.referenceVersion===306&&SAL.referenceOwnerUid===user.uid&&Payroll.slip(getSalPeriod(2026,8).slip).valid){payrollReferenceState='ready';return;}
+  payrollReferenceState='loading';
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6000);
+  try{
+    const response=await fetch('./private-import/2026-08-payroll.json?v=306',{signal:controller.signal,cache:'no-cache'});
+    if(!response.ok)throw Error('Payroll reference unavailable');
+    const reference=await response.json();
+    if(!fbUser||fbUser.uid!==user.uid)return;
+    SAL=Payroll.attachReference(SAL,reference);SAL.referenceOwnerUid=user.uid;
+    normalizeSal();sSAL();payrollReferenceState='ready';
+  }catch(e){if(fbUser&&fbUser.uid===user.uid)payrollReferenceState='error';}
+  finally{clearTimeout(timer);}
+}
+function automaticNightRule(){
+  if(!fbUser||typeof payrollLeaveState==='undefined'||!payrollLeaveState.ownHistoryLoaded||payrollLeaveState.uid!==fbUser.uid)return null;
+  const samples=[];
+  for(const key of Object.keys(SAL.monthly||{}).filter(k=>/^\d{4}-\d{2}$/.test(k)).sort().slice(-12)){
+    const record=Payroll.slip(SAL.monthly[key]&&SAL.monthly[key].slip);if(!record.valid)continue;
+    const est=calcSalaryEst(Number(key.slice(0,4)),Number(key.slice(5)),{skipNightFit:true});
+    if(!est||est.dataPending||record.data.sickH===null||record.data.weekdayH===null||record.data.holidayH===null)continue;
+    const complete=Math.abs(est.sickPayH-record.data.sickH)<.001&&Math.abs(est.weekdayH-record.data.weekdayH)<.001&&Math.abs(est.holidayH-record.data.holidayH)<.001;
+    samples.push({complete,amount:record.data.nightPay,days:est.days.filter(d=>d.shift==='晚').map(d=>({worked:d.worked,shiftHours:d.shiftHours}))});
+  }
+  return Payroll.inferNightRule(samples);
 }
 function sNotes(){const d=JSON.stringify(NOTES);try{localStorage.setItem("sb_notes",d)}catch(e){}try{sCk("sb_notes",d,3650)}catch(e){}_scheduleCloudSave()}
 function alYear(y,m,d){return(m>12||(m===12&&d>=26))?y:y-1}
@@ -1611,19 +1648,26 @@ function payCardHtml(y,m){
 //       加班總額只取整一次；公司薪資條的免稅／應稅分項僅供核對，不回寫總額
 //       夜點費 = 晚班次數 × 每次夜點費；提案與其他加項按薪資月保存
 // ═══════════════════════════════════════════════════════════════
-function calcSalaryEst(y,m){
+function calcSalaryEst(y,m,options={}){
   if(!SAL.enabled||!SAL.base)return null;
   const pp=calcPayPeriod(y,m);if(!pp||!rot())return null;
   const period=getSalPeriod(y,m),n=Payroll.number;
-  const baseSum=['base','meal','transport','position'].reduce((v,k)=>v+(n(SAL[k])||0),0);
+  const monthSalary=Payroll.salaryAt(SAL,salPeriodKey(y,m)+'-25'),baseSum=monthSalary.baseSum;
   const hourly=baseSum/240,otHourly=(SAL.otWageBase>0?SAL.otWageBase:baseSum)/240;
   const leaveHourly=(SAL.leaveWageBase>0?SAL.leaveWageBase:baseSum)/240;
   const sh=rot().h,dailyOT=Math.max(0,sh-8),uid=fbUser&&fbUser.uid,notes=[],days=[];
-  let sickH=0,personalH=0,autoFront=0,autoBack=0,holidayH=0,holidayRaw=0;
+  let sickH=0,personalH=0,autoFront=0,autoBack=0,holidayH=0,holidayRaw=0,ordinaryRaw=0,sickRaw=0,personalRaw=0;
+  const nightFit=!options.skipNightFit&&(!SAL.nightPolicy||SAL.nightPolicy==='auto')?automaticNightRule():null;
+  const nightPolicy=nightFit?nightFit.policy:(['attendance','prorated','full'].includes(SAL.nightPolicy)?SAL.nightPolicy:'prorated');
+  const nightRate=nightFit?nightFit.rate:(n(SAL.night)||0);
+  const nightEstimated=!nightFit&&(!SAL.nightPolicy||SAL.nightPolicy==='auto'||SAL.nightPolicy==='unconfirmed'||SAL.nightRateSource==='legacy-unverified'||SAL.nightRateSource==='unconfirmed');
   let nightAutoCount=0,partialNightCount=0,nightScheduledCount=0,workedDays=0,workedHours=0;
   for(let dt=new Date(pp.sd);dt<=pp.ed;dt.setDate(dt.getDate()+1)){
     const cy=dt.getFullYear(),cm=dt.getMonth()+1,cd=dt.getDate(),key=ek(cy,cm,cd);
     const shift=gs(cy,cm,cd),isWork=!!(shift&&shift!=="休"),o=period.days[key]||{};
+    const daySalary=Payroll.salaryAt(SAL,key);
+    const dayOtHourly=(SAL.otWageBase>0?SAL.otWageBase:daySalary.baseSum)/240;
+    const dayLeaveHourly=(SAL.leaveWageBase>0?SAL.leaveWageBase:daySalary.baseSum)/240;
     const weekly=SAL.dayRuleMode==='weekly'&&Array.isArray(SAL.weeklyDayKinds)?SAL.weeklyDayKinds[dt.getDay()]:'work';
     const kind=['work','rest','holiday'].includes(o.kind)?o.kind:(['rest','holiday'].includes(weekly)?weekly:'work');
     const leaves=getPayrollLeaves(key),sum=summarizeRegularLeaveForDay(leaves,sh,uid);
@@ -1643,46 +1687,48 @@ function calcSalaryEst(y,m){
     }
     if(!isWork&&leaves.some(l=>['sick','personal'].includes(_leaveId(getLT(l.leaveType)||{id:l.leaveType}))))notes.push('leaveOnOffDay');
     const normalOT=isWork?getActualOTForDay(key,dailyOT,sh,uid):0;
-    const autoWorked=isWork?Math.max(0,Math.min(8,sh)-sum.totalHours)+normalOT:0;
+    const paidHours=isWork?Math.max(0,Math.min(8,sh)-sum.totalHours)+normalOT:0;
+    const disasterHours=isWork?Math.min(sh,Math.max(0,+TYD[key]||0)):0;
+    // Paid disaster leave is not physical night attendance. Keep its paid OT;
+    // do not count an absent night as an attended night shift.
+    const autoWorked=Math.max(0,paidHours-disasterHours);
     const worked=kind!=='work'&&n(o.workedHours)!==null?Math.min(12,n(o.workedHours)):autoWorked;
-    const pay=Payroll.dailyOT(kind,worked,normalOT,otHourly,SAL.otTier1Rate,SAL.otTier2Rate);
-    autoFront+=pay.front;autoBack+=pay.back;holidayH+=pay.holidayH;holidayRaw+=pay.holiday;
+    const pay=Payroll.dailyOT(kind,worked,normalOT,dayOtHourly,SAL.otTier1Rate,SAL.otTier2Rate);
+    autoFront+=pay.front;autoBack+=pay.back;holidayH+=pay.holidayH;holidayRaw+=pay.holiday;ordinaryRaw+=pay.ordinary;
+    sickRaw+=daySickH*dayLeaveHourly*SAL.sickRate;personalRaw+=dayPersonalH*dayLeaveHourly*SAL.personalRate;
     if(worked>0){workedDays++;workedHours+=worked;}
     let nightUnits=0,nightUnknown=false;
     if(shift==='晚'){
       nightScheduledCount++;
-      const result=Payroll.nightUnits(worked,sh,SAL.nightPolicy);
+      const result=Payroll.nightUnits(worked,sh,nightPolicy);
       nightUnits=result.units;nightUnknown=result.unknown;
-      if(nightUnknown)partialNightCount++;
+      if(worked>0&&worked<sh-1e-7)partialNightCount++;
       nightAutoCount+=nightUnits;
     }
-    days.push({key,shift,kind,worked,normalOT:pay.weekdayH,holidayH:pay.holidayH,nightUnits,nightUnknown,daySickH,dayPersonalH,legacyWageH,sickOrLeaveH:sum.totalHours});
+    days.push({key,shift,kind,worked,shiftHours:sh,dayOtHourly,dayLeaveHourly,disasterHours,normalOT:pay.weekdayH,holidayH:pay.holidayH,nightUnits,nightUnknown,daySickH,dayPersonalH,legacyWageH,sickOrLeaveH:sum.totalHours});
   }
   const autoOtH=autoFront+autoBack;
   // Always recalculate from daily attendance. Monthly totals / imported hours
   // are audit records, never inputs that freeze a forecast after schedule edits.
   const totalFront=autoFront,totalBack=autoBack;
   const weekdayH=totalFront+totalBack,otH=weekdayH+holidayH;
-  const rawOtPay=totalFront*otHourly*SAL.otTier1Rate+totalBack*otHourly*SAL.otTier2Rate;
+  const rawOtPay=ordinaryRaw;
   const otPay=Math.max(0,Payroll.roundPay(rawOtPay,SAL.payRounding)),holidayPay=Math.max(0,Payroll.roundPay(holidayRaw,SAL.payRounding));
   // Tax-exempt and taxable amounts cannot be inferred by prorating a monthly hour limit.
   const otTaxFree=null,otTaxable=null;
   const nightCount=nightAutoCount;
-  const nightAutoPay=Math.round(nightCount*(n(SAL.night)||0));
+  const nightAutoPay=Math.round(nightCount*nightRate);
   const nightPay=nightAutoPay;
   if(nightScheduledCount>0){
-    if(!(SAL.night>0)&&nightCount>0&&SAL.nightRateSource!=='configured')notes.push('nightRate');
-    if(partialNightCount>0)notes.push('partialNight');
-    if(SAL.nightRateSource==='legacy-unverified')notes.push('legacyNightRate');
-    if(SAL.nightRateSource==='unconfirmed')notes.push('unconfirmedNightRate');
+    if(!(nightRate>0)&&nightCount>0&&SAL.nightRateSource!=='configured')notes.push('nightRate');
+    else if(nightEstimated&&nightCount>0)notes.push('nightEstimate');
   }
-  if(workedDays>0&&!['roster','weekly'].includes(SAL.dayRuleMode))notes.push('dayRules');
   const sickPayH=sickH,personalPayH=personalH;
-  const sickDed=Math.round(sickPayH*leaveHourly*SAL.sickRate),personalDed=Math.round(personalPayH*leaveHourly*SAL.personalRate),leaveDed=sickDed+personalDed;
+  const sickDed=Math.round(sickRaw+1e-8),personalDed=Math.round(personalRaw+1e-8),leaveDed=sickDed+personalDed;
   const proposal=n(period.proposal)||0,otherIncome=n(period.otherIncome)||0;
   const pensionWage=n(SAL.laborPensionWage)||0,pensionSelfRate=n(SAL.laborPensionSelfRate)||0,pensionEmployerRate=n(SAL.laborPensionEmployerRate)===null?6:n(SAL.laborPensionEmployerRate);
   const laborPensionSelf=Math.round(pensionWage*pensionSelfRate/100),laborPensionEmployer=Math.round(pensionWage*pensionEmployerRate/100);
-  const fixedDed=['union','welfare','laborIns','healthIns','otherDed'].reduce((v,k)=>v+(n(SAL[k])||0),0);
+  const fixedDed=monthSalary.fixedDed;
   const income=Math.round(baseSum+proposal+otherIncome+otPay+holidayPay+nightPay),deduction=Math.round(fixedDed+leaveDed+laborPensionSelf),net=income-deduction;
   const official=period.slip||{otTaxFree:period.reportedTaxFree||null,otTaxable:period.reportedTaxable||null,leaveDed:period.reportedLeaveDed||null,
     income:period.reportedGross||null,deduction:period.reportedDeduction||null,net:period.reportedNet||null,
@@ -1692,16 +1738,16 @@ function calcSalaryEst(y,m){
   if(n(official.weekdayH)!==null&&Math.abs(weekdayH-n(official.weekdayH))>.001)notes.push('weekdayHoursMismatch');
   if(typeof payrollLeaveState!=='undefined'&&uid){
     const prev=new Date(y,m-2,1),months=[salPeriodKey(y,m),salPeriodKey(prev.getFullYear(),prev.getMonth()+1)];
-    if(payrollLeaveState.uid!==uid||payrollLeaveState.loading||payrollLeaveState.error||months.some(k=>!payrollLeaveState.months.includes(k)))notes.push('leaveNotReady');
+    if(payrollLeaveState.uid!==uid||payrollLeaveState.loading||payrollLeaveState.error||(!payrollLeaveState.ownHistoryLoaded&&months.some(k=>!payrollLeaveState.months.includes(k))))notes.push('leaveNotReady');
   }
   const est={hourly,otHourly,leaveHourly,baseSum,proposal,otherIncome,nightCount,sickH,personalH,sickPayH,personalPayH,
     otH,weekdayH,holidayH,autoOtH,otPay,holidayPay,rawOtPay,otTaxFree,otTaxable,nightPay,nightAutoPay,sickDed,personalDed,leaveDed,
     pensionWage,pensionSelfRate,pensionEmployerRate,laborPensionSelf,laborPensionEmployer,income,deduction,fixedDed,net,totalFront,totalBack,
-    nightAutoCount,nightScheduledCount,partialNightCount,nightRate:n(SAL.night)||0,sickRate:SAL.sickRate,workedDays,workedHours,days,notes,incomplete:notes.length>0,
+    nightAutoCount,nightScheduledCount,partialNightCount,nightRate,nightPolicy,nightFit,sickRate:SAL.sickRate,workedDays,workedHours,days,notes,incomplete:notes.length>0,
     nightTotalOverridden:false,otHoursOverridden:false,taxSplitReported:false,
     officialAnnualH:official.annualH,officialSickH:official.sickH,officialDisasterH:official.disasterH,reportedLeaveDed:official.leaveDed,periodKey:salPeriodKey(y,m)};
   est.notes=Array.from(new Set(notes));est.incomplete=est.notes.length>0;
-  est.missingComponents=est.notes.includes('nightRate')||est.notes.includes('partialNight');
+  est.missingComponents=est.notes.includes('nightRate');
   est.dataPending=est.notes.includes('leaveNotReady');
   const check=Payroll.reconcile(est,official);est.reconciliation=check;est.official=check.data;est.hasSlip=check.valid;est.verified=check.matched;
   est.reportedGross=check.data.income;est.reportedDeduction=check.data.deduction;est.reportedNet=check.data.net;
@@ -1720,7 +1766,8 @@ function salaryFieldLabels(){
 }
 function salaryNoteText(code){
   const labels={
-    nightRate:['夜點單價未設定，下面只列已算項目小計，尚非完整實領。','Tarif malam belum diatur; jumlah di bawah belum lengkap.'],
+    nightRate:['既有資料缺少夜點單價，暫列已知金額小計。','Tarif malam belum tersedia; jumlah belum lengkap.'],
+    nightEstimate:['夜點暫依既有單價與出勤比例估算；歷月資料尚不足以確認公司給付方式。','Tunjangan malam sementara memakai tarif tersimpan dan proporsi kehadiran.'],
     partialNight:['部分晚班的給付規則未設定；選定一次後，系統會按出勤自動計算。','Atur sekali aturan shift malam parsial untuk hitungan otomatis.'],
     legacyNightRate:['夜點單價已恢復為先前設定的 489 元；這不是已核實的公司單價，請在規則設定確認。','Tarif lama 489 dipulihkan; konfirmasikan tarif perusahaan pada pengaturan.'],
     unconfirmedNightRate:['夜點單價尚未確認，目前以填入單價試算。','Tarif malam belum dikonfirmasi; sementara memakai tarif yang diisi.'],
@@ -1746,18 +1793,20 @@ function rSalary(){
   const num=(key,title,value,hint='')=>`<label class="payroll-field" for="sal_${key}"><span>${title}</span><input type="number" id="sal_${key}" value="${Payroll.number(value)===null?'':value}" min="0" step="0.01" inputmode="decimal" class="sal-in">${hint?`<small>${hint}</small>`:''}</label>`;
   const select=(key,title,value,options)=>`<label class="payroll-field" for="sal_${key}"><span>${title}</span><select id="sal_${key}">${options.map(([v,l])=>`<option value="${v}"${v===value?' selected':''}>${l}</option>`).join('')}</select></label>`;
   const fixed=[['base','職能俸','Gaji pokok'],['meal','伙食津貼','Makan'],['transport','交通津貼','Transport'],['position','崗位津貼','Posisi'],['union','工會會費','Iuran serikat'],['welfare','福利金','Kesejahteraan'],['laborIns','勞保自付','Asuransi kerja'],['healthIns','健保自付','Asuransi kesehatan'],['otherDed','其他固定扣款','Potongan lain']];
-  return `<div class="modal-bg" data-a="salClose"><div class="modal-sheet help-sheet payroll-form" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="payroll-form-heading"><h2>${zh?'自動計薪設定':'Pengaturan hitung otomatis'}</h2><button class="icon-action" data-a="salClose" aria-label="${zh?'關閉':'Tutup'}">×</button></div>
-  <p>${zh?'固定規則設定一次。之後依班表、調班、請假與實際加班自動重算。':'Atur aturan tetap sekali. Hitungan mengikuti jadwal, cuti dan lembur.'}</p>
-  <section class="payroll-form-section"><h3>${zh?'夜點給付規則':'Aturan tunjangan malam'}</h3><div class="payroll-form-grid">${num('night',zh?'完整一班夜點費':'Tarif shift penuh',SAL.night)}${select('nightPolicy',zh?'部分出勤晚班':'Shift malam parsial',SAL.nightPolicy||'unconfirmed',[
-    ['unconfirmed',zh?'尚未確認':'Belum dikonfirmasi'],['attendance',zh?'有出勤即給一班':'Hadir = satu unit'],['prorated',zh?'依出勤工時比例':'Proporsi jam kerja'],['full',zh?'完整出勤才給付':'Hanya shift penuh']])}</div>
-  ${SAL.nightRateSource==='legacy-unverified'?`<p class="payroll-help">${zh?'已還原原設定 489 元，未再使用單月反推的 553 元。請確認公司實際單價。':'Tarif lama 489 dipulihkan, bukan 553 hasil perkiraan satu bulan.'}</p>`:''}
-  <label class="payroll-confirm"><input id="sal_nightConfirmed" type="checkbox"${SAL.nightRateSource==='configured'?' checked':''}>${zh?'以上夜點單價已依公司規則確認（不給付可填 0）':'Tarif malam telah dikonfirmasi (0 jika tidak diberikan)'}</label></section>
-  <section class="payroll-form-section"><h3>${zh?'平日與假日分類':'Jenis hari penggajian'}</h3>${select('dayRuleMode',zh?'採用的公司制度':'Aturan perusahaan',SAL.dayRuleMode||'unconfirmed',[
-    ['unconfirmed',zh?'尚未確認':'Belum dikonfirmasi'],['roster',zh?'輪班：排定工作日按平日；特殊日期另記':'Shift: hari terjadwal biasa'],['weekly',zh?'固定依星期分類':'Aturan mingguan tetap']])}
+  return `<div class="modal-bg" data-a="salClose"><div class="modal-sheet help-sheet payroll-form" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="payroll-form-heading"><h2>${zh?'自動計薪依據':'Dasar hitungan otomatis'}</h2><button class="icon-action" data-a="salClose" aria-label="${zh?'關閉':'Tutup'}">×</button></div>
+  <p>${zh?'已保存的薪資、調薪日期與請假紀錄會自動套用。正常使用只需維護班表與請假。':'Data gaji, tanggal perubahan dan cuti diterapkan otomatis. Cukup perbarui jadwal dan cuti.'}</p>
+  <section class="payroll-form-section payroll-basis"><h3>${zh?'目前計算依據':'Dasar saat ini'}</h3><dl><div><dt>${zh?'固定應領':'Gaji tetap'}</dt><dd>${studioMoney(Payroll.salaryAt(SAL,salPeriodKey(y,m)+'-25').baseSum)}</dd></div><div><dt>${zh?'計薪區間':'Periode'}</dt><dd>${zh?'上月26日～本月25日':'26 bulan lalu – 25 bulan ini'}</dd></div><div><dt>${zh?'跨月調薪':'Perubahan gaji'}</dt><dd>${zh?'按生效日期逐日計算':'Mengikuti tanggal berlaku'}</dd></div><div><dt>${zh?'晚班請假':'Cuti shift malam'}</dt><dd>${zh?'扣除未出勤，再算夜點':'Kurangi ketidakhadiran'}</dd></div></dl><p>${zh?'下方只保留日後調薪或公司制度變更時的修正入口，不必逐項確認才能計算。':'Bagian bawah hanya untuk perubahan gaji atau aturan; tidak perlu konfirmasi satu per satu.'}</p></section>
+  <details class="payroll-form-section"><summary>${zh?'薪資或制度變更（選填）':'Perubahan gaji / aturan (opsional)'}</summary>
+  <section class="payroll-form-section"><h3>${zh?'夜點給付規則':'Aturan tunjangan malam'}</h3><div class="payroll-form-grid">${num('night',zh?'完整一班夜點費':'Tarif shift penuh',SAL.night)}${select('nightPolicy',zh?'部分出勤晚班':'Shift malam parsial',SAL.nightPolicy||'auto',[
+    ['auto',zh?'自動分析既有資料':'Analisis data tersimpan'],['attendance',zh?'有出勤即給一班':'Hadir = satu unit'],['prorated',zh?'依出勤工時比例':'Proporsi jam kerja'],['full',zh?'完整出勤才給付':'Hanya shift penuh']])}</div>
+  <p class="payroll-help">${zh?'自動模式會比對已保存的歷月資料；未能確認時保留估算標示。':'Mode otomatis membandingkan riwayat; hasil yang belum pasti ditandai estimasi.'}</p>
+  </section>
+  <section class="payroll-form-section"><h3>${zh?'平日與假日分類':'Jenis hari penggajian'}</h3>${select('dayRuleMode',zh?'採用的公司制度':'Aturan perusahaan',SAL.dayRuleMode||'roster',[['roster',zh?'輪班：排定工作日按平日；特殊日期另記':'Shift: hari terjadwal biasa'],['weekly',zh?'固定依星期分類':'Aturan mingguan tetap']])}
   <p class="payroll-help">${zh?'輪班休息日不一定是週六日。只有公司固定按星期分類時，才使用下列每週規則。':'Hari istirahat shift tidak selalu akhir pekan. Gunakan aturan mingguan hanya bila perusahaan demikian.'}</p>
   <div class="payroll-form-grid">${[0,1,2,3,4,5,6].map(i=>select('week_'+i,(zh?'星期':'Hari ')+(zh?['日','一','二','三','四','五','六'][i]:['Min','Sen','Sel','Rab','Kam','Jum','Sab'][i]),(SAL.weeklyDayKinds||[])[i]||'work',[
     ['work',zh?'一般工作日':'Hari biasa'],['rest',zh?'休息日':'Istirahat'],['holiday',zh?'公司指定有薪休假日':'Libur berbayar perusahaan']])).join('')}</div></section>
   <details class="payroll-form-section"><summary>${zh?'固定薪資、扣款與倍率':'Gaji tetap, potongan & tarif'}</summary><div class="payroll-form-grid">${fixed.map(([key,z,id])=>num(key,zh?z:id,SAL[key])).join('')}
+  <label class="payroll-field"><span>${zh?'薪資變更生效日':'Tanggal berlaku perubahan gaji'}</span><input type="date" id="sal_effectiveFrom" value="${ek(TY,TM,TD)}"></label>
   ${num('otWageBase',zh?'加班月基數（0＝固定應領）':'Basis lembur (0 = gaji tetap)',SAL.otWageBase)}${num('leaveWageBase',zh?'請假月基數（0＝固定應領）':'Basis cuti (0 = gaji tetap)',SAL.leaveWageBase)}
   ${num('otTier1Rate',zh?'平日前 2 小時倍率':'Tarif 2 jam pertama',SAL.otTier1Rate)}${num('otTier2Rate',zh?'平日後 2 小時倍率':'Tarif 2 jam berikut',SAL.otTier2Rate)}
   ${num('sickRate',zh?'病假扣薪率':'Potongan sakit',SAL.sickRate)}${num('personalRate',zh?'事假扣薪率':'Potongan izin',SAL.personalRate)}
@@ -1765,7 +1814,7 @@ function rSalary(){
   ${num('laborPensionWage',zh?'勞退月提繳工資':'Basis pensiun',SAL.laborPensionWage)}${num('laborPensionSelfRate',zh?'勞退自提率 %':'Pensiun sendiri %',SAL.laborPensionSelfRate)}${num('laborPensionEmployerRate',zh?'公司提撥率 %（不扣實領）':'Pensiun perusahaan %',SAL.laborPensionEmployerRate)}</div></details>
   <details class="payroll-form-section"><summary>${salPeriodKey(y,m)} · ${zh?'額外獎金與特殊出勤':'Bonus & kerja khusus'}</summary><p>${zh?'提案等非固定獎金無法由班表得知，有紀錄才計入本期；不影響班表自動計算。':'Bonus tidak dapat diketahui dari jadwal; hanya catatan bulan ini yang dihitung.'}</p><div class="payroll-form-grid">${num('proposal',zh?'提案獎金':'Bonus proposal',p.proposal)}${num('otherIncome',zh?'其他加項':'Pendapatan lain',p.otherIncome)}</div>
   <p>${zh?'一般日期由固定規則判斷。僅在公司安排有例外时記錄日期與出勤，金額仍自動計算。':'Hari biasa memakai aturan tetap. Catat hanya pengecualian; jumlah dihitung otomatis.'}</p>${salaryDaysForm(y,m)}</details>
-  <div class="payroll-form-actions"><button data-a="salReset" class="soft-btn">${zh?'清除全部':'Hapus semua'}</button><button data-a="salSave" class="salary-primary-action">${zh?'儲存並自動重算':'Simpan & hitung ulang'}</button></div></div></div>`;
+  </details><div class="payroll-form-actions"><button data-a="salClose" class="soft-btn">${zh?'關閉':'Tutup'}</button><button data-a="salSave" class="salary-primary-action">${zh?'儲存並自動重算':'Simpan & hitung ulang'}</button></div></div></div>`;
 }
 function saveSalaryForm(){
   const read=id=>{const el=document.getElementById(id),value=el?el.value.trim():'';if(value==='')return null;
@@ -1776,13 +1825,16 @@ function saveSalaryForm(){
     for(const k of globals){const value=read('sal_'+k);next[k]=value===null?(k==='otTier1Rate'?1.3334:k==='otTier2Rate'?1.6667:0):value;}
     if(!(next.base>0))throw Error(lang==='zh'?'請先填職能俸':'Isi gaji pokok');
     if(next.sickRate>1||next.personalRate>1||next.laborPensionSelfRate>100||next.laborPensionEmployerRate>100)throw Error(lang==='zh'?'扣薪率請填 0–1；提繳率請填 0–100。':'Periksa persentase.');
-    next.nightPolicy=choice('nightPolicy',['unconfirmed','attendance','prorated','full'],'unconfirmed');
-    next.dayRuleMode=choice('dayRuleMode',['unconfirmed','roster','weekly'],'unconfirmed');
+    next.nightPolicy=choice('nightPolicy',['auto','attendance','prorated','full'],'auto');
+    next.dayRuleMode=choice('dayRuleMode',['roster','weekly'],'roster');
     next.payRounding=choice('payRounding',['nearest','floor'],'nearest');
     next.weeklyDayKinds=Array.from({length:7},(_,i)=>choice('week_'+i,['work','rest','holiday'],'work'));
-    const confirmed=document.getElementById('sal_nightConfirmed');
-    if(confirmed&&confirmed.checked)next.nightRateSource='configured';
-    else if(next.night!==SAL.night||SAL.nightRateSource==='configured')next.nightRateSource='unconfirmed';
+    if(next.night!==SAL.night||next.nightPolicy!==SAL.nightPolicy)next.nightRateSource=next.nightPolicy==='auto'?'unconfirmed':'configured';
+    if(Payroll.fixedKeys.some(k=>next[k]!==SAL[k])){
+      const now=new Date(),field=document.getElementById('sal_effectiveFrom'),date=field&&field.value?field.value:ek(now.getFullYear(),now.getMonth()+1,now.getDate());
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(new Date(date+'T00:00:00').getTime()))throw Error(lang==='zh'?'生效日期無效':'Tanggal berlaku tidak valid');
+      next.wageHistory=(SAL.wageHistory||[]).filter(r=>r.effectiveFrom!==date).concat({effectiveFrom:date,...Object.fromEntries(Payroll.fixedKeys.map(k=>[k,next[k]])),source:'user-change'});
+    }
     const data={inputVersion:3,proposal:read('sal_proposal')||0,otherIncome:read('sal_otherIncome')||0,days:{}};
     const previous=getSalPeriod(PAY_VIEW.y,PAY_VIEW.m),pp=calcPayPeriod(PAY_VIEW.y,PAY_VIEW.m);
     if(pp)for(let d=new Date(pp.sd);d<=pp.ed;d.setDate(d.getDate()+1)){
@@ -7106,14 +7158,15 @@ function uiWeatherPreviewHtml(){
 function salaryForecastTitle(est){
   if(est.dataPending)return lang==='zh'?'請假資料同步中':'Menyinkronkan cuti';
   if(est.missingComponents)return lang==='zh'?'已算項目小計 · 尚有缺項':'Subtotal · belum lengkap';
-  if(est.incomplete)return lang==='zh'?'自動試算 · 規則待確認':'Hitungan otomatis · periksa aturan';
+  if(est.incomplete)return lang==='zh'?'自動預估 · 含待核對項目':'Estimasi otomatis · belum cocok';
   return lang==='zh'?'自動預估實領':'Estimasi bersih otomatis';
 }
 function uiPayPreviewHtml(y,m){
   const pv=latestClosedSalaryMonth();y=pv.y;m=pv.m;
   const est=calcSalaryEst(y,m),pp=calcPayPeriod(y,m);if(!pp)return'';
-  const value=est?(est.dataPending?'—':studioMoney(est.net)):`${pp.tH}h`;
-  const title=est?salaryForecastTitle(est):(lang==='zh'?'設定自動計薪':'Atur hitungan otomatis');
+  const actual=est&&est.hasSlip?est.official:null;
+  const value=actual?studioMoney(actual.net):(est?(est.dataPending?'—':studioMoney(est.net)):`${pp.tH}h`);
+  const title=actual?(lang==='zh'?'公司實領 · 既有薪資條':'Gaji bersih · slip tersimpan'):est?salaryForecastTitle(est):(lang==='zh'?'設定自動計薪':'Atur hitungan otomatis');
   return `<button class="insight-row" data-a="tabPay"><span class="insight-icon pay">${studioIcon('money',23)}</span><span class="insight-copy"><small>${m} 月 · ${title}</small><strong>${value}</strong></span>${uiIcon('chevron',18)}</button>`;
 }
 function studioMoney(n){return '$'+Math.round(Number(n)||0).toLocaleString()}
@@ -7126,6 +7179,7 @@ function studioSalaryRows(est){
 }
 function salaryReconciliationHtml(est){
   const check=est.reconciliation;if(!check)return'';
+  if(est.dataPending)return `<p class="payroll-help">${salaryNoteText('leaveNotReady')}</p>`;
   const isZh=lang==='zh',labels=salaryFieldLabels(),hasTarget=check.rows.some(r=>r.actual!==null)||Object.values(check.deltas).some(x=>x!==null);
   if(!hasTarget)return '';
   const delta=n=>n===null?'—':(n>0?'+':n<0?'−':'')+studioMoney(Math.abs(n));
@@ -7133,7 +7187,7 @@ function salaryReconciliationHtml(est){
 }
 function salaryDailyAuditHtml(est){
   if(!est.days)return'';const isZh=lang==='zh';
-  return `<details class="salary-breakdown"><summary><span>${isZh?'逐日計算依據':'Dasar per hari'}</span>${uiIcon('chevron',18)}</summary><p class="payroll-help">${isZh?'出勤＝班表工時減請假及未加班時段；未登入或缺少紀錄時仍屬推算。':'Jam kerja dihitung dari jadwal dikurangi cuti dan lembur yang tidak dikerjakan.'}</p>${est.days.filter(d=>d.worked||d.sickOrLeaveH||d.shift==='晚').map(d=>`<div class="payroll-audit-row"><strong>${d.key.slice(5).replace('-','/')} · ${esc(d.shift||'—')}</strong><span>${({work:isZh?'平日':'Biasa',rest:isZh?'休息日':'Istirahat',holiday:isZh?'國定休假日':'Libur'})[d.kind]} · ${d.worked}h</span><small>${isZh?'加班':'Lembur'} ${d.normalOT+d.holidayH}h · ${isZh?'夜點':'Malam'} ${d.nightUnknown?(isZh?'待確認':'Periksa'):Math.round(d.nightUnits*100)/100}<br>${isZh?'病假扣薪':'Sakit'} ${d.daySickH||0}h${d.legacyWageH?` · ${isZh?'依舊紀錄時數':'Jam dari catatan lama'}`:''}</small></div>`).join('')}</details>`;
+  return `<details class="salary-breakdown"><summary><span>${isZh?'逐日計算依據':'Dasar per hari'}</span>${uiIcon('chevron',18)}</summary><p class="payroll-help">${isZh?'出勤＝班表工時減請假及未加班時段；未登入或缺少紀錄時仍屬推算。':'Jam kerja dihitung dari jadwal dikurangi cuti dan lembur yang tidak dikerjakan.'}</p>${est.days.filter(d=>d.worked||d.sickOrLeaveH||d.shift==='晚').map(d=>`<div class="payroll-audit-row"><strong>${d.key.slice(5).replace('-','/')} · ${esc(d.shift||'—')}</strong><span>${({work:isZh?'平日':'Biasa',rest:isZh?'休息日':'Istirahat',holiday:isZh?'國定休假日':'Libur'})[d.kind]} · ${d.worked}h</span><small>${isZh?'加班':'Lembur'} ${d.normalOT+d.holidayH}h · ${isZh?'夜點':'Malam'} ${d.nightUnknown?(isZh?'待確認':'Periksa'):Math.round(d.nightUnits*100)/100}<br>${isZh?'病假扣薪':'Sakit'} ${d.daySickH||0}h · ${isZh?'當日時薪':'Tarif hari ini'} $${(d.dayOtHourly||0).toFixed(2)}${d.disasterHours?` · ${isZh?'天災假':'Cuti bencana'} ${d.disasterHours}h`:''}${d.legacyWageH?` · ${isZh?'依舊紀錄時數':'Jam dari catatan lama'}`:''}</small></div>`).join('')}</details>`;
 }
 function uiSalaryDashboardHtml(y,m){
   const isZh=lang==='zh',pp=calcPayPeriod(y,m);if(!pp||!rot())return'';
@@ -7144,17 +7198,17 @@ function uiSalaryDashboardHtml(y,m){
   const head=`<div class="salary-dashboard-head"><div class="period-navigation"><button class="icon-action previous" data-a="payPrev" aria-label="${isZh?'上個薪資月':'Bulan gaji sebelumnya'}">${uiIcon('chevron',18)}</button><h2>${label}</h2><button class="icon-action" data-a="payNext" aria-label="${isZh?'下個薪資月':'Bulan gaji berikutnya'}">${uiIcon('chevron',18)}</button></div><div class="period-caption"><span>${period}</span><button class="text-action" data-a="payLatest">${isZh?'最新':'Terbaru'}</button></div></div>`;
   const est=calcSalaryEst(y,m);
   if(!est)return `<section class="salary-dashboard salary-empty">${head}<div class="salary-empty-copy">${studioIcon('money',34)}<h3>${isZh?'先設定，再掌握薪資':'Atur data gaji Anda'}</h3><p>${isZh?'填入固定應領、扣款與加班規則，即可查看預估實領。':'Masukkan data tetap untuk estimasi.'}</p><button class="salary-primary-action" data-a="salOpen">${isZh?'設定薪資資料':'Atur data gaji'}${uiIcon('arrow',17)}</button></div></section>`;
-  const actual=null,display=est; // The primary value is ALWAYS calculated, even when a saved slip exists.
-  if(est.dataPending)return `<section class="salary-dashboard">${head}<div class="payroll-auto-badge">v305 · ${isZh?'自動計算':'Hitungan otomatis'}</div><div class="salary-hero payroll-incomplete"><span>${salaryForecastTitle(est)}</span><p>${salaryNoteText('leaveNotReady')}</p><button class="soft-btn" data-a="salRefresh">${isZh?'重新同步':'Sinkronkan lagi'}</button></div></section>`;
+  const actual=est.hasSlip?est.official:null,display=actual||est;
+  if(est.dataPending&&!actual)return `<section class="salary-dashboard">${head}<div class="payroll-auto-badge">v306 · ${isZh?'自動計算':'Hitungan otomatis'}</div><div class="salary-hero payroll-incomplete"><span>${salaryForecastTitle(est)}</span><p>${salaryNoteText('leaveNotReady')}</p><button class="soft-btn" data-a="salRefresh">${isZh?'重新同步':'Sinkronkan lagi'}</button></div></section>`;
   const gross=Math.max(1,display.income),netPct=Math.max(0,Math.min(100,display.net/gross*100)),dedPct=100-netPct;
   const notes=(est.notes||[]).map(k=>`<li>${salaryNoteText(k)}</li>`).join('');
-  const moneyTitle=salaryForecastTitle(est);
-  const meta=est.missingComponents?(isZh?'缺少項目未當作 0 元結清，這不是完整實領。':'Komponen yang belum diketahui tidak dianggap nol.'):
+  const moneyTitle=actual?(isZh?'公司實領 · 既有薪資條':'Gaji bersih · slip tersimpan'):salaryForecastTitle(est);
+  const meta=actual?(isZh?'自動讀取你已提供的薪資條；下方另外顯示班表計算與差額。':'Slip tersimpan dimuat otomatis; estimasi jadwal ditampilkan terpisah.') : est.missingComponents?(isZh?'缺少項目未當作 0 元結清，這不是完整實領。':'Komponen yang belum diketahui tidak dianggap nol.'):
     (isZh?'班表 × 公司規則 · 修改出勤後自動重算':'Jadwal × aturan · diperbarui otomatis');
-  const metrics=`<div class="salary-metrics"><div><strong>${est.workedDays===undefined?pp.wd:est.workedDays}<small>${isZh?'天':'hri'}</small></strong><span>${isZh?'扣假後出勤':'Kerja setelah cuti'}</span></div><div><strong>${Math.round((est.workedHours===undefined?pp.tH:est.workedHours)*100)/100}<small>h</small></strong><span>${isZh?'扣假後工時':'Jam setelah cuti'}</span></div><div><strong>${est.otH}<small>h</small></strong><span>${isZh?'估算加班':'Estimasi lembur'}</span></div></div>`;
+  const metrics=est.dataPending?'':`<div class="salary-metrics"><div><strong>${est.workedDays===undefined?pp.wd:est.workedDays}<small>${isZh?'天':'hri'}</small></strong><span>${isZh?'扣假後出勤':'Kerja setelah cuti'}</span></div><div><strong>${Math.round((est.workedHours===undefined?pp.tH:est.workedHours)*100)/100}<small>h</small></strong><span>${isZh?'扣假後工時':'Jam setelah cuti'}</span></div><div><strong>${est.otH}<small>h</small></strong><span>${isZh?'估算加班':'Estimasi lembur'}</span></div></div>`;
   const companyHours=actual?`<div class="salary-leave-meta"><b>${isZh?'公司時數':'Jam slip'}</b>${[['weekdayH','平日','Biasa'],['holidayH','假日','Libur'],['sickH','病假','Sakit'],['disasterH','天災假','Bencana']].filter(([k])=>actual[k]!==null).map(([k,zh,id])=>`<span>${isZh?zh:id} ${actual[k]}h</span>`).join('')}</div>`:'';
   const salaryRows=actual?studioSalaryRows(Object.assign({isSlip:true},actual)):studioSalaryRows(est);
-  return `<section class="salary-dashboard">${head}<div class="payroll-auto-badge">v305 · ${isZh?'自動計算':'Hitungan otomatis'}</div><div class="salary-hero${est.incomplete?' payroll-incomplete':''}"><div class="salary-hero-label"><span>${moneyTitle}</span><span class="salary-hero-seal" aria-hidden="true">${studioIcon(actual?'shield':'money',23)}</span></div><strong class="salary-net">${studioMoney(display.net)}</strong><p>${meta}</p></div><div class="salary-flow"><div class="salary-flow-label"><span>${isZh?'應領':'Pendapatan'}<b>${studioMoney(display.income)}</b></span><span>${isZh?'應扣':'Potongan'}<b>${studioMoney(display.deduction)}</b></span></div><div class="salary-flow-track" aria-hidden="true"><i style="width:${netPct}%"></i><b style="width:${dedPct}%"></b></div></div>${metrics}${companyHours}<div class="pay-calendar-row"><div>${studioIcon('money',20)}<span><small>${isZh?'發薪日':'Tanggal gaji'}</small><strong>${actual&&actual.payDate?esc(actual.payDate.slice(5).replace('-',' / ')):payMY.m+' / '+pay5}</strong></span></div><div>${studioIcon('award',20)}<span><small>${isZh?'績效獎金':'Bonus kinerja'}</small><strong>${payMY.m}<em> / </em>${pay20}</strong></span></div></div><details class="salary-breakdown" open><summary><span>${studioIcon('trend',18)}${actual?(isZh?'公司薪資明細':'Rincian slip'):(isZh?'估算明細':'Rincian estimasi')}</span>${uiIcon('chevron',18)}</summary><div class="salary-detail-list">${salaryRows}</div></details>${notes?`<aside class="payroll-callout"><strong>${isZh?'估算仍有待確認項目':'Estimasi perlu diperiksa'}</strong><ul>${notes}</ul><button class="text-action" data-a="salOpen">${isZh?'設定一次公司規則':'Atur aturan sekali'}</button></aside>`:''}${salaryReconciliationHtml(est)?`<details class="salary-breakdown"><summary>${isZh?'既有薪資紀錄對照（不參與計算）':'Catatan pembanding'}</summary>${salaryReconciliationHtml(est)}</details>`:''}<details class="salary-breakdown"><summary><span>${isZh?'估算公式與時數':'Rumus estimasi'}</span>${uiIcon('chevron',18)}</summary><div class="salary-detail-meta"><span>${isZh?'固定時薪':'Per jam'} $${est.hourly.toFixed(2)}</span><span>${isZh?'加班基數時薪':'Basis lembur'} $${est.otHourly.toFixed(2)}</span><span>${isZh?'請假基數時薪':'Basis cuti'} $${est.leaveHourly.toFixed(2)}</span></div><p class="payroll-help">${isZh?`病假 ${est.sickPayH||0}h × 扣薪時薪 $${est.leaveHourly.toFixed(2)} × ${Math.round((est.sickRate||0)*100)}% ＝ ${studioMoney(est.sickDed)}。平日加班前段 ${est.totalFront||0}h、後段 ${est.totalBack||0}h。夜點 ${Math.round((est.nightCount||0)*100)/100} 班 × $${est.nightRate||0} ＝ ${studioMoney(est.nightPay)}。免稅與應稅不按比例推算。`:`Sakit tercatat ${est.sickH||0}h / dihitung ${est.sickPayH||0}h. Lembur tingkat 1: ${est.totalFront||0}h; tingkat 2: ${est.totalBack||0}h.`}</p></details>${salaryDailyAuditHtml(est)}<p class="salary-disclaimer">${studioIcon('info',16)}<span>${isZh?'依班表與已記錄的獎金自動試算；未登記的浮動獎金不在此金額內。':'Dihitung dari jadwal dan bonus tercatat; bonus yang belum tercatat tidak termasuk.'}</span></p></section>`;
+  return `<section class="salary-dashboard">${head}<div class="payroll-auto-badge">v306 · ${isZh?'自動計算':'Hitungan otomatis'}</div><div class="salary-hero${est.incomplete?' payroll-incomplete':''}"><div class="salary-hero-label"><span>${moneyTitle}</span><span class="salary-hero-seal" aria-hidden="true">${studioIcon(actual?'shield':'money',23)}</span></div><strong class="salary-net">${studioMoney(display.net)}</strong><p>${meta}</p></div><div class="salary-flow"><div class="salary-flow-label"><span>${isZh?'應領':'Pendapatan'}<b>${studioMoney(display.income)}</b></span><span>${isZh?'應扣':'Potongan'}<b>${studioMoney(display.deduction)}</b></span></div><div class="salary-flow-track" aria-hidden="true"><i style="width:${netPct}%"></i><b style="width:${dedPct}%"></b></div></div>${metrics}${companyHours}<div class="pay-calendar-row"><div>${studioIcon('money',20)}<span><small>${isZh?'發薪日':'Tanggal gaji'}</small><strong>${actual&&actual.payDate?esc(actual.payDate.slice(5).replace('-',' / ')):payMY.m+' / '+pay5}</strong></span></div><div>${studioIcon('award',20)}<span><small>${isZh?'績效獎金':'Bonus kinerja'}</small><strong>${payMY.m}<em> / </em>${pay20}</strong></span></div></div><details class="salary-breakdown" open><summary><span>${studioIcon('trend',18)}${actual?(isZh?'公司薪資明細':'Rincian slip'):(isZh?'估算明細':'Rincian estimasi')}</span>${uiIcon('chevron',18)}</summary><div class="salary-detail-list">${salaryRows}</div></details>${notes?`<aside class="payroll-callout"><strong>${isZh?'估算仍有待確認項目':'Estimasi perlu diperiksa'}</strong><ul>${notes}</ul><button class="text-action" data-a="salOpen">${isZh?'查看計算依據':'Lihat dasar perhitungan'}</button></aside>`:''}${salaryReconciliationHtml(est)?`<details class="salary-breakdown" open><summary>${isZh?'班表自動計算與公司差額':'Estimasi otomatis vs slip'}</summary>${salaryReconciliationHtml(est)}</details>`:''}<details class="salary-breakdown"><summary><span>${isZh?'估算公式與時數':'Rumus estimasi'}</span>${uiIcon('chevron',18)}</summary><div class="salary-detail-meta"><span>${isZh?'固定時薪':'Per jam'} $${est.hourly.toFixed(2)}</span><span>${isZh?'加班基數時薪':'Basis lembur'} $${est.otHourly.toFixed(2)}</span><span>${isZh?'請假基數時薪':'Basis cuti'} $${est.leaveHourly.toFixed(2)}</span></div><p class="payroll-help">${isZh?`病假合計 ${est.sickPayH||0}h，依每天生效的薪資 × 扣薪率 ${Math.round((est.sickRate||0)*100)}% 加總＝${studioMoney(est.sickDed)}。平日加班前段 ${est.totalFront||0}h、後段 ${est.totalBack||0}h。夜點 ${Math.round((est.nightCount||0)*100)/100} 班 × $${est.nightRate||0} ＝ ${studioMoney(est.nightPay)}。免稅與應稅不按比例推算。`:`Sakit tercatat ${est.sickH||0}h / dihitung ${est.sickPayH||0}h. Lembur tingkat 1: ${est.totalFront||0}h; tingkat 2: ${est.totalBack||0}h.`}</p></details>${salaryDailyAuditHtml(est)}<p class="salary-disclaimer">${studioIcon('info',16)}<span>${isZh?'依班表與已記錄的獎金自動試算；未登記的浮動獎金不在此金額內。':'Dihitung dari jadwal dan bonus tercatat; bonus yang belum tercatat tidak termasuk.'}</span></p></section>`;
 }
 function uiPrecipChartHtml(d){
   if(!d||!Array.isArray(d.hTime)||!Array.isArray(d.hPrec))return'';

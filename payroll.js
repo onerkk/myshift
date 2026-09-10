@@ -1,4 +1,4 @@
-/* Payroll v305. Deterministic forecast; recorded payslips never drive the estimate. */
+/* Payroll v306. Dated wages, validated history and independent daily forecasts. */
 (function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -52,7 +52,11 @@
         p.inputVersion=3;s.monthly[key]=p;
       }
     }
-    s.schemaVersion=6;
+    if(old<7){
+      if(!s.dayRuleMode||s.dayRuleMode==='unconfirmed')s.dayRuleMode='roster';
+      if(!s.nightPolicy||s.nightPolicy==='unconfirmed')s.nightPolicy='auto';
+    }
+    s.schemaVersion=7;
     return s;
   }
   function period(source){
@@ -107,6 +111,71 @@
     return{units:worked>=shiftHours-1e-7?1:0,unknown:worked<shiftHours-1e-7};
   }
   function roundPay(value,policy){return policy==='floor'?Math.floor(value+1e-7):Math.round(value+1e-7);}
+  const fixedKeys=['base','meal','transport','position','union','welfare','laborIns','healthIns','otherDed'];
+  function salaryAt(source,date){
+    const rows=(Array.isArray(source.wageHistory)?source.wageHistory:[])
+      .filter(r=>r&&/^\d{4}-\d{2}-\d{2}$/.test(r.effectiveFrom||''))
+      .sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom));
+    const row=rows.filter(r=>r.effectiveFrom<=date).pop();
+    // Future explicit changes in the normal salary form take precedence. Historical
+    // rows remain immutable; editing today's salary must not rewrite previous pay.
+    const out=Object.assign({},source);
+    // For dates after the last historical statement, a differing current setting
+    // is retained without inventing a retrospective effective date.
+    const hasDatedChange=rows.some(r=>r.source==='user-change'&&r.effectiveFrom>source.wageHistoryCutoff);
+    const live=source.wageHistoryCutoff&&!hasDatedChange&&date>source.wageHistoryCutoff&&row&&row.effectiveFrom<=source.wageHistoryCutoff;
+    if(row&&!live)for(const k of fixedKeys)if(number(row[k])!==null)out[k]=number(row[k]);
+    out.baseSum=['base','meal','transport','position'].reduce((v,k)=>v+(number(out[k])||0),0);
+    out.fixedDed=['union','welfare','laborIns','healthIns','otherDed'].reduce((v,k)=>v+(number(out[k])||0),0);
+    out.effectiveFrom=row?row.effectiveFrom:null;
+    return out;
+  }
+  function attachReference(source,raw){
+    const parsed=parseImport(JSON.stringify(raw)),s=migrate(source),details=raw.sourceDetails||{};
+    const previous=s.monthly[parsed.month]||{};
+    // A user's later saved, complete statement wins over the bundled reference.
+    s.monthly[parsed.month]={...previous};
+    if(!slip(previous.slip).valid)Object.assign(s.monthly[parsed.month],{slip:parsed.slip,referenceSource:'provided-payslip',inputVersion:3});
+    const target=s.monthly[parsed.month];
+    if(!number(previous.proposal))target.proposal=parsed.slip.proposal;
+    if(!number(previous.otherIncome))target.otherIncome=parsed.slip.otherIncome;
+    const current={...(details.fixedIncome||{}),...(details.fixedDeduction||{})};
+    for(const k of fixedKeys)if(number(current[k])!==null&&(!(number(s[k])>0)||(details.fixedIncomeHistory||[]).some(r=>number(r[k])===number(s[k]))))s[k]=number(current[k]);
+    const history=Array.isArray(s.wageHistory)?s.wageHistory.slice():[];
+    for(const r of details.fixedIncomeHistory||[]){
+      if(!r||!/^\d{4}-\d{2}-\d{2}$/.test(r.effectiveFrom||'')||history.some(h=>h.effectiveFrom===r.effectiveFrom))continue;
+      const row={effectiveFrom:r.effectiveFrom,source:'provided-payslip'};
+      for(const k of fixedKeys)if(number(r[k])!==null)row[k]=number(r[k]);
+      history.push(row);
+    }
+    if(/^\d{4}-\d{2}-\d{2}$/.test(details.fixedPayEffectiveDate||'')&&!history.some(r=>r.effectiveFrom===details.fixedPayEffectiveDate)){
+      history.push({effectiveFrom:details.fixedPayEffectiveDate,...current,source:'provided-payslip'});
+    }
+    if(!(number(s.night)>0)&&s.nightRateSource!=='configured'&&number(details.nightEstimate&&details.nightEstimate.rate)>0){
+      s.night=number(details.nightEstimate.rate);s.nightPolicy='auto';s.nightRateSource='unconfirmed';
+    }
+    s.wageHistory=history;s.wageHistoryCutoff=parsed.month+'-25';s.enabled=number(s.base)>0;s.referenceVersion=306;
+    return s;
+  }
+  function inferNightRule(observations){
+    const rows=(observations||[]).filter(r=>r&&r.complete===true&&number(r.amount)!==null&&Array.isArray(r.days));
+    if(rows.length<2)return null;
+    const matches=[];
+    for(const policy of ['attendance','prorated','full']){
+      let low=0,high=Infinity;
+      for(const r of rows){
+        const units=r.days.reduce((v,d)=>v+nightUnits(d.worked,d.shiftHours,policy).units,0);
+        if(!units){if(r.amount>0){high=-1;break;}continue;}
+        low=Math.max(low,(r.amount-.5)/units);high=Math.min(high,(r.amount+.5)/units);
+      }
+      if(high>=low&&Number.isFinite(high)){
+        const rate=Math.round((low+high)*50)/100;
+        if(rate<high&&rows.every(r=>money(r.days.reduce((v,d)=>v+nightUnits(d.worked,d.shiftHours,policy).units,0)*rate)===r.amount))matches.push({policy,rate,sampleCount:rows.length});
+      }
+    }
+    // Several policies can coincide for full shifts. Do not silently pick one.
+    return matches.length===1?matches[0]:null;
+  }
   function reconcile(est,official){
     const checked=slip(official),s=checked.data;
     const rows=incomeKeys.concat(deductionKeys).map(key=>{
@@ -119,5 +188,5 @@
     const deltas={};for(const k of totalKeys)deltas[k]=s[k]===null?null:est[k]-s[k];
     return{...checked,rows,deltas,matched:checked.valid&&!est.incomplete&&rows.every(r=>r.delta===0)};
   }
-  return{number,money,migrate,period,slip,parseImport,dailyOT,nightUnits,roundPay,reconcile,incomeKeys,deductionKeys,totalKeys,hourKeys,optionalKeys};
+  return{number,money,migrate,period,slip,parseImport,dailyOT,nightUnits,roundPay,salaryAt,attachReference,inferNightRule,fixedKeys,reconcile,incomeKeys,deductionKeys,totalKeys,hourKeys,optionalKeys};
 });
