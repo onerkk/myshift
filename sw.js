@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v310-foreground-fx';
+const CACHE_NAME = 'myshift-v311-unit-sync';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache

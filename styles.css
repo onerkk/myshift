@@ -403,3 +403,12 @@ html[data-theme="dark"] .bottom-nav{box-shadow:inset 0 1px 0 #ffffff16,0 3px 0 #
 .payroll-basis dl{margin:0}.payroll-basis dl>div{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:11px 0;border-bottom:1px solid var(--line);font-size:.875rem;line-height:1.6}.payroll-basis dt{flex:0 0 auto;color:var(--ink-2)}.payroll-basis dd{margin:0;min-width:0;text-align:right;overflow-wrap:break-word;color:var(--ink);font-weight:650}
 .payroll-form .payroll-confirm input[type="checkbox"]{width:20px;min-width:20px;max-width:20px;height:20px;min-height:20px;flex:0 0 20px;padding:0;margin:2px 0}
 .payroll-form .payroll-field{min-width:0}.payroll-form .payroll-field>span{line-height:1.6;overflow-wrap:break-word}
+
+/* v311: backend configuration state beside each unit selector. */
+.unit-config-status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;font-size:.73rem;line-height:1.65;color:var(--ink-2)}
+.unit-config-status[data-state="ready"]{color:var(--brand)}
+.unit-config-status[data-state="error"],.unit-config-warning{color:var(--amber)}
+.unit-config-status button{flex:none;min-height:38px;padding:7px 11px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);color:var(--brand);font:inherit;font-weight:650;cursor:pointer;box-shadow:var(--button-shadow)}
+.unit-config-warning{font-size:.73rem;line-height:1.65;margin:7px 0 0}
+#unitSel:disabled,#unitChg:disabled{opacity:.65;cursor:wait}
+#unitSel,#unitChg{min-height:44px;color:var(--ink);background:var(--surface)!important;border-color:var(--line-strong)!important}

@@ -402,7 +402,7 @@ function syncALYearLeaves(){
     if(changed){sAL();render()}
   },"syncALYear").catch(e=>console.log("syncALYear err",e));
 }
-fbAuth.onAuthStateChanged(u=>{if(SAL.referenceOwnerUid&&(!u||u.uid!==SAL.referenceOwnerUid)){SAL=Object.assign({},SAL_DEFAULT,{monthly:{}});try{localStorage.removeItem("sb_sal")}catch(e){}}fbUser=u;fbAuthReady=true;if(u){
+fbAuth.onAuthStateChanged(u=>{if(SAL.referenceOwnerUid&&(!u||u.uid!==SAL.referenceOwnerUid)){SAL=Object.assign({},SAL_DEFAULT,{monthly:{}});try{localStorage.removeItem("sb_sal")}catch(e){}}fbUser=u;fbAuthReady=true;loadAppConfig(true);if(u){
   // Immediately save display name for admin panel
   fsEnqueue(()=>fbDb.collection("users").doc(u.uid).set({displayName:u.displayName||"",email:u.email||"",photoURL:u.photoURL||"",lastLogin:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),"loginTouch").catch(()=>{});
   _doAuthInit()}else{loadAdminEv()}render()});
@@ -983,7 +983,7 @@ let APP_CFG={admins:[],visualFx:{enabled:true},
       rain:[],heavyRain:[],strongWind:[],heat:[],cold:[],fog:[]
     }
   },
-  units:["冷抽二股A板","冷抽二股B板","冷抽二股C板","冷抽一股A板","冷抽一股B板","冷抽一股C板","熱處理A板","熱處理B板","品管","其他"],
+  units:[], // The unit list comes exclusively from config/app. No demo fallback.
   rotations:[
     {id:"4on2off",name:"做4休2",nameId:"4K 2L",hours:12,cycle:["早","早","早","早","休","休","晚","晚","晚","晚","休","休"]},
     {id:"2on2off",name:"做2休2",nameId:"2K 2L",hours:12,cycle:["早","早","休","休","晚","晚","休","休"]},
@@ -1001,7 +1001,8 @@ let APP_CFG={admins:[],visualFx:{enabled:true},
   ]
 };
 normalizePayrollLeaveTypes();
-const UNITS_DEFAULT=APP_CFG.units.slice();
+let appConfigState={phase:"loading",hasData:false,errorCode:""};
+let appConfigSync=null;
 try{window.APP_CFG=APP_CFG}catch(e){}
 
 // ═══════════════════════════════════════════════════════════════
@@ -1189,37 +1190,60 @@ function applyGustAdminUiCompat(){
     });
   }catch(e){}
 }
-function loadAppConfig(){
-  return fsEnqueue(async()=>{
-    const doc=await fbDb.collection("config").doc("app").get();
-    if(doc.exists){
-      const d=doc.data();
-      if(d.units&&d.units.length)APP_CFG.units=d.units;
-      if(d.leaveTypes&&d.leaveTypes.length)APP_CFG.leaveTypes=d.leaveTypes;
-      normalizePayrollLeaveTypes();
-      if(d.admins)APP_CFG.admins=d.admins;
-      if(d.rotations&&d.rotations.length)APP_CFG.rotations=d.rotations;
-      if(d.visualFx&&typeof d.visualFx.enabled==='boolean') APP_CFG.visualFx.enabled=d.visualFx.enabled;
-      // wxAlerts: 合併讀取（保留預設值，後台可單獨覆寫部分欄位）
-      if(d.wxAlerts&&typeof d.wxAlerts==='object'){
-        for(const k in d.wxAlerts){
-          if(d.wxAlerts[k]===undefined||d.wxAlerts[k]===null) continue;
-          if(k==='timeWindows'&&typeof d.wxAlerts[k]==='object'){
-            // 深層合併時段
-            APP_CFG.wxAlerts.timeWindows=APP_CFG.wxAlerts.timeWindows||{};
-            for(const aid in d.wxAlerts.timeWindows){
-              if(Array.isArray(d.wxAlerts.timeWindows[aid])) APP_CFG.wxAlerts.timeWindows[aid]=d.wxAlerts.timeWindows[aid];
-            }
-          }else{
-            APP_CFG.wxAlerts[k]=d.wxAlerts[k];
-          }
+function applyAppConfig(d){
+  APP_CFG.units=Array.isArray(d.units)?[...new Set(d.units.filter(u=>typeof u==='string'&&u.trim()))]:[];
+  if(d.leaveTypes&&d.leaveTypes.length)APP_CFG.leaveTypes=d.leaveTypes;
+  normalizePayrollLeaveTypes();
+  if(d.admins)APP_CFG.admins=d.admins;
+  if(d.rotations&&d.rotations.length)APP_CFG.rotations=d.rotations;
+  if(d.visualFx&&typeof d.visualFx.enabled==='boolean') APP_CFG.visualFx.enabled=d.visualFx.enabled;
+  // wxAlerts: 合併讀取（保留預設值，後台可單獨覆寫部分欄位）
+  if(d.wxAlerts&&typeof d.wxAlerts==='object'){
+    for(const k in d.wxAlerts){
+      if(d.wxAlerts[k]===undefined||d.wxAlerts[k]===null) continue;
+      if(k==='timeWindows'&&typeof d.wxAlerts[k]==='object'){
+        // 深層合併時段
+        APP_CFG.wxAlerts.timeWindows=APP_CFG.wxAlerts.timeWindows||{};
+        for(const aid in d.wxAlerts.timeWindows){
+          if(Array.isArray(d.wxAlerts.timeWindows[aid])) APP_CFG.wxAlerts.timeWindows[aid]=d.wxAlerts.timeWindows[aid];
         }
+      }else{
+        APP_CFG.wxAlerts[k]=d.wxAlerts[k];
       }
-      normalizeWxAlertConfig();
-      rebuildR();
-      applyVisualFxSetting();
     }
-  },"loadAppConfig").catch(e=>console.log("loadCfg err",e));
+  }
+  normalizeWxAlertConfig();
+  rebuildR();
+  applyVisualFxSetting();
+}
+function loadAppConfig(force=false){
+  if(!appConfigSync)appConfigSync=AppConfigSync.create({
+    ref:fbDb.collection("config").doc("app"),
+    onData:applyAppConfig,
+    onState:state=>{appConfigState=state;render();}
+  });
+  return appConfigSync.start(force);
+}
+function unitConfigAvailable(){return appConfigState.hasData&&getUnits().length>0;}
+function unitConfigStatusHtml(){
+  const zh=lang==='zh',st=appConfigState,phase=st.phase;
+  const denied=['permission-denied','unauthenticated'].includes(st.errorCode);
+  let text=phase==='ready'?(getUnits().length?(zh?`已與後台同步 · ${getUnits().length} 個單位`:`Tersinkron · ${getUnits().length} unit`):(zh?'後台尚未設定單位，請管理員新增。':'Belum ada unit; hubungi admin.')):
+    phase==='missing'?(zh?'後台設定尚未建立，請管理員確認。':'Konfigurasi belum tersedia; hubungi admin.'):
+    phase==='cached'?(zh?'顯示上次同步的單位，連線後會自動更新。':'Unit terakhir ditampilkan; diperbarui setelah tersambung.'):
+    phase==='error'?(denied&&!fbUser?(zh?'請先登入以載入後台單位。':'Masuk untuk memuat unit.'):(zh?'單位同步失敗，請檢查連線後重試。':'Unit gagal disinkronkan; periksa koneksi dan coba lagi.')):
+    (zh?'正在同步後台單位…':'Menyinkronkan unit…');
+  if(phase==='error'&&st.hasData)text+=' '+(zh?'目前顯示上次同步結果。':'Menampilkan hasil sinkronisasi terakhir.');
+  const retry=['error','cached','missing'].includes(phase);
+  const warning=st.hasData&&S.unit&&S.unit!=='__all'&&!getUnits().includes(S.unit)?`<p class="unit-config-warning">${esc(S.unit)} · ${S.lockedUnit?(zh?'管理員指派的單位已移除，請管理員更新。':'Unit yang ditetapkan sudah dihapus; hubungi admin.'):(zh?'已不在後台清單，請重新選擇。':'Sudah tidak tersedia; pilih unit kembali.')}</p>`:'';
+  return `<div class="unit-config-status" data-state="${phase}" role="status"><span>${text}</span>${retry?`<button type="button" onclick="${denied&&!fbUser?'fbLogin()':'loadAppConfig(true)'}">${denied&&!fbUser?(zh?'登入':'Masuk'):(zh?'重新同步':'Sinkron ulang')}</button>`:''}</div>${warning}`;
+}
+function changeSelectedUnit(value){
+  if(S.lockedUnit){alert(lang==='zh'?'單位已被管理員鎖定':'Unit dikunci oleh admin');return false;}
+  if(!appConfigState.hasData||!(value===''||getUnits().includes(value)||(value==='__all'&&isAdmin()))){
+    alert(lang==='zh'?'單位清單已更新或尚未載入，請重新選擇。':'Daftar unit diperbarui atau belum dimuat; pilih kembali.');return false;
+  }
+  S.unit=value;sv();if(fbUser)loadLeaves();return true;
 }
 // 全域 FX 開關：套用設定（影響 canvas 顯示 + 聲音）
 // 最終開啟條件 = 管理員允許 AND 用戶啟用
@@ -1992,10 +2016,13 @@ function _doRender(){
       let h=S.step==="type"?rType():S.step==="wiz"?rWiz():rCal();
       if(_dashPainted)h=h.replace(/ fi"/g,'"');
       if(h!==_lastAppHtml){
+        // Live configuration updates must not clear an unfinished setup form.
+        const setupState=S.step==='type'&&a.querySelector('#unitSel')?_captureReplaceState(a):null;
         a.innerHTML=h;
         _lastAppHtml=h;
         _dashPainted=true;
         _bindActions(a);
+        if(setupState)_restoreReplaceState(a,setupState);
       }
     }
 
@@ -2037,9 +2064,9 @@ function rType(){
   const unitOpts=getUnits().map(u=>`<option value="${esc(u)}"${S.unit===u?' selected':''}>${esc(u)}</option>`).join('');
   return`<div class="page"><div class="hero fu"><img src="${IMG.icon}"><h1>${t("app")}</h1><p>${t("desc")}</p></div>
   <div class="al-setup fu d1" style="margin-bottom:10px"><h3>🏭 ${lang==="zh"?"選擇單位":"Pilih Unit"}</h3>
-    <select id="unitSel" onchange="if(S.lockedUnit){this.value=S.lockedUnit;alert(lang==='zh'?'單位已被管理員鎖定':'Unit dikunci');return}S.unit=this.value;sv();if(fbUser)loadLeaves()" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff">
+    <select id="unitSel" ${unitConfigAvailable()?'':' disabled'} aria-describedby="unitConfigHint" onchange="if(!changeSelectedUnit(this.value))this.value=getUnits().includes(S.unit)?S.unit:''" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff">
       <option value="">${lang==="zh"?"-- 請選擇 --":"-- Pilih --"}</option>${unitOpts}
-    </select>
+    </select><div id="unitConfigHint">${unitConfigStatusHtml()}</div>
   </div>
   ${Object.keys(R).length?Object.entries(R).map(([k,v],i)=>`<button class="rcard fu d${(i%3)+1}" data-a="pick" data-k="${k}"><div class="rcard-icon">${v.c.filter(x=>x!=="休").length>9?"":v.c.filter(x=>x!=="休").length}${v.c.filter(x=>x!=="休").length>9?k.substring(0,3):":"+v.c.filter(x=>x==="休").length}</div><div class="rcard-info"><div class="rcard-name">${RN[lang]&&RN[lang][k]||k}</div><div class="rcard-sub">${v.h}h · ${v.c.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join(""):`<div style="padding:20px;text-align:center;color:var(--tx3);font-size:13px">${lang==="zh"?"⚠️ 尚未設定輪班規則，請管理員到後台設定":"⚠️ Belum ada aturan shift"}</div>`}
   <div class="al-setup fu d3"><h3>${t("alSetup")}</h3><div class="al-setup-hint" style="margin-bottom:8px;font-size:11px;color:var(--green);font-weight:600">${alYRange(curALY())}</div><div class="al-setup-row"><label>${t("alTotal")}</label><input type="number" id="alTI" value="${getAL().total||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-hint">${t("alSkip")}</div></div>
@@ -2630,8 +2657,8 @@ function rHelp(){
   return`<div class="modal-bg" data-a="closeH"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="help-header"><div class="help-header-icon"><img src="${IMG.icon}" style="width:40px;height:40px;border-radius:10px"></div><div><div class="modal-title" style="text-align:left;font-size:18px">${isZh?"我的班表 使用說明":"My Shift Panduan"}</div><div style="font-size:11px;color:var(--tx3);margin-top:2px">${isZh?"華新麗華 輪班管理系統":"Sistem Manajemen Shift"}</div></div></div><div style="height:16px"></div>
   ${colorLegend}${stepsHtml}</div>
   <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee">
-    <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:700;color:var(--tx)">🏭 ${isZh?"切換單位":"Ganti Unit"}</label><div style="display:flex;gap:6px;margin-top:6px"><select id="unitChg" style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;font-weight:600"><option value="">${isZh?"-- 無 --":"-- None --"}</option>${isAdmin()?`<option value="__all"${S.unit==="__all"?" selected":""}>${isZh?"全部單位":"Semua Unit"}</option>`:""}
-${getUnits().map(u=>`<option value="${esc(u)}"${S.unit===u?' selected':''}>${esc(u)}</option>`).join('')}</select><button data-a="chUnit" style="padding:8px 14px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">${isZh?"確認":"OK"}</button></div></div>
+    <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:700;color:var(--tx)">🏭 ${isZh?"切換單位":"Ganti Unit"}</label><div style="display:flex;gap:6px;margin-top:6px"><select id="unitChg"${unitConfigAvailable()?'':' disabled'} style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;font-weight:600"><option value="">${isZh?"-- 無 --":"-- None --"}</option>${isAdmin()?`<option value="__all"${S.unit==="__all"?" selected":""}>${isZh?"全部單位":"Semua Unit"}</option>`:""}
+${getUnits().map(u=>`<option value="${esc(u)}"${S.unit===u?' selected':''}>${esc(u)}</option>`).join('')}</select><button data-a="chUnit"${unitConfigAvailable()?'':' disabled'} style="padding:8px 14px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">${isZh?"確認":"OK"}</button></div>${unitConfigStatusHtml()}</div>
     <button class="modal-done" data-a="closeH">${t("done")}</button>
     
     <button class="modal-done" data-a="reset" style="background:var(--red);margin-top:6px">${isZh?"⚠️ 重新設定班表":"⚠️ Reset Jadwal"}</button>
@@ -2795,7 +2822,7 @@ function handle(e){
     case "prev":if(S.mo===1){S.yr--;S.mo=12}else S.mo--;loadLeaves();loadAdminEv();break;
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();break;
     case "today":S.yr=TY;S.mo=TM;loadLeaves();loadAdminEv();break;
-    case "chUnit":{if(S.lockedUnit){alert(lang==="zh"?"單位已被管理員鎖定，無法更改":"Unit dikunci oleh admin");break}const sel=document.getElementById("unitChg");if(sel){S.unit=sel.value;sv();loadLeaves();render()}}break;
+    case "chUnit":{if(S.lockedUnit){alert(lang==="zh"?"單位已被管理員鎖定，無法更改":"Unit dikunci oleh admin");break}const sel=document.getElementById("unitChg");if(sel&&changeSelectedUnit(sel.value))render()}break;
     case "reset":if(S.lockedRt){S.pos=null;S.step="wiz";S.wT=S.wS=S.wN=S.wD=null;break}S.step="type";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){fsEnqueue(()=>fbDb.collection("users").doc(fbUser.uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}),"reset").catch(()=>{})}break;
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
@@ -5215,7 +5242,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v310</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v311</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }
@@ -5244,3 +5271,13 @@ function wxAlertHtml(){
   }).join('');
   return `<section class="wx-alert-stack studio-alerts"><div class="wx-alert-head"><div><span class="wx-alert-head-icon">${studioIcon('shield',14)}</span><span>${isZh?'即時災防與天氣':'Disaster & weather'}</span></div><span class="wx-alert-count">${alerts.length}</span></div>${items}</section>`;
 }
+
+// Public configuration is independent of login and of the queued user writes.
+// Start after the application globals are initialized; reattach terminal listeners
+// when returning online or restoring the app from the browser's back/forward cache.
+loadAppConfig();
+window.addEventListener('online',()=>loadAppConfig(true));
+window.addEventListener('pageshow',event=>{if(event.persisted)loadAppConfig(true)});
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&['error','cached'].includes(appConfigState.phase)&&navigator.onLine!==false)loadAppConfig(true);
+});
