@@ -13,7 +13,7 @@ function presenter(name){
   const b=source.indexOf('\nfunction ',a+9);
   return source.slice(a,b<0?source.length:b);
 }
-const names=['salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
+const names=['salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherSculpture','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
 const fixed=Date.parse('2026-09-10T10:10:00Z');
 class Clock extends Date{constructor(...args){super(...(args.length?args:[fixed]))}static now(){return fixed}}
 function env(lang='zh'){
@@ -79,7 +79,7 @@ test('weekends are individually tagged and Taiwan holiday weekends become a visi
   assert.equal((h.match(/class="day [^"]* break-day/g)||[]).length,4);
   assert.match(h,/data-d="26" aria-current="false" aria-label="26 早班, 星期六/);
   assert.match(h,/data-d="27" aria-current="false" aria-label="27 早班, 星期日/);
-  assert.match(h,/class="calendar-date-tag official"[^>]*>國假/);
+  assert.match(h,/class="calendar-date-tag official"[^>]*title="國定假日"[^>]*>假/);
   c.isTWOff=()=>false;c.gh=()=>null;c.S.mo=11;
   assert.doesNotMatch(c.uiCalendarPageHtml(),/class="calendar-breaks"/);
 });
@@ -91,7 +91,7 @@ test('seven-day and reminder actions open their explicit date across month and y
   const events=c.uiUpcomingEventsHtml(2027,1);assert.match(events,/data-y="2027" data-m="1" data-d="2"/);assert.match(events,/&lt;img/);assert.doesNotMatch(events,/<img/);
 });
 test('shift console displays the actual remaining duration and no fabricated progress on rest days',()=>{
-  const c=env();const h=c.uiTodayHeroHtml();assert.match(h,/1小時50分/);assert.match(h,/aria-valuenow="85"/);
+  const c=env();const h=c.uiTodayHeroHtml();assert.match(h.replace(/<[^>]+>/g,''),/1小時50分/);assert.match(h,/aria-valuenow="85"/);
   c.shift='休';const rest=c.uiTodayHeroHtml();assert.match(rest,/今天休息/);assert.doesNotMatch(rest,/role="progressbar"|班表已同步|連休第 1/);
 });
 test('salary shows configured amounts and only claims verification when the difference is zero',()=>{
@@ -123,5 +123,5 @@ test('unknown night components and loading never masquerade as a complete net',(
   let h=c.uiSalaryDashboardHtml(2026,8);assert.match(h,/已算項目小計 · 尚有缺項/);assert.match(h,/待計算/);assert.doesNotMatch(h,/自動預估實領|加入薪資條/);
   assert.match(c.uiPayPreviewHtml(),/小計/);
   c.estimate.dataPending=true;h=c.uiSalaryDashboardHtml(2026,8);assert.match(h,/同步中/);assert.doesNotMatch(h,/\$25,000/);
-  assert.doesNotMatch(c.uiPayPreviewHtml(),/\$25,000/);assert.match(h,/v306 · 自動計算/);
+  assert.doesNotMatch(c.uiPayPreviewHtml(),/\$25,000/);assert.match(h,/薪資紀錄 · 自動核算/);
 });

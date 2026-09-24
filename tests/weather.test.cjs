@@ -27,7 +27,7 @@ function appEnv(){
   const c={Date,Math,Number,String,Array,Object,Set,Map,Promise,console,URL,URLSearchParams,AbortController,Response,setTimeout,clearTimeout,
     WeatherData:{...W},lang:'zh',wxData:null,wxErr:false,typhoonData:null,earthquakeData:null,window:{},document:{hidden:false,getElementById:()=>null},
     navigator:{onLine:true,geolocation:{},permissions:{query:async()=>({state:'granted'})}},localStorage:{getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)},
-    render(){renders.push(c.wxData)},loadCwaData(){},checkAndNotifyAlerts(){},studioIcon(){return ''},studioWeatherIcon(){return ''},uiIcon(){return ''},esc:x=>String(x),
+    render(){renders.push(c.wxData)},loadCwaData(){},checkAndNotifyAlerts(){},studioIcon(){return ''},studioWeatherIcon(){return ''},studioWeatherSculpture(){return ''},uiIcon(){return ''},esc:x=>String(x),
     t:()=>['日','一','二','三','四','五','六'],uiPrecipChartHtml:()=>'',rainObsHtml:()=>'',tideHtml:()=>''};
   let calls=0;const pending=deferred();
   c.WeatherData.createClient=()=>({get(){calls++;return pending.promise}});
