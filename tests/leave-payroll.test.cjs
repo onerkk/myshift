@@ -33,7 +33,7 @@ function env(){
     between('function _leaveId(', '// ═══ 班別覆寫'),
     between('function salPeriodKey(', '// 薪資年月不是'),
     between('function calcPayPeriod(', 'function payCardHtml('),
-    between('function automaticNightRule(', 'function sNotes('),
+    between('function payrollHistoryEstimates(', 'function sNotes('),
     between('function calcSalaryEst(', 'function salaryEstHtml('),
     between('function _syncAnnualDateToALD(', 'const ADMIN_EMAILS='),
     between('function leaveStepMinutes(', '// 請假彈窗渲染後'),
@@ -309,4 +309,61 @@ test('default payroll screen explains automatic rules without requiring confirma
     c.lang=lang;const h=c.rSalary();assert.doesNotMatch(h,/sal_nightConfirmed|type="checkbox"|sal_importFile|尚未確認|固定規則設定一次/);
     assert.match(h,/payroll-basis/);assert.equal((h.match(/<details\b/g)||[]).length,(h.match(/<\/details>/g)||[]).length);
   }
+});
+
+test('leave preview uses the exact dated month engine, including night loss and rounding, without mutating records',()=>{
+  const c=env();c.shifts={'2026-09-10':'晚'};c.SAL.night=300;c.SAL.nightPolicy='prorated';
+  const entry=record('sick',0,720),before=JSON.stringify({sal:c.SAL,leaves:c.leavesCache});
+  const impact=c.leaveSalaryImpact('2026-09-10',entry);
+  assert.equal(JSON.stringify({sal:c.SAL,leaves:c.leavesCache}),before);
+  assert.equal(impact.month,'2026-09');assert.equal(impact.delta.leaveDed,400);assert.equal(impact.delta.otPay,-600);assert.equal(impact.delta.nightPay,-300);assert.equal(impact.delta.net,-1300);
+  c.leavesCache['2026-09-10']=[entry];const saved=c.calcSalaryEst(2026,9);assert.equal(saved.net,impact.after.net);assert.equal(saved.leaveDed,impact.after.leaveDed);
+});
+test('preview routes the 26th to the following pay month and keeps pre-raise wages',()=>{
+  const c=env();c.SAL.base=30000;c.SAL.wageHistory=[{effectiveFrom:'2026-05-01',base:24000},{effectiveFrom:'2026-07-01',base:30000}];c.shifts={'2026-06-26':'早'};
+  const impact=c.leaveSalaryImpact('2026-06-26',record('sick',0,720));
+  assert.equal(impact.month,'2026-07');assert.equal(impact.delta.leaveDed,400);assert.equal(impact.delta.otPay,-600);assert.equal(impact.delta.net,-1000);
+  c.shifts={'2026-12-26':'早'};assert.equal(c.leaveSalaryImpact('2026-12-26',record('annual',480,720)).month,'2027-01');
+});
+test('preview uses the daily rest-day rule, not ordinary overtime or sick deduction',()=>{
+  const c=env();c.SAL.monthly['2026-09']={days:{'2026-09-10':{kind:'rest'}}};
+  const impact=c.leaveSalaryImpact('2026-09-10',record('sick',0,720));
+  assert.equal(impact.delta.leaveDed,0);assert.equal(impact.delta.otPay,0);assert.equal(impact.delta.holidayPay,-2333);assert.equal(impact.after.holidayH,0);
+});
+test('saved company amounts stay immutable while a historical leave preview changes only the estimate',()=>{
+  const c=env();c.SAL.monthly['2026-09']={slip:{baseSum:24000,proposal:0,otherIncome:0,otTaxFree:600,otTaxable:0,holidayPay:0,nightPay:0,fixedDed:0,leaveDed:0,laborPensionSelf:0,income:24600,deduction:0,net:24600}};
+  const impact=c.leaveSalaryImpact('2026-09-10',record('personal',0,720));
+  assert.equal(impact.after.official.net,24600);assert.equal(impact.after.net,23200);assert.equal(c.SAL.monthly['2026-09'].slip.net,24600);
+});
+test('saved special-day hours cannot keep holiday and night pay after a full leave; cancellation restores them',()=>{
+  const c=env();c.shifts['2026-09-10']='晚';c.SAL.night=300;c.SAL.nightPolicy='prorated';
+  c.SAL.monthly['2026-09']={days:{'2026-09-10':{kind:'rest',workedHours:12}}};
+  const entry=record('sick',0,720),impact=c.leaveSalaryImpact('2026-09-10',entry);
+  assert.equal(impact.delta.holidayPay,-2333);assert.equal(impact.delta.nightPay,-300);assert.equal(impact.delta.leaveDed,0);
+  c.leavesCache['2026-09-10']=[entry];assert.equal(c.calcSalaryEst(2026,9).net,impact.after.net);
+  c.leavesCache={};assert.equal(c.calcSalaryEst(2026,9).net,impact.before.net);
+  c.SAL.monthly['2026-09'].days['2026-09-10'].workedHours=4;
+  c.leavesCache['2026-09-10']=[record('sick',0,240)];
+  assert.ok(c.calcSalaryEst(2026,9).notes.includes('specialAttendance'));
+});
+test('leave preview preserves the minus sign when the projected net is below zero',()=>{
+  const c=env();c.SAL.otherDed=24000;c.select('personal',0,720);
+  c.fields.leaveTimePreview={textContent:'',classList:{toggle(){}}};
+  c.updateLeaveTimePreview('2026-09-10');assert.match(c.fields.leaveTimePreview.textContent,/儲存後 −\$800/);
+});
+test('history audit and payroll use the same night rule, trained only on earlier complete periods',()=>{
+  const c=env();c.shifts={'2026-05-10':'晚','2026-06-10':'晚','2026-06-11':'晚','2026-07-10':'晚','2026-07-11':'晚','2026-08-10':'晚'};
+  c.leavesCache={'2026-06-10':[record('annual',0,360)],'2026-07-10':[record('annual',0,240)]};
+  Object.assign(c.SAL,{night:300,nightPolicy:'prorated',nightRateSource:'configured'});
+  for(const m of [5,6,7,8]){
+    const e=c.calcSalaryEst(2026,m),s={};
+    for(const key of ['baseSum','proposal','otherIncome','holidayPay','nightPay','fixedDed','leaveDed','laborPensionSelf','income','deduction','net','sickH','personalH','annualH','disasterH','weekdayH','holidayH'])s[key]=e[key];
+    s.otTaxFree=e.otPay;s.otTaxable=0;c.SAL.monthly['2026-0'+m]={slip:s};
+  }
+  Object.assign(c.SAL,{night:100,nightPolicy:'auto',nightRateSource:'unconfirmed'});
+  c.payrollLeaveState={uid:'me',ownHistoryLoaded:true,months:[],loading:false,error:false};
+  assert.equal(c.automaticNightRule('2026-07'),null);
+  const fit=c.automaticNightRule('2026-08');assert.equal(fit.policy,'prorated');assert.equal(fit.rate,300);assert.equal(fit.validatedMonth,'2026-07');
+  const audit=c.salaryHistoryAudit().rows.find(r=>r.month==='2026-08');
+  assert.equal(audit.matched,true);assert.equal(audit.estimate,c.calcSalaryEst(2026,8).net);
 });

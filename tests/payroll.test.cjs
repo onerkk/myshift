@@ -106,3 +106,24 @@ test('night rule inference requires multiple complete months and rejects ambiguo
   assert.equal(Payroll.inferNightRule([{complete:true,amount:300,days:[day(12)]},{complete:true,amount:600,days:[day(12),day(12)]}]),null);
   assert.equal(Payroll.inferNightRule([...rows,{complete:true,amount:1000,days:[day(12)]}]),null);
 });
+
+test('night auto learning needs three distinct complete periods and an untouched holdout month',()=>{
+  const row=(month,worked,amount)=>({month,complete:true,amount,days:[{worked:12,shiftHours:12},{worked,shiftHours:12}]});
+  const rows=[row('2026-05',6,450),row('2026-06',3,375),row('2026-07',9,525)];
+  const fit=Payroll.validateNightRule(rows);assert.equal(fit.rate,300);assert.equal(fit.policy,'prorated');assert.equal(fit.validatedMonth,'2026-07');
+  assert.equal(Payroll.validateNightRule(rows.slice(0,2)),null);
+  assert.equal(Payroll.validateNightRule([rows[0],rows[0],rows[1]]),null);
+  assert.equal(Payroll.validateNightRule([rows[0],rows[1],{...rows[2],amount:526}]),null);
+  assert.equal(Payroll.validateNightRule([rows[0],rows[1],{...rows[2],complete:false}]),null);
+});
+test('multi-month audit never treats equal net totals with wrong components as matched',()=>{
+  const audit=Payroll.historyAudit([{month:'2026-08',slip:official,estimate:{...oldEstimate,net:27600,deduction:1400,leaveDed:400,sickPayH:7,personalPayH:0,weekdayH:16,holidayH:8}}]);
+  assert.equal(audit.valid,1);assert.equal(audit.matched,0);assert.ok(audit.rows[0].differences.some(d=>d.key==='nightPay'));assert.deepEqual(audit.rows[0].hourMismatches,['sickH']);
+  assert.equal(Payroll.historyAudit([{month:'2026-07',slip:{net:27600},estimate:oldEstimate}]).valid,0);
+});
+test('the provided August sick deduction is reproduced without calibrating a free parameter',()=>{
+  const r=JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname,'../private-import/2026-08-payroll.json'),'utf8'));
+  const expected=Math.round(r.slip.baseSum/240*r.slip.sickH*.5);assert.equal(expected,r.slip.leaveDed);
+  // Independent cents-scale arithmetic, before rounding to whole dollars.
+  assert.equal(Math.round(r.slip.baseSum*r.slip.sickH/480),r.slip.leaveDed);
+});
