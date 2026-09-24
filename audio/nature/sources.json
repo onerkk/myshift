@@ -1,1 +1,86 @@
-
+[
+  {
+    "file": "rain.mp3",
+    "title": "more rain.wav",
+    "author": "mlaramie",
+    "source": "https://freesound.org/people/mlaramie/sounds/193875/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "field recording",
+    "edits": "Excerpt 6–42s; loudness normalization; 15/25ms edge fades; MP3 128kbps. No synthesized replacement.",
+    "durationSeconds": 36.049,
+    "sha256": "a2396589a3d9c651b9b612efbe399ef78cd154a6c6dd6b5c57aa93edfabb75bb"
+  },
+  {
+    "file": "leaves.mp3",
+    "title": "Autumn wind and dry leaves.wav",
+    "author": "Stek59",
+    "source": "https://freesound.org/people/Stek59/sounds/457318/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "field recording",
+    "edits": "Excerpt 2–36s; loudness normalization; 15/25ms edge fades; MP3 128kbps. No synthesized replacement.",
+    "durationSeconds": 34.038,
+    "sha256": "0b06be460e4d35db33261f526004e4009a1988be4b3eb14e5dbfbe4748599dfb"
+  },
+  {
+    "file": "wind.mp3",
+    "title": "Wind(leaves).WAV",
+    "author": "o_ciz",
+    "source": "https://freesound.org/people/o_ciz/sounds/475448/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "field recording",
+    "edits": "Excerpt 12–48s; loudness normalization; 15/25ms edge fades; MP3 128kbps. No synthesized replacement.",
+    "durationSeconds": 36.049,
+    "sha256": "2478af9b50f04186775a3e0a1c769529d1311d5d1b74b09edfc8217fe004c4fc"
+  },
+  {
+    "file": "thunder.mp3",
+    "title": "Thunder",
+    "author": "Dave_Girtsman",
+    "source": "https://freesound.org/people/Dave_Girtsman/sounds/332543/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "field recording",
+    "edits": "Excerpt 0–18.396s; loudness normalization; 15/25ms edge fades; MP3 128kbps. No synthesized replacement.",
+    "durationSeconds": 18.442,
+    "sha256": "d116c8eb42f6af9697975082ba0cc795bbcec46391cb8cb8641facd278df10a9"
+  },
+  {
+    "file": "birds.mp3",
+    "title": "Birds",
+    "author": "LilMati",
+    "source": "https://freesound.org/people/LilMati/sounds/519120/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "field recording",
+    "edits": "Excerpt 7–39s; loudness normalization; 15/25ms edge fades; MP3 128kbps. No synthesized replacement.",
+    "durationSeconds": 32.026,
+    "sha256": "b6cba27e08055f794d0988cf557e4bf71b9b494c600b0400ce8c02c885c29592"
+  },
+  {
+    "file": "crickets.mp3",
+    "title": "Crickets At Night - Clean sound",
+    "author": "Defelozedd94",
+    "source": "https://freesound.org/people/Defelozedd94/sounds/522298/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "field recording",
+    "edits": "Excerpt 8–40s; loudness normalization; 15/25ms edge fades; MP3 128kbps. No synthesized replacement.",
+    "durationSeconds": 32.026,
+    "sha256": "34649e182fc14cd190dfe14217ca73f7ab8b8643d82d8e69f82c6e743d16f0e2"
+  },
+  {
+    "file": "click.mp3",
+    "title": "Button Click",
+    "author": "DeWildAshDev",
+    "source": "https://freesound.org/people/DeWildAshDev/sounds/858919/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "recorded object foley",
+    "edits": "Excerpt 0–0.847s; loudness normalization; 15/25ms edge fades; MP3 128kbps. No synthesized replacement.",
+    "durationSeconds": 0.888,
+    "sha256": "b1f72855a48f10d6e6cb3aab1f974f02235b83508017fce6c71f6ebd67d46f9a"
+  }
+]
