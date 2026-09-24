@@ -13,7 +13,7 @@ function presenter(name){
   const b=source.indexOf('\nfunction ',a+9);
   return source.slice(a,b<0?source.length:b);
 }
-const names=['salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
+const names=['salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
 const fixed=Date.parse('2026-09-10T10:10:00Z');
 class Clock extends Date{constructor(...args){super(...(args.length?args:[fixed]))}static now(){return fixed}}
 function env(lang='zh'){
@@ -69,6 +69,19 @@ test('calendar has every real date, correct December/January navigation and nati
   c.action('prev');assert.equal(c.S.yr,2026);assert.equal(c.S.mo,12);
   c.action('today');assert.equal(c.S.yr,2026);assert.equal(c.S.mo,9);
   c.action('open',{d:'25'});assert.equal(JSON.stringify(c.S.modal),JSON.stringify({y:2026,m:9,d:25}));assert.deepEqual(c.errors,[]);
+});
+test('weekends are individually tagged and Taiwan holiday weekends become a visible multi-day break',()=>{
+  const c=env();c.S.yr=2026;c.S.mo=9;
+  c.isTWOff=(y,m,d)=>y===2026&&m===9&&(d===25||d===28);
+  c.gh=(y,m,d)=>y===2026&&m===9&&d===25?'中秋節':y===2026&&m===9&&d===28?'教師節':null;
+  const h=c.uiCalendarPageHtml();
+  assert.match(h,/class="calendar-breaks"/);assert.match(h,/9\/25（五）/);assert.match(h,/9\/28（一）/);assert.match(h,/4天/);
+  assert.equal((h.match(/class="day [^"]* break-day/g)||[]).length,4);
+  assert.match(h,/data-d="26" aria-current="false" aria-label="26 早班, 星期六/);
+  assert.match(h,/data-d="27" aria-current="false" aria-label="27 早班, 星期日/);
+  assert.match(h,/class="calendar-date-tag official"[^>]*>國假/);
+  c.isTWOff=()=>false;c.gh=()=>null;c.S.mo=11;
+  assert.doesNotMatch(c.uiCalendarPageHtml(),/class="calendar-breaks"/);
 });
 test('seven-day and reminder actions open their explicit date across month and year boundaries',()=>{
   const c=env();c.TY=2026;c.TM=12;c.TD=29;
