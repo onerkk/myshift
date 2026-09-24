@@ -2,252 +2,34 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#071113">
 <title>即時雷達與雲層預估 · 我的班表</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<style>
-  :root{
-    --ink:#070b14; --panel:rgba(16,23,38,.86); --panel-solid:#101726;
-    --line:#26344f; --tx:#e9f0fb; --tx2:#93a6c4; --tx3:#5f718f;
-    --now:#37d6ef;      /* 即時 / 你的位置 */
-    --fore:#f6a723;     /* 預報 */
-    --bad:#ff5a6e;
-    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
-    --sans:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC","Segoe UI",sans-serif;
-  }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;margin:0}
-  body{background:var(--ink);color:var(--tx);font-family:var(--sans);overflow:hidden}
-  #map{position:fixed;inset:0;background:var(--ink);z-index:0}
-
-  /* 頂部：地點 + 即時判讀 */
-  .top{position:fixed;top:0;left:0;right:0;z-index:1000;padding:max(10px,env(safe-area-inset-top)) 12px 0;
-    pointer-events:none;display:flex;justify-content:center}
-  .topcard{pointer-events:auto;width:100%;max-width:520px;background:var(--panel);
-    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);
-    border-radius:16px;padding:11px 14px;box-shadow:0 8px 30px rgba(0,0,0,.45)}
-  .loc{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:650;letter-spacing:.2px}
-  .loc .pin{width:9px;height:9px;border-radius:50%;background:var(--now);
-    box-shadow:0 0 0 0 rgba(55,214,239,.6);animation:pulse 2.2s infinite}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(55,214,239,.55)}70%{box-shadow:0 0 0 9px rgba(55,214,239,0)}100%{box-shadow:0 0 0 0 rgba(55,214,239,0)}}
-  .coords{font-family:var(--mono);font-size:11px;color:var(--tx3);margin-left:auto}
-  .verdict{margin-top:8px;font-family:var(--mono);font-size:13px;line-height:1.45;color:var(--tx2)}
-  .verdict b{color:var(--tx);font-weight:600}
-  .verdict .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
-
-  /* 實測雨量站 */
-  .rainbox{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--tx2)}
-  .rainbox .rb-head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-  .rainbox .rb-head .rdrop{color:#7fd0ff}
-  .rainbox .rb-st{color:var(--tx);font-weight:600}
-  .rainbox .rb-meta{color:var(--tx3);margin-left:auto;font-size:11px}
-  .rainbox .rb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-  .rainbox .rb-cell{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:9px;padding:6px 4px;text-align:center}
-  .rainbox .rb-k{font-size:10px;color:var(--tx3)}
-  .rainbox .rb-v{font-size:16px;font-weight:650;color:var(--tx);margin-top:1px;line-height:1.1}
-  .rainbox .rb-v.wet{color:#5fd0ff}
-  .rainbox .rb-v.dry{color:var(--tx3)}
-  .rainbox .rb-u{font-size:9px;color:var(--tx3)}
-  .rainbox.err{color:var(--tx3)}
-
-  /* 未來降雨機率（CWA 模型預報） */
-  .fcbox{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--tx2)}
-  .fcbox .fc-head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-  .fcbox .fc-title{color:var(--tx);font-weight:600}
-  .fcbox .fc-src{color:var(--tx3);margin-left:auto;font-size:10px}
-  .fcbox .fc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-  .fcbox .fc-cell{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:9px;padding:6px 4px;text-align:center}
-  .fcbox .fc-h{font-size:10px;color:var(--tx3)}
-  .fcbox .fc-ic{font-size:15px;line-height:1.15;margin:1px 0}
-  .fcbox .fc-p{font-size:16px;font-weight:650;line-height:1.1}
-  .fcbox .fc-p.fc-hi{color:#5fd0ff}
-  .fcbox .fc-p.fc-mid{color:#f6c544}
-  .fcbox .fc-p.fc-lo{color:var(--tx3)}
-  .fcbox .fc-note{margin-top:5px;font-size:9px;color:var(--tx3);line-height:1.4}
-
-  /* 常駐精簡數據 + 收合鈕 */
-  .ministat{display:flex;gap:14px;margin-top:8px;font-family:var(--mono);font-size:12px;color:var(--tx2)}
-  .ministat b{color:var(--tx);font-weight:650}
-  .ministat .mwet{color:#5fd0ff}
-  .cardtoggle{display:block;width:100%;margin-top:9px;padding:7px;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:9px;color:var(--tx2);font-family:var(--mono);font-size:11.5px;text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
-  .cardtoggle:active{background:rgba(255,255,255,.1)}
-
-  /* 底部控制 */
-  .ctrl{position:fixed;left:0;right:0;bottom:0;z-index:1000;padding:0 12px max(12px,env(safe-area-inset-bottom));
-    display:flex;justify-content:center;pointer-events:none}
-  .ctrlcard{pointer-events:auto;width:100%;max-width:520px;background:var(--panel);
-    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);
-    border-radius:18px;padding:12px 14px 13px;box-shadow:0 -8px 30px rgba(0,0,0,.45)}
-  .frameline{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
-  .ftime{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:.5px}
-  .ftag{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;letter-spacing:.4px}
-  .ftag.past{color:#b9c6dd;background:rgba(120,140,170,.18);border:1px solid #3a496a}
-  .ftag.live{color:#04222a;background:var(--now)}
-  .ftag.fore{color:#2a1c00;background:var(--fore)}
-  .fwhen{font-family:var(--mono);font-size:12px;color:var(--tx3);margin-left:auto}
-
-  /* 時間軸：過去 | 現在 | 預報 */
-  .track{position:relative;height:30px;margin:2px 2px 0}
-  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:30px;background:transparent;margin:0;position:relative;z-index:3}
-  input[type=range]:focus{outline:none}
-  input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(55,214,239,.5)}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;
-    background:#fff;border:3px solid var(--now);margin-top:-9px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.5)}
-  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--now);cursor:pointer}
-  .rail{position:absolute;left:2px;right:2px;top:13px;height:4px;border-radius:3px;
-    background:linear-gradient(90deg,#34425e 0 var(--split,70%),rgba(246,167,35,.35) var(--split,70%) 100%);z-index:1}
-  .nowmark{position:absolute;top:6px;width:2px;height:18px;background:var(--now);left:var(--split,70%);z-index:2;border-radius:2px}
-  .rlabels{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--tx3);margin-top:1px;padding:0 2px}
-
-  .buttons{display:flex;align-items:center;gap:10px;margin-top:11px}
-  .play{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:13px;border:none;
-    background:var(--now);color:#042027;font-weight:750;font-size:15px;font-family:var(--sans);cursor:pointer}
-  .play:active{transform:translateY(1px)}
-  .step{width:44px;height:44px;border-radius:13px;border:1px solid var(--line);background:rgba(255,255,255,.04);
-    color:var(--tx);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-  .step:active{transform:translateY(1px)}
-
-  .legend{display:flex;align-items:center;gap:4px;margin-top:11px;font-family:var(--mono);font-size:10px;color:var(--tx3);flex-wrap:wrap}
-  .legend .sw{height:9px;border-radius:2px;flex:1;min-width:14px}
-  .legend .sw.universal{min-width:80px;background:linear-gradient(90deg,#827b69,#88ddee,#0091ca,#00a3e0,#ffee00,#ffaa00,#ff4400,#ff77ff,#fff)}
-  .legend .txt{white-space:nowrap}
-
-  /* 浮動按鈕：回到定位 */
-  .fab{position:fixed;right:12px;z-index:1000;bottom:calc(192px + env(safe-area-inset-bottom));
-    width:46px;height:46px;border-radius:14px;background:var(--panel-solid);border:1px solid var(--line);
-    color:var(--now);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.5)}
-  .fab:active{transform:translateY(1px)}
-
-  .credit{position:fixed;left:12px;z-index:1000;bottom:calc(192px + env(safe-area-inset-bottom));
-    font-family:var(--mono);font-size:10px;color:var(--tx3);background:var(--panel);border:1px solid var(--line);
-    border-radius:8px;padding:4px 8px}
-  .credit a{color:var(--tx2);text-decoration:none}
-
-  /* 覆蓋層：載入 / 錯誤 */
-  .overlay{position:fixed;inset:0;z-index:2000;background:var(--ink);display:flex;align-items:center;justify-content:center;padding:28px}
-  .overlay .box{max-width:340px;text-align:center}
-  .overlay h1{font-size:19px;margin:0 0 8px;font-weight:700}
-  .overlay p{font-size:14px;color:var(--tx2);line-height:1.6;margin:0 0 18px}
-  .spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--now);border-radius:50%;
-    margin:0 auto 16px;animation:spin .9s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .retry{height:42px;padding:0 20px;border-radius:12px;border:none;background:var(--now);color:#042027;font-weight:700;font-size:15px;cursor:pointer}
-  .hidden{display:none!important}
-
-  .leaflet-control-zoom{display:none}
-  .leaflet-control-attribution{background:rgba(7,17,19,.78)!important;color:#9db5af!important;border:1px solid var(--line);border-radius:8px 8px 0 0;padding:3px 7px!important;font:10px/1.4 var(--sans)!important;box-shadow:0 -3px 14px #0003;backdrop-filter:blur(12px)}
-  .leaflet-control-attribution a{color:#c2ded7!important}
-  #map .leaflet-tile-pane .leaflet-tile{filter:brightness(.62) saturate(.7) contrast(.94)}
-  .leaflet-bar a{background:var(--panel-solid);color:var(--tx);border-color:var(--line)}
-  .me-dot{width:16px;height:16px;border-radius:50%;background:var(--now);border:3px solid #fff;box-shadow:0 0 0 6px rgba(55,214,239,.25),0 2px 6px rgba(0,0,0,.6)}
-
-  @media (prefers-reduced-motion:reduce){.loc .pin{animation:none}.spinner{animation-duration:2s}}
-
-  .backchip{display:inline-flex;align-items:center;gap:3px;margin-bottom:8px;padding:4px 11px 4px 8px;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;color:var(--tx2);font-family:var(--mono);font-size:11px;text-decoration:none;-webkit-tap-highlight-color:transparent}
-  .backchip:active{background:rgba(255,255,255,.13)}
-
-  .radar-status{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:10px;font-weight:750;color:var(--tx3);white-space:nowrap}
-  .radar-status i{width:6px;height:6px;border-radius:50%;background:#6d8981;box-shadow:0 0 0 3px #78dfd011}
-  .radar-status.ok{color:#9fe2d3}.radar-status.ok i{background:#78dfd0;box-shadow:0 0 0 3px #78dfd028,0 0 12px #78dfd080}
-  .radar-status.error{color:#ff9ca6}.radar-status.error i{background:#ff6875;box-shadow:0 0 0 3px #ff68751d}
-  .cloud-summary{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 11px;border-radius:15px;background:linear-gradient(145deg,rgba(120,223,208,.13),rgba(14,42,43,.5));border:1px solid rgba(120,223,208,.19);box-shadow:inset 0 1px 0 #ffffff0c,0 4px 12px #0002;min-height:50px}
-  .cloud-summary-icon{width:31px;height:31px;display:grid;place-items:center;flex:none;border-radius:11px;color:#06211f;background:linear-gradient(145deg,#b4fff1,#55cabb);box-shadow:inset 1px 2px 2px #fff9,inset -1px -2px 2px #087e7650,0 3px 0 #176d67,0 5px 10px #0003;font-size:16px}
-  .cloud-summary-copy{min-width:0;flex:1}.cloud-summary-copy strong{display:block;font-size:12px;color:var(--tx);line-height:1.35}.cloud-summary-copy small{display:block;margin-top:2px;font-size:10px;color:var(--tx2);line-height:1.35}
-  .cloud-summary-arrow{width:28px;height:28px;display:grid;place-items:center;flex:none;color:var(--now);font-size:17px;border-radius:9px;background:#ffffff08;box-shadow:inset 0 1px 0 #ffffff14,0 2px 0 #0003}
-  .cloud-summary.pending .cloud-summary-icon{animation:cloudPulse 1.8s ease-in-out infinite}
-  @keyframes cloudPulse{50%{transform:translateY(-2px);box-shadow:inset 1px 2px 2px #fff9,0 0 16px #78dfd060,0 3px 0 #176d67}}
-  .cloud-summary.error{border-color:#ff687533;background:linear-gradient(145deg,#ff687512,#0e2a2b77)}
-  .cloudbox{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--tx2)}
-  .cloudbox .cloud-head{display:flex;align-items:center;gap:7px;margin-bottom:7px}.cloudbox .cloud-title{font-size:12px;color:var(--tx);font-weight:800}.cloudbox .cloud-src{font-size:9px;color:var(--tx3);margin-left:auto}
-  .cloudbox .cloud-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
-  .cloudbox .cloud-cell{position:relative;overflow:hidden;min-width:0;padding:8px 4px 7px;text-align:center;border-radius:13px;border:1px solid rgba(154,214,204,.12);background:linear-gradient(150deg,#ffffff0a,#ffffff03);box-shadow:inset 0 1px 0 #ffffff0c,0 3px 0 #0002;animation:cloudCellIn .45s both}
-  .cloudbox .cloud-cell:nth-child(2){animation-delay:.05s}.cloudbox .cloud-cell:nth-child(3){animation-delay:.1s}.cloudbox .cloud-cell:nth-child(4){animation-delay:.15s}
-  @keyframes cloudCellIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-  .cloudbox .cloud-hour{font-size:9px;color:var(--tx3)}.cloudbox .cloud-cover{display:block;margin:3px 0 2px;font-size:17px;line-height:1.1;font-weight:850;color:var(--tx)}
-  .cloudbox .cloud-wind{font-size:9px;color:#9fe2d3;white-space:nowrap}.cloudbox .cloud-conf{margin-top:6px;font-size:9px;color:var(--tx3);line-height:1.5}
-  .cloudbox.err .cloud-conf{color:#ffacb4}
-  .leaflet-pane.leaflet-forecast-pane{z-index:560;pointer-events:none}
-  .cloud-route-path{stroke-dasharray:8 9;animation:routeFlow 2.3s linear infinite;filter:drop-shadow(0 0 4px #78dfd099)}
-  @keyframes routeFlow{to{stroke-dashoffset:-34}}
-  .cloud-route-end{display:flex;align-items:center;gap:5px;white-space:nowrap;color:#052320;font:800 10px/1 var(--sans);padding:6px 8px;border:1px solid #bcfff2;border-radius:11px;background:linear-gradient(145deg,#cafff3,#6bd8ca);box-shadow:inset 1px 2px 2px #fff,0 3px 0 #217e75,0 7px 15px #0007;transform:translateY(-2px);animation:routeBob 2.4s ease-in-out infinite}
-  .cloud-route-end b{display:inline-block;font-size:14px;transform:rotate(var(--arrow,0deg));text-shadow:0 1px 0 #fff7}
-  @keyframes routeBob{50%{transform:translateY(-6px)}}
-
-
-  /* APEX ATELIER RADAR — coherent with the flagship app shell */
-  :root{
-    --ink:#071113;--panel:rgba(9,24,26,.91);--panel-solid:#0d1d20;
-    --line:rgba(154,214,204,.16);--tx:#edf7f5;--tx2:#b3c5c2;--tx3:#7f9490;
-    --now:#78dfd0;--fore:#ffb251;--bad:#ff6875;
-  }
-  body{background:radial-gradient(90% 70% at 100% 0%,rgba(57,173,159,.14),transparent 55%),var(--ink)}
-  .top{padding:max(12px,env(safe-area-inset-top)) 12px 0}
-  .topcard{border-radius:24px;padding:13px 15px;background:var(--panel);border-color:var(--line);box-shadow:0 20px 54px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.045);backdrop-filter:blur(24px) saturate(1.2);-webkit-backdrop-filter:blur(24px) saturate(1.2)}
-  .backchip{margin-bottom:10px;padding:6px 11px;border-radius:11px;background:rgba(255,255,255,.055);font-family:var(--sans);font-size:11px;font-weight:700}
-  .loc{font-size:16px;font-weight:800;letter-spacing:-.02em}.coords{font-size:10px}.verdict{margin-top:9px;font-family:var(--sans);font-size:12px;line-height:1.55}.ministat{font-family:var(--sans);font-size:11px}.cardtoggle{margin-top:10px;padding:9px;border-radius:12px;font-family:var(--sans);font-size:11px;font-weight:700}
-  .rainbox,.fcbox{font-family:var(--sans)}.rainbox .rb-cell,.fcbox .fc-cell{border-radius:12px;background:rgba(255,255,255,.045)}
-  .ctrl{padding:0 12px max(12px,env(safe-area-inset-bottom))}.ctrlcard{border-radius:25px;padding:14px 15px 15px;background:var(--panel);border-color:var(--line);box-shadow:0 -20px 54px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.045);backdrop-filter:blur(24px) saturate(1.2);-webkit-backdrop-filter:blur(24px) saturate(1.2)}
-  .ftime{font-family:var(--sans);font-size:25px;font-weight:850;letter-spacing:-.035em}.ftag,.fwhen,.rlabels,.legend{font-family:var(--sans)}.ftag{padding:4px 8px}.play{height:48px;border-radius:15px;background:var(--now);font-size:14px}.step{width:48px;height:48px;border-radius:15px}.fab{width:50px;height:50px;border-radius:16px;background:var(--panel-solid);border-color:var(--line)}.credit{border-radius:10px;background:var(--panel);border-color:var(--line);font-family:var(--sans)}
-  input[type=range]::-webkit-slider-thumb{border-color:var(--now)}.nowmark{background:var(--now)}
-
-  /* v307: compact, tactile weather console with a clear model-vs-radar hierarchy. */
-  :root{--panel:rgba(8,25,27,.91);--panel-solid:#0c2022;--line:rgba(153,224,211,.2);--now:#7be0d1;--fore:#ffc16d}
-  body{background:radial-gradient(80% 56% at 15% -5%,#24786d25,transparent 75%),#061012}
-  #map{background:#071416}
-  .topcard,.ctrlcard{border-color:rgba(153,224,211,.22);box-shadow:inset 0 1px 0 #ffffff13,inset 0 -2px 0 #01080950,0 18px 48px #0008,0 2px 0 #24504c75}
-  .topcard{max-height:calc(100vh - 276px - env(safe-area-inset-bottom));max-height:calc(100dvh - 276px - env(safe-area-inset-bottom));overflow:auto;scrollbar-width:thin;scrollbar-color:#496b65 transparent}
-  .topcard::-webkit-scrollbar{width:4px}.topcard::-webkit-scrollbar-thumb{background:#496b65;border-radius:9px}
-  .backchip,.cardtoggle,.step,.fab{transition:transform .16s ease,box-shadow .16s ease,background .16s ease,border-color .16s ease}
-  .backchip{box-shadow:inset 0 1px 0 #ffffff12,0 3px 0 #051012;}
-  .backchip:active,.cardtoggle:active,.step:active,.fab:active{transform:translateY(2px);box-shadow:inset 0 2px 5px #0007}
-  .loc{gap:8px}.loc .pin{box-shadow:0 0 0 4px #78dfd01b,0 0 18px #78dfd050}
-  .verdict{padding-left:2px}.verdict b{color:#d8fff7}
-  .ministat{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}.ministat>span{padding:5px 8px;border-radius:9px;background:#ffffff08;box-shadow:inset 0 1px 0 #ffffff08,0 2px 0 #0004}
-  .cardtoggle{min-height:40px;padding:9px 11px;border-radius:13px;color:#d6e8e4;background:linear-gradient(145deg,#172d2f,#0b1b1d);border-color:#41635d65;box-shadow:inset 0 1px 0 #ffffff15,inset 0 -2px 0 #0006,0 3px 0 #081012,0 6px 14px #0003}
-  .rainbox,.fcbox,.cloudbox{font-family:var(--sans)}.rainbox .rb-cell,.fcbox .fc-cell{border-radius:12px;background:linear-gradient(145deg,#ffffff0a,#ffffff04);box-shadow:inset 0 1px 0 #ffffff0c,0 3px 0 #0003}
-  .ctrlcard{padding:12px 14px 13px}.frameline{align-items:center;margin-bottom:7px}.ftime{font-size:23px}.fwhen{font-size:10px}
-  .track{height:32px}.rail{height:5px;top:13px;background:linear-gradient(90deg,#263e42 0 var(--split,70%),#f6a72344 var(--split,70%) 100%);box-shadow:inset 0 1px 2px #0008,0 1px 0 #ffffff12}
-  input[type=range]::-webkit-slider-thumb{width:23px;height:23px;margin-top:-9px;background:radial-gradient(circle at 38% 32%,#fff,#c5fff5 56%,#61d6c6 58%);border:3px solid #f5fffc;box-shadow:0 0 0 3px #78dfd04d,0 4px 9px #0008}
-  .buttons{gap:9px;margin-top:8px}.play{height:48px;color:#072623;background:linear-gradient(145deg,#bbfff2,#6cdccb 58%,#49b9ab);border:1px solid #c3fff3;box-shadow:inset 1px 2px 2px #fff,inset -2px -3px 3px #16877d45,0 4px 0 #236f68,0 8px 17px #0005;font-weight:850;transition:transform .16s ease,filter .16s ease}
-  .play:hover{filter:brightness(1.06)}.play:active{transform:translateY(3px);box-shadow:inset 2px 3px 5px #0a655d77,0 1px 0 #236f68}
-  .step{background:linear-gradient(145deg,#1a3032,#0d1e20);box-shadow:inset 0 1px 0 #ffffff13,inset 0 -2px 0 #0007,0 3px 0 #071012,0 6px 12px #0004}
-  .legend{margin-top:9px;font-size:9px}.legend .sw{height:8px;border-radius:4px;box-shadow:inset 0 1px 0 #ffffff55,0 2px 3px #0005}
-  .fab{background:linear-gradient(145deg,#183538,#0a1b1d);border-color:#55817a80;box-shadow:inset 1px 2px 2px #ffffff16,0 4px 0 #071012,0 9px 19px #0006;font-size:19px}
-  .credit{background:rgba(8,25,27,.88);box-shadow:inset 0 1px 0 #ffffff0d,0 3px 0 #040b0c,0 6px 16px #0005}.credit a{color:#c1e9e2}
-  .leaflet-bottom{bottom:calc(212px + env(safe-area-inset-bottom))!important;right:6px!important}
-  .overlay{background:radial-gradient(ellipse at 50% 40%,#153635,#061012 67%)}.spinner{border-color:#243e3b;border-top-color:var(--now)}
-  @media(max-height:680px){.topcard{max-height:calc(100vh - 242px - env(safe-area-inset-bottom));max-height:calc(100dvh - 242px - env(safe-area-inset-bottom));padding:10px 12px}.cloud-summary{margin-top:7px;padding:8px}.ctrlcard{padding:10px 12px}.legend{margin-top:7px}.leaflet-bottom{bottom:calc(194px + env(safe-area-inset-bottom))!important}}
-  @media(max-width:380px){.coords{font-size:9px}.radar-status{font-size:9px}.cloud-summary-copy strong{font-size:11px}.cloudbox .cloud-wind{font-size:8px}.legend .txt:last-child{width:100%;margin-left:0!important}}
-  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
-
-</style>
+<link rel="stylesheet" href="./radar-ui.css?v=308-studio">
 </head>
 <body>
 <div id="map"></div>
 
 <div class="top">
-  <div class="topcard">
-    <a class="backchip" href="./" onclick="if(history.length>1){history.back();return false}">‹ 班表</a>
-    <div class="loc"><span class="pin"></span><span id="locName">定位中…</span><span class="coords" id="coords"></span><span class="radar-status" id="radarStatus"><i></i><span>雷達連線中</span></span></div>
-    <div class="verdict" id="verdict">正在取得最新雷達圖資…</div>
-    <div class="cloud-summary pending" id="cloudSummary"><span class="cloud-summary-icon">☁</span><span class="cloud-summary-copy"><strong>雲層趨勢預估</strong><small>取得未來 4 小時雲量與風場…</small></span><span class="cloud-summary-arrow">›</span></div>
-    <div class="ministat" id="miniStat" style="display:none"><span id="rainMini">雨量 —</span><span id="fcMini">未來 —</span></div>
-    <button class="cardtoggle" id="cardToggle" aria-expanded="false">▾ 雨量・逐時雲況・降雨機率</button>
-    <div id="cardBody" style="display:none">
-      <div class="rainbox" id="rainBox" style="display:none"></div>
-      <div class="fcbox" id="fcStrip" style="display:none"></div>
+  <section class="topcard" aria-label="雷達與雲流">
+    <header class="radar-topbar"><a class="backchip" href="./" aria-label="回到班表" onclick="if(history.length>1){history.back();return false}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 6-6 6 6 6"/></svg></a><div class="radar-title"><h1>即時雷達</h1><span>雨區觀測・雲流預估</span></div><span class="radar-status" id="radarStatus"><i></i><span>雷達連線中</span></span></header>
+    <div class="loc"><span class="pin"></span><span id="locName">定位中…</span><span class="coords" id="coords"></span></div>
+    <button type="button" class="cloud-summary pending" id="cloudSummary" aria-controls="cardBody" aria-expanded="false"><span class="cloud-summary-icon">☁</span><span class="cloud-summary-copy"><strong>雲層趨勢預估</strong><small>取得未來 4 小時雲量與風場…</small></span><span class="cloud-summary-arrow">↗</span></button>
+    <div class="topcard-foot"><div class="ministat" id="miniStat" style="display:none"><span id="rainMini">雨量 —</span><span id="fcMini">未來 —</span></div><button class="cardtoggle" id="cardToggle" aria-controls="cardBody" aria-expanded="false">逐時詳情 ＋</button></div>
+    <div id="cardBody" style="display:none" tabindex="-1">
+      <div class="verdict" id="verdict">正在取得最新雷達圖資…</div>
       <div class="cloudbox" id="cloudBox" style="display:none"></div>
+      <div class="fcbox" id="fcStrip" style="display:none"></div>
+      <div class="rainbox" id="rainBox" style="display:none"></div>
     </div>
-  </div>
+  </section>
 </div>
-
-<div class="credit">雷達 <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a> · 地圖 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>
-<button class="fab" id="recenter" aria-label="回到我的位置" title="回到我的位置">◎</button>
+<button class="fab" id="recenter" aria-label="回到我的位置" title="回到我的位置"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg></button>
 
 <div class="ctrl">
-  <div class="ctrlcard">
+  <div class="ctrlcard" aria-label="雷達播放控制">
     <div class="frameline">
       <span class="ftime" id="ftime">--:--</span>
       <span class="ftag past" id="ftag">—</span>
@@ -268,7 +50,7 @@
       <span class="txt">弱</span>
       <span class="sw universal" aria-label="RainViewer Universal Blue 強度色階"></span>
       <span class="txt">強</span>
-      <span class="txt" style="margin-left:8px;color:var(--tx2)">彩色為實測回波・虛線為 4 小時雲流估算</span>
+      <span class="txt" style="margin-left:8px;color:var(--tx2)">彩色回波實測 · 虛線雲流推估</span>
     </div>
   </div>
 </div>
@@ -308,6 +90,7 @@
 
   function initMap(lat,lon){
     map=L.map("map",{zoomControl:false,attributionControl:true,minZoom:5,maxZoom:11}).setView([lat,lon],8);
+    if(map.attributionControl)map.attributionControl.setPrefix(false);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       {maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(map);
     var icon=L.divIcon({className:"",html:'<div class="me-dot"></div>',iconSize:[16,16],iconAnchor:[8,8]});
@@ -333,11 +116,11 @@
     layers=frames.map(function(f){
       return L.tileLayer(host+f.path+"/"+SIZE+"/{z}/{x}/{y}/"+COLOR+"/"+SMOOTH+"_"+SNOW+".png",
         {tileSize:SIZE,opacity:0,pane:"radar",crossOrigin:false,updateWhenZooming:false,
-         maxNativeZoom:7,maxZoom:11}); // RainViewer 圖磚最高 zoom 7，超過則放大顯示
+         maxNativeZoom:7,maxZoom:11,attribution:'<a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'}); // RainViewer 圖磚最高 zoom 7，超過則放大顯示
     });
     layers.forEach(function(L_,k){
       var errors=0;
-      L_.on("tileload",function(){if(k===idx)setRadarStatus("ok","雷達圖磚正常");});
+      L_.on("tileload",function(){if(k===idx)setRadarStatus("ok","影像已載入");});
       L_.on("tileerror",function(){errors++;if(k===idx&&errors>=2)setRadarStatus("error","雷達影像載入失敗");});
       L_.addTo(map);
     });
@@ -488,7 +271,7 @@
 
   var COMPASS=["北","北北東","東北","東北東","東","東南東","東南","南南東","南","南南西","西南","西南西","西","西北西","西北","北北西"];
   function compass(degrees){return degrees==null?"方向不明":COMPASS[Math.round(degrees/22.5)%16]}
-  function cloudArrow(degrees){return degrees==null?"•":"➤"}
+  function cloudArrow(degrees){return degrees==null?"·":'<b style="transform:rotate('+degrees+'deg)">↑</b>'}
   function renderCloudForecast(result){
     var summary=$("cloudSummary"), box=$("cloudBox");
     if(cloudPathLayer)cloudPathLayer.clearLayers();
@@ -506,9 +289,9 @@
     if(!map||!cloudPathLayer)return;
     if(result.bearing!==null){
       var coords=result.points.map(function(p){return [p.lat,p.lon]});
-      L.polyline(coords,{pane:"forecast",color:"#78dfd0",weight:4,opacity:.88,dashArray:"8 9",lineCap:"round",className:"cloud-route-path"}).addTo(cloudPathLayer);
+      L.polyline(coords,{pane:"forecast",color:"#196c4e",weight:4,opacity:.88,dashArray:"8 9",lineCap:"round",className:"cloud-route-path"}).addTo(cloudPathLayer);
       result.points.slice(1,4).forEach(function(p,i){
-        L.circleMarker([p.lat,p.lon],{pane:"forecast",radius:4+i*.8,color:"#d2fff6",weight:2,opacity:.9,fillColor:"#55cabb",fillOpacity:.9}).addTo(cloudPathLayer);
+        L.circleMarker([p.lat,p.lon],{pane:"forecast",radius:4+i*.8,color:"#ffffff",weight:2,opacity:.9,fillColor:"#267b56",fillOpacity:.9}).addTo(cloudPathLayer);
       });
       var endIcon=L.divIcon({className:"",html:'<div class="cloud-route-end"><span>＋4h</span><b style="--arrow:'+result.bearing+'deg">↑</b></div>',iconSize:[54,28],iconAnchor:[7,15]});
       L.marker([end.lat,end.lon],{pane:"markerPane",icon:endIcon,interactive:false,zIndexOffset:1200}).addTo(cloudPathLayer);
@@ -528,15 +311,19 @@
   function toggleCard(){
     cardOpen=!cardOpen;
     $("cardBody").style.display=cardOpen?"":"none";
-    $("cardToggle").textContent=cardOpen?"▴ 收合詳細資料":"▾ 雨量・逐時雲況・降雨機率";
+    $("cardToggle").textContent=cardOpen?"收合詳情 −":"逐時詳情 ＋";
+    document.querySelector(".topcard").classList.toggle("is-expanded",cardOpen);
+    $("cloudSummary").setAttribute("aria-expanded",String(cardOpen));
     $("cardToggle").setAttribute("aria-expanded",String(cardOpen));
   }
   // 把「你的位置」往畫面下方移，避開上方資訊卡，讓雲圖露出來
   function offsetMapForCard(zoom){
     if(!map||!me) return;
     map.setView([me.lat,me.lon], (zoom||map.getZoom()), {animate:false});
-    var dy=Math.round(map.getSize().y*0.15);
-    map.panBy([0,-dy],{animate:false});
+    var top=document.querySelector(".top").getBoundingClientRect().bottom;
+    var bottom=document.querySelector(".ctrl").getBoundingClientRect().top;
+    var target=(top+bottom)/2;
+    map.panBy([0,Math.round(map.getSize().y/2-target)],{animate:false});
   }
 
   function gotPosition(pos){
@@ -573,6 +360,13 @@
   $("slider").oninput=function(){ pause(); show(parseInt(this.value,10)||0); };
   $("recenter").onclick=function(){ if(map&&me) offsetMapForCard(Math.min(Math.max(map.getZoom(),8),9)); };
   $("cardToggle").onclick=toggleCard;
+  $("cloudSummary").onclick=toggleCard;
+  function syncControls(){document.documentElement.style.setProperty("--ctrl-height",Math.ceil(document.querySelector(".ctrl").getBoundingClientRect().height)+"px")}
+  if(window.ResizeObserver)new ResizeObserver(syncControls).observe(document.querySelector(".ctrl"));
+  syncControls();
+  window.addEventListener("resize",function(){syncControls();if(map)map.invalidateSize()});
+  // Stop background playback and resume only when requested by the user.
+  document.addEventListener("visibilitychange",function(){if(document.hidden)pause()});
 
   start();
 })();
