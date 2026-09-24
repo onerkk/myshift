@@ -176,6 +176,29 @@
     // Several policies can coincide for full shifts. Do not silently pick one.
     return matches.length===1?matches[0]:null;
   }
+  function validateNightRule(observations){
+    const unique=new Map();
+    for(const r of observations||[])if(r&&/^\d{4}-(0[1-9]|1[0-2])$/.test(r.month||''))unique.set(r.month,r);
+    const rows=[...unique.values()].filter(r=>r.complete===true).sort((a,b)=>a.month.localeCompare(b.month));
+    if(rows.length<3)return null;
+    const train=rows.slice(0,-1),holdout=rows[rows.length-1],rule=inferNightRule(train);
+    if(!rule)return null;
+    const expected=money(holdout.days.reduce((n,d)=>n+nightUnits(d.worked,d.shiftHours,rule.policy).units,0)*rule.rate);
+    if(number(holdout.amount)===null||expected!==holdout.amount)return null;
+    return{...rule,sampleCount:rows.length,validatedMonth:holdout.month,source:'history-matched'};
+  }
+  function historyAudit(records){
+    const rows=(records||[]).map(r=>{
+      const check=slip(r.slip),e=r.estimate;
+      if(!check.valid||!e)return{month:r.month,valid:false,pending:false,matched:false,differences:[],hourMismatches:[]};
+      const compared=reconcile(e,check.data),s=check.data;
+      const pairs={sickH:e.sickPayH,personalH:e.personalPayH,annualH:e.annualH,disasterH:e.disasterH,weekdayH:e.weekdayH,holidayH:e.holidayH};
+      const hourMismatches=Object.keys(pairs).filter(k=>s[k]!==null&&number(pairs[k])!==null&&Math.abs(s[k]-pairs[k])>.001);
+      const differences=compared.rows.filter(x=>x.delta!==null&&x.delta!==0).map(x=>({key:x.key,delta:x.delta}));
+      return{month:r.month,valid:true,pending:!!e.dataPending,matched:compared.matched&&!hourMismatches.length,actual:s.net,estimate:e.net,differences,hourMismatches};
+    });
+    return{total:rows.length,valid:rows.filter(r=>r.valid).length,matched:rows.filter(r=>r.matched).length,rows};
+  }
   function reconcile(est,official){
     const checked=slip(official),s=checked.data;
     const rows=incomeKeys.concat(deductionKeys).map(key=>{
@@ -188,5 +211,5 @@
     const deltas={};for(const k of totalKeys)deltas[k]=s[k]===null?null:est[k]-s[k];
     return{...checked,rows,deltas,matched:checked.valid&&!est.incomplete&&rows.every(r=>r.delta===0)};
   }
-  return{number,money,migrate,period,slip,parseImport,dailyOT,nightUnits,roundPay,salaryAt,attachReference,inferNightRule,fixedKeys,reconcile,incomeKeys,deductionKeys,totalKeys,hourKeys,optionalKeys};
+  return{number,money,migrate,period,slip,parseImport,dailyOT,nightUnits,roundPay,salaryAt,attachReference,inferNightRule,validateNightRule,historyAudit,fixedKeys,reconcile,incomeKeys,deductionKeys,totalKeys,hourKeys,optionalKeys};
 });

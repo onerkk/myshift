@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v308-studio';
+const CACHE_NAME = 'myshift-v309-nature-pay';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -58,7 +58,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if(event.request.method!=='GET'||url.origin!==self.location.origin)return;
   const isNavigation=event.request.mode==='navigate';
-  const isAsset=/\.(?:js|html|css|json|png|jpe?g|svg|webp|ico|woff2?)$/i.test(url.pathname);
+  const isAsset=/\.(?:js|html|css|json|png|jpe?g|svg|webp|ico|mp3|md|woff2?)$/i.test(url.pathname);
   if(!isNavigation&&!isAsset)return;
   // Only shell navigations ignore UI query parameters; versioned assets keep theirs.
   if(isNavigation)url.search='';

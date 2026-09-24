@@ -1231,10 +1231,10 @@ function applyVisualFxSetting(){
     if(cv) cv.style.display=visualOn?'':'none';
   }catch(e){}
   try{
-    if((!visualOn||!soundOn) && window.WxFx && window.WxFx._forceSilence) window.WxFx._forceSilence();
+    if(window.WxFx&&window.WxFx.refresh)window.WxFx.refresh();
   }catch(e){}
   try{
-    if((!visualOn||!soundOn) && window.WxSfx && window.WxSfx._forceSilence) window.WxSfx._forceSilence();
+    if(!soundOn && window.WxSfx && window.WxSfx._forceSilence) window.WxSfx._forceSilence();
     else if(soundOn && window.WxSfx && window.WxFx && window.WxFx.getMode && window.WxSfx.setMode && !window.WxSfx.isMuted()) window.WxSfx.setMode(window.WxFx.getMode());
   }catch(e){}
   // 切換特效或後台設定後，立刻依目前最新天氣重新判定，不必等下一次 API 更新。
@@ -1332,6 +1332,7 @@ function payViewMove(delta){
   PAY_VIEW={y:Math.floor(idx/12),m:(idx%12+12)%12+1};
 }
 function payViewLatest(){PAY_VIEW=latestClosedSalaryMonth()}
+function payViewCurrent(){const d=new Date();if(d.getDate()>25)d.setMonth(d.getMonth()+1,1);PAY_VIEW={y:d.getFullYear(),m:d.getMonth()+1}}
 function setSalPeriod(y,m,data){
   if(!SAL.monthly||typeof SAL.monthly!=="object")SAL.monthly={};
   const key=salPeriodKey(y,m),prev=(SAL.monthly[key]&&typeof SAL.monthly[key]==="object")?SAL.monthly[key]:{};
@@ -1511,17 +1512,44 @@ async function loadPayrollReference(){
   }catch(e){if(fbUser&&fbUser.uid===user.uid)payrollReferenceState='error';}
   finally{clearTimeout(timer);}
 }
-function automaticNightRule(){
-  if(!fbUser||typeof payrollLeaveState==='undefined'||!payrollLeaveState.ownHistoryLoaded||payrollLeaveState.uid!==fbUser.uid)return null;
-  const samples=[];
-  for(const key of Object.keys(SAL.monthly||{}).filter(k=>/^\d{4}-\d{2}$/.test(k)).sort().slice(-12)){
-    const record=Payroll.slip(SAL.monthly[key]&&SAL.monthly[key].slip);if(!record.valid)continue;
-    const est=calcSalaryEst(Number(key.slice(0,4)),Number(key.slice(5)),{skipNightFit:true});
-    if(!est||est.dataPending||record.data.sickH===null||record.data.weekdayH===null||record.data.holidayH===null)continue;
-    const complete=Math.abs(est.sickPayH-record.data.sickH)<.001&&Math.abs(est.weekdayH-record.data.weekdayH)<.001&&Math.abs(est.holidayH-record.data.holidayH)<.001;
-    samples.push({complete,amount:record.data.nightPay,days:est.days.filter(d=>d.shift==='晚').map(d=>({worked:d.worked,shiftHours:d.shiftHours}))});
+function payrollHistoryEstimates(beforeMonth){
+  const out=[];
+  for(const key of Object.keys(SAL.monthly||{}).filter(k=>/^\d{4}-(0[1-9]|1[0-2])$/.test(k)&&(!beforeMonth||k<beforeMonth)).sort().slice(-24)){
+    const stored=SAL.monthly[key]||{},checked=Payroll.slip(stored.slip);
+    if(!stored.slip&&!stored.reportedNet&&!stored.reportedGross)continue;
+    const estimate=calcSalaryEst(Number(key.slice(0,4)),Number(key.slice(5)),{skipNightFit:true});
+    out.push({month:key,checked,estimate,legacy:!stored.slip});
   }
-  return Payroll.inferNightRule(samples);
+  return out;
+}
+function nightHistorySamples(records){
+  const samples=[];
+  for(const row of records){
+    const est=row.estimate,record=row.checked;
+    if(!record.valid||!est||est.dataPending)continue;
+    // Matching totals alone cannot establish attendance. Every company attendance
+    // field must be present; a missing field is not zero. Exclude legacy timing.
+    const pairs=[['sickH',est.sickPayH],['personalH',est.personalPayH],['annualH',est.annualH],['disasterH',est.disasterH],['weekdayH',est.weekdayH],['holidayH',est.holidayH]];
+    const complete=pairs.every(([k,v])=>record.data[k]!==null&&Math.abs(v-record.data[k])<.001)&&!est.legacyLeaveCount&&!est.notes.some(n=>['leaveOnOffDay','specialAttendance'].includes(n));
+    samples.push({month:row.month,complete,amount:record.data.nightPay,days:est.days.filter(d=>d.shift==='晚').map(d=>({worked:d.worked,shiftHours:d.shiftHours}))});
+  }
+  return samples;
+}
+function automaticNightRule(beforeMonth){
+  if(!fbUser||typeof payrollLeaveState==='undefined'||!payrollLeaveState.ownHistoryLoaded||payrollLeaveState.uid!==fbUser.uid)return null;
+  return Payroll.validateNightRule(nightHistorySamples(payrollHistoryEstimates(beforeMonth)));
+}
+function salaryHistoryAudit(){
+  const records=payrollHistoryEstimates();
+  const canInfer=(!SAL.nightPolicy||SAL.nightPolicy==='auto')&&fbUser&&typeof payrollLeaveState!=='undefined'&&payrollLeaveState.ownHistoryLoaded&&payrollLeaveState.uid===fbUser.uid;
+  if(canInfer){
+    const samples=nightHistorySamples(records);
+    for(const row of records){
+      const fit=Payroll.validateNightRule(samples.filter(s=>s.month<row.month));
+      if(fit)row.estimate=calcSalaryEst(Number(row.month.slice(0,4)),Number(row.month.slice(5)),{nightFit:fit});
+    }
+  }
+  return Payroll.historyAudit(records.map(r=>({month:r.month,slip:r.checked.valid?r.checked.data:null,errors:r.checked.errors,estimate:r.estimate,legacy:r.legacy})));
 }
 function sNotes(){const d=JSON.stringify(NOTES);try{localStorage.setItem("sb_notes",d)}catch(e){}try{sCk("sb_notes",d,3650)}catch(e){}_scheduleCloudSave()}
 function alYear(y,m,d){return(m>12||(m===12&&d>=26))?y:y-1}
@@ -1656,8 +1684,9 @@ function calcSalaryEst(y,m,options={}){
   const hourly=baseSum/240,otHourly=(SAL.otWageBase>0?SAL.otWageBase:baseSum)/240;
   const leaveHourly=(SAL.leaveWageBase>0?SAL.leaveWageBase:baseSum)/240;
   const sh=rot().h,dailyOT=Math.max(0,sh-8),uid=fbUser&&fbUser.uid,notes=[],days=[];
+  let annualH=0,disasterH=0,legacyLeaveCount=0;
   let sickH=0,personalH=0,autoFront=0,autoBack=0,holidayH=0,holidayRaw=0,ordinaryRaw=0,sickRaw=0,personalRaw=0;
-  const nightFit=!options.skipNightFit&&(!SAL.nightPolicy||SAL.nightPolicy==='auto')?automaticNightRule():null;
+  const nightFit=Object.prototype.hasOwnProperty.call(options,'nightFit')?options.nightFit:!options.skipNightFit&&(!SAL.nightPolicy||SAL.nightPolicy==='auto')?automaticNightRule(salPeriodKey(y,m)):null;
   const nightPolicy=nightFit?nightFit.policy:(['attendance','prorated','full'].includes(SAL.nightPolicy)?SAL.nightPolicy:'prorated');
   const nightRate=nightFit?nightFit.rate:(n(SAL.night)||0);
   const nightEstimated=!nightFit&&(!SAL.nightPolicy||SAL.nightPolicy==='auto'||SAL.nightPolicy==='unconfirmed'||SAL.nightRateSource==='legacy-unverified'||SAL.nightRateSource==='unconfirmed');
@@ -1670,7 +1699,8 @@ function calcSalaryEst(y,m,options={}){
     const dayLeaveHourly=(SAL.leaveWageBase>0?SAL.leaveWageBase:daySalary.baseSum)/240;
     const weekly=SAL.dayRuleMode==='weekly'&&Array.isArray(SAL.weeklyDayKinds)?SAL.weeklyDayKinds[dt.getDay()]:'work';
     const kind=['work','rest','holiday'].includes(o.kind)?o.kind:(['rest','holiday'].includes(weekly)?weekly:'work');
-    const leaves=getPayrollLeaves(key),sum=summarizeRegularLeaveForDay(leaves,sh,uid);
+    const leaves=options.leaveOverrides&&Object.prototype.hasOwnProperty.call(options.leaveOverrides,key)?options.leaveOverrides[key]:getPayrollLeaves(key),sum=summarizeRegularLeaveForDay(leaves,sh,uid);
+    if(isWork)for(const entry of sum.entries){const type=getLT(entry.leave.leaveType)||{id:entry.leave.leaveType};if(_leaveId(type)==='annual'||_leaveName(type).includes('特休'))annualH+=entry.hours;if(!hasPreciseLeaveTime(entry.leave))legacyLeaveCount++;}
     let daySickH=0,dayPersonalH=0,legacyWageH=0;
     // Wage hours and attendance are different quantities. Old records explicitly
     // stored 10/12 payable leave hours; do not silently truncate those to eight.
@@ -1686,13 +1716,18 @@ function calcSalaryEst(y,m,options={}){
       sickH+=daySickH;personalH+=dayPersonalH;
     }
     if(!isWork&&leaves.some(l=>['sick','personal'].includes(_leaveId(getLT(l.leaveType)||{id:l.leaveType}))))notes.push('leaveOnOffDay');
-    const normalOT=isWork?getActualOTForDay(key,dailyOT,sh,uid):0;
+    const normalOT=isWork?getActualOTForDay(key,dailyOT,sh,uid,leaves):0;
     const paidHours=isWork?Math.max(0,Math.min(8,sh)-sum.totalHours)+normalOT:0;
     const disasterHours=isWork?Math.min(sh,Math.max(0,+TYD[key]||0)):0;
+    disasterH+=disasterHours;
     // Paid disaster leave is not physical night attendance. Keep its paid OT;
     // do not count an absent night as an attended night shift.
     const autoWorked=Math.max(0,paidHours-disasterHours);
-    const worked=kind!=='work'&&n(o.workedHours)!==null?Math.min(12,n(o.workedHours)):autoWorked;
+    const manualWorked=kind!=='work'?n(o.workedHours):null;
+    // A saved special-day total must never create attendance during leave.
+    // With no special-day clock range, cap it at the remaining scheduled hours.
+    const worked=manualWorked===null?autoWorked:Math.max(0,Math.min(12,manualWorked,isWork?autoWorked:12));
+    if(isWork&&manualWorked>0&&manualWorked<sh&&autoWorked>0&&autoWorked<sh)notes.push('specialAttendance');
     const pay=Payroll.dailyOT(kind,worked,normalOT,dayOtHourly,SAL.otTier1Rate,SAL.otTier2Rate);
     autoFront+=pay.front;autoBack+=pay.back;holidayH+=pay.holidayH;holidayRaw+=pay.holiday;ordinaryRaw+=pay.ordinary;
     sickRaw+=daySickH*dayLeaveHourly*SAL.sickRate;personalRaw+=dayPersonalH*dayLeaveHourly*SAL.personalRate;
@@ -1740,7 +1775,7 @@ function calcSalaryEst(y,m,options={}){
     const prev=new Date(y,m-2,1),months=[salPeriodKey(y,m),salPeriodKey(prev.getFullYear(),prev.getMonth()+1)];
     if(payrollLeaveState.uid!==uid||payrollLeaveState.loading||payrollLeaveState.error||(!payrollLeaveState.ownHistoryLoaded&&months.some(k=>!payrollLeaveState.months.includes(k))))notes.push('leaveNotReady');
   }
-  const est={hourly,otHourly,leaveHourly,baseSum,proposal,otherIncome,nightCount,sickH,personalH,sickPayH,personalPayH,
+  const est={annualH,disasterH,legacyLeaveCount,hourly,otHourly,leaveHourly,baseSum,proposal,otherIncome,nightCount,sickH,personalH,sickPayH,personalPayH,
     otH,weekdayH,holidayH,autoOtH,otPay,holidayPay,rawOtPay,otTaxFree,otTaxable,nightPay,nightAutoPay,sickDed,personalDed,leaveDed,
     pensionWage,pensionSelfRate,pensionEmployerRate,laborPensionSelf,laborPensionEmployer,income,deduction,fixedDed,net,totalFront,totalBack,
     nightAutoCount,nightScheduledCount,partialNightCount,nightRate,nightPolicy,nightFit,sickRate:SAL.sickRate,workedDays,workedHours,days,notes,incomplete:notes.length>0,
@@ -1773,11 +1808,18 @@ function salaryNoteText(code){
     unconfirmedNightRate:['夜點單價尚未確認，目前以填入單價試算。','Tarif malam belum dikonfirmasi; sementara memakai tarif yang diisi.'],
     dayRules:['平日／假日給薪分類尚未確認，目前暫依排班作平日試算。請設定一次公司分類規則。','Jenis hari kerja/libur belum dikonfirmasi. Atur sekali aturan perusahaan.'],
     leaveOnOffDay:['有請假紀錄落在目前班表的休假日，請在逐日明細核對調班。','Ada cuti pada hari istirahat; periksa perubahan jadwal.'],
+    specialAttendance:['特殊出勤僅有手動總時數，已限制為扣假後可出勤時數；部分請假與特殊出勤的重疊時段仍需核對。','Jam kerja khusus dibatasi oleh sisa kehadiran; periksa tumpang tindih cuti karena waktu kerja khusus belum lengkap.'],
     sickHoursMismatch:['病假紀錄與既有核對資料不同；系統仍按目前紀錄自動計算。','Jam sakit berbeda dari catatan pembanding; tetap dihitung otomatis.'],
     holidayHoursMismatch:['假日給薪時數與既有核對資料不同，需核對出勤類別與紀錄。','Jam libur berbeda dari catatan pembanding.'],
     weekdayHoursMismatch:['平日給薪時數與既有核對資料不同，需核對每日出勤。','Jam kerja berbeda dari catatan pembanding.'],
     leaveNotReady:['正在同步本計薪期的請假資料，完成後會自動重算。若持續未完成，請重新連線。','Menyinkronkan cuti; dihitung ulang setelah selesai. Sambungkan kembali jika belum selesai.']
   };return (labels[code]||[code,code])[lang==='zh'?0:1];
+}
+function salaryHistoryHtml(){
+  const zh=lang==='zh',audit=salaryHistoryAudit();
+  if(!audit.total)return '';
+  const labels=salaryFieldLabels();
+  return `<details class="payroll-history"><summary><span>${zh?'歷月計算核對':'Audit riwayat gaji'}<small>${audit.valid} ${zh?'份完整薪資條':'slip lengkap'} · ${audit.matched} ${zh?'期分項一致':'periode cocok'}</small></span>${uiIcon('chevron',16)}</summary><div class="payroll-history-body"><p>${zh?'每期依當時薪資與目前保存的逐日紀錄重新計算。實領相同仍需各分項相同，才列為一致。':'Dihitung ulang dari upah bertanggal dan catatan harian; semua komponen harus cocok.'}</p>${audit.rows.map(r=>`<div class="history-month"><header><b>${r.month}</b><span>${!r.valid?(zh?'記錄不完整':'Belum lengkap'):r.pending?(zh?'請假資料同步中':'Cuti dimuat'):r.matched?(zh?'分項一致':'Komponen cocok'):r.differences.length||r.hourMismatches.length?(zh?'有差額':'Ada selisih'):(zh?'規則待核對':'Aturan perlu diperiksa')}</span></header>${r.valid&&!r.pending?`<div class="history-amounts"><span>${zh?'公司':'Slip'} <b>${studioMoney(r.actual)}</b></span><span>${zh?'班表':'Jadwal'} <b>${studioMoney(r.estimate)}</b></span></div>${r.differences.length?`<ul>${r.differences.map(d=>`<li>${labels[d.key]} <b>${d.delta>0?'+':'−'}${studioMoney(Math.abs(d.delta))}</b></li>`).join('')}</ul>`:''}${r.hourMismatches.length?`<p class="history-gap">${zh?'時數不符：':'Jam berbeda: '}${r.hourMismatches.map(k=>labels[k]).join('、')}</p>`:''}`:''}</div>`).join('')}<p class="history-method">${zh?'夜點自動推算至少需要 3 期出勤完整、時數吻合的資料；以最末一期獨立驗證，且只用該薪資期之前的紀錄。資料不足時保留估算，不拿公司實領回填公式。':'Tarif malam memerlukan 3 periode kehadiran lengkap dan cocok; periode terakhir untuk validasi. Slip tidak menggantikan perhitungan.'}</p></div></details>`;
 }
 function salaryDaysForm(y,m){
   const p=getSalPeriod(y,m),pp=calcPayPeriod(y,m);if(!pp)return'';
@@ -2146,10 +2188,19 @@ function uiLeaveSummaryHtml(y,m){
   const nextText=next?`${next.date.slice(5).replace('-', '/')} · ${esc(isZh?(next.lt.name||next.leaveType):(next.lt.nameId||next.lt.name||next.leaveType))}`:(isZh?"目前沒有":"Tidak ada");
   return `<section class="leave-center"><div class="leave-center-head"><div><span class="section-label">${isZh?"請假中心":"Pusat cuti"}</span><h3>${monthLabel}</h3></div><button class="leave-calendar-link" data-a="tabCalendar">${isZh?"查看班表":"Lihat jadwal"} ${uiIcon("chevron",15)}</button></div><div class="leave-metrics"><div><strong>${Math.round(total*10)/10}<small>h</small></strong><span>${isZh?"請假時數":"Jam cuti"}</span></div><div><strong>${days.size}</strong><span>${isZh?"請假天數":"Hari cuti"}</span></div><div><strong>${annual}</strong><span>${isZh?"特休餘額":"Sisa tahunan"}</span></div></div><div class="leave-type-list">${typeChips}</div><div class="leave-next"><span>${isZh?"下一筆請假":"Cuti berikutnya"}</span><strong>${nextText}</strong></div></section>`;
 }
+function natureControlsHtml(){
+  const zh=lang==='zh',quality=WxFx.getQuality(),volume=Math.round(WxSfx.getVolume()*100);
+  return `<section class="nature-controls"><div class="nature-controls-head"><span class="nature-emblem" aria-hidden="true">${studioIcon('sun',22)}</span><div><h3>${zh?'自然光景':'Suasana alam'}</h3><p>${zh?'光線有層次，聲音來自現場':'Cahaya berlapis, rekaman lapangan'}</p></div><span class="nature-live">${zh?'實地錄音':'Rekaman asli'}</span></div><div class="nature-level" role="group" aria-label="${zh?'動畫密度':'Kepadatan animasi'}">${[['subtle','輕柔','Lembut'],['balanced','自然','Alami'],['rich','豐富','Kaya']].map(([v,z,id])=>`<button onclick="WxFx.setQuality('${v}');render()" aria-pressed="${quality===v}" class="${quality===v?'active':''}">${zh?z:id}</button>`).join('')}</div><label class="nature-volume"><span>${zh?'環境音量':'Volume'}</span><input type="range" min="0" max="100" value="${volume}" aria-label="${zh?'環境音量':'Volume ambience'}" oninput="WxSfx.setVolume(this.value/100);this.nextElementSibling.value=this.value+'%'"/><output>${volume}%</output></label><small class="nature-audio-status">${WxSfx.isMuted()?(zh?'已靜音，開啟上方聲音開關即可聆聽':'Aktifkan suara di atas untuk mendengar'):(zh?'實地錄音依天氣與時段切換':'Rekaman mengikuti cuaca dan waktu')}</small><div class="nature-previews"><span>${zh?'試看 8 秒':'Pratinjau 8 dtk'}</span>${[['clear','日光','Cerah'],['rain','雨幕','Hujan'],['wind','風葉','Angin']].map(([v,z,id])=>`<button onclick="previewNature('${v}',this)">${zh?z:id}</button>`).join('')}</div><p class="nature-preview-state" role="status"></p><a href="./audio/nature/ATTRIBUTION.md" target="_blank" rel="noopener">${zh?'錄音來源與授權':'Sumber & lisensi rekaman'} ↗</a></section>`;
+}
+function previewNature(mode,button){
+  WxFx.preview(mode);const label=button.closest('.nature-controls').querySelector('.nature-preview-state');
+  label.textContent=lang==='zh'?'效果預覽中，不變更實際天氣資料。':'Pratinjau efek; data cuaca tidak berubah.';
+  clearTimeout(window._naturePreviewLabel);window._naturePreviewLabel=setTimeout(()=>{label.textContent=''},8100);
+}
 function uiMoreHtml(y,m){
   const zh=lang==='zh',lunarOn=!!S.showLunar,soundOn=!WxSfx.isMuted();
   const row=(action,icon,title,sub)=>`<button class="settings-row" data-a="${action}"><span class="settings-row-icon">${uiIcon(icon,20)}</span><span class="settings-row-copy"><strong>${title}</strong><small>${sub}</small></span>${uiIcon('chevron',17)}</button>`;
-  return `<section class="quick-controls"><h2 class="settings-group-title">${zh?'偏好設定':'Preferensi'}</h2><div class="quick-control-card language-control"><span class="quick-control-label">${zh?'顯示語言':'Bahasa'}</span><div class="segmented-language" role="group" aria-label="${zh?'顯示語言':'Bahasa'}"><button class="${lang==='zh'?'active':''}" data-a="lzh" aria-pressed="${lang==='zh'}">中文</button><button class="${lang==='id'?'active':''}" data-a="lid" aria-pressed="${lang==='id'}">Indonesia</button></div></div><button class="quick-control-card" data-a="lunar" role="switch" aria-checked="${lunarOn}"><span class="quick-control-icon">${uiIcon('moon',20)}</span><span class="quick-control-copy"><b>${zh?'農曆與宜忌':'Kalender lunar'}</b><small>${lunarOn?(zh?'在班表中顯示':'Tampil di kalender'):(zh?'目前隱藏':'Disembunyikan')}</small></span><span class="status-switch${lunarOn?' on':''}" aria-hidden="true"><i></i></span></button><button class="quick-control-card" data-a="sfx" role="switch" aria-checked="${soundOn}"><span class="quick-control-icon">${uiIcon('sound',20)}</span><span class="quick-control-copy"><b>${zh?'提示音與環境音':'Suara'}</b><small>${soundOn?(zh?'已開啟':'Aktif'):(zh?'已靜音':'Dimatikan')}</small></span><span class="status-switch${soundOn?' on':''}" aria-hidden="true"><i></i></span></button></section>${uiLeaveSummaryHtml(y,m)}<section class="settings-panel"><div class="settings-group"><h2 class="settings-group-title">${zh?'班表工具':'Alat jadwal'}</h2>${row('stats','chart',zh?'年度統計':'Statistik tahunan',zh?'班別、工時、加班與請假':'Shift, jam, lembur dan cuti')}${row('share','share',zh?'分享班表':'Bagikan jadwal',zh?'儲存目前月份的班表圖片':'Ekspor gambar kalender bulan ini')}${row('help','help',zh?'使用說明':'Bantuan',zh?'功能、標記與資料來源':'Fitur, tanda dan sumber data')}</div><div class="settings-group"><h2 class="settings-group-title">${zh?'天氣與通知':'Cuaca & notifikasi'}</h2>${row('prefs','settings',zh?'天氣與警報設定':'Cuaca & peringatan',zh?'定位、通知、動畫與音效':'Lokasi, notifikasi, animasi dan suara')}</div>${isAdmin()?`<div class="settings-group"><h2 class="settings-group-title">${zh?'單位管理':'Administrasi unit'}</h2>${row('leavesOv','calendar',zh?'單位請假總覽':'Ringkasan cuti unit',zh?'請假名單、時數與人力':'Nama, jam cuti dan tenaga')}</div>`:''}<div class="settings-group danger-zone">${row('reset','refresh',zh?'重新設定輪班':'Atur ulang shift',zh?'重新選擇班制與輪班位置':'Pilih kembali pola dan posisi shift')}</div></section>`;
+  return `<section class="quick-controls"><h2 class="settings-group-title">${zh?'偏好設定':'Preferensi'}</h2><div class="quick-control-card language-control"><span class="quick-control-label">${zh?'顯示語言':'Bahasa'}</span><div class="segmented-language" role="group" aria-label="${zh?'顯示語言':'Bahasa'}"><button class="${lang==='zh'?'active':''}" data-a="lzh" aria-pressed="${lang==='zh'}">中文</button><button class="${lang==='id'?'active':''}" data-a="lid" aria-pressed="${lang==='id'}">Indonesia</button></div></div><button class="quick-control-card" data-a="lunar" role="switch" aria-checked="${lunarOn}"><span class="quick-control-icon">${uiIcon('moon',20)}</span><span class="quick-control-copy"><b>${zh?'農曆與宜忌':'Kalender lunar'}</b><small>${lunarOn?(zh?'在班表中顯示':'Tampil di kalender'):(zh?'目前隱藏':'Disembunyikan')}</small></span><span class="status-switch${lunarOn?' on':''}" aria-hidden="true"><i></i></span></button><button class="quick-control-card" data-a="sfx" role="switch" aria-checked="${soundOn}"><span class="quick-control-icon">${uiIcon('sound',20)}</span><span class="quick-control-copy"><b>${zh?'真實自然音與按鍵聲':'Suara alam & tombol'}</b><small>${soundOn?(zh?'已開啟':'Aktif'):(zh?'已靜音':'Dimatikan')}</small></span><span class="status-switch${soundOn?' on':''}" aria-hidden="true"><i></i></span></button></section>${natureControlsHtml()}${uiLeaveSummaryHtml(y,m)}<section class="settings-panel"><div class="settings-group"><h2 class="settings-group-title">${zh?'班表工具':'Alat jadwal'}</h2>${row('stats','chart',zh?'年度統計':'Statistik tahunan',zh?'班別、工時、加班與請假':'Shift, jam, lembur dan cuti')}${row('share','share',zh?'分享班表':'Bagikan jadwal',zh?'儲存目前月份的班表圖片':'Ekspor gambar kalender bulan ini')}${row('help','help',zh?'使用說明':'Bantuan',zh?'功能、標記與資料來源':'Fitur, tanda dan sumber data')}</div><div class="settings-group"><h2 class="settings-group-title">${zh?'天氣與通知':'Cuaca & notifikasi'}</h2>${row('prefs','settings',zh?'天氣與警報設定':'Cuaca & peringatan',zh?'定位、通知、動畫與音效':'Lokasi, notifikasi, animasi dan suara')}</div>${isAdmin()?`<div class="settings-group"><h2 class="settings-group-title">${zh?'單位管理':'Administrasi unit'}</h2>${row('leavesOv','calendar',zh?'單位請假總覽':'Ringkasan cuti unit',zh?'請假名單、時數與人力':'Nama, jam cuti dan tenaga')}</div>`:''}<div class="settings-group danger-zone">${row('reset','refresh',zh?'重新設定輪班':'Atur ulang shift',zh?'重新選擇班制與輪班位置':'Pilih kembali pola dan posisi shift')}</div></section>`;
 }
 function rCal(){
   const r=rot(),c=cyc(),y=S.yr,m=S.mo,dm=dim(y,m),fd=fdw(y,m),ic=y===TY&&m===TM;
@@ -2631,25 +2682,41 @@ function submitLeave(date){
   if(button){button.dataset.saving="1";button.disabled=true}
   return addLeave(date,selected.entry.leaveType,selected.h.regularHours,rIn?rIn.value.trim():"",selected.entry);
 }
+function leaveSalaryImpact(date,entry){
+  if(!SAL.enabled||!SAL.base)return null;
+  const a=date.split('-').map(Number),periodDate=new Date(a[0],a[1]-1,a[2]);
+  if(a[2]>25)periodDate.setMonth(periodDate.getMonth()+1,1);
+  const y=periodDate.getFullYear(),m=periodDate.getMonth()+1;
+  const before=calcSalaryEst(y,m);if(!before)return null;
+  // Freeze the learnt rule for this comparison so adding a leave cannot change
+  // the pay rule itself. The same period rounding is used before and after.
+  const after=calcSalaryEst(y,m,{nightFit:before.nightFit,leaveOverrides:{[date]:getPayrollLeaves(date).concat(entry)}});
+  if(!after)return null;
+  const keys=['leaveDed','otPay','holidayPay','nightPay','net'];
+  return{month:salPeriodKey(y,m),before,after,delta:Object.fromEntries(keys.map(k=>[k,after[k]-before[k]])),day:after.days.find(d=>d.key===date)};
+}
 function updateLeaveTimePreview(date){
   const box=document.getElementById("leaveTimePreview"),button=document.getElementById("leaveSubmitBtn"),v=leaveSelection(date);
   if(!box||!v)return;
   if(button)button.disabled=!!v.error||button.dataset.saving==="1";
   box.classList.toggle("invalid",!!v.error);
   if(v.error){box.textContent=v.error;return}
-  const isZh=lang==="zh",hours=v.h,ltName=isZh?v.lt.name:(v.lt.nameId||v.lt.name);
+  const isZh=lang==="zh",hours=v.h,ltName=isZh?v.lt.name:(v.lt.nameId||v.lt.name),lines=[];
   const afterOT=getActualOTForDay(date,v.rule.overtimeMinutes/60,v.rule.shiftHours,fbUser&&fbUser.uid,v.mine.concat(v.entry));
-  let lines=[];
   lines.push(isZh?`${ltName} ${hours.regularHours}h${hours.overtimeHours?` · 未加班 ${hours.overtimeHours}h`:""}`:`${ltName} ${hours.regularHours}h${hours.overtimeHours?` · Tidak lembur ${hours.overtimeHours}h`:""}`);
-  if(!hours.regularHours)lines[0]=isZh?`未加班 ${hours.overtimeHours}h · 不扣假、不扣本薪`:`Tidak lembur ${hours.overtimeHours}h · Cuti & gaji pokok tidak dipotong`;
-  if(v.rule.overtimeMinutes)lines.push(isZh?`儲存後當日加班 ${afterOT}h`:`Lembur hari ini setelah simpan: ${afterOT}h`);
-  if(SAL.enabled&&SAL.base){
-    const base=SAL.base+SAL.meal+SAL.transport+SAL.position,otHourly=(SAL.otWageBase>0?SAL.otWageBase:base)/240,leaveHourly=(SAL.leaveWageBase>0?SAL.leaveWageBase:base)/240;
-    const deduction=hours.regularHours*leaveHourly*leaveWageDeductRate(v.lt),otPay=(Math.min(2,afterOT)*SAL.otTier1Rate+Math.max(0,afterOT-2)*SAL.otTier2Rate)*otHourly;
-    lines.push(isZh?`本次扣薪約 $${deduction.toFixed(2)}${v.rule.overtimeMinutes?` · 當日加班費約 $${otPay.toFixed(2)}`:""}`:`Potongan ini ±$${deduction.toFixed(2)}${v.rule.overtimeMinutes?` · Upah lembur hari ini ±$${otPay.toFixed(2)}`:""}`);
+  if(!hours.regularHours)lines[0]=isZh?`未加班 ${hours.overtimeHours}h · 不扣假、不扣本薪`:`Tidak lembur ${hours.overtimeHours}h · Cuti & gaji pokok tetap`;
+  if(v.rule.overtimeMinutes)lines.push(isZh?`儲存後當日加班 ${afterOT}h`:`Lembur setelah simpan: ${afterOT}h`);
+  const impact=leaveSalaryImpact(date,v.entry);
+  if(impact){
+    const d=impact.delta,money=n=>'$'+Math.abs(n).toLocaleString('en-US'),netMoney=(impact.after.net<0?'−':'')+money(impact.after.net);
+    lines.push(isZh?`${impact.month} 薪資期 · 本次增加扣薪 ${money(d.leaveDed)}`:`Periode ${impact.month} · Tambahan potongan ${money(d.leaveDed)}`);
+    if(d.otPay||d.holidayPay)lines.push(isZh?`加班費${d.otPay+d.holidayPay<=0?'減少':'增加'} ${money(d.otPay+d.holidayPay)}`:`Perubahan lembur ${d.otPay+d.holidayPay>0?'+':'−'}${money(d.otPay+d.holidayPay)}`);
+    if(d.nightPay)lines.push(isZh?`夜點費${d.nightPay<0?'減少':'增加'} ${money(d.nightPay)}`:`Perubahan tunjangan malam ${d.nightPay>0?'+':'−'}${money(d.nightPay)}`);
+    lines.push(isZh?`預估實領${d.net<=0?'減少':'增加'} ${money(d.net)} · 儲存後 ${netMoney}`:`Estimasi bersih ${d.net>0?'+':'−'}${money(d.net)} · Sesudah ${netMoney}`);
+    if(impact.after.incomplete)lines.push(isZh?'依目前計薪規則試算；待核對項目見薪資頁。':'Estimasi memakai aturan saat ini; rincian di halaman gaji.');
   }else if(hours.regularHours){
     const rate=leaveWageDeductRate(v.lt);
-    lines.push(isZh?(rate>0?`正常請假依扣薪時薪 × ${hours.regularHours}h × ${rate} 計算。`:"正常請假不扣本薪；加班依所選時段自動換算。"):(rate>0?`Potongan: tarif cuti × ${hours.regularHours}h × ${rate}.`:"Gaji pokok tetap; lembur dihitung dari waktu yang dipilih."));
+    lines.push(isZh?(rate>0?`正常請假依扣薪時薪 × ${hours.regularHours}h × ${rate} 計算。`:'正常請假不扣本薪；加班依所選時段換算。'):'Potongan mengikuti jenis cuti dan jam yang dipilih.');
   }
   box.textContent=lines.join("\n");
 }
@@ -2720,6 +2787,7 @@ function handle(e){
     case "payPrev":payViewMove(-1);loadLeaves();break;
     case "payNext":payViewMove(1);loadLeaves();break;
     case "payLatest":payViewLatest();loadLeaves();break;
+    case "payCurrent":payViewCurrent();loadLeaves();break;
     case "tabWeather":setUiTab("weather");break;
     case "tabMore":setUiTab("more");break;
     case "prefs":openUserPrefs();return;
@@ -4439,9 +4507,9 @@ function userPrefsModalHtml(){
   const fxDetail=Object.assign({weather:true,animals:true,seasonal:true,sound:true},up.fxDetail||{});
   const fxRows=[
     {key:'weather',icon:'🌦️',color:'#3498db',titleZh:'天氣動畫',titleId:'Animasi cuaca',descZh:'雨、雪、雷電、霧、強風、冷熱效果',descId:'Hujan, salju, petir, kabut, angin, panas/dingin'},
-    {key:'animals',icon:'🦋',color:'#e67e22',titleZh:'動物動畫',titleId:'Animasi hewan',descZh:'蝴蝶、蜻蜓、青蛙、螢火蟲',descId:'Kupu-kupu, capung, katak, kunang-kunang'},
-    {key:'seasonal',icon:'🍁',color:'#27ae60',titleZh:'季節動畫',titleId:'Animasi musim',descZh:'花瓣、花朵、落葉、霜、雲層',descId:'Kelopak, bunga, daun, embun beku, awan'},
-    {key:'sound',icon:'🔊',color:'#8e44ad',titleZh:'環境音效',titleId:'Suara ambience',descZh:'雨聲、風聲、鳥鳴、蟲鳴',descId:'Suara hujan, angin, burung, serangga'}
+    {key:'animals',icon:'🦋',color:'#e67e22',titleZh:'動物動畫',titleId:'Animasi hewan',descZh:'緩緩飛行的蝴蝶與夜間螢火蟲',descId:'Kupu-kupu dan kunang-kunang malam'},
+    {key:'seasonal',icon:'🍁',color:'#27ae60',titleZh:'季節動畫',titleId:'Animasi musim',descZh:'飄落花瓣、葉片翻轉、分層雲影',descId:'Kelopak, bunga, daun, embun beku, awan'},
+    {key:'sound',icon:'🔊',color:'#8e44ad',titleZh:'環境音效',titleId:'Suara ambience',descZh:'實地錄製的雨、風、落葉、鳥鳴與蟲鳴',descId:'Suara hujan, angin, burung, serangga'}
   ].map(item=>`<div style="padding:10px 12px;background:rgba(255,255,255,0.55);border-radius:8px;display:flex;align-items:center;gap:10px;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
         <div style="font-size:18px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:${item.color};color:#fff;border-radius:50%;flex-shrink:0">${item.icon}</div>
@@ -4784,2254 +4852,11 @@ function rStats(){
   <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--tx2);margin-top:4px"><span>${isZh?"已用":"Terpakai"} ${alUsedCalc}h</span><span>${isZh?"剩餘":"Sisa"} ${alRemCalc}h / ${alTotal}h</span></div>`:""}
   <button class="modal-done" data-a="closeStats" style="margin-top:14px">${t("done")}</button></div></div>`}
 
-// ═══ WEATHER EFFECTS ENGINE v2 ═══
-const WxFx = (function(){
-  let canvas, ctx, raf, particles=[], splashes=[], debris=[], stars=[];
-  let mode="none", _w=0, _h=0;
-  let wxCode=0, wxTemp=0, wxWind=0;
-  let lightningTimer=0, lightningAlpha=0;
-  let heatPhase=0;
-  let ambientHour=-1;
-  // ── Real photo FX assets ──
-  const FX_IMG={swallowtail:[],purple:[],monarch:[],maple:[],cloud:[],bolt:[],drop:null,
-    blossom:[],flower:[],dfly:[],frost_img:[],debris_img:[],frog:[],pleaf:[],lpad:[],
-    firefly:[],sun:[]};
-  function _preloadFx(){
-    const kinds=[
-      {key:"swallowtail",dir:"butterfly/",prefix:"swallowtail-",count:6},
-      {key:"purple",dir:"butterfly/",prefix:"purple-",count:6},
-      {key:"monarch",dir:"butterfly/",prefix:"monarch-",count:6},
-      {key:"maple",dir:"maple/",prefix:"maple-",count:4},
-      {key:"cloud",dir:"cloud/",prefix:"cloud-",count:3},
-      {key:"bolt",dir:"lightning/",prefix:"bolt-",count:4},
-      {key:"blossom",dir:"blossom/",prefix:"blossom-",count:6},
-      {key:"flower",dir:"flower/",prefix:"flower-",count:4},
-      {key:"dfly",dir:"dragonfly/",prefix:"dfly-",count:6},
-      {key:"frost_img",dir:"frost/",prefix:"snow-",count:4},
-      {key:"debris_img",dir:"debris/",prefix:"leaf-",count:3},
-      {key:"frog",dir:"frog/",prefix:"frog-",count:4},
-      {key:"pleaf",dir:"pleaf/",prefix:"leaf-",count:3},
-      {key:"lpad",dir:"lilypad/",prefix:"pad-",count:1},
-      {key:"firefly",dir:"firefly/",prefix:"firefly-",count:4},
-      {key:"sun",dir:"sun/",prefix:"sun-",count:3}, // sun-01 正午黃 / sun-02 日出日落橘 / sun-03 深夕陽紅
-    ];
-    kinds.forEach(k=>{
-      for(let i=1;i<=k.count;i++){
-        const img=new Image();
-        img.src="./images/fx/"+k.dir+k.prefix+String(i).padStart(2,"0")+".png";
-        FX_IMG[k.key].push(img);
-      }
-    });
-    // 雨滴只需單張
-    const d=new Image();
-    d.src="./images/fx/rain/drop.png";
-    FX_IMG.drop=d;
-  }
-  
-  function init(){
-    if(canvas) return;
-    canvas=document.createElement("canvas");
-    canvas.id="wxfx";
-    canvas.style.cssText="position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0";
-    document.body.appendChild(canvas);
-    ctx=canvas.getContext("2d");
-    resize();
-    window.addEventListener("resize",resize);
-    _preloadFx();
-    // Generate stars once
-    stars=[];
-    for(let i=0;i<80;i++) stars.push({x:Math.random(),y:Math.random()*0.6,r:0.5+Math.random()*1.5,tw:Math.random()*Math.PI*2,sp:0.01+Math.random()*0.02});
-    // Start ambient loop immediately
-    if(!raf) loop();
-  }
-  
-  function resize(){
-    const dpr=window.devicePixelRatio||1;
-    _w=window.innerWidth;_h=window.innerHeight;
-    canvas.width=_w*dpr;canvas.height=_h*dpr;
-    canvas.style.width=_w+"px";canvas.style.height=_h+"px";
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-  }
-  
-  function setMode(m){
-    if(m===mode) return;
-    mode=m;
-    particles=[];splashes=[];debris=[];
-    heatPhase=0;lightningTimer=0;lightningAlpha=0;
-    // 深色夜間背景會吃掉半透明雨線；雨天模式提高畫布可見度，其餘模式維持柔和。
-    if(canvas)canvas.style.opacity=(mode==="none"?"0":mode==="rain"?"0.34":(mode==="heavy"||mode==="storm"||mode==="typhoon")?"0.48":mode==="fog"?"0.20":"0.12");
-    if(typeof WxSfx!=='undefined') WxSfx.setMode(m);
-    document.body.classList.remove("wx-heat","wx-rain","wx-storm","wx-fog","wx-snow","wx-wind","wx-typhoon","wx-cold");
-    if(mode==="none") return;
-    if(mode==="heat") document.body.classList.add("wx-heat");
-    if(mode==="rain"||mode==="heavy") document.body.classList.add("wx-rain");
-    if(mode==="storm") document.body.classList.add("wx-storm");
-    if(mode==="fog") document.body.classList.add("wx-fog");
-    if(mode==="snow") document.body.classList.add("wx-snow");
-    if(mode==="wind") document.body.classList.add("wx-wind");
-    if(mode==="typhoon") document.body.classList.add("wx-typhoon");
-    if(mode==="cold") document.body.classList.add("wx-cold");
-    seedParticles();
-  }
-  
-  function seedParticles(){
-    particles=[];splashes=[];debris=[];
-    if(mode==="rain"){
-      for(let i=0;i<180;i++) particles.push(mkRain(false));
-    } else if(mode==="heavy"){
-      for(let i=0;i<350;i++) particles.push(mkRain(true));
-    } else if(mode==="storm"){
-      for(let i=0;i<450;i++) particles.push(mkRain(true,true));
-      lightningTimer=80+Math.random()*120;
-    } else if(mode==="snow"){
-      for(let i=0;i<70;i++) particles.push(mkSnow());
-    } else if(mode==="fog"){
-      for(let i=0;i<12;i++) particles.push(mkFog());
-    } else if(mode==="wind"){
-      for(let i=0;i<30;i++) particles.push(mkWindStreak());
-      for(let i=0;i<8;i++) debris.push(mkDebris());
-    } else if(mode==="typhoon"){
-      for(let i=0;i<500;i++) particles.push(mkRain(true,true));
-      for(let i=0;i<50;i++) particles.push(mkWindStreak());
-      for(let i=0;i<15;i++) debris.push(mkDebris());
-      lightningTimer=40+Math.random()*80;
-    } else if(mode==="cold"){
-      for(let i=0;i<50;i++) particles.push(mkFrost());
-      for(let i=0;i<8;i++) particles.push(mkBreath());
-    }
-  }
-  
-  function mkRain(heavy,wind){
-    const speed=heavy?14+Math.random()*10:7+Math.random()*6;
-    const len=heavy?22+Math.random()*18:12+Math.random()*12;
-    const drift=wind?5+Math.random()*6:1+Math.random()*2;
-    return{type:"rain",x:Math.random()*_w*1.4-_w*.2, y:Math.random()*_h*-1, speed, len, drift,
-      alpha:heavy?0.52+Math.random()*0.28:0.38+Math.random()*0.24,
-      width:heavy?2.2+Math.random()*1.1:1.45+Math.random()*0.65};
-  }
-  
-  function mkSnow(){
-    return{type:"snow",x:Math.random()*_w, y:Math.random()*_h*-0.5, r:2+Math.random()*4,
-      speed:0.6+Math.random()*1.8, drift:Math.random()*1.2-0.6,
-      alpha:0.5+Math.random()*0.4, wobble:Math.random()*Math.PI*2};
-  }
-  
-  function mkFog(){
-    return{type:"fog",x:Math.random()*_w*1.5-_w*.25, y:_h*0.1+Math.random()*_h*0.8,
-      w:300+Math.random()*400, h:60+Math.random()*80,
-      speed:0.2+Math.random()*0.4, alpha:0.06+Math.random()*0.06,
-      dir:Math.random()>0.5?1:-1};
-  }
-  
-  function mkWindStreak(){
-    return{type:"wind",x:-Math.random()*_w*0.3, y:Math.random()*_h,
-      speed:8+Math.random()*12, len:40+Math.random()*80,
-      alpha:0.06+Math.random()*0.08, width:1+Math.random()};
-  }
-  
-  function mkDebris(){
-    const shapes=["leaf","dot","line"];
-    return{x:-20-Math.random()*100, y:Math.random()*_h,
-      speed:4+Math.random()*8, vy:Math.sin(Math.random()*Math.PI*2)*1.5,
-      wobble:Math.random()*Math.PI*2, wobbleSpeed:0.03+Math.random()*0.04,
-      r:2+Math.random()*3, alpha:0.5+Math.random()*0.35,
-      shape:shapes[Math.floor(Math.random()*shapes.length)],
-      rot:Math.random()*Math.PI*2, rotSpeed:0.05+Math.random()*0.1,
-      size:14+Math.random()*20,imgIdx:Math.floor(Math.random()*3)};
-  }
-
-  function mkFrost(){
-    // Frost crystals that grow on screen edges
-    const side=Math.floor(Math.random()*4); // 0=top,1=right,2=bottom,3=left
-    let x,y;
-    if(side===0){x=Math.random()*_w;y=Math.random()*60}
-    else if(side===1){x=_w-Math.random()*60;y=Math.random()*_h}
-    else if(side===2){x=Math.random()*_w;y=_h-Math.random()*60}
-    else{x=Math.random()*60;y=Math.random()*_h}
-    return{type:"frost",x,y,r:3+Math.random()*8,alpha:0,maxAlpha:0.55+Math.random()*0.25,
-      growSpeed:0.001+Math.random()*0.002,rot:Math.random()*Math.PI*2,
-      branches:3+Math.floor(Math.random()*4),
-      size:28+Math.random()*28,imgIdx:Math.floor(Math.random()*4)};
-  }
-
-  function mkBreath(){
-    // Breath-like mist puffs rising slowly
-    return{type:"breath",x:_w*0.2+Math.random()*_w*0.6, y:_h*0.5+Math.random()*_h*0.4,
-      r:15+Math.random()*25, alpha:0, maxAlpha:0.04+Math.random()*0.03,
-      speed:-0.15-Math.random()*0.2, drift:Math.random()*0.4-0.2,
-      phase:0, growing:true};
-  }
-  
-  function addSplash(x){
-    splashes.push({x,y:_h-2,vx:(Math.random()-0.5)*2,vy:-1.5-Math.random()*2,life:1});
-  }
-  
-  // ═══ AMBIENT DAY/NIGHT ═══
-  let _sunPhase=Math.random()*Math.PI*2;
-  
-  // 參數：x, y, r（太陽半徑）, coreR/G/B（光暈色調 RGB）, coreA（太陽本體 alpha）, glowA（光暈強度）, rayA（光芒強度）, rayCount（光芒數量）, sunIdx（0=正午黃/1=晨昏橘/2=深夕陽紅）
-  function drawSunDisc(x,y,r,coreR,coreG,coreB,coreA,glowA,rayA,rayCount,sunIdx){
-    // 1. 外層光暈（用背景顏色，在太陽後面發光）
-    const g2=ctx.createRadialGradient(x,y,r*0.3,x,y,r*2.8);
-    g2.addColorStop(0,`rgba(${coreR},${coreG},${coreB},${glowA*0.5})`);
-    g2.addColorStop(0.4,`rgba(${coreR},${coreG},${coreB},${glowA*0.2})`);
-    g2.addColorStop(1,`rgba(${coreR},${coreG},${coreB},0)`);
-    ctx.fillStyle=g2;
-    ctx.fillRect(x-r*3,y-r*3,r*6,r*6);
-    // 2. 光芒（晨昏時顯著）
-    if(rayA>0.01){
-      _sunPhase+=0.003;
-      ctx.save();
-      ctx.translate(x,y);
-      ctx.rotate(_sunPhase*0.3);
-      for(let i=0;i<rayCount;i++){
-        const angle=(Math.PI*2/rayCount)*i;
-        const len=r*(1.8+Math.sin(_sunPhase+i*1.3)*0.6);
-        const w=r*0.15;
-        ctx.beginPath();
-        ctx.moveTo(0,0);
-        ctx.lineTo(Math.cos(angle-w)*len,Math.sin(angle-w)*len);
-        ctx.lineTo(Math.cos(angle+w)*len,Math.sin(angle+w)*len);
-        ctx.closePath();
-        const rg=ctx.createRadialGradient(0,0,r*0.3,0,0,len);
-        rg.addColorStop(0,`rgba(${coreR},${coreG},${coreB},${rayA})`);
-        rg.addColorStop(1,`rgba(${coreR},${coreG},${coreB},0)`);
-        ctx.fillStyle=rg;
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-    // 3. 太陽本體——用對應時段的真實照片
-    const idx=Math.min(Math.max(sunIdx||0,0),(FX_IMG.sun.length-1));
-    const sunImg=FX_IMG.sun&&FX_IMG.sun[idx];
-    if(sunImg&&sunImg.complete&&sunImg.naturalWidth>0){
-      ctx.save();
-      ctx.globalAlpha=coreA;
-      // 照片本身已經有色調，不再疊色調濾鏡避免過色
-      const sz=r*2.8;
-      ctx.drawImage(sunImg,x-sz/2,y-sz/2,sz,sz);
-      ctx.restore();
-    } else {
-      // Fallback：原本的漸層圓
-      const g1=ctx.createRadialGradient(x,y,0,x,y,r);
-      g1.addColorStop(0,`rgba(255,255,230,${coreA})`);
-      g1.addColorStop(0.5,`rgba(${coreR},${coreG},${coreB},${coreA*0.7})`);
-      g1.addColorStop(1,`rgba(${coreR},${coreG},${coreB},0)`);
-      ctx.fillStyle=g1;
-      ctx.beginPath();
-      ctx.arc(x,y,r,0,Math.PI*2);
-      ctx.fill();
-    }
-  }
-  
-  function drawAmbient(){
-    const h=new Date().getHours(),m=new Date().getMinutes();
-    const t=h+m/60;
-    
-    if(t>=19||t<5){
-      // Night（19:00 起；19-20 為進入夜間的漸變，20:00 起完整夜色）
-      const intensity=(t>=19&&t<20)? Math.min((t-19)/1,1) : 1;
-      const grd=ctx.createLinearGradient(0,0,0,_h);
-      grd.addColorStop(0,`rgba(5,10,30,${0.65*intensity})`);
-      grd.addColorStop(0.5,`rgba(8,15,38,${0.55*intensity})`);
-      grd.addColorStop(1,`rgba(12,20,45,${0.45*intensity})`);
-      ctx.fillStyle=grd;
-      ctx.fillRect(0,0,_w,_h);
-      // 下雨、豪雨、雷雨時不應仍滿天星；霧雨只保留極淡背景，避免誤以為特效仍是夜空模式。
-      const starWeatherFactor=(mode==="rain"?0.08:(mode==="fog"?0.18:(mode==="none"||mode==="heat"||mode==="cold")?1:0));
-      if(starWeatherFactor>0)stars.forEach(s=>{
-        s.tw+=s.sp;
-        const a=(0.5+Math.sin(s.tw)*0.4)*intensity*starWeatherFactor;
-        ctx.beginPath();
-        ctx.fillStyle=`rgba(255,255,240,${a})`;
-        ctx.arc(s.x*_w,s.y*_h,s.r,0,Math.PI*2);
-        ctx.fill();
-      });
-    } else if(t>=5&&t<7){
-      // Sunrise — sun disc rising with warm sky
-      const p=(t-5)/2;
-      const grd=ctx.createLinearGradient(0,0,0,_h*0.7);
-      grd.addColorStop(0,`rgba(255,120,40,${0.2*p})`);
-      grd.addColorStop(0.4,`rgba(255,160,80,${0.15*p})`);
-      grd.addColorStop(1,"rgba(255,200,150,0)");
-      ctx.fillStyle=grd;
-      ctx.fillRect(0,0,_w,_h*0.7);
-      const sunY=_h*0.22-p*_h*0.06;
-      drawSunDisc(_w*0.8,sunY,25+p*15, 255,150,50, 0.5*p, 0.4*p, 0.15*p, 10, 1);
-      const starA=(1-p)*0.7;
-      if(starA>0.05) stars.forEach(s=>{
-        s.tw+=s.sp;
-        ctx.beginPath();
-        ctx.fillStyle=`rgba(255,255,240,${(0.3+Math.sin(s.tw)*0.2)*starA})`;
-        ctx.arc(s.x*_w,s.y*_h,s.r*0.7,0,Math.PI*2);
-        ctx.fill();
-      });
-    } else if(t>=7&&t<10){
-      // Morning sun（下移避開 header，拉大 alpha 讓可見）
-      const p=(t-7)/3;
-      drawSunDisc(_w*0.75,_h*0.14,22+p*10, 255,200,80, 0.35, 0.25*p, 0.10*p, 8, 0);
-    } else if(t>=10&&t<15){
-      // Midday — overhead sun with rays（下移避開 header、加大、提亮）
-      const p=Math.min((t-10)/2,1);
-      const ep=t>12?Math.max(0,(15-t)/3):p;
-      drawSunDisc(_w*0.5,_h*0.12,24+ep*8, 255,230,100, 0.45*ep, 0.30*ep, 0.12*ep, 12, 0);
-      if(ep>0.3){
-        const fg=ctx.createRadialGradient(_w*0.5,_h*0.12,0,_w*0.5,_h*0.12,_w*0.5);
-        fg.addColorStop(0,`rgba(255,255,200,${0.10*ep})`);
-        fg.addColorStop(1,"rgba(255,255,200,0)");
-        ctx.fillStyle=fg;
-        ctx.fillRect(0,0,_w,_h*0.35);
-      }
-    } else if(t>=15&&t<17){
-      // Afternoon — golden sun moving right（下移避開 header）
-      const p=(t-15)/2;
-      const sunX=_w*(0.6+p*0.2);
-      const sunY=_h*(0.12+p*0.03);
-      drawSunDisc(sunX,sunY,26+p*10, 255,180,50, 0.4+p*0.1, 0.30*p, 0.12*p, 10, 1);
-      const grd=ctx.createRadialGradient(sunX,sunY,0,sunX,sunY,_w*0.5);
-      grd.addColorStop(0,`rgba(255,190,60,${0.12*p})`);
-      grd.addColorStop(1,"rgba(255,200,80,0)");
-      ctx.fillStyle=grd;
-      ctx.fillRect(0,0,_w,_h*0.4);
-    } else if(t>=17&&t<18){
-      // Sunset — large orange-red sun with dramatic rays（下移避開 header）
-      const p=t-17;
-      const grd=ctx.createLinearGradient(0,0,0,_h*0.5);
-      grd.addColorStop(0,`rgba(200,60,20,${0.18+p*0.22})`);
-      grd.addColorStop(0.4,`rgba(160,40,80,${0.10+p*0.15})`);
-      grd.addColorStop(1,"rgba(80,30,100,0)");
-      ctx.fillStyle=grd;
-      ctx.fillRect(0,0,_w,_h*0.5);
-      const sunY=_h*(0.15+p*0.08);
-      drawSunDisc(_w*0.85,sunY,38-p*10, 230,70,20, 0.5*(1-p*0.4), 0.4*(1-p*0.4), 0.18*(1-p*0.3), 14, 2);
-    } else if(t>=18&&t<19){
-      // Afterglow — 餘暉快速消退，為 19 點轉夜做準備
-      const p=t-18;
-      const ag=ctx.createLinearGradient(0,0,0,_h*0.3);
-      ag.addColorStop(0,`rgba(180,60,40,${0.12*(1-p)})`);
-      ag.addColorStop(1,"rgba(100,40,60,0)");
-      ctx.fillStyle=ag;
-      ctx.fillRect(0,0,_w,_h*0.3);
-      // 淺藍夜幕逐漸覆上
-      const grd=ctx.createLinearGradient(0,0,0,_h);
-      grd.addColorStop(0,`rgba(20,30,70,${0.06+p*0.12})`);
-      grd.addColorStop(0.6,`rgba(15,25,60,${0.03+p*0.09})`);
-      grd.addColorStop(1,`rgba(10,20,50,${0.02+p*0.07})`);
-      ctx.fillStyle=grd;
-      ctx.fillRect(0,0,_w,_h);
-      // 星星淡淡出現
-      const starA=p*0.4;
-      if(starA>0.05) stars.forEach(s=>{
-        s.tw+=s.sp;
-        ctx.beginPath();
-        ctx.fillStyle=`rgba(255,255,240,${(0.3+Math.sin(s.tw)*0.25)*starA})`;
-        ctx.arc(s.x*_w,s.y*_h,s.r,0,Math.PI*2);
-        ctx.fill();
-      });
-    }
-  }
-
-  // ═══ WEATHER DRAW FUNCTIONS ═══
-  function drawHeat(){
-    heatPhase+=0.018;
-    for(let i=0;i<8;i++){
-      const yBase=_h-(_h*0.12*i);
-      const amp=4+Math.sin(heatPhase+i)*3;
-      ctx.beginPath();
-      ctx.strokeStyle=`rgba(255,140,0,${0.06-i*0.006})`;
-      ctx.lineWidth=50+i*12;
-      for(let x=0;x<_w;x+=3){
-        const y=yBase+Math.sin(x*0.007+heatPhase+i*0.7)*amp-heatPhase*10%_h;
-        if(x===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-      }
-      ctx.stroke();
-    }
-    const grd=ctx.createRadialGradient(_w*0.85,-20,0,_w*0.85,-20,_w*0.55);
-    grd.addColorStop(0,`rgba(255,200,50,${0.12+Math.sin(heatPhase*0.5)*0.04})`);
-    grd.addColorStop(1,"rgba(255,200,50,0)");
-    ctx.fillStyle=grd;
-    ctx.fillRect(0,0,_w,_h*0.6);
-  }
-  
-  function drawRain(){
-    const topG=ctx.createLinearGradient(0,0,0,_h*0.3);
-    topG.addColorStop(0,mode==="heavy"?"rgba(40,50,70,0.15)":"rgba(60,70,90,0.08)");
-    topG.addColorStop(1,"rgba(60,70,90,0)");
-    ctx.fillStyle=topG;
-    ctx.fillRect(0,0,_w,_h*0.3);
-    
-    const dropImg=FX_IMG.drop;
-    const useImg=dropImg&&dropImg.complete&&dropImg.naturalWidth>0;
-    
-    particles.forEach(p=>{
-      if(p.type!=="rain") return;
-      p.y+=p.speed;
-      p.x+=p.drift;
-      if(p.y>_h){
-        if(Math.random()<0.15) addSplash(p.x);
-        p.y=-p.len-Math.random()*_h*0.3;
-        p.x=Math.random()*_w*1.4-_w*.2;
-      }
-      if(useImg){
-        // 真實雨滴圖：依 p.len (長度) 決定尺寸
-        const dw=Math.max(2,p.width*1.5);
-        const dh=p.len;
-        ctx.save();
-        ctx.globalAlpha=p.alpha;
-        // 圖片中心對準雨滴頭部，旋轉跟著飄移方向
-        const ang=Math.atan2(p.len,p.drift*2.5);
-        ctx.translate(p.x,p.y);
-        ctx.rotate(Math.PI/2-ang);
-        ctx.drawImage(dropImg,-dw/2,0,dw,dh);
-        ctx.restore();
-      }else{
-        // Fallback: 線條雨滴
-        ctx.beginPath();
-        ctx.strokeStyle=`rgba(180,200,230,${p.alpha})`;
-        ctx.lineWidth=p.width;
-        ctx.moveTo(p.x,p.y);
-        ctx.lineTo(p.x+p.drift*2.5,p.y+p.len);
-        ctx.stroke();
-      }
-    });
-    drawSplashes();
-  }
-  
-  function drawSplashes(){
-    for(let i=splashes.length-1;i>=0;i--){
-      const s=splashes[i];
-      s.x+=s.vx;s.y+=s.vy;s.vy+=0.15;s.life-=0.06;
-      if(s.life<=0){splashes.splice(i,1);continue}
-      ctx.beginPath();
-      ctx.fillStyle=`rgba(180,200,230,${s.life*0.5})`;
-      ctx.arc(s.x,s.y,1.5*s.life,0,Math.PI*2);
-      ctx.fill();
-    }
-  }
-  
-  function drawStorm(){
-    const topG=ctx.createLinearGradient(0,0,0,_h*0.5);
-    topG.addColorStop(0,"rgba(20,25,40,0.2)");
-    topG.addColorStop(1,"rgba(20,25,40,0)");
-    ctx.fillStyle=topG;
-    ctx.fillRect(0,0,_w,_h*0.5);
-    drawRain();
-    drawLightning();
-  }
-  
-  // 當前閃電圖的位置與狀態（觸發一次後殘留數幀）
-  let lightningImg=null,lightningX=0,lightningW=0,lightningH=0;
-  function drawLightning(){
-    lightningTimer--;
-    if(lightningTimer<=0){
-      lightningAlpha=0.6+Math.random()*0.3;
-      if(typeof WxSfx!=='undefined') WxSfx.triggerThunder();
-      lightningTimer=mode==="typhoon"?60+Math.random()*150:100+Math.random()*250;
-      // 隨機挑一張閃電圖並設定位置
-      const idx=Math.floor(Math.random()*FX_IMG.bolt.length);
-      lightningImg=FX_IMG.bolt[idx]||null;
-      lightningH=_h*(.6+Math.random()*.3);// 閃電高度約畫面 60-90%
-      lightningW=lightningH*0.5;// 閃電圖本身是 512x1024 比例 0.5
-      lightningX=_w*0.15+Math.random()*_w*0.7-lightningW/2;
-    }
-    if(lightningAlpha>0){
-      // 先畫背景閃光
-      ctx.fillStyle=`rgba(220,230,255,${lightningAlpha*.5})`;
-      ctx.fillRect(0,0,_w,_h);
-      // 再畫閃電本體
-      if(lightningImg&&lightningImg.complete&&lightningImg.naturalWidth>0){
-        ctx.save();
-        ctx.globalAlpha=Math.min(1,lightningAlpha*1.8);
-        ctx.drawImage(lightningImg,lightningX,0,lightningW,lightningH);
-        ctx.restore();
-      }else{
-        // Fallback: 用 path 畫鋸齒
-        ctx.save();
-        ctx.strokeStyle=`rgba(220,230,255,${lightningAlpha*1.5})`;
-        ctx.lineWidth=2.5;
-        ctx.beginPath();
-        let lx=lightningX+lightningW/2,ly=0;
-        ctx.moveTo(lx,ly);
-        for(let seg=0;seg<8;seg++){
-          lx+=(Math.random()-0.5)*60;
-          ly+=lightningH/8;
-          ctx.lineTo(lx,ly);
-        }
-        ctx.stroke();
-        ctx.restore();
-      }
-      lightningAlpha*=0.85;
-      if(lightningAlpha<0.02)lightningAlpha=0;
-    }
-  }
-  
-  function drawWind(){
-    // Wind streaks
-    particles.forEach(p=>{
-      if(p.type!=="wind") return;
-      p.x+=p.speed;
-      p.y+=Math.sin(p.x*0.01)*0.5;
-      if(p.x>_w+p.len){p.x=-p.len-Math.random()*100;p.y=Math.random()*_h}
-      ctx.beginPath();
-      ctx.strokeStyle=`rgba(180,200,220,${p.alpha})`;
-      ctx.lineWidth=p.width;
-      ctx.moveTo(p.x,p.y);
-      ctx.lineTo(p.x+p.len,p.y+Math.sin(p.x*0.02)*3);
-      ctx.stroke();
-    });
-    drawDebris();
-  }
-  
-  function drawDebris(){
-    debris.forEach(d=>{
-      d.x+=d.speed;
-      d.wobble+=d.wobbleSpeed;
-      d.y+=d.vy+Math.sin(d.wobble)*2;
-      d.rot+=d.rotSpeed;
-      if(d.x>_w+30){d.x=-30-Math.random()*100;d.y=Math.random()*_h}
-      if(d.y<-20||d.y>_h+20){d.y=Math.random()*_h;d.x=-30}
-      const dimg=FX_IMG.debris_img[d.imgIdx||0];
-      const sz=d.size||18;
-      if(dimg&&dimg.complete&&dimg.naturalWidth>0){
-        ctx.save();
-        ctx.translate(d.x,d.y);
-        ctx.rotate(d.rot);
-        ctx.globalAlpha=d.alpha;
-        ctx.drawImage(dimg,-sz/2,-sz/2,sz,sz);
-        ctx.restore();
-      }else{
-        // Fallback: 程序化葉/點/線
-        ctx.save();
-        ctx.translate(d.x,d.y);
-        ctx.rotate(d.rot);
-        ctx.globalAlpha=d.alpha;
-        if(d.shape==="leaf"){
-          ctx.beginPath();
-          ctx.fillStyle="rgba(80,120,60,0.7)";
-          ctx.ellipse(0,0,d.r*1.5,d.r*0.7,0,0,Math.PI*2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.strokeStyle="rgba(60,90,40,0.5)";
-          ctx.lineWidth=0.5;
-          ctx.moveTo(-d.r,0);ctx.lineTo(d.r,0);
-          ctx.stroke();
-        } else if(d.shape==="dot"){
-          ctx.beginPath();
-          ctx.fillStyle="rgba(140,120,90,0.6)";
-          ctx.arc(0,0,d.r*0.6,0,Math.PI*2);
-          ctx.fill();
-        } else {
-          ctx.beginPath();
-          ctx.strokeStyle="rgba(120,110,80,0.5)";
-          ctx.lineWidth=1;
-          ctx.moveTo(-d.r,0);ctx.lineTo(d.r,0);
-          ctx.stroke();
-        }
-        ctx.globalAlpha=1;
-        ctx.restore();
-      }
-    });
-  }
-  
-  function drawTyphoon(){
-    // Dark heavy overlay
-    const topG=ctx.createLinearGradient(0,0,0,_h*0.6);
-    topG.addColorStop(0,"rgba(15,15,30,0.3)");
-    topG.addColorStop(1,"rgba(15,15,30,0)");
-    ctx.fillStyle=topG;
-    ctx.fillRect(0,0,_w,_h*0.6);
-    
-    // Horizontal rain
-    particles.forEach(p=>{
-      if(p.type!=="rain") return;
-      p.y+=p.speed*0.6;
-      p.x+=p.drift+8;
-      if(p.y>_h||p.x>_w+20){
-        if(Math.random()<0.1) addSplash(p.x);
-        p.y=Math.random()*_h;
-        p.x=-p.len-Math.random()*_w*0.3;
-      }
-      ctx.beginPath();
-      ctx.strokeStyle=`rgba(180,200,230,${p.alpha})`;
-      ctx.lineWidth=p.width;
-      ctx.moveTo(p.x,p.y);
-      ctx.lineTo(p.x+p.len*0.7,p.y+p.len*0.3);
-      ctx.stroke();
-    });
-    drawSplashes();
-    
-    // Wind streaks
-    particles.forEach(p=>{
-      if(p.type!=="wind") return;
-      p.x+=p.speed*1.5;
-      p.y+=Math.sin(p.x*0.008)*1.5;
-      if(p.x>_w+p.len){p.x=-p.len-Math.random()*200;p.y=Math.random()*_h}
-      ctx.beginPath();
-      ctx.strokeStyle=`rgba(160,180,210,${p.alpha*1.5})`;
-      ctx.lineWidth=p.width*1.5;
-      ctx.moveTo(p.x,p.y);
-      ctx.lineTo(p.x+p.len*1.3,p.y+Math.sin(p.x*0.015)*5);
-      ctx.stroke();
-    });
-    drawDebris();
-    drawLightning();
-    
-    // Screen shake via subtle oscillation
-    heatPhase+=0.08;
-    const shake=Math.sin(heatPhase)*0.5;
-    canvas.style.transform=`translate(${shake}px,${shake*0.3}px)`;
-  }
-  
-  function drawSnow(){
-    const topG=ctx.createLinearGradient(0,0,0,_h*0.25);
-    topG.addColorStop(0,"rgba(220,230,245,0.08)");
-    topG.addColorStop(1,"rgba(220,230,245,0)");
-    ctx.fillStyle=topG;
-    ctx.fillRect(0,0,_w,_h*0.25);
-    particles.forEach(p=>{
-      p.y+=p.speed;
-      p.wobble+=0.02;
-      p.x+=Math.sin(p.wobble)*p.drift+0.15;
-      if(p.y>_h+10){p.y=-10;p.x=Math.random()*_w}
-      ctx.beginPath();
-      ctx.fillStyle=`rgba(255,255,255,${p.alpha})`;
-      ctx.shadowColor="rgba(255,255,255,0.5)";
-      ctx.shadowBlur=p.r*2;
-      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-      ctx.fill();
-    });
-    ctx.shadowBlur=0;
-  }
-  
-  function drawFog(){
-    particles.forEach(p=>{
-      p.x+=p.speed*p.dir;
-      if(p.x>_w+p.w)p.x=-p.w;
-      if(p.x<-p.w)p.x=_w;
-      const grd=ctx.createRadialGradient(p.x+p.w/2,p.y,0,p.x+p.w/2,p.y,p.w/2);
-      grd.addColorStop(0,`rgba(200,210,220,${p.alpha})`);
-      grd.addColorStop(1,"rgba(200,210,220,0)");
-      ctx.fillStyle=grd;
-      ctx.fillRect(p.x,p.y-p.h,p.w,p.h*2);
-    });
-    const gf=ctx.createLinearGradient(0,_h*0.7,0,_h);
-    gf.addColorStop(0,"rgba(200,210,220,0)");
-    gf.addColorStop(1,"rgba(200,210,220,0.1)");
-    ctx.fillStyle=gf;
-    ctx.fillRect(0,_h*0.7,_w,_h*0.3);
-  }
-  
-  function drawCold(){
-    // Icy blue overlay at edges
-    const edgeG=ctx.createRadialGradient(_w/2,_h/2,_h*0.3,_w/2,_h/2,_h*0.8);
-    edgeG.addColorStop(0,"rgba(180,210,240,0)");
-    edgeG.addColorStop(1,"rgba(160,195,230,0.08)");
-    ctx.fillStyle=edgeG;
-    ctx.fillRect(0,0,_w,_h);
-
-    // Draw frost crystals
-    particles.forEach(p=>{
-      if(p.type==="frost"){
-        if(p.alpha<p.maxAlpha) p.alpha+=p.growSpeed;
-        const fimg=FX_IMG.frost_img[p.imgIdx||0];
-        const sz=p.size||40;
-        if(fimg&&fimg.complete&&fimg.naturalWidth>0){
-          ctx.save();
-          ctx.translate(p.x,p.y);
-          ctx.rotate(p.rot);
-          ctx.globalAlpha=p.alpha;
-          ctx.drawImage(fimg,-sz/2,-sz/2,sz,sz);
-          ctx.restore();
-        }else{
-          // Fallback: 程序化雪花
-          ctx.save();
-          ctx.translate(p.x,p.y);
-          ctx.rotate(p.rot);
-          ctx.strokeStyle=`rgba(200,225,255,${p.alpha})`;
-          ctx.lineWidth=1;
-          for(let b=0;b<p.branches;b++){
-            const angle=(Math.PI*2/p.branches)*b;
-            const len=p.r;
-            const ex=Math.cos(angle)*len, ey=Math.sin(angle)*len;
-            ctx.beginPath();
-            ctx.moveTo(0,0);
-            ctx.lineTo(ex,ey);
-            ctx.stroke();
-            const mid=0.6;
-            const mx=Math.cos(angle)*len*mid, my=Math.sin(angle)*len*mid;
-            ctx.beginPath();
-            ctx.moveTo(mx,my);
-            ctx.lineTo(mx+Math.cos(angle+0.5)*len*0.3,my+Math.sin(angle+0.5)*len*0.3);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(mx,my);
-            ctx.lineTo(mx+Math.cos(angle-0.5)*len*0.3,my+Math.sin(angle-0.5)*len*0.3);
-            ctx.stroke();
-          }
-          ctx.fillStyle=`rgba(220,240,255,${p.alpha*0.8})`;
-          ctx.beginPath();
-          ctx.arc(0,0,1.5,0,Math.PI*2);
-          ctx.fill();
-          ctx.restore();
-        }
-      }
-      if(p.type==="breath"){
-        p.y+=p.speed;
-        p.x+=p.drift;
-        p.r+=0.03;
-        if(p.growing){
-          p.alpha+=0.0008;
-          if(p.alpha>=p.maxAlpha){p.growing=false}
-        }else{
-          p.alpha-=0.0005;
-        }
-        if(p.alpha<=0){
-          // Reset breath puff
-          p.x=_w*0.2+Math.random()*_w*0.6;
-          p.y=_h*0.5+Math.random()*_h*0.4;
-          p.r=15+Math.random()*25;
-          p.alpha=0;p.growing=true;
-          p.drift=Math.random()*0.4-0.2;
-        }
-        const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
-        g.addColorStop(0,`rgba(210,225,245,${p.alpha})`);
-        g.addColorStop(1,"rgba(210,225,245,0)");
-        ctx.fillStyle=g;
-        ctx.fillRect(p.x-p.r,p.y-p.r,p.r*2,p.r*2);
-      }
-    });
-
-    // Bottom frost gradient
-    const bfG=ctx.createLinearGradient(0,_h*0.85,0,_h);
-    bfG.addColorStop(0,"rgba(200,220,245,0)");
-    bfG.addColorStop(1,"rgba(200,220,245,0.06)");
-    ctx.fillStyle=bfG;
-    ctx.fillRect(0,_h*0.85,_w,_h*0.15);
-  }
-
-  // ═══ MAIN LOOP ═══
-  // 視覺引擎與音效引擎統一使用頁面層的設定判定，避免各 IIFE 各自維護造成作用域或邏輯分歧。
-  function fxEnabled(kind){
-    try{
-      if(typeof isFxEnabled==='function') return isFxEnabled(kind);
-      if(window&&typeof window.isFxEnabled==='function') return window.isFxEnabled(kind);
-    }catch(e){}
-    return true;
-  }
-  function anyVisualEnabled(){
-    return fxEnabled('weather')||fxEnabled('animals')||fxEnabled('seasonal');
-  }
-
-  function loop(){
-    raf=requestAnimationFrame(loop);
-    if(!anyVisualEnabled()){
-      ctx.clearRect(0,0,_w,_h);
-      return;
-    }
-    ctx.clearRect(0,0,_w,_h);
-    if(mode!=="typhoon") canvas.style.transform="";
-    
-    // Ambient: 太陽/夜色/星星（白天晚上都要畫）
-    drawAmbient();
-    // Weather overlay
-    if(mode==="heat") drawHeat();
-    else if(mode==="rain"||mode==="heavy") drawRain();
-    else if(mode==="storm") drawStorm();
-    else if(mode==="snow") drawSnow();
-    else if(mode==="fog") drawFog();
-    else if(mode==="wind") drawWind();
-    else if(mode==="typhoon") drawTyphoon();
-    else if(mode==="cold") drawCold();
-    // Seasonal overlay (always runs)
-    drawSeason();
-  }
-  
-  function update(code,temp,prec,wind){
-    init();
-    wxCode=code||0;wxTemp=temp||0;wxWind=wind||0;
-    if(!fxEnabled('weather')){setMode("none");return}
-    if(code===null||code===undefined){setMode("none");return}
-    // Typhoon: storm codes + extreme wind
-    if((code===95||code===96||code===99)&&wind>=50){setMode("typhoon");return}
-    // Storm
-    if(code===95||code===96||code===99){setMode("storm");return}
-    // Heavy rain
-    if([55,65,67,82].includes(code)){setMode("heavy");return}
-    // Rain
-    if([51,53,56,61,63,66,80,81].includes(code)){setMode("rain");return}
-    // Snow / sleet
-    if([71,73,75,77,85,86].includes(code)){setMode("snow");return}
-    // 高降雨機率代表目前小時已有雨勢證據；即使 current code 暫時仍是多雲/霧，也先顯示雨。
-    if(prec>=40){setMode(prec>=85?"heavy":"rain");return}
-    // Fog
-    if(code===45||code===48){setMode("fog");return}
-    // Strong wind (no rain)
-    if(wind>=35){setMode("wind");return}
-    // Precip probability fallback
-    if(prec>=40&&code<=3){setMode("rain");return}
-    // Heat shimmer
-    if((code===0||code===1)&&temp>=32){setMode("heat");return}
-    // Cold wave (clear/cloudy but very cold)
-    if(code<=3&&temp<=10){setMode("cold");return}
-    // No weather effect, but ambient still runs
-    setMode("none");
-  }
-  
-
-  // ═══ SEASONAL EFFECTS (weather-aware) ═══
-  let seasonParts=[],curSeason="",curTimeSlot="",seasonTimer=0,burstTimer=0;
-
-  function getTimeSlot(){
-    const h=new Date().getHours();
-    if(h>=6&&h<10) return 'morning';
-    if(h>=10&&h<16) return 'day';
-    if(h>=16&&h<19) return 'dusk';
-    return 'night';
-  }
-  // Harsh: suppress ALL seasonal (storm, typhoon, heavy rain, snow)
-  function isHarsh(){return mode==='storm'||mode==='typhoon'||mode==='heavy'||mode==='snow'}
-  // Moderate: suppress flying creatures but keep falling particles (rain, fog, strong wind)
-  function isModerate(){return mode==='rain'||mode==='fog'||mode==='wind'}
-  // Any bad: no creatures
-  function noCreatures(){return !fxEnabled('animals')||isHarsh()||isModerate()}
-  // Should show clouds
-  function showClouds(){return fxEnabled('seasonal')&&(mode==='rain'||mode==='heavy'||mode==='storm'||mode==='fog'||mode==='typhoon'||mode==='wind'||wxCode>=3)}
-
-  // ── Particle makers ──
-  function mkBlossom(){
-    const pinks=[[255,183,197],[255,210,225],[248,187,208],[255,160,185],[252,228,236]];
-    const c=pinks[Math.floor(Math.random()*pinks.length)];
-    return{type:"blossom",x:Math.random()*_w*1.3-_w*.15,y:-10-Math.random()*_h*.3,
-      r:3+Math.random()*5,speed:.3+Math.random()*.8,drift:.2+Math.random()*.6,
-      wobble:Math.random()*Math.PI*2,ws:.01+Math.random()*.02,
-      rot:Math.random()*Math.PI*2,rs:.008+Math.random()*.025,
-      alpha:.55+Math.random()*.3,c,petals:4+Math.floor(Math.random()*2),
-      size:14+Math.random()*16,imgIdx:Math.floor(Math.random()*6)}
-  }
-  function mkFlower(){
-    const cols=[[255,200,220],[255,180,200],[240,230,140],[200,220,255],[255,220,180]];
-    const c=cols[Math.floor(Math.random()*cols.length)];
-    return{type:"flower",x:Math.random()*_w,y:_h-10-Math.random()*40,
-      r:4+Math.random()*4,alpha:0,maxA:.7+Math.random()*.2,growing:true,
-      life:250+Math.random()*350,c,petals:5+Math.floor(Math.random()*2),
-      size:22+Math.random()*18,imgIdx:Math.floor(Math.random()*4)}
-  }
-  function mkFirefly(){
-    const isDark=document.documentElement.getAttribute('data-theme')==='dark';
-    return{type:"ffly",x:Math.random()*_w,y:_h*.15+Math.random()*_h*.7,
-      speed:.15+Math.random()*.35,angle:Math.random()*Math.PI*2,
-      turn:.008+Math.random()*.025,pulse:Math.random()*Math.PI*2,
-      ps:.015+Math.random()*.035,r:2+Math.random()*2.5,
-      maxA:isDark?(.75+Math.random()*.25):(.35+Math.random()*.5),
-      imgIdx:Math.floor(Math.random()*4),
-      size:isDark?(20+Math.random()*14):(14+Math.random()*10)}
-  }
-  function mkLeaf(){
-    const imgIdx=Math.floor(Math.random()*4);// 4 張楓葉隨機挑
-    return{type:"leaf",x:Math.random()*_w*1.3-_w*.15,y:-15-Math.random()*_h*.3,
-      size:18+Math.random()*24,// 真實照片需要更大尺寸，18-42px
-      speed:.5+Math.random()*1,drift:.6+Math.random()*1.2,
-      wobble:Math.random()*Math.PI*2,ws:.01+Math.random()*.015,
-      rot:Math.random()*Math.PI*2,rs:.012+Math.random()*.035,
-      alpha:.75+Math.random()*.2,imgIdx}
-  }
-  function mkFrostSpark(){
-    return{type:"fspark",x:Math.random()*_w,y:Math.random()*_h,
-      r:1+Math.random()*1.5,pulse:Math.random()*Math.PI*2,
-      ps:.006+Math.random()*.012,maxA:.12+Math.random()*.2}
-  }
-  function mkMist(){
-    return{type:"mist",x:Math.random()*_w*1.5-_w*.25,y:_h*.55+Math.random()*_h*.4,
-      w:200+Math.random()*300,h:40+Math.random()*60,
-      speed:.08+Math.random()*.15,alpha:.015+Math.random()*.015,
-      dir:Math.random()>.5?1:-1}
-  }
-  function mkCloud(){
-    const w=200+Math.random()*240;
-    return{type:"cloud",x:-w-Math.random()*200,y:Math.random()*_h*.2,
-      w:w,h:w*0.5,// 寬:高 2:1 符合雲照片比例
-      speed:.15+Math.random()*.25,alpha:.2+Math.random()*.15,
-      imgIdx:Math.floor(Math.random()*3)}
-  }
-  function mkDragonfly(){
-    // state: flying（飛行）/ perched（停棲）/ leaving（離開中）
-    return{type:"dfly",x:Math.random()*_w,y:_h*.1+Math.random()*_h*.3,
-      speed:1.5+Math.random()*2,angle:Math.random()*Math.PI*2,
-      turn:.03+Math.random()*.03,wingPhase:Math.random()*Math.PI*2,
-      alpha:.6+Math.random()*.25,r:5+Math.random()*3,
-      size:30+Math.random()*20,imgIdx:Math.floor(Math.random()*6),
-      state:"flying",
-      // 飛行計時器：隨機 600-1500 幀後想找葉子停
-      flyTimer:600+Math.floor(Math.random()*900),
-      perchTimer:0,perchLeafIdx:-1}
-  }
-  function mkButterfly(){
-    // 三種蝴蝶隨機挑選：鳳蝶(黃黑)、紫斑蝶(深紫)、君主斑蝶(橘黑)
-    const kinds=["swallowtail","purple","monarch"];
-    const kind=kinds[Math.floor(Math.random()*kinds.length)];
-    const size=36+Math.random()*24;
-    return{type:"bfly",kind,x:Math.random()*_w,y:_h*.15+Math.random()*_h*.5,
-      speed:.5+Math.random()*.8,angle:Math.random()*Math.PI*2,
-      turn:.015+Math.random()*.02,
-      frame:Math.floor(Math.random()*6),
-      frameTimer:0,
-      frameInterval:3+Math.floor(Math.random()*2),
-      size,alpha:.85+Math.random()*.15,
-      state:"flying",
-      // 蝴蝶停得比較少，900-2400 幀才想停
-      flyTimer:900+Math.floor(Math.random()*1500),
-      perchTimer:0,perchLeafIdx:-1}
-  }
-  // 樹葉（蜻蜓、蝴蝶停棲用）固定位置不移動
-  function mkPerchLeaf(){
-    return{type:"pleaf",
-      x:_w*(.15+Math.random()*.7),
-      y:_h*(.65+Math.random()*.23), // 畫面下方，跟荷葉同一區帶
-      size:40+Math.random()*20,
-      rot:(Math.random()-.5)*.5,
-      imgIdx:Math.floor(Math.random()*3),
-      alpha:.85+Math.random()*.1,
-      // 永久停棲點，不會被移除
-      permanent:true}
-  }
-  // 荷葉（青蛙坐的位置）固定在畫面下半部
-  let _lpadIdCounter=0;
-  function mkLilypad(){
-    return{type:"lpad",
-      padId:++_lpadIdCounter, // 獨立 ID，不受 array index 影響
-      x:_w*(.1+Math.random()*.8),
-      y:_h*(.7+Math.random()*.2), // 底部水面
-      size:65+Math.random()*20, // 65-85 適中（太大搶戲、太小青蛙擺不上）
-      rot:(Math.random()-.5)*.3,
-      alpha:.88+Math.random()*.08,
-      permanent:true}
-  }
-  // 青蛙：坐在荷葉上，偶爾跳、偶爾伸舌頭吃蟲（夜晚螢火蟲/白天蜻蜓）
-  function mkFrog(padId){
-    return{type:"frog",
-      padId,
-      x:0,y:0,
-      size:45+Math.random()*10,
-      imgIdx:0,
-      state:"sitting",
-      blinkTimer:120+Math.floor(Math.random()*180),
-      jumpTimer:400+Math.floor(Math.random()*1200),
-      huntTimer:180+Math.floor(Math.random()*240),
-      tongueProgress:0,
-      tongueFromX:0,tongueFromY:0,tongueToX:0,tongueToY:0,
-      preyRef:null,
-      jumpProgress:0,jumpFromX:0,jumpFromY:0,jumpToX:0,jumpToY:0,
-      facing:1,
-      alpha:.95,
-      permanent:true}
-  }
-  // 畫青蛙舌頭（全域座標）
-  function drawFrogTongue(p){
-    if(p.state!=='catching'&&p.state!=='retracting') return;
-    const t=Math.max(0,Math.min(1,p.tongueProgress));
-    if(t<=0.01) return;
-    const fx=p.tongueFromX,fy=p.tongueFromY;
-    const tx=p.tongueToX,ty=p.tongueToY;
-    const cx=fx+(tx-fx)*t,cy=fy+(ty-fy)*t;
-    ctx.save();
-    ctx.strokeStyle='rgba(230,85,120,0.92)';
-    ctx.lineWidth=2.2;
-    ctx.lineCap='round';
-    ctx.beginPath();
-    ctx.moveTo(fx,fy);
-    ctx.lineTo(cx,cy);
-    ctx.stroke();
-    ctx.fillStyle='rgba(245,120,150,0.95)';
-    ctx.beginPath();
-    ctx.arc(cx,cy,2.8,0,Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-    if(p.state==='retracting'&&p.preyRef){
-      p.preyRef.x=cx;p.preyRef.y=cy;
-    }
-  }
-
-  // ── Seeding ──
-  function seedSeason(s,ts){
-    seasonParts=[];curSeason=s;curTimeSlot=ts;
-    const seasonalOn=fxEnabled('seasonal');
-    const animalsOn=fxEnabled('animals');
-    // Clouds for overcast
-    if(showClouds()) for(let i=0;i<4+Math.floor(Math.random()*3);i++) seasonParts.push(mkCloud());
-    if(isHarsh()) return; // Storm/typhoon: no seasonal visuals at all
-    const noc=noCreatures(); // Rain/fog/wind: no flying creatures
-
-    if(s==='spring'){
-      // Blossoms always
-      if(seasonalOn) for(let i=0;i<12+Math.floor(Math.random()*8);i++) seasonParts.push(mkBlossom());
-      // Flowers at bottom
-      if(seasonalOn) for(let i=0;i<5+Math.floor(Math.random()*4);i++) seasonParts.push(mkFlower());
-      // 春天白天：2-3 片停棲葉給蝴蝶停
-      if(animalsOn&&!noc&&(ts==='morning'||ts==='day'||ts==='dusk')){
-        if(seasonalOn) for(let i=0;i<2+Math.floor(Math.random()*2);i++) seasonParts.push(mkPerchLeaf());
-        // 白天至少 1 隻蝴蝶，最多 3 隻
-        seasonParts.push(mkButterfly());
-        if(Math.random()>.4) seasonParts.push(mkButterfly());
-        if(Math.random()>.7) seasonParts.push(mkButterfly());
-      }
-      // 春夜加入荷葉+青蛙（青蛙雨天也要坐著，只有 harsh 天氣才移除）
-      if(animalsOn&&ts==='night'&&!isHarsh()){
-        if(!noc) for(let i=0;i<4+Math.floor(Math.random()*4);i++) seasonParts.push(mkFirefly());
-        // 2 片荷葉 + 1 隻青蛙
-        const lilies=[];
-        if(seasonalOn){
-          for(let i=0;i<2;i++){const lp=mkLilypad();seasonParts.push(lp);lilies.push(lp)}
-        }
-        if(lilies.length>0) seasonParts.push(mkFrog(lilies[0].padId));
-      }
-    } else if(s==='summer'){
-      if(!noc&&(ts==='day'||ts==='morning')){
-        // 2-3 片停棲葉給蜻蜓停
-        for(let i=0;i<2+Math.floor(Math.random()*2);i++) seasonParts.push(mkPerchLeaf());
-        if(Math.random()>.4) seasonParts.push(mkDragonfly());
-        if(Math.random()>.7) seasonParts.push(mkDragonfly());
-      } else if(!isHarsh()&&(ts==='night'||ts==='dusk')){
-        if(!noc) for(let i=0;i<8+Math.floor(Math.random()*8);i++) seasonParts.push(mkFirefly());
-        // 夏夜 2-3 片荷葉 + 1-2 隻青蛙
-        const numLily=2+Math.floor(Math.random()*2);
-        const lilies=[];
-        for(let i=0;i<numLily;i++){const lp=mkLilypad();seasonParts.push(lp);lilies.push(lp)}
-        if(lilies.length>0){
-          seasonParts.push(mkFrog(lilies[0].padId));
-          if(Math.random()>.5&&lilies.length>1){
-            seasonParts.push(mkFrog(lilies[1].padId));
-          }
-        }
-      }
-    } else if(s==='autumn'){
-      if(seasonalOn) for(let i=0;i<8+Math.floor(Math.random()*6);i++) seasonParts.push(mkLeaf());
-      if(seasonalOn) for(let i=0;i<2+Math.floor(Math.random()*2);i++) seasonParts.push(mkMist());
-    } else if(s==='winter'){
-      if(seasonalOn) for(let i=0;i<20+Math.floor(Math.random()*15);i++) seasonParts.push(mkFrostSpark());
-      if(seasonalOn) for(let i=0;i<3+Math.floor(Math.random()*2);i++) seasonParts.push(mkMist());
-    }
-  }
-
-  // ── Drawing ──
-  let lastMode="none";
-  function drawSeason(){
-    const s=getSeason(),ts=getTimeSlot();
-    const seasonalOn=fxEnabled('seasonal');
-    const animalsOn=fxEnabled('animals');
-    seasonTimer++;
-    // Force re-seed immediately when weather mode changes
-    const modeChanged=(mode!==lastMode);lastMode=mode;
-    if(s!==curSeason||ts!==curTimeSlot||modeChanged||seasonTimer>1500){seedSeason(s,ts);seasonTimer=0}
-    // Purge creatures immediately during bad weather (in case any survived)
-    if(isHarsh()){
-      // Harsh 天氣：清除所有生物（含青蛙、荷葉）
-      seasonParts=seasonParts.filter(p=>p.type!=='bfly'&&p.type!=='dfly'&&p.type!=='ffly'&&p.type!=='frog'&&p.type!=='lpad'&&p.type!=='pleaf');
-    } else if(noCreatures()){
-      // Moderate 天氣（雨、霧、風）：只清除飛行生物，青蛙+荷葉保留
-      seasonParts=seasonParts.filter(p=>p.type!=='bfly'&&p.type!=='dfly'&&p.type!=='ffly'&&p.type!=='pleaf');
-    }
-    if(!animalsOn){
-      seasonParts=seasonParts.filter(p=>!['bfly','dfly','ffly','frog'].includes(p.type));
-    }
-    if(!seasonalOn){
-      seasonParts=seasonParts.filter(p=>!['cloud','blossom','flower','leaf','fspark','mist','pleaf','lpad'].includes(p.type));
-    }
-
-    // Random bursts
-    burstTimer--;
-    if(burstTimer<=0&&!isHarsh()){
-      burstTimer=250+Math.floor(Math.random()*500);
-      if(s==='spring'){
-        if(seasonalOn) for(let i=0;i<3+Math.floor(Math.random()*5);i++) seasonParts.push(mkBlossom());
-        if(animalsOn&&!noCreatures()&&(ts==='day'||ts==='morning')&&Math.random()>.6) seasonParts.push(mkButterfly());
-        if(seasonalOn&&Math.random()>.5) seasonParts.push(mkFlower());
-      } else if(s==='summer'&&animalsOn&&!noCreatures()&&(ts==='night'||ts==='dusk')){
-        for(let i=0;i<2+Math.floor(Math.random()*4);i++) seasonParts.push(mkFirefly());
-      } else if(s==='autumn'&&seasonalOn){
-        for(let i=0;i<2+Math.floor(Math.random()*5);i++) seasonParts.push(mkLeaf());
-      }
-    }
-    // Cloud bursts for weather
-    if(seasonalOn&&showClouds()&&burstTimer%200===0&&seasonParts.filter(p=>p.type==='cloud').length<8){
-      seasonParts.push(mkCloud());
-    }
-
-    // Season tints (only when calm)
-    if(!isHarsh()){
-      if(s==='autumn'){
-        const g=ctx.createLinearGradient(0,0,0,_h*.4);
-        g.addColorStop(0,"rgba(180,100,30,0.025)");g.addColorStop(1,"rgba(180,100,30,0)");
-        ctx.fillStyle=g;ctx.fillRect(0,0,_w,_h*.4);
-      }
-      if(s==='winter'){
-        const g=ctx.createRadialGradient(_w/2,_h/2,_h*.3,_w/2,_h/2,_h*.75);
-        g.addColorStop(0,"rgba(180,210,240,0)");g.addColorStop(1,"rgba(180,210,240,0.035)");
-        ctx.fillStyle=g;ctx.fillRect(0,0,_w,_h);
-      }
-    }
-
-    // Draw particles（frog 延後畫，避免被 lpad 等蓋住）
-    // 排序：飛行生物（蝴蝶/蜻蜓/螢火蟲）移到陣列前端，反向迭代時最後畫 → 在 pleaf/lpad 之上
-    const _zOrder={bfly:0,dfly:0,ffly:0,frog:1,lpad:2,pleaf:2};
-    seasonParts.sort((a,b)=>(_zOrder[a.type]??9)-(_zOrder[b.type]??9));
-    for(let i=seasonParts.length-1;i>=0;i--){
-      const p=seasonParts[i];
-      if(p.type==='frog') continue; // 青蛙最後統一處理
-
-      if(p.type==='cloud'){
-        p.x+=p.speed;
-        if(p.x>_w+p.w){p.x=-p.w-Math.random()*100;p.y=Math.random()*_h*.2}
-        // 選一張雲的照片 (p.imgIdx 在 mkCloud 時隨機分配)
-        const cimg=FX_IMG.cloud[p.imgIdx||0];
-        if(cimg&&cimg.complete&&cimg.naturalWidth>0){
-          ctx.save();
-          ctx.globalAlpha=p.alpha*3;// 雲照片本身是真實的，alpha 設定要更明顯
-          ctx.drawImage(cimg,p.x,p.y,p.w,p.h);
-          ctx.restore();
-        }else{
-          // Fallback: 圓圈雲
-          ctx.fillStyle=`rgba(160,170,185,${p.alpha})`;
-          const cx=p.x+p.w/2,cy=p.y+p.h/2;
-          for(let j=0;j<5;j++){
-            const ox=(j-2)*p.w*.18,oy=Math.sin(j*1.2)*p.h*.2;
-            const rr=p.w*.15+Math.sin(j*2)*p.w*.05;
-            ctx.beginPath();ctx.arc(cx+ox,cy+oy,rr,0,Math.PI*2);ctx.fill();
-          }
-        }
-      }
-      else if(p.type==='blossom'){
-        p.y+=p.speed;p.x+=p.drift;p.wobble+=p.ws;p.rot+=p.rs;
-        p.x+=Math.sin(p.wobble)*.7;
-        if(p.y>_h+20){seasonParts.splice(i,1);continue}
-        const bimg=FX_IMG.blossom[p.imgIdx||0];
-        const sz=p.size||20;
-        if(bimg&&bimg.complete&&bimg.naturalWidth>0){
-          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-          ctx.globalAlpha=p.alpha;
-          ctx.drawImage(bimg,-sz/2,-sz/2,sz,sz);
-          ctx.restore();
-        }else{
-          // Fallback: 程序化花瓣
-          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-          for(let j=0;j<p.petals;j++){
-            const a=(Math.PI*2/p.petals)*j;
-            ctx.beginPath();
-            ctx.ellipse(Math.cos(a)*p.r*.4,Math.sin(a)*p.r*.4,p.r,p.r*.5,a,0,Math.PI*2);
-            ctx.fillStyle=`rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.alpha})`;
-            ctx.fill();
-          }
-          ctx.beginPath();ctx.arc(0,0,p.r*.25,0,Math.PI*2);
-          ctx.fillStyle=`rgba(255,230,180,${p.alpha})`;ctx.fill();
-          ctx.restore();
-        }
-      }
-      else if(p.type==='flower'){
-        p.life--;
-        if(p.growing){p.alpha+=.008;if(p.alpha>=p.maxA)p.growing=false}
-        else if(p.life<60){p.alpha-=.008}
-        if(p.life<=0||p.alpha<=0){seasonParts.splice(i,1);continue}
-        const fimg=FX_IMG.flower[p.imgIdx||0];
-        const sz=p.size||28;
-        if(fimg&&fimg.complete&&fimg.naturalWidth>0){
-          ctx.save();ctx.translate(p.x,p.y);
-          ctx.globalAlpha=p.alpha;
-          ctx.drawImage(fimg,-sz/2,-sz,sz,sz);
-          ctx.restore();
-        }else{
-          ctx.save();ctx.translate(p.x,p.y);
-          for(let j=0;j<p.petals;j++){
-            const a=(Math.PI*2/p.petals)*j-Math.PI/2;
-            ctx.beginPath();
-            ctx.ellipse(Math.cos(a)*p.r*.5,Math.sin(a)*p.r*.5,p.r*.7,p.r*.35,a,0,Math.PI*2);
-            ctx.fillStyle=`rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.alpha})`;
-            ctx.fill();
-          }
-          ctx.beginPath();ctx.arc(0,0,p.r*.2,0,Math.PI*2);
-          ctx.fillStyle=`rgba(255,220,80,${p.alpha})`;ctx.fill();
-          ctx.strokeStyle=`rgba(80,160,60,${p.alpha*.5})`;ctx.lineWidth=1;
-          ctx.beginPath();ctx.moveTo(0,p.r*.5);ctx.lineTo(0,p.r*2);ctx.stroke();
-          ctx.restore();
-        }
-      }
-      else if(p.type==='bfly'){
-        // 找停棲目標：樹葉
-        if(p.state==="flying"){
-          p.angle+=p.turn*(Math.sin(p.frame*.7)>0?1:-1);
-          p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.6;
-          p.flyTimer--;
-          if(p.flyTimer<=0){
-            // 找最近的樹葉停棲
-            const leaves=seasonParts.filter(q=>q.type==='pleaf');
-            if(leaves.length>0){
-              const leaf=leaves[Math.floor(Math.random()*leaves.length)];
-              p.perchLeafIdx=seasonParts.indexOf(leaf);
-              p.state="approaching";p.targetX=leaf.x;p.targetY=leaf.y-leaf.size*.35;
-            }else{p.flyTimer=600+Math.floor(Math.random()*600)}
-          }
-          // 超出畫面太遠 → 自然離開（移除）
-          if(p.x<-80||p.x>_w+80||p.y<-80||p.y>_h+80){
-            seasonParts.splice(i,1);continue;
-          }
-        } else if(p.state==="approaching"){
-          // 平滑接近葉子
-          const dx=p.targetX-p.x,dy=p.targetY-p.y;
-          const dist=Math.hypot(dx,dy);
-          if(dist<3){
-            p.state="perched";p.x=p.targetX;p.y=p.targetY;
-            p.perchTimer=300+Math.floor(Math.random()*600); // 5-15 秒
-            p.angle=-Math.PI/2; // 朝上
-          } else {
-            p.angle=Math.atan2(dy,dx);
-            p.x+=Math.cos(p.angle)*p.speed*1.2;
-            p.y+=Math.sin(p.angle)*p.speed*1.2;
-          }
-        } else if(p.state==="perched"){
-          p.perchTimer--;
-          if(p.perchTimer<=0){
-            p.state="leaving";
-            p.angle=-Math.PI/2+(Math.random()-.5)*.6; // 往上飛走
-          }
-        } else if(p.state==="leaving"){
-          p.x+=Math.cos(p.angle)*p.speed;
-          p.y+=Math.sin(p.angle)*p.speed;
-          if(p.x<-80||p.x>_w+80||p.y<-80||p.y>_h+80){
-            seasonParts.splice(i,1);continue;
-          }
-        }
-        // 翅膀幀切換（停棲時減緩）
-        p.frameTimer++;
-        const fInt=p.state==="perched"?p.frameInterval*4:p.frameInterval;
-        if(p.frameTimer>=fInt){p.frameTimer=0;p.frame=(p.frame+1)%6}
-        const imgArr=FX_IMG[p.kind]||FX_IMG.swallowtail;
-        const img=imgArr[p.frame];
-        if(img&&img.complete&&img.naturalWidth){
-          ctx.save();
-          ctx.translate(p.x,p.y);
-          ctx.rotate(p.angle+Math.PI/2);
-          ctx.globalAlpha=p.alpha;
-          const s=p.size;
-          ctx.drawImage(img,-s/2,-s/2,s,s);
-          ctx.restore();
-        }else{
-          // Fallback 程序化蝴蝶
-          const wing=Math.abs(Math.sin(p.frame*.8))*.7+.3;
-          const r=p.size*.15;
-          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle+Math.PI/2);
-          ctx.fillStyle=`rgba(255,200,50,${p.alpha*.7})`;
-          ctx.beginPath();ctx.ellipse(-r*.6,0,r*wing,r*.7,-.3,0,Math.PI*2);ctx.fill();
-          ctx.beginPath();ctx.ellipse(r*.6,0,r*wing,r*.7,.3,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle=`rgba(60,40,30,${p.alpha})`;
-          ctx.beginPath();ctx.ellipse(0,0,1.5,r*.4,0,0,Math.PI*2);ctx.fill();
-          ctx.restore();
-        }
-      }
-      else if(p.type==='dfly'){
-        p.wingPhase=(p.wingPhase||0)+.2;
-        if(p.state==="flying"){
-          p.angle+=p.turn*(Math.random()>.5?1:-1);
-          p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.4;
-          p.flyTimer--;
-          if(p.flyTimer<=0){
-            const leaves=seasonParts.filter(q=>q.type==='pleaf');
-            if(leaves.length>0){
-              const leaf=leaves[Math.floor(Math.random()*leaves.length)];
-              p.perchLeafIdx=seasonParts.indexOf(leaf);
-              p.state="approaching";p.targetX=leaf.x;p.targetY=leaf.y-leaf.size*.3;
-            }else{p.flyTimer=400+Math.floor(Math.random()*600)}
-          }
-          if(p.x<-50||p.x>_w+50||p.y<-30||p.y>_h+30){
-            seasonParts.splice(i,1);continue;
-          }
-        } else if(p.state==="approaching"){
-          const dx=p.targetX-p.x,dy=p.targetY-p.y;
-          const dist=Math.hypot(dx,dy);
-          if(dist<4){
-            p.state="perched";p.x=p.targetX;p.y=p.targetY;
-            p.perchTimer=400+Math.floor(Math.random()*600); // 6-16 秒
-            p.angle=0;
-          } else {
-            p.angle=Math.atan2(dy,dx);
-            p.x+=Math.cos(p.angle)*p.speed*1.3;
-            p.y+=Math.sin(p.angle)*p.speed*1.3;
-          }
-        } else if(p.state==="perched"){
-          p.perchTimer--;
-          if(p.perchTimer<=0){
-            p.state="leaving";
-            // 往畫面外一個方向離開
-            p.angle=Math.random()*Math.PI*2;
-          }
-        } else if(p.state==="leaving"){
-          p.x+=Math.cos(p.angle)*p.speed*1.2;
-          p.y+=Math.sin(p.angle)*p.speed*1.2;
-          if(p.x<-50||p.x>_w+50||p.y<-30||p.y>_h+30){
-            seasonParts.splice(i,1);continue;
-          }
-        }
-        const dimg=FX_IMG.dfly[p.imgIdx||0];
-        const sz=p.size||35;
-        if(dimg&&dimg.complete&&dimg.naturalWidth>0){
-          ctx.save();
-          ctx.translate(p.x,p.y);
-          ctx.rotate(p.angle);
-          ctx.globalAlpha=p.state==="perched"?p.alpha:p.alpha;
-          // 停棲時翅膀慢慢振動（半透明 tint）；飛行時正常
-          ctx.drawImage(dimg,-sz/2,-sz/2,sz,sz);
-          ctx.restore();
-        }else{
-          const wf=Math.abs(Math.sin(p.wingPhase));
-          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);
-          ctx.fillStyle=`rgba(40,80,120,${p.alpha})`;
-          ctx.beginPath();ctx.ellipse(0,0,p.r*1.2,1.5,0,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle=`rgba(180,220,255,${p.alpha*.4*wf})`;
-          ctx.beginPath();ctx.ellipse(-2,-3,p.r*.8*wf,p.r*.3,-.4,0,Math.PI*2);ctx.fill();
-          ctx.beginPath();ctx.ellipse(-2,3,p.r*.8*wf,p.r*.3,.4,0,Math.PI*2);ctx.fill();
-          ctx.restore();
-        }
-      }
-      else if(p.type==='pleaf'){
-        // 靜態停棲樹葉（給蜻蜓、蝴蝶停）
-        const sz=p.size;
-        const img=FX_IMG.pleaf&&FX_IMG.pleaf[p.imgIdx||0];
-        if(img&&img.complete&&img.naturalWidth>0){
-          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-          ctx.globalAlpha=p.alpha;
-          ctx.drawImage(img,-sz/2,-sz/2,sz,sz);
-          ctx.restore();
-        }else{
-          // Fallback: 程序化葉片（綠色橢圓帶葉脈）
-          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-          ctx.globalAlpha=p.alpha;
-          const grad=ctx.createRadialGradient(0,0,sz*.1,0,0,sz*.55);
-          grad.addColorStop(0,"rgba(120,180,80,.9)");
-          grad.addColorStop(.7,"rgba(80,140,50,.85)");
-          grad.addColorStop(1,"rgba(50,100,30,.75)");
-          ctx.fillStyle=grad;
-          ctx.beginPath();ctx.ellipse(0,0,sz*.5,sz*.3,0,0,Math.PI*2);ctx.fill();
-          ctx.strokeStyle="rgba(40,80,20,.5)";ctx.lineWidth=1;
-          ctx.beginPath();ctx.moveTo(-sz*.5,0);ctx.lineTo(sz*.5,0);ctx.stroke();
-          ctx.restore();
-        }
-      }
-      else if(p.type==='lpad'){
-        // 荷葉（青蛙坐的）
-        const sz=p.size;
-        const img=FX_IMG.lpad&&FX_IMG.lpad[0];
-        if(img&&img.complete&&img.naturalWidth>0){
-          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-          ctx.globalAlpha=p.alpha;
-          ctx.drawImage(img,-sz/2,-sz/2,sz,sz);
-          ctx.restore();
-        }else{
-          // Fallback: 圓形荷葉
-          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-          ctx.globalAlpha=p.alpha;
-          const grad=ctx.createRadialGradient(0,0,sz*.1,0,0,sz*.5);
-          grad.addColorStop(0,"rgba(150,200,100,.95)");
-          grad.addColorStop(.8,"rgba(90,150,60,.9)");
-          grad.addColorStop(1,"rgba(60,110,40,.8)");
-          ctx.fillStyle=grad;
-          ctx.beginPath();ctx.arc(0,0,sz*.5,0,Math.PI*2);ctx.fill();
-          // V 形缺口（荷葉特徵）
-          ctx.fillStyle="rgba(0,0,0,0)";
-          ctx.globalCompositeOperation="destination-out";
-          ctx.beginPath();
-          ctx.moveTo(0,0);
-          ctx.lineTo(sz*.45,-sz*.08);
-          ctx.lineTo(sz*.45,sz*.08);
-          ctx.closePath();ctx.fill();
-          ctx.globalCompositeOperation="source-over";
-          ctx.restore();
-        }
-      }
-      else if(p.type==='frog'){
-        // 青蛙狀態機：sitting / crouching / jumping
-        // 用 padId 找目前歸屬的荷葉（index 會漂移所以不用）
-        let lly=null;
-        for(let j=0;j<seasonParts.length;j++){
-          const q=seasonParts[j];
-          if(q.type==='lpad'&&q.padId===p.padId){lly=q;break;}
-        }
-        if(!lly){
-          // 歸屬的荷葉沒了，找任一片荷葉重新歸屬
-          const anyLily=seasonParts.find(q=>q.type==='lpad');
-          if(!anyLily){seasonParts.splice(i,1);continue;}
-          p.padId=anyLily.padId;lly=anyLily;
-        }
-        if(p.state==="sitting"){
-          p.x=lly.x;
-          p.y=lly.y-p.size*0.45;
-          p.blinkTimer--;
-          if(p.blinkTimer<=0){
-            p.imgIdx=p.imgIdx===1?0:1;
-            p.blinkTimer=p.imgIdx===1?(5+Math.floor(Math.random()*6)):(120+Math.floor(Math.random()*180));
-          }
-          p.huntTimer--;
-          if(p.huntTimer<=0){
-            const mouthX=p.x,mouthY=p.y-p.size*0.05;
-            const maxR=160;
-            let best=null,bestD=maxR*maxR;
-            for(let k=0;k<seasonParts.length;k++){
-              const q=seasonParts[k];
-              if(q.type!=='ffly'&&q.type!=='dfly') continue;
-              if(q.type==='dfly'&&q.state!=='flying') continue;
-              const dx=q.x-mouthX,dy=q.y-mouthY;
-              const d2=dx*dx+dy*dy;
-              if(d2<bestD){bestD=d2;best=q;}
-            }
-            if(best){
-              p.preyRef=best;
-              p.tongueFromX=mouthX;p.tongueFromY=mouthY;
-              p.tongueToX=best.x;p.tongueToY=best.y;
-              p.tongueProgress=0;
-              p.state="catching";
-              p.imgIdx=1;
-              p.facing=best.x<p.x?1:-1;
-              p.huntTimer=0;
-            } else {
-              p.huntTimer=120+Math.floor(Math.random()*180);
-            }
-          }
-          if(p.state==="sitting"){
-            p.jumpTimer--;
-            if(p.jumpTimer<=0){
-              const others=seasonParts.filter(q=>q.type==='lpad'&&q.padId!==p.padId);
-              if(others.length>0){
-                const target=others[Math.floor(Math.random()*others.length)];
-                p.jumpFromX=p.x;p.jumpFromY=p.y;
-                p.jumpToX=target.x;p.jumpToY=target.y-p.size*0.45;
-                p.jumpTargetPadId=target.padId;
-                p.jumpProgress=0;p.state="crouching";p.crouchTimer=20;
-                p.facing=p.jumpToX<p.jumpFromX?1:-1;
-                p.imgIdx=2;
-              } else {
-                p.jumpTimer=400+Math.floor(Math.random()*1200);
-              }
-            }
-          }
-        } else if(p.state==="catching"){
-          p.tongueProgress+=0.15;
-          if(p.preyRef&&seasonParts.indexOf(p.preyRef)>=0){
-            p.tongueToX=p.preyRef.x;p.tongueToY=p.preyRef.y;
-          } else {
-            p.preyRef=null;p.state="retracting";p.tongueProgress=1;
-          }
-          if(p.tongueProgress>=1){
-            p.tongueProgress=1;
-            p.state="retracting";
-          }
-        } else if(p.state==="retracting"){
-          p.tongueProgress-=0.2;
-          if(p.tongueProgress<=0){
-            p.tongueProgress=0;
-            if(p.preyRef){
-              const idx=seasonParts.indexOf(p.preyRef);
-              if(idx>=0) seasonParts.splice(idx,1);
-              p.preyRef=null;
-            }
-            p.state="sitting";
-            p.imgIdx=0;
-            p.huntTimer=240+Math.floor(Math.random()*360);
-            p.blinkTimer=60+Math.floor(Math.random()*120);
-          }
-        } else if(p.state==="crouching"){
-          p.crouchTimer--;
-          if(p.crouchTimer<=0){
-            p.state="jumping";p.imgIdx=3;
-          }
-        } else if(p.state==="jumping"){
-          p.jumpProgress+=.025;
-          if(p.jumpProgress>=1){
-            p.state="sitting";
-            p.padId=p.jumpTargetPadId;
-            p.imgIdx=0;p.blinkTimer=120+Math.floor(Math.random()*180);
-            p.jumpTimer=400+Math.floor(Math.random()*1200);
-          } else {
-            const tt=p.jumpProgress;
-            p.x=p.jumpFromX+(p.jumpToX-p.jumpFromX)*tt;
-            const arc=-Math.sin(tt*Math.PI)*80;
-            p.y=p.jumpFromY+(p.jumpToY-p.jumpFromY)*tt+arc;
-          }
-        }
-        const sz=p.size;
-        const fimg=FX_IMG.frog&&FX_IMG.frog[p.imgIdx||0];
-        if(fimg&&fimg.complete&&fimg.naturalWidth>0){
-          ctx.save();ctx.translate(p.x,p.y);
-          if(p.facing===-1) ctx.scale(-1,1);
-          ctx.globalAlpha=p.alpha;
-          ctx.drawImage(fimg,-sz/2,-sz/2,sz,sz);
-          ctx.restore();
-        }else{
-          // Fallback: 程序化綠色青蛙
-          ctx.save();ctx.translate(p.x,p.y);
-          ctx.globalAlpha=p.alpha;
-          ctx.fillStyle="#5a8f3a";
-          ctx.beginPath();ctx.ellipse(0,2,sz*.35,sz*.28,0,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle="#6ba84a";
-          ctx.beginPath();ctx.ellipse(0,-sz*.15,sz*.3,sz*.22,0,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle="#fff";
-          ctx.beginPath();ctx.arc(-sz*.12,-sz*.25,sz*.08,0,Math.PI*2);ctx.fill();
-          ctx.beginPath();ctx.arc(sz*.12,-sz*.25,sz*.08,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle="#000";
-          const ey=p.imgIdx===1?sz*.02:0;
-          ctx.beginPath();ctx.arc(-sz*.12,-sz*.25+ey,sz*.04,0,Math.PI*2);ctx.fill();
-          ctx.beginPath();ctx.arc(sz*.12,-sz*.25+ey,sz*.04,0,Math.PI*2);ctx.fill();
-          ctx.restore();
-        }
-        drawFrogTongue(p);
-      }
-      else if(p.type==='ffly'){
-        p.angle+=p.turn*(Math.sin(p.pulse*.5)>0?1:-1);
-        p.x+=Math.cos(p.angle)*p.speed;p.y+=Math.sin(p.angle)*p.speed*.7;
-        p.pulse+=p.ps;
-        const a=Math.max(0,(Math.sin(p.pulse)*.5+.5))*p.maxA;
-        if(p.x<-20)p.x=_w+10;if(p.x>_w+20)p.x=-10;
-        if(p.y<_h*.1)p.y=_h*.9;if(p.y>_h*.95)p.y=_h*.2;
-        if(a>.01){
-          const fimg=FX_IMG.firefly&&FX_IMG.firefly[p.imgIdx||0];
-          // 先畫光暈（永遠畫，是螢火蟲的靈魂）
-          const glowR=p.r*4;
-          const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,glowR);
-          g.addColorStop(0,`rgba(200,255,100,${a*0.8})`);
-          g.addColorStop(.4,`rgba(180,240,80,${a*0.4})`);
-          g.addColorStop(1,"rgba(150,230,50,0)");
-          ctx.fillStyle=g;ctx.fillRect(p.x-glowR,p.y-glowR,glowR*2,glowR*2);
-          // 再疊上真實螢火蟲照片
-          if(fimg&&fimg.complete&&fimg.naturalWidth>0){
-            const sz=p.size||16;
-            ctx.save();
-            ctx.translate(p.x,p.y);
-            ctx.rotate(p.angle+Math.PI/2);
-            ctx.globalAlpha=Math.min(1,a*1.8); // 螢火蟲本體透明度隨脈衝變化
-            ctx.drawImage(fimg,-sz/2,-sz/2,sz,sz);
-            ctx.restore();
-          } else {
-            // fallback：亮點
-            ctx.beginPath();ctx.fillStyle=`rgba(220,255,150,${a*1.2})`;
-            ctx.arc(p.x,p.y,p.r*.5,0,Math.PI*2);ctx.fill();
-          }
-        }
-      }
-      else if(p.type==='leaf'){
-        p.y+=p.speed;p.x+=p.drift;p.wobble+=p.ws;p.rot+=p.rs;
-        p.x+=Math.sin(p.wobble)*1.1;p.speed+=Math.sin(p.wobble*2)*.015;
-        if(p.y>_h+40){seasonParts.splice(i,1);continue}
-        const sz=p.size;
-        const img=FX_IMG.maple[p.imgIdx||0];
-        if(img&&img.complete&&img.naturalWidth>0){
-          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-          ctx.globalAlpha=p.alpha;
-          ctx.drawImage(img,-sz,-sz,sz*2,sz*2);
-          ctx.restore();
-        }else{
-          // Fallback: 圖片未載入時畫程序化葉形
-          ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-          ctx.beginPath();ctx.moveTo(0,-sz);
-          ctx.quadraticCurveTo(sz*.5,-sz*.3,sz*.8,-sz*.6);
-          ctx.quadraticCurveTo(sz*.4,0,sz*.6,sz*.4);
-          ctx.quadraticCurveTo(sz*.2,sz*.3,0,sz*.8);
-          ctx.quadraticCurveTo(-sz*.2,sz*.3,-sz*.6,sz*.4);
-          ctx.quadraticCurveTo(-sz*.4,0,-sz*.8,-sz*.6);
-          ctx.quadraticCurveTo(-sz*.5,-sz*.3,0,-sz);
-          ctx.fillStyle=`rgba(200,75,25,${p.alpha})`;ctx.fill();
-          ctx.restore();
-        }
-      }
-      else if(p.type==='fspark'){
-        p.pulse+=p.ps;
-        const a=Math.max(0,Math.sin(p.pulse))*p.maxA;
-        if(a>.01){
-          ctx.beginPath();ctx.fillStyle=`rgba(210,230,255,${a})`;
-          ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
-          ctx.strokeStyle=`rgba(220,240,255,${a*.4})`;ctx.lineWidth=.5;
-          ctx.beginPath();ctx.moveTo(p.x-p.r*2,p.y);ctx.lineTo(p.x+p.r*2,p.y);ctx.stroke();
-          ctx.beginPath();ctx.moveTo(p.x,p.y-p.r*2);ctx.lineTo(p.x,p.y+p.r*2);ctx.stroke();
-        }
-      }
-      else if(p.type==='mist'){
-        p.x+=p.speed*p.dir;
-        if(p.x>_w+p.w)p.x=-p.w;if(p.x<-p.w)p.x=_w;
-        const g=ctx.createRadialGradient(p.x+p.w/2,p.y,0,p.x+p.w/2,p.y,p.w/2);
-        g.addColorStop(0,`rgba(200,210,225,${p.alpha})`);g.addColorStop(1,"rgba(200,210,225,0)");
-        ctx.fillStyle=g;ctx.fillRect(p.x,p.y-p.h,p.w,p.h*2);
-      }
-    }
-    // === 青蛙最後畫（確保在荷葉/其他粒子之上）===
-    for(let i=seasonParts.length-1;i>=0;i--){
-      const p=seasonParts[i];
-      if(p.type!=='frog') continue;
-      // 青蛙狀態機：sitting / crouching / jumping
-      let lly=null;
-      for(let j=0;j<seasonParts.length;j++){
-        const q=seasonParts[j];
-        if(q.type==='lpad'&&q.padId===p.padId){lly=q;break;}
-      }
-      if(!lly){
-        const anyLily=seasonParts.find(q=>q.type==='lpad');
-        if(!anyLily){seasonParts.splice(i,1);continue;}
-        p.padId=anyLily.padId;lly=anyLily;
-      }
-      if(p.state==="sitting"){
-        p.x=lly.x;
-        p.y=lly.y-p.size*0.45;
-        p.blinkTimer--;
-        if(p.blinkTimer<=0){
-          p.imgIdx=p.imgIdx===1?0:1;
-          p.blinkTimer=p.imgIdx===1?(5+Math.floor(Math.random()*6)):(120+Math.floor(Math.random()*180));
-        }
-        p.huntTimer--;
-        if(p.huntTimer<=0){
-          const mouthX=p.x,mouthY=p.y-p.size*0.05;
-          const maxR=160;
-          let best=null,bestD=maxR*maxR;
-          for(let k=0;k<seasonParts.length;k++){
-            const q=seasonParts[k];
-            if(q.type!=='ffly'&&q.type!=='dfly') continue;
-            if(q.type==='dfly'&&q.state!=='flying') continue;
-            const dx=q.x-mouthX,dy=q.y-mouthY;
-            const d2=dx*dx+dy*dy;
-            if(d2<bestD){bestD=d2;best=q;}
-          }
-          if(best){
-            p.preyRef=best;
-            p.tongueFromX=mouthX;p.tongueFromY=mouthY;
-            p.tongueToX=best.x;p.tongueToY=best.y;
-            p.tongueProgress=0;
-            p.state="catching";
-            p.imgIdx=1;
-            p.facing=best.x<p.x?1:-1;
-            p.huntTimer=0;
-          } else {
-            p.huntTimer=120+Math.floor(Math.random()*180);
-          }
-        }
-        if(p.state==="sitting"){
-          p.jumpTimer--;
-          if(p.jumpTimer<=0){
-            const others=seasonParts.filter(q=>q.type==='lpad'&&q.padId!==p.padId);
-            if(others.length>0){
-              const target=others[Math.floor(Math.random()*others.length)];
-              p.jumpFromX=p.x;p.jumpFromY=p.y;
-              p.jumpToX=target.x;p.jumpToY=target.y-p.size*0.45;
-              p.jumpTargetPadId=target.padId;
-              p.jumpProgress=0;p.state="crouching";p.crouchTimer=20;
-              p.facing=p.jumpToX<p.jumpFromX?1:-1;
-              p.imgIdx=2;
-            } else {
-              p.jumpTimer=400+Math.floor(Math.random()*1200);
-            }
-          }
-        }
-      } else if(p.state==="catching"){
-        p.tongueProgress+=0.15;
-        if(p.preyRef&&seasonParts.indexOf(p.preyRef)>=0){
-          p.tongueToX=p.preyRef.x;p.tongueToY=p.preyRef.y;
-        } else {
-          p.preyRef=null;p.state="retracting";p.tongueProgress=1;
-        }
-        if(p.tongueProgress>=1){
-          p.tongueProgress=1;
-          p.state="retracting";
-        }
-      } else if(p.state==="retracting"){
-        p.tongueProgress-=0.2;
-        if(p.tongueProgress<=0){
-          p.tongueProgress=0;
-          if(p.preyRef){
-            const idx=seasonParts.indexOf(p.preyRef);
-            if(idx>=0) seasonParts.splice(idx,1);
-            p.preyRef=null;
-          }
-          p.state="sitting";
-          p.imgIdx=0;
-          p.huntTimer=240+Math.floor(Math.random()*360);
-          p.blinkTimer=60+Math.floor(Math.random()*120);
-        }
-      } else if(p.state==="crouching"){
-        p.crouchTimer--;
-        if(p.crouchTimer<=0){p.state="jumping";p.imgIdx=3;}
-      } else if(p.state==="jumping"){
-        p.jumpProgress+=.025;
-        if(p.jumpProgress>=1){
-          p.state="sitting";
-          p.padId=p.jumpTargetPadId;
-          p.imgIdx=0;p.blinkTimer=120+Math.floor(Math.random()*180);
-          p.jumpTimer=400+Math.floor(Math.random()*1200);
-        } else {
-          const tt=p.jumpProgress;
-          p.x=p.jumpFromX+(p.jumpToX-p.jumpFromX)*tt;
-          const arc=-Math.sin(tt*Math.PI)*80;
-          p.y=p.jumpFromY+(p.jumpToY-p.jumpFromY)*tt+arc;
-        }
-      }
-      const sz=p.size;
-      const fimg=FX_IMG.frog&&FX_IMG.frog[p.imgIdx||0];
-      if(fimg&&fimg.complete&&fimg.naturalWidth>0){
-        ctx.save();ctx.translate(p.x,p.y);
-        if(p.facing===-1) ctx.scale(-1,1);
-        ctx.globalAlpha=p.alpha;
-        ctx.drawImage(fimg,-sz/2,-sz/2,sz,sz);
-        ctx.restore();
-      }else{
-        // Fallback: 程序化綠色青蛙
-        ctx.save();ctx.translate(p.x,p.y);
-        ctx.globalAlpha=p.alpha;
-        ctx.fillStyle="#5a8f3a";
-        ctx.beginPath();ctx.ellipse(0,2,sz*.35,sz*.28,0,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle="#6ba84a";
-        ctx.beginPath();ctx.ellipse(0,-sz*.15,sz*.3,sz*.22,0,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle="#fff";
-        ctx.beginPath();ctx.arc(-sz*.12,-sz*.25,sz*.08,0,Math.PI*2);ctx.fill();
-        ctx.beginPath();ctx.arc(sz*.12,-sz*.25,sz*.08,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle="#000";
-        const ey=p.imgIdx===1?sz*.02:0;
-        ctx.beginPath();ctx.arc(-sz*.12,-sz*.25+ey,sz*.04,0,Math.PI*2);ctx.fill();
-        ctx.beginPath();ctx.arc(sz*.12,-sz*.25+ey,sz*.04,0,Math.PI*2);ctx.fill();
-        ctx.restore();
-      }
-      drawFrogTongue(p);
-    }
-    if(seasonParts.length>130) seasonParts.splice(0,seasonParts.length-130);
-  }
-
-  function getMode(){return mode}
-  function _debug(){
-    const stat=[];
-    Object.keys(FX_IMG).forEach(key=>{
-      const v=FX_IMG[key];
-      if(Array.isArray(v)){
-        v.forEach((img,i)=>{
-          stat.push({
-            kind:key,
-            idx:i+1,
-            src:(img&&img.src||"").replace(location.origin,""),
-            loaded:!!(img&&img.complete&&img.naturalWidth>0),
-            w:img?img.naturalWidth:0
-          });
-        });
-      }else if(v){
-        stat.push({
-          kind:key,
-          idx:1,
-          src:(v.src||"").replace(location.origin,""),
-          loaded:!!(v.complete&&v.naturalWidth>0),
-          w:v.naturalWidth
-        });
-      }
-    });
-    const bflyCount=seasonParts.filter(p=>p.type==='bfly').length;
-    const leafCount=seasonParts.filter(p=>p.type==='leaf').length;
-    console.table(stat);
-    console.log("Season:",curSeason,"TimeSlot:",curTimeSlot,"Mode:",mode,"Butterflies:",bflyCount,"Leaves:",leafCount);
-    return{stat,bflyCount,leafCount,season:curSeason,ts:curTimeSlot,mode};
-  }
-  function _spawnBfly(n){
-    n=n||3;
-    for(let i=0;i<n;i++) seasonParts.push(mkButterfly());
-    return"Spawned "+n+" butterflies. Total: "+seasonParts.filter(p=>p.type==='bfly').length;
-  }
-  function _spawnLeaf(n){
-    n=n||10;
-    for(let i=0;i<n;i++) seasonParts.push(mkLeaf());
-    return"Spawned "+n+" leaves. Total: "+seasonParts.filter(p=>p.type==='leaf').length;
-  }
-  // 強制靜音（由全域 FX 開關呼叫）
-  function _forceSilence(){
-    try{
-      if(typeof stopSeasonSnd==='function') stopSeasonSnd();
-    }catch(e){}
-  }
-  return{update,getMode,_debug,_spawnBfly,_spawnLeaf,_forceSilence};
-})();
-try{window.WxFx=WxFx;_syncWeatherFx()}catch(e){}
-
-// ═══ WEATHER SOUND ENGINE ═══
-const WxSfx = (function(){
-  let actx=null, masterGain=null;
-  let rainNode=null, rainGain=null, rainFilter=null;
-  let windNode=null, windGain=null, windFilter=null, windLfo=null, windLfoGain=null;
-  let mode="none", muted=true, _initialized=false;
-  
-  try{muted=localStorage.getItem("sb_sfx")!=="on"}catch(e){}
-  
-  function initAudio(){
-    // 全域 FX 停用，或音效分類停用時，拒絕啟動音訊
-    try{
-      const adminOff=window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false;
-      const userOff=window.USER_PREFS&&window.USER_PREFS.visualFx===false;
-      const soundOff=window.USER_PREFS&&window.USER_PREFS.fxDetail&&window.USER_PREFS.fxDetail.sound===false;
-      if(adminOff||userOff||soundOff) return false;
-    }catch(e){}
-    if(_initialized) return true;
-    try{
-      actx=new (window.AudioContext||window.webkitAudioContext)();
-      masterGain=actx.createGain();
-      masterGain.gain.value=muted?0:1;
-      masterGain.connect(actx.destination);
-      _initialized=true;
-      return true;
-    }catch(e){return false}
-  }
-  
-  function mkNoise(duration){
-    const sr=actx.sampleRate;
-    const buf=actx.createBuffer(1,sr*duration,sr);
-    const d=buf.getChannelData(0);
-    for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-    return buf;
-  }
-  
-  function startRain(heavy){
-    stopRain();
-    if(!actx) return;
-    const buf=mkNoise(2);
-    rainNode=actx.createBufferSource();
-    rainNode.buffer=buf;
-    rainNode.loop=true;
-    rainFilter=actx.createBiquadFilter();
-    rainFilter.type="bandpass";
-    rainFilter.frequency.value=heavy?1500:800;
-    rainFilter.Q.value=heavy?0.5:0.8;
-    rainGain=actx.createGain();
-    rainGain.gain.value=heavy?0.18:0.1;
-    rainNode.connect(rainFilter);
-    rainFilter.connect(rainGain);
-    rainGain.connect(masterGain);
-    rainNode.start();
-  }
-  
-  function stopRain(){
-    if(rainNode){try{rainNode.stop()}catch(e){}rainNode=null}
-    rainGain=null;rainFilter=null;
-  }
-  
-  function startWind(intense){
-    stopWind();
-    if(!actx) return;
-    const buf=mkNoise(2);
-    windNode=actx.createBufferSource();
-    windNode.buffer=buf;
-    windNode.loop=true;
-    windFilter=actx.createBiquadFilter();
-    windFilter.type="bandpass";
-    windFilter.frequency.value=intense?400:250;
-    windFilter.Q.value=0.4;
-    windGain=actx.createGain();
-    windGain.gain.value=intense?0.15:0.08;
-    // LFO for howling effect
-    windLfo=actx.createOscillator();
-    windLfo.type="sine";
-    windLfo.frequency.value=intense?0.4:0.2;
-    windLfoGain=actx.createGain();
-    windLfoGain.gain.value=intense?200:100;
-    windLfo.connect(windLfoGain);
-    windLfoGain.connect(windFilter.frequency);
-    windLfo.start();
-    windNode.connect(windFilter);
-    windFilter.connect(windGain);
-    windGain.connect(masterGain);
-    windNode.start();
-  }
-  
-  function stopWind(){
-    if(windNode){try{windNode.stop()}catch(e){}windNode=null}
-    if(windLfo){try{windLfo.stop()}catch(e){}windLfo=null}
-    windGain=null;windFilter=null;windLfoGain=null;
-  }
-  
-  function thunder(){
-    if(!actx||muted) return;
-    const now=actx.currentTime;
-    const distance=0.15+Math.random()*0.8;
-    const intensity=0.45+Math.random()*0.5;
-    const tail=0.35+Math.random()*0.6;
-    const lightningDelay=0.12+distance*2.2;
-    const ts=now+lightningDelay;
-
-    const bus=actx.createGain();bus.gain.value=1.0;bus.connect(masterGain);
-
-    // Crack layer
-    (function(){
-      const n=actx.createBufferSource();n.buffer=mkNoise(0.8);
-      const hp=actx.createBiquadFilter();hp.type="highpass";hp.frequency.value=1800-distance*900;
-      const bp=actx.createBiquadFilter();bp.type="bandpass";bp.frequency.value=2500-distance*1000;bp.Q.value=1.2;
-      const g=actx.createGain();
-      g.gain.setValueAtTime(.0001,ts);g.gain.linearRampToValueAtTime(.35+intensity*.5,ts+.004);g.gain.exponentialRampToValueAtTime(.0001,ts+.09);
-      n.connect(hp);hp.connect(bp);bp.connect(g);g.connect(bus);
-      n.start(ts);n.stop(ts+.12);
-    })();
-
-    // Boom layer
-    (function(){
-      const o1=actx.createOscillator();o1.type="sawtooth";
-      const o2=actx.createOscillator();o2.type="triangle";
-      const n=actx.createBufferSource();n.buffer=mkNoise(2.5);
-      const nlp=actx.createBiquadFilter();nlp.type="lowpass";nlp.frequency.value=220-distance*100;
-      const g1=actx.createGain(),g2=actx.createGain(),gn=actx.createGain(),mix=actx.createGain();
-      const bt=ts+.02;
-      o1.frequency.setValueAtTime(42+intensity*16-distance*10,bt);
-      o2.frequency.setValueAtTime(58+intensity*12-distance*10,bt);
-      g1.gain.setValueAtTime(.0001,bt);g1.gain.linearRampToValueAtTime(.16+intensity*.18,bt+.03);g1.gain.exponentialRampToValueAtTime(.0001,bt+1.2);
-      g2.gain.setValueAtTime(.0001,bt);g2.gain.linearRampToValueAtTime(.12+intensity*.14,bt+.05);g2.gain.exponentialRampToValueAtTime(.0001,bt+1.4);
-      gn.gain.setValueAtTime(.0001,bt);gn.gain.linearRampToValueAtTime(.25+intensity*.3,bt+.02);gn.gain.exponentialRampToValueAtTime(.0001,bt+1.0);
-      mix.gain.value=1.0;
-      o1.connect(g1);o2.connect(g2);n.connect(nlp);nlp.connect(gn);
-      g1.connect(mix);g2.connect(mix);gn.connect(mix);mix.connect(bus);
-      o1.start(bt);o2.start(bt+.01);n.start(bt);
-      o1.stop(bt+1.25);o2.stop(bt+1.45);n.stop(bt+1.1);
-    })();
-
-    // Rumble layer
-    (function(){
-      const n=actx.createBufferSource();n.buffer=mkNoise(6);
-      const lp=actx.createBiquadFilter();lp.type="lowpass";lp.frequency.value=500-distance*220;
-      const bp=actx.createBiquadFilter();bp.type="bandpass";bp.frequency.value=90+intensity*40;bp.Q.value=.4;
-      const g=actx.createGain();
-      const decay=1.8+tail*3.2+distance*1.5;
-      const rt=ts+.08;
-      g.gain.setValueAtTime(.0001,rt);g.gain.linearRampToValueAtTime(.18+intensity*.25+tail*.1,rt+.08);g.gain.exponentialRampToValueAtTime(.0001,rt+decay);
-      n.connect(lp);lp.connect(bp);bp.connect(g);g.connect(bus);
-      n.start(rt);n.stop(rt+decay+.2);
-    })();
-
-    // Reflection layer (echo taps)
-    const taps=[{d:.18,g:.16,c:900},{d:.33,g:.12,c:700},{d:.57,g:.08,c:500},{d:.82,g:.05,c:350}];
-    taps.forEach((tap,i)=>{
-      const dl=actx.createDelay(2.0);dl.delayTime.value=tap.d+distance*.25+i*.03;
-      const f=actx.createBiquadFilter();f.type="lowpass";f.frequency.value=tap.c-distance*180;
-      const g=actx.createGain();g.gain.value=tap.g+tail*.03;
-      bus.connect(dl);dl.connect(f);f.connect(g);g.connect(masterGain);
-    });
-  }
-  
-  function stopAll(){stopRain();stopWind()}
-  
-  function setMode(m){
-    if(m===mode) return;
-    mode=m;
-    stopAll();
-    if(!soundEnabled()) return;
-    if(!muted&&!_initialized) initAudio();
-    if(!_initialized||!actx) return;
-    if(actx.state==="suspended") actx.resume();
-    switch(mode){
-      case "rain": startRain(false); break;
-      case "heavy": startRain(true); break;
-      case "storm": startRain(true); startWind(false); break;
-      case "wind": startWind(false); break;
-      case "typhoon": startRain(true); startWind(true); break;
-      case "snow":
-        // Very soft ambient
-        startRain(false);
-        if(rainGain)rainGain.gain.value=0.02;
-        if(rainFilter){rainFilter.frequency.value=3000;rainFilter.Q.value=1.5}
-        break;
-      case "fog":
-        // Very quiet wind for fog
-        startWind(false);
-        if(windGain)windGain.gain.value=.02;
-        if(windFilter){windFilter.frequency.value=120;windFilter.Q.value=.15}
-        break;
-      case "cold":
-        // Soft eerie wind whistle
-        startWind(false);
-        if(windGain)windGain.gain.value=0.04;
-        if(windFilter){windFilter.frequency.value=180;windFilter.Q.value=0.3}
-        break;
-    }
-  }
-  
-  function toggle(){
-    // 全域 FX 停用或音效分類停用時，無法解除靜音
-    try{
-      const adminOff=window.APP_CFG&&window.APP_CFG.visualFx&&window.APP_CFG.visualFx.enabled===false;
-      const userOff=window.USER_PREFS&&window.USER_PREFS.visualFx===false;
-      const soundOff=window.USER_PREFS&&window.USER_PREFS.fxDetail&&window.USER_PREFS.fxDetail.sound===false;
-      if(adminOff||userOff||soundOff){
-        muted=true;
-        if(masterGain) masterGain.gain.value=0;
-        render();
-        return;
-      }
-    }catch(e){}
-    if(!initAudio()) return;
-    muted=!muted;
-    try{localStorage.setItem("sb_sfx",muted?"off":"on")}catch(e){}
-    if(masterGain) masterGain.gain.value=muted?0:1;
-    if(!muted&&actx&&actx.state==="suspended") actx.resume();
-    // Restart current weather sounds when unmuting
-    if(!muted&&mode!=="none"){const cur=mode;mode="none";setMode(cur)}
-    // Restart seasonal sounds
-    if(!muted){setSeasonSnd(getSeason())}else{stopSeasonSnd()}
-    render();
-  }
-  
-  function triggerThunder(){
-    if(!soundEnabled()) return;
-    if(!_initialized){if(!initAudio())return}
-    if(actx&&actx.state==='suspended')actx.resume();
-    thunder();
-  }
-  
-  function isMuted(){return muted||!soundEnabled()}
-  function _forceSilence(){
-    try{
-      if(masterGain) masterGain.gain.value=0;
-      stopAll();
-      stopSeasonSnd();
-      if(actx&&actx.state==='running'){try{actx.suspend()}catch(e){}}
-    }catch(e){}
-  }
-
-  // Auto-start audio on first user gesture if previously enabled
-  if(!muted){
-    const _autoStart=()=>{
-      document.removeEventListener("touchstart",_autoStart);
-      document.removeEventListener("click",_autoStart);
-      if(!_initialized&&initAudio()){
-        if(actx&&actx.state==="suspended")actx.resume();
-        if(mode!=="none"){const cur=mode;mode="none";setMode(cur)}
-        setSeasonSnd(getSeason());
-      }
-    };
-    document.addEventListener("touchstart",_autoStart,{once:true,passive:true});
-    document.addEventListener("click",_autoStart,{once:true});
-  }
-
-
-  // ═══ SEASONAL SOUNDS (weather-aware) ═══
-  let seasonSnd="",seasonInterval=null;
-  let cicadaNode2=null,cicadaGain2=null,cicadaFilter2=null,cicadaLfo2=null,cicadaLfoG2=null;
-  let frogInterval=null;
-
-  function stopSeasonSnd(){
-    if(cicadaNode2){try{cicadaNode2.stop()}catch(e){}cicadaNode2=null}
-    if(cicadaLfo2){try{cicadaLfo2.stop()}catch(e){}cicadaLfo2=null}
-    cicadaGain2=null;cicadaFilter2=null;cicadaLfoG2=null;
-    if(seasonInterval){clearTimeout(seasonInterval);seasonInterval=null}
-    if(frogInterval){clearTimeout(frogInterval);frogInterval=null}
-    seasonSnd="";
-  }
-
-  // Bird sounds with variety
-  function chirpBird(species){
-    if(!actx||muted)return;
-    const sp=species||Math.floor(Math.random()*4);
-    if(sp===0){
-      // Sparrow: rapid short chirps
-      const f=3000+Math.random()*1500,n=2+Math.floor(Math.random()*3);
-      for(let j=0;j<n;j++){
-        const osc=actx.createOscillator();osc.type="sine";
-        const g=actx.createGain();const t0=actx.currentTime+j*.07;
-        g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.03,t0+.01);
-        g.gain.exponentialRampToValueAtTime(.001,t0+.06);
-        osc.frequency.setValueAtTime(f+Math.random()*400,t0);
-        osc.frequency.linearRampToValueAtTime(f+600,t0+.02);
-        osc.frequency.linearRampToValueAtTime(f-100,t0+.05);
-        osc.connect(g);g.connect(masterGain);osc.start(t0);osc.stop(t0+.1);
-      }
-    } else if(sp===1){
-      // Warbler: descending melodic trill
-      const f=4000+Math.random()*1000;
-      for(let j=0;j<4+Math.floor(Math.random()*3);j++){
-        const osc=actx.createOscillator();osc.type="sine";
-        const g=actx.createGain();const t0=actx.currentTime+j*.1;
-        g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.025,t0+.015);
-        g.gain.exponentialRampToValueAtTime(.001,t0+.08);
-        osc.frequency.setValueAtTime(f-j*200,t0);
-        osc.frequency.linearRampToValueAtTime(f-j*200-300,t0+.06);
-        osc.connect(g);g.connect(masterGain);osc.start(t0);osc.stop(t0+.12);
-      }
-    } else if(sp===2){
-      // Cuckoo: two notes
-      for(let j=0;j<2;j++){
-        const osc=actx.createOscillator();osc.type="sine";
-        const g=actx.createGain();const t0=actx.currentTime+j*.35;
-        g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.04,t0+.02);
-        g.gain.exponentialRampToValueAtTime(.001,t0+.25);
-        osc.frequency.setValueAtTime(j===0?1200:900,t0);
-        osc.connect(g);g.connect(masterGain);osc.start(t0);osc.stop(t0+.3);
-      }
-    } else {
-      // Robin: melodic rising
-      const f=2500+Math.random()*800;
-      for(let j=0;j<3;j++){
-        const osc=actx.createOscillator();osc.type="sine";
-        const g=actx.createGain();const t0=actx.currentTime+j*.12;
-        g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.03,t0+.015);
-        g.gain.exponentialRampToValueAtTime(.001,t0+.1);
-        osc.frequency.setValueAtTime(f+j*300,t0);
-        osc.frequency.linearRampToValueAtTime(f+j*300+200,t0+.05);
-        osc.connect(g);g.connect(masterGain);osc.start(t0);osc.stop(t0+.15);
-      }
-    }
-  }
-
-  function chirpCricket(){
-    if(!actx||muted)return;
-    const f=4200+Math.random()*800,n=2+Math.floor(Math.random()*4);
-    for(let j=0;j<n;j++){
-      const osc=actx.createOscillator();osc.type="sine";osc.frequency.value=f+Math.random()*200;
-      const g=actx.createGain();const t0=actx.currentTime+j*.06;
-      g.gain.setValueAtTime(.02+Math.random()*.01,t0);g.gain.setValueAtTime(0,t0+.025);
-      osc.connect(g);g.connect(masterGain);osc.start(t0);osc.stop(t0+.04);
-    }
-  }
-
-  function croakFrog(){
-    if(!actx||muted)return;
-    // 連續 2-4 聲「呱」，每聲極短帶脈衝顆粒感
-    const calls=2+Math.floor(Math.random()*3);
-    const baseF=180+Math.random()*120; // 蛙種基頻 180-300Hz
-    let t=actx.currentTime;
-    for(let n=0;n<calls;n++){
-      const dur=0.08+Math.random()*0.07; // 每聲 80-150ms
-      // 主振盪：鋸齒，做共振峰
-      const osc=actx.createOscillator();
-      osc.type="sawtooth";
-      osc.frequency.setValueAtTime(baseF*(0.95+Math.random()*0.1),t);
-      osc.frequency.exponentialRampToValueAtTime(baseF*0.75,t+dur);
-      // 帶通濾波模擬聲道共振峰
-      const flt=actx.createBiquadFilter();
-      flt.type="bandpass";
-      flt.frequency.value=700+Math.random()*200;
-      flt.Q.value=6;
-      // 第二個共振峰（高頻「呱」的亮度）
-      const flt2=actx.createBiquadFilter();
-      flt2.type="bandpass";
-      flt2.frequency.value=1600+Math.random()*400;
-      flt2.Q.value=4;
-      const mix=actx.createGain();mix.gain.value=0.7;
-      const mix2=actx.createGain();mix2.gain.value=0.3;
-      // 脈衝顆粒感：用 LFO 調變振幅，50-80Hz 讓它聽起來「顆顆顆」
-      const lfo=actx.createOscillator();
-      lfo.type="square";
-      lfo.frequency.value=55+Math.random()*25;
-      const lfoG=actx.createGain();
-      lfoG.gain.value=0.5;
-      // 總包絡
-      const env=actx.createGain();
-      env.gain.setValueAtTime(0,t);
-      env.gain.linearRampToValueAtTime(0.12,t+0.01);
-      env.gain.setValueAtTime(0.10,t+dur*0.6);
-      env.gain.exponentialRampToValueAtTime(0.001,t+dur);
-      // 連接：osc -> flt & flt2 -> mix -> env(受 lfo 調變) -> masterGain
-      osc.connect(flt);osc.connect(flt2);
-      flt.connect(mix);flt2.connect(mix2);
-      mix.connect(env);mix2.connect(env);
-      lfo.connect(lfoG);lfoG.connect(env.gain);
-      env.connect(masterGain);
-      osc.start(t);osc.stop(t+dur+0.02);
-      lfo.start(t);lfo.stop(t+dur+0.02);
-      // 兩聲之間的間隔（青蛙通常 120-250ms）
-      t+=dur+0.12+Math.random()*0.13;
-    }
-  }
-
-  function startCicada(){
-    if(!actx)return;
-    const buf=mkNoise(2);
-    cicadaNode2=actx.createBufferSource();cicadaNode2.buffer=buf;cicadaNode2.loop=true;
-    cicadaFilter2=actx.createBiquadFilter();cicadaFilter2.type="bandpass";
-    cicadaFilter2.frequency.value=3500+Math.random()*1500;cicadaFilter2.Q.value=4+Math.random()*3;
-    cicadaGain2=actx.createGain();cicadaGain2.gain.value=.04;
-    cicadaLfo2=actx.createOscillator();cicadaLfo2.frequency.value=5+Math.random()*7;
-    cicadaLfoG2=actx.createGain();cicadaLfoG2.gain.value=.025;
-    cicadaLfo2.connect(cicadaLfoG2);cicadaLfoG2.connect(cicadaGain2.gain);cicadaLfo2.start();
-    cicadaNode2.connect(cicadaFilter2);cicadaFilter2.connect(cicadaGain2);cicadaGain2.connect(masterGain);
-    cicadaNode2.start();
-  }
-
-  function hasWeatherWind(){return mode==='wind'||mode==='storm'||mode==='typhoon'||mode==='cold'}
-  function hasWeatherRain(){return mode==='rain'||mode==='heavy'||mode==='storm'||mode==='typhoon'||mode==='snow'}
-  function wxSuppressSound(){return mode==='rain'||mode==='heavy'||mode==='storm'||mode==='typhoon'||mode==='snow'||mode==='fog'}
-  function soundEnabled(){
-    try{
-      if(typeof isFxEnabled==='function') return isFxEnabled('sound');
-      if(window&&typeof window.isFxEnabled==='function') return window.isFxEnabled('sound');
-    }catch(e){}
-    return true;
-  }
-
-  function setSeasonSnd(s){
-    const suppress=wxSuppressSound();
-    const key=s+'_'+(suppress?'wx':'')+mode+'_'+getTimeSlot();
-    if(key===seasonSnd)return;
-    stopSeasonSnd();
-    if(!soundEnabled()||muted||!_initialized||!actx)return;
-    seasonSnd=key;
-    if(suppress) return; // Weather sounds dominate
-
-    const ts=getTimeSlot();
-    if(s==='spring'){
-      if(ts==='morning'||ts==='day'){
-        // Random birds every 4-10s, varying species
-        const loop=()=>{chirpBird();seasonInterval=setTimeout(loop,4000+Math.random()*6000)};
-        seasonInterval=setTimeout(loop,1500+Math.random()*2000);
-      } else if(ts==='dusk'){
-        // Sparse birds + early crickets
-        const loop=()=>{if(Math.random()>.5)chirpBird(2);else chirpCricket();seasonInterval=setTimeout(loop,5000+Math.random()*8000)};
-        seasonInterval=setTimeout(loop,2000);
-      } else {
-        // Night: frogs + crickets
-        const cLoop=()=>{chirpCricket();seasonInterval=setTimeout(cLoop,2000+Math.random()*5000)};
-        seasonInterval=setTimeout(cLoop,1000);
-        const fLoop=()=>{croakFrog();frogInterval=setTimeout(fLoop,3000+Math.random()*8000)};
-        frogInterval=setTimeout(fLoop,2000+Math.random()*3000);
-      }
-    } else if(s==='summer'){
-      if(ts==='morning'||ts==='day'){
-        startCicada();
-        // Occasional bird too
-        const loop=()=>{if(Math.random()>.6)chirpBird(Math.floor(Math.random()*4));seasonInterval=setTimeout(loop,8000+Math.random()*12000)};
-        seasonInterval=setTimeout(loop,5000);
-      } else if(ts==='dusk'){
-        // Cicadas fading, crickets starting
-        startCicada();if(cicadaGain2)cicadaGain2.gain.value=.02;
-        const loop=()=>{chirpCricket();seasonInterval=setTimeout(loop,2500+Math.random()*4000)};
-        seasonInterval=setTimeout(loop,1500);
-      } else {
-        // Night: crickets + frogs, no cicadas
-        const cLoop=()=>{chirpCricket();seasonInterval=setTimeout(cLoop,1500+Math.random()*3500)};
-        seasonInterval=setTimeout(cLoop,800);
-        const fLoop=()=>{croakFrog();frogInterval=setTimeout(fLoop,4000+Math.random()*8000)};
-        frogInterval=setTimeout(fLoop,2000);
-      }
-    } else if(s==='autumn'){
-      // Soft wind only if weather isn't already providing wind
-      if(!hasWeatherWind()){startWind(false);if(windGain)windGain.gain.value=.02}
-      if(ts==='day'||ts==='morning'){
-        // Very sparse birds
-        const loop=()=>{if(Math.random()>.4)chirpBird(3);seasonInterval=setTimeout(loop,10000+Math.random()*15000)};
-        seasonInterval=setTimeout(loop,5000);
-      } else {
-        // Night: slow crickets
-        const loop=()=>{chirpCricket();seasonInterval=setTimeout(loop,3000+Math.random()*7000)};
-        seasonInterval=setTimeout(loop,2000);
-      }
-    } else if(s==='winter'){
-      if(!hasWeatherWind()){startWind(false);if(windGain)windGain.gain.value=.03;
-      if(windFilter){windFilter.frequency.value=150;windFilter.Q.value=.2}}
-    }
-  }
-
-  function getTimeSlot(){
-    const h=new Date().getHours();
-    if(h>=6&&h<10) return 'morning';
-    if(h>=10&&h<16) return 'day';
-    if(h>=16&&h<19) return 'dusk';
-    return 'night';
-  }
-
-  // Periodic check for time/weather changes (every 15s for responsiveness)
-  setInterval(()=>{
-    if(!_initialized||muted)return;
-    setSeasonSnd(getSeason());
-  },15000);
-
-  return{setMode,toggle,triggerThunder,isMuted,initAudio,setSeasonSnd,stopSeasonSnd,_forceSilence};
-})();
-try{window.WxSfx=WxSfx}catch(e){}
+// v309: one atmospheric renderer and one recorded-audio player.
+const WxSfx=NatureAudio.create();
+const WxFx=NatureEffects.create();
+window.WxSfx=WxSfx;window.WxFx=WxFx;
+try{_syncWeatherFx()}catch(e){}
 
 // ══════════════ AUTO DARK MODE（直接切換，不再漸暗） ══════════════
 (function(){
@@ -7048,7 +4873,7 @@ try{window.WxSfx=WxSfx}catch(e){}
       else document.documentElement.removeAttribute('data-theme');
     }
     const mt=document.querySelector('meta[name="theme-color"]');
-    if(mt) mt.setAttribute('content',darkUI?'#0c1424':'#eef2f8');
+    if(mt) mt.setAttribute('content',darkUI?'#0d1916':'#e7edea');
     const dim=document.getElementById('_dim');
     if(dim) dim.remove();
   }
@@ -7202,7 +5027,7 @@ function uiSalaryDashboardHtml(y,m){
   const pay5=getPayDay(payMY.y,payMY.m,5),pay20=getPayDay(payMY.y,payMY.m,20);
   const label=isZh?`${y} 年 ${m} 月`:`${String(m).padStart(2,'0')} / ${y}`;
   const period=`${py}/${String(pm).padStart(2,'0')}/26 – ${y}/${String(m).padStart(2,'0')}/25`;
-  const head=`<div class="salary-dashboard-head"><div class="period-navigation"><button class="icon-action previous" data-a="payPrev" aria-label="${isZh?'上個薪資月':'Bulan gaji sebelumnya'}">${uiIcon('chevron',18)}</button><h2>${label}</h2><button class="icon-action" data-a="payNext" aria-label="${isZh?'下個薪資月':'Bulan gaji berikutnya'}">${uiIcon('chevron',18)}</button></div><div class="period-caption"><span>${period}</span><button class="text-action" data-a="payLatest">${isZh?'最新':'Terbaru'}</button></div></div>`;
+  const head=`<div class="salary-dashboard-head"><div class="period-navigation"><button class="icon-action previous" data-a="payPrev" aria-label="${isZh?'上個薪資月':'Bulan gaji sebelumnya'}">${uiIcon('chevron',18)}</button><h2>${label}</h2><button class="icon-action" data-a="payNext" aria-label="${isZh?'下個薪資月':'Bulan gaji berikutnya'}">${uiIcon('chevron',18)}</button></div><div class="period-caption"><span>${period}</span><button class="text-action" data-a="payLatest">${isZh?'最近已結算':'Terbaru'}</button></div><button class="pay-current-action" data-a="payCurrent">${uiIcon('clock',15)}${isZh?'本期試算 · 請假後自動更新':'Periode aktif · otomatis setelah cuti'}${uiIcon('chevron',14)}</button></div>`;
   const est=calcSalaryEst(y,m);
   if(!est)return `<section class="salary-dashboard salary-empty">${head}<div class="salary-empty-copy">${studioIcon('money',34)}<h3>${isZh?'先設定，再掌握薪資':'Atur data gaji Anda'}</h3><p>${isZh?'填入固定應領、扣款與加班規則，即可查看預估實領。':'Masukkan data tetap untuk estimasi.'}</p><button class="salary-primary-action" data-a="salOpen">${isZh?'設定薪資資料':'Atur data gaji'}${uiIcon('arrow',17)}</button></div></section>`;
   const actual=est.hasSlip?est.official:null,display=actual||est;
@@ -7213,9 +5038,9 @@ function uiSalaryDashboardHtml(y,m){
   const meta=actual?(isZh?'自動讀取你已提供的薪資條；下方另外顯示班表計算與差額。':'Slip tersimpan dimuat otomatis; estimasi jadwal ditampilkan terpisah.') : est.missingComponents?(isZh?'缺少項目未當作 0 元結清，這不是完整實領。':'Komponen yang belum diketahui tidak dianggap nol.'):
     (isZh?'班表 × 公司規則 · 修改出勤後自動重算':'Jadwal × aturan · diperbarui otomatis');
   const metrics=est.dataPending?'':`<div class="salary-metrics"><div><strong>${est.workedDays===undefined?pp.wd:est.workedDays}<small>${isZh?'天':'hri'}</small></strong><span>${isZh?'扣假後出勤':'Kerja setelah cuti'}</span></div><div><strong>${Math.round((est.workedHours===undefined?pp.tH:est.workedHours)*100)/100}<small>h</small></strong><span>${isZh?'扣假後工時':'Jam setelah cuti'}</span></div><div><strong>${est.otH}<small>h</small></strong><span>${isZh?'估算加班':'Estimasi lembur'}</span></div></div>`;
-  const companyHours=actual?`<div class="salary-leave-meta"><b>${isZh?'公司時數':'Jam slip'}</b>${[['weekdayH','平日','Biasa'],['holidayH','假日','Libur'],['sickH','病假','Sakit'],['disasterH','天災假','Bencana']].filter(([k])=>actual[k]!==null).map(([k,zh,id])=>`<span>${isZh?zh:id} ${actual[k]}h</span>`).join('')}</div>`:'';
+  const companyHours=actual?`<div class="salary-leave-meta"><b>${isZh?'公司時數':'Jam slip'}</b>${[['weekdayH','平日','Biasa'],['holidayH','假日','Libur'],['sickH','病假','Sakit'],['disasterH','天災假','Bencana']].filter(([k])=>Payroll.number(actual[k])!==null).map(([k,zh,id])=>`<span>${isZh?zh:id} ${actual[k]}h</span>`).join('')}</div>`:'';
   const salaryRows=actual?studioSalaryRows(Object.assign({isSlip:true},actual)):studioSalaryRows(est);
-  return `<section class="salary-dashboard">${head}<div class="payroll-auto-badge">${isZh?'薪資紀錄 · 自動核算':'Catatan gaji · hitungan otomatis'}</div><div data-depth class="salary-hero${est.incomplete?' payroll-incomplete':''}"><div class="salary-hero-label"><span>${moneyTitle}</span><span class="salary-hero-seal" aria-hidden="true">${studioIcon(actual?'shield':'money',23)}</span></div><strong class="salary-net">${studioMoney(display.net)}</strong><p>${meta}</p></div><div class="salary-flow"><div class="salary-flow-label"><span>${isZh?'應領':'Pendapatan'}<b>${studioMoney(display.income)}</b></span><span>${isZh?'應扣':'Potongan'}<b>${studioMoney(display.deduction)}</b></span></div><div class="salary-flow-track" aria-hidden="true"><i style="width:${netPct}%"></i><b style="width:${dedPct}%"></b></div></div>${metrics}${companyHours}<div class="pay-calendar-row"><div>${studioIcon('money',20)}<span><small>${isZh?'發薪日':'Tanggal gaji'}</small><strong>${actual&&actual.payDate?esc(actual.payDate.slice(5).replace('-',' / ')):payMY.m+' / '+pay5}</strong></span></div><div>${studioIcon('award',20)}<span><small>${isZh?'績效獎金':'Bonus kinerja'}</small><strong>${payMY.m}<em> / </em>${pay20}</strong></span></div></div><details class="salary-breakdown" open><summary><span>${studioIcon('trend',18)}${actual?(isZh?'公司薪資明細':'Rincian slip'):(isZh?'估算明細':'Rincian estimasi')}</span>${uiIcon('chevron',18)}</summary><div class="salary-detail-list">${salaryRows}</div></details>${notes?`<aside class="payroll-callout"><strong>${isZh?'估算仍有待確認項目':'Estimasi perlu diperiksa'}</strong><ul>${notes}</ul><button class="text-action" data-a="salOpen">${isZh?'查看計算依據':'Lihat dasar perhitungan'}</button></aside>`:''}${salaryReconciliationHtml(est)?`<details class="salary-breakdown" open><summary>${isZh?'班表自動計算與公司差額':'Estimasi otomatis vs slip'}</summary>${salaryReconciliationHtml(est)}</details>`:''}<details class="salary-breakdown"><summary><span>${isZh?'估算公式與時數':'Rumus estimasi'}</span>${uiIcon('chevron',18)}</summary><div class="salary-detail-meta"><span>${isZh?'固定時薪':'Per jam'} $${est.hourly.toFixed(2)}</span><span>${isZh?'加班基數時薪':'Basis lembur'} $${est.otHourly.toFixed(2)}</span><span>${isZh?'請假基數時薪':'Basis cuti'} $${est.leaveHourly.toFixed(2)}</span></div><p class="payroll-help">${isZh?`病假合計 ${est.sickPayH||0}h，依每天生效的薪資 × 扣薪率 ${Math.round((est.sickRate||0)*100)}% 加總＝${studioMoney(est.sickDed)}。平日加班前段 ${est.totalFront||0}h、後段 ${est.totalBack||0}h。夜點 ${Math.round((est.nightCount||0)*100)/100} 班 × $${est.nightRate||0} ＝ ${studioMoney(est.nightPay)}。免稅與應稅不按比例推算。`:`Sakit tercatat ${est.sickH||0}h / dihitung ${est.sickPayH||0}h. Lembur tingkat 1: ${est.totalFront||0}h; tingkat 2: ${est.totalBack||0}h.`}</p></details>${salaryDailyAuditHtml(est)}<p class="salary-disclaimer">${studioIcon('info',16)}<span>${isZh?'依班表與已記錄的獎金自動試算；未登記的浮動獎金不在此金額內。':'Dihitung dari jadwal dan bonus tercatat; bonus yang belum tercatat tidak termasuk.'}</span></p></section>`;
+  return `<section class="salary-dashboard">${head}<div class="payroll-auto-badge">${isZh?'薪資紀錄 · 自動核算':'Catatan gaji · hitungan otomatis'}</div><div data-depth class="salary-hero${est.incomplete?' payroll-incomplete':''}"><div class="salary-hero-label"><span>${moneyTitle}</span><span class="salary-hero-seal" aria-hidden="true">${studioIcon(actual?'shield':'money',23)}</span></div><strong class="salary-net">${studioMoney(display.net)}</strong><p>${meta}</p></div><div class="salary-flow"><div class="salary-flow-label"><span>${isZh?'應領':'Pendapatan'}<b>${studioMoney(display.income)}</b></span><span>${isZh?'應扣':'Potongan'}<b>${studioMoney(display.deduction)}</b></span></div><div class="salary-flow-track" aria-hidden="true"><i style="width:${netPct}%"></i><b style="width:${dedPct}%"></b></div></div>${metrics}${companyHours}<div class="pay-calendar-row"><div>${studioIcon('money',20)}<span><small>${isZh?'發薪日':'Tanggal gaji'}</small><strong>${actual&&actual.payDate?esc(actual.payDate.slice(5).replace('-',' / ')):payMY.m+' / '+pay5}</strong></span></div><div>${studioIcon('award',20)}<span><small>${isZh?'績效獎金':'Bonus kinerja'}</small><strong>${payMY.m}<em> / </em>${pay20}</strong></span></div></div><details class="salary-breakdown" open><summary><span>${studioIcon('trend',18)}${actual?(isZh?'公司薪資明細':'Rincian slip'):(isZh?'估算明細':'Rincian estimasi')}</span>${uiIcon('chevron',18)}</summary><div class="salary-detail-list">${salaryRows}</div></details>${notes?`<aside class="payroll-callout"><strong>${isZh?'估算仍有待確認項目':'Estimasi perlu diperiksa'}</strong><ul>${notes}</ul><button class="text-action" data-a="salOpen">${isZh?'查看計算依據':'Lihat dasar perhitungan'}</button></aside>`:''}${salaryReconciliationHtml(est)?`<details class="salary-breakdown" open><summary>${isZh?'班表自動計算與公司差額':'Estimasi otomatis vs slip'}</summary>${salaryReconciliationHtml(est)}</details>`:''}<details class="salary-breakdown"><summary><span>${isZh?'估算公式與時數':'Rumus estimasi'}</span>${uiIcon('chevron',18)}</summary><div class="salary-detail-meta"><span>${isZh?'固定時薪':'Per jam'} $${est.hourly.toFixed(2)}</span><span>${isZh?'加班基數時薪':'Basis lembur'} $${est.otHourly.toFixed(2)}</span><span>${isZh?'請假基數時薪':'Basis cuti'} $${est.leaveHourly.toFixed(2)}</span></div><p class="payroll-help">${isZh?`病假合計 ${est.sickPayH||0}h，依每天生效的薪資 × 扣薪率 ${Math.round((est.sickRate||0)*100)}% 加總＝${studioMoney(est.sickDed)}。平日加班前段 ${est.totalFront||0}h、後段 ${est.totalBack||0}h。夜點 ${Math.round((est.nightCount||0)*100)/100} 班 × $${est.nightRate||0} ＝ ${studioMoney(est.nightPay)}。免稅與應稅不按比例推算。`:`Sakit tercatat ${est.sickH||0}h / dihitung ${est.sickPayH||0}h. Lembur tingkat 1: ${est.totalFront||0}h; tingkat 2: ${est.totalBack||0}h.`}</p></details>${salaryDailyAuditHtml(est)}${salaryHistoryHtml()}<p class="salary-disclaimer">${studioIcon('info',16)}<span>${isZh?'依班表與已記錄的獎金自動試算；未登記的浮動獎金不在此金額內。':'Dihitung dari jadwal dan bonus tercatat; bonus yang belum tercatat tidak termasuk.'}</span></p></section>`;
 }
 function uiPrecipChartHtml(d){
   if(!d||!Array.isArray(d.hTime)||!Array.isArray(d.hPrec))return'';
@@ -7390,7 +5215,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v308</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v309</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }
