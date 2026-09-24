@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v306-history-payroll';
+const CACHE_NAME = 'myshift-v307-cloud-break';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache

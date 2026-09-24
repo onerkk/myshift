@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#071113">
-<title>即時雷達 · 我頭上的雨</title>
+<title>即時雷達與雲層預估 · 我的班表</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>
@@ -111,6 +111,7 @@
 
   .legend{display:flex;align-items:center;gap:4px;margin-top:11px;font-family:var(--mono);font-size:10px;color:var(--tx3);flex-wrap:wrap}
   .legend .sw{height:9px;border-radius:2px;flex:1;min-width:14px}
+  .legend .sw.universal{min-width:80px;background:linear-gradient(90deg,#827b69,#88ddee,#0091ca,#00a3e0,#ffee00,#ffaa00,#ff4400,#ff77ff,#fff)}
   .legend .txt{white-space:nowrap}
 
   /* 浮動按鈕：回到定位 */
@@ -136,6 +137,9 @@
   .hidden{display:none!important}
 
   .leaflet-control-zoom{display:none}
+  .leaflet-control-attribution{background:rgba(7,17,19,.78)!important;color:#9db5af!important;border:1px solid var(--line);border-radius:8px 8px 0 0;padding:3px 7px!important;font:10px/1.4 var(--sans)!important;box-shadow:0 -3px 14px #0003;backdrop-filter:blur(12px)}
+  .leaflet-control-attribution a{color:#c2ded7!important}
+  #map .leaflet-tile-pane .leaflet-tile{filter:brightness(.62) saturate(.7) contrast(.94)}
   .leaflet-bar a{background:var(--panel-solid);color:var(--tx);border-color:var(--line)}
   .me-dot{width:16px;height:16px;border-radius:50%;background:var(--now);border:3px solid #fff;box-shadow:0 0 0 6px rgba(55,214,239,.25),0 2px 6px rgba(0,0,0,.6)}
 
@@ -143,6 +147,33 @@
 
   .backchip{display:inline-flex;align-items:center;gap:3px;margin-bottom:8px;padding:4px 11px 4px 8px;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;color:var(--tx2);font-family:var(--mono);font-size:11px;text-decoration:none;-webkit-tap-highlight-color:transparent}
   .backchip:active{background:rgba(255,255,255,.13)}
+
+  .radar-status{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:10px;font-weight:750;color:var(--tx3);white-space:nowrap}
+  .radar-status i{width:6px;height:6px;border-radius:50%;background:#6d8981;box-shadow:0 0 0 3px #78dfd011}
+  .radar-status.ok{color:#9fe2d3}.radar-status.ok i{background:#78dfd0;box-shadow:0 0 0 3px #78dfd028,0 0 12px #78dfd080}
+  .radar-status.error{color:#ff9ca6}.radar-status.error i{background:#ff6875;box-shadow:0 0 0 3px #ff68751d}
+  .cloud-summary{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 11px;border-radius:15px;background:linear-gradient(145deg,rgba(120,223,208,.13),rgba(14,42,43,.5));border:1px solid rgba(120,223,208,.19);box-shadow:inset 0 1px 0 #ffffff0c,0 4px 12px #0002;min-height:50px}
+  .cloud-summary-icon{width:31px;height:31px;display:grid;place-items:center;flex:none;border-radius:11px;color:#06211f;background:linear-gradient(145deg,#b4fff1,#55cabb);box-shadow:inset 1px 2px 2px #fff9,inset -1px -2px 2px #087e7650,0 3px 0 #176d67,0 5px 10px #0003;font-size:16px}
+  .cloud-summary-copy{min-width:0;flex:1}.cloud-summary-copy strong{display:block;font-size:12px;color:var(--tx);line-height:1.35}.cloud-summary-copy small{display:block;margin-top:2px;font-size:10px;color:var(--tx2);line-height:1.35}
+  .cloud-summary-arrow{width:28px;height:28px;display:grid;place-items:center;flex:none;color:var(--now);font-size:17px;border-radius:9px;background:#ffffff08;box-shadow:inset 0 1px 0 #ffffff14,0 2px 0 #0003}
+  .cloud-summary.pending .cloud-summary-icon{animation:cloudPulse 1.8s ease-in-out infinite}
+  @keyframes cloudPulse{50%{transform:translateY(-2px);box-shadow:inset 1px 2px 2px #fff9,0 0 16px #78dfd060,0 3px 0 #176d67}}
+  .cloud-summary.error{border-color:#ff687533;background:linear-gradient(145deg,#ff687512,#0e2a2b77)}
+  .cloudbox{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--tx2)}
+  .cloudbox .cloud-head{display:flex;align-items:center;gap:7px;margin-bottom:7px}.cloudbox .cloud-title{font-size:12px;color:var(--tx);font-weight:800}.cloudbox .cloud-src{font-size:9px;color:var(--tx3);margin-left:auto}
+  .cloudbox .cloud-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  .cloudbox .cloud-cell{position:relative;overflow:hidden;min-width:0;padding:8px 4px 7px;text-align:center;border-radius:13px;border:1px solid rgba(154,214,204,.12);background:linear-gradient(150deg,#ffffff0a,#ffffff03);box-shadow:inset 0 1px 0 #ffffff0c,0 3px 0 #0002;animation:cloudCellIn .45s both}
+  .cloudbox .cloud-cell:nth-child(2){animation-delay:.05s}.cloudbox .cloud-cell:nth-child(3){animation-delay:.1s}.cloudbox .cloud-cell:nth-child(4){animation-delay:.15s}
+  @keyframes cloudCellIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .cloudbox .cloud-hour{font-size:9px;color:var(--tx3)}.cloudbox .cloud-cover{display:block;margin:3px 0 2px;font-size:17px;line-height:1.1;font-weight:850;color:var(--tx)}
+  .cloudbox .cloud-wind{font-size:9px;color:#9fe2d3;white-space:nowrap}.cloudbox .cloud-conf{margin-top:6px;font-size:9px;color:var(--tx3);line-height:1.5}
+  .cloudbox.err .cloud-conf{color:#ffacb4}
+  .leaflet-pane.leaflet-forecast-pane{z-index:560;pointer-events:none}
+  .cloud-route-path{stroke-dasharray:8 9;animation:routeFlow 2.3s linear infinite;filter:drop-shadow(0 0 4px #78dfd099)}
+  @keyframes routeFlow{to{stroke-dashoffset:-34}}
+  .cloud-route-end{display:flex;align-items:center;gap:5px;white-space:nowrap;color:#052320;font:800 10px/1 var(--sans);padding:6px 8px;border:1px solid #bcfff2;border-radius:11px;background:linear-gradient(145deg,#cafff3,#6bd8ca);box-shadow:inset 1px 2px 2px #fff,0 3px 0 #217e75,0 7px 15px #0007;transform:translateY(-2px);animation:routeBob 2.4s ease-in-out infinite}
+  .cloud-route-end b{display:inline-block;font-size:14px;transform:rotate(var(--arrow,0deg));text-shadow:0 1px 0 #fff7}
+  @keyframes routeBob{50%{transform:translateY(-6px)}}
 
 
   /* APEX ATELIER RADAR — coherent with the flagship app shell */
@@ -161,6 +192,36 @@
   .ftime{font-family:var(--sans);font-size:25px;font-weight:850;letter-spacing:-.035em}.ftag,.fwhen,.rlabels,.legend{font-family:var(--sans)}.ftag{padding:4px 8px}.play{height:48px;border-radius:15px;background:var(--now);font-size:14px}.step{width:48px;height:48px;border-radius:15px}.fab{width:50px;height:50px;border-radius:16px;background:var(--panel-solid);border-color:var(--line)}.credit{border-radius:10px;background:var(--panel);border-color:var(--line);font-family:var(--sans)}
   input[type=range]::-webkit-slider-thumb{border-color:var(--now)}.nowmark{background:var(--now)}
 
+  /* v307: compact, tactile weather console with a clear model-vs-radar hierarchy. */
+  :root{--panel:rgba(8,25,27,.91);--panel-solid:#0c2022;--line:rgba(153,224,211,.2);--now:#7be0d1;--fore:#ffc16d}
+  body{background:radial-gradient(80% 56% at 15% -5%,#24786d25,transparent 75%),#061012}
+  #map{background:#071416}
+  .topcard,.ctrlcard{border-color:rgba(153,224,211,.22);box-shadow:inset 0 1px 0 #ffffff13,inset 0 -2px 0 #01080950,0 18px 48px #0008,0 2px 0 #24504c75}
+  .topcard{max-height:calc(100vh - 276px - env(safe-area-inset-bottom));max-height:calc(100dvh - 276px - env(safe-area-inset-bottom));overflow:auto;scrollbar-width:thin;scrollbar-color:#496b65 transparent}
+  .topcard::-webkit-scrollbar{width:4px}.topcard::-webkit-scrollbar-thumb{background:#496b65;border-radius:9px}
+  .backchip,.cardtoggle,.step,.fab{transition:transform .16s ease,box-shadow .16s ease,background .16s ease,border-color .16s ease}
+  .backchip{box-shadow:inset 0 1px 0 #ffffff12,0 3px 0 #051012;}
+  .backchip:active,.cardtoggle:active,.step:active,.fab:active{transform:translateY(2px);box-shadow:inset 0 2px 5px #0007}
+  .loc{gap:8px}.loc .pin{box-shadow:0 0 0 4px #78dfd01b,0 0 18px #78dfd050}
+  .verdict{padding-left:2px}.verdict b{color:#d8fff7}
+  .ministat{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}.ministat>span{padding:5px 8px;border-radius:9px;background:#ffffff08;box-shadow:inset 0 1px 0 #ffffff08,0 2px 0 #0004}
+  .cardtoggle{min-height:40px;padding:9px 11px;border-radius:13px;color:#d6e8e4;background:linear-gradient(145deg,#172d2f,#0b1b1d);border-color:#41635d65;box-shadow:inset 0 1px 0 #ffffff15,inset 0 -2px 0 #0006,0 3px 0 #081012,0 6px 14px #0003}
+  .rainbox,.fcbox,.cloudbox{font-family:var(--sans)}.rainbox .rb-cell,.fcbox .fc-cell{border-radius:12px;background:linear-gradient(145deg,#ffffff0a,#ffffff04);box-shadow:inset 0 1px 0 #ffffff0c,0 3px 0 #0003}
+  .ctrlcard{padding:12px 14px 13px}.frameline{align-items:center;margin-bottom:7px}.ftime{font-size:23px}.fwhen{font-size:10px}
+  .track{height:32px}.rail{height:5px;top:13px;background:linear-gradient(90deg,#263e42 0 var(--split,70%),#f6a72344 var(--split,70%) 100%);box-shadow:inset 0 1px 2px #0008,0 1px 0 #ffffff12}
+  input[type=range]::-webkit-slider-thumb{width:23px;height:23px;margin-top:-9px;background:radial-gradient(circle at 38% 32%,#fff,#c5fff5 56%,#61d6c6 58%);border:3px solid #f5fffc;box-shadow:0 0 0 3px #78dfd04d,0 4px 9px #0008}
+  .buttons{gap:9px;margin-top:8px}.play{height:48px;color:#072623;background:linear-gradient(145deg,#bbfff2,#6cdccb 58%,#49b9ab);border:1px solid #c3fff3;box-shadow:inset 1px 2px 2px #fff,inset -2px -3px 3px #16877d45,0 4px 0 #236f68,0 8px 17px #0005;font-weight:850;transition:transform .16s ease,filter .16s ease}
+  .play:hover{filter:brightness(1.06)}.play:active{transform:translateY(3px);box-shadow:inset 2px 3px 5px #0a655d77,0 1px 0 #236f68}
+  .step{background:linear-gradient(145deg,#1a3032,#0d1e20);box-shadow:inset 0 1px 0 #ffffff13,inset 0 -2px 0 #0007,0 3px 0 #071012,0 6px 12px #0004}
+  .legend{margin-top:9px;font-size:9px}.legend .sw{height:8px;border-radius:4px;box-shadow:inset 0 1px 0 #ffffff55,0 2px 3px #0005}
+  .fab{background:linear-gradient(145deg,#183538,#0a1b1d);border-color:#55817a80;box-shadow:inset 1px 2px 2px #ffffff16,0 4px 0 #071012,0 9px 19px #0006;font-size:19px}
+  .credit{background:rgba(8,25,27,.88);box-shadow:inset 0 1px 0 #ffffff0d,0 3px 0 #040b0c,0 6px 16px #0005}.credit a{color:#c1e9e2}
+  .leaflet-bottom{bottom:calc(212px + env(safe-area-inset-bottom))!important;right:6px!important}
+  .overlay{background:radial-gradient(ellipse at 50% 40%,#153635,#061012 67%)}.spinner{border-color:#243e3b;border-top-color:var(--now)}
+  @media(max-height:680px){.topcard{max-height:calc(100vh - 242px - env(safe-area-inset-bottom));max-height:calc(100dvh - 242px - env(safe-area-inset-bottom));padding:10px 12px}.cloud-summary{margin-top:7px;padding:8px}.ctrlcard{padding:10px 12px}.legend{margin-top:7px}.leaflet-bottom{bottom:calc(194px + env(safe-area-inset-bottom))!important}}
+  @media(max-width:380px){.coords{font-size:9px}.radar-status{font-size:9px}.cloud-summary-copy strong{font-size:11px}.cloudbox .cloud-wind{font-size:8px}.legend .txt:last-child{width:100%;margin-left:0!important}}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+
 </style>
 </head>
 <body>
@@ -169,18 +230,20 @@
 <div class="top">
   <div class="topcard">
     <a class="backchip" href="./" onclick="if(history.length>1){history.back();return false}">‹ 班表</a>
-    <div class="loc"><span class="pin"></span><span id="locName">定位中…</span><span class="coords" id="coords"></span></div>
-    <div class="verdict" id="verdict">讀取雷達回波…</div>
+    <div class="loc"><span class="pin"></span><span id="locName">定位中…</span><span class="coords" id="coords"></span><span class="radar-status" id="radarStatus"><i></i><span>雷達連線中</span></span></div>
+    <div class="verdict" id="verdict">正在取得最新雷達圖資…</div>
+    <div class="cloud-summary pending" id="cloudSummary"><span class="cloud-summary-icon">☁</span><span class="cloud-summary-copy"><strong>雲層趨勢預估</strong><small>取得未來 4 小時雲量與風場…</small></span><span class="cloud-summary-arrow">›</span></div>
     <div class="ministat" id="miniStat" style="display:none"><span id="rainMini">雨量 —</span><span id="fcMini">未來 —</span></div>
-    <button class="cardtoggle" id="cardToggle">▾ 詳細雨量・未來機率</button>
+    <button class="cardtoggle" id="cardToggle" aria-expanded="false">▾ 雨量・逐時雲況・降雨機率</button>
     <div id="cardBody" style="display:none">
       <div class="rainbox" id="rainBox" style="display:none"></div>
       <div class="fcbox" id="fcStrip" style="display:none"></div>
+      <div class="cloudbox" id="cloudBox" style="display:none"></div>
     </div>
   </div>
 </div>
 
-<div class="credit">雷達 © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a> · <span id="verStamp">v10</span></div>
+<div class="credit">雷達 <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a> · 地圖 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>
 <button class="fab" id="recenter" aria-label="回到我的位置" title="回到我的位置">◎</button>
 
 <div class="ctrl">
@@ -195,7 +258,7 @@
       <div class="nowmark" id="nowmark"></div>
       <input type="range" id="slider" min="0" max="0" value="0" step="1" aria-label="雷達時間">
     </div>
-    <div class="rlabels"><span id="lblPast">過去 30 分</span><span></span><span id="lblNow">最新</span></div>
+    <div class="rlabels"><span id="lblPast">過去 60 分</span><span></span><span id="lblNow">最新</span></div>
     <div class="buttons">
       <button class="step" id="prev" aria-label="上一格">‹</button>
       <button class="play" id="play"><span id="playIcon">▶</span><span id="playTxt">播放</span></button>
@@ -203,13 +266,9 @@
     </div>
     <div class="legend">
       <span class="txt">弱</span>
-      <span class="sw" style="background:#00b3ff"></span>
-      <span class="sw" style="background:#00d56a"></span>
-      <span class="sw" style="background:#f7e400"></span>
-      <span class="sw" style="background:#ff8a00"></span>
-      <span class="sw" style="background:#ff2d2d"></span>
+      <span class="sw universal" aria-label="RainViewer Universal Blue 強度色階"></span>
       <span class="txt">強</span>
-      <span class="txt" style="margin-left:8px;color:var(--tx2)">看你位置標記下方的顏色，往哪移動</span>
+      <span class="txt" style="margin-left:8px;color:var(--tx2)">彩色為實測回波・虛線為 4 小時雲流估算</span>
     </div>
   </div>
 </div>
@@ -223,18 +282,21 @@
   </div>
 </div>
 
+<script src="./cloud-forecast.js?v=307-cloud-track"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 (function(){
   "use strict";
   var RV_API="https://api.rainviewer.com/public/weather-maps.json";
-  var COLOR=4, SIZE=256, SMOOTH=1, SNOW=1; // RainViewer 色階 4，平滑
-  var map, meMarker, frames=[], layers=[], idx=0, playing=false, timer=null, refresh=null, refreshRain=null, me=null, liveIdx=0;
+  var COLOR=2, SIZE=256, SMOOTH=1, SNOW=1; // RainViewer 2026 僅提供 Universal Blue 色階 2
+  var map, meMarker, frames=[], layers=[], cloudPathLayer=null, idx=0, playing=false, timer=null, refresh=null, refreshRain=null, me=null, liveIdx=0, cloudAbort=null, cloudRevision=0;
 
   var $=function(id){return document.getElementById(id)};
   function pad(n){return (n<10?"0":"")+n}
   function hhmm(unix){var d=new Date(unix*1000);return pad(d.getHours())+":"+pad(d.getMinutes())}
+  function hhmmMs(ms){var d=new Date(ms);return pad(d.getHours())+":"+pad(d.getMinutes())}
+  function setRadarStatus(kind,text){var el=$("radarStatus");if(!el)return;el.className="radar-status"+(kind?" "+kind:"");el.lastElementChild.textContent=text}
 
   function fail(title,text,retry){
     $("ovSpin").classList.add("hidden");
@@ -245,33 +307,42 @@
   function hideOverlay(){ $("overlay").classList.add("hidden"); }
 
   function initMap(lat,lon){
-    map=L.map("map",{zoomControl:false,attributionControl:false,minZoom:5,maxZoom:12}).setView([lat,lon],8);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      {subdomains:"abcd",maxZoom:19,detectRetina:true}).addTo(map);
+    map=L.map("map",{zoomControl:false,attributionControl:true,minZoom:5,maxZoom:11}).setView([lat,lon],8);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(map);
     var icon=L.divIcon({className:"",html:'<div class="me-dot"></div>',iconSize:[16,16],iconAnchor:[8,8]});
     meMarker=L.marker([lat,lon],{icon:icon,interactive:false,zIndexOffset:1000}).addTo(map);
     map.createPane("radar"); map.getPane("radar").style.zIndex=350;
+    map.createPane("forecast"); map.getPane("forecast").style.zIndex=560; map.getPane("forecast").classList.add("leaflet-forecast-pane");
+    cloudPathLayer=L.layerGroup().addTo(map);
   }
 
   function buildFrames(data){
     var host=data.host, r=data.radar||{};
-    var past=(r.past||[]).map(function(f){return {time:f.time,path:f.path,kind:"past"}});
-    // 只保留最近約半小時（4 格 ≈ 30-40 分），不做 2 小時整段
-    var KEEP=4;
+    if(!host||!Array.isArray(r.past)) throw new Error("雷達服務沒有提供歷史圖層");
+    var past=r.past.filter(function(f){return f&&Number.isFinite(Number(f.time))&&typeof f.path==="string"&&f.path.indexOf("/v2/radar/")===0;})
+      .map(function(f){return {time:Number(f.time),path:f.path,kind:"past"};}).sort(function(a,b){return a.time-b.time;});
+    // RainViewer currently serves a two-hour archive; show the latest 60 minutes to keep motion readable.
+    var KEEP=7;
     if(past.length>KEEP) past=past.slice(-KEEP);
-    var now=(r.nowcast||[]).map(function(f){return {time:f.time,path:f.path,kind:"fore"}});
-    frames=past.concat(now);
-    if(past.length) frames[past.length-1].kind="live"; // 最後一格實測 = 現在
+    if(!past.length) throw new Error("目前沒有可用的雷達影像");
+    frames=past;
+    frames[frames.length-1].kind="live"; // latest archive image; it may lag the wall clock
     // 清掉舊圖層
     layers.forEach(function(L_){ if(L_) map.removeLayer(L_); });
     layers=frames.map(function(f){
       return L.tileLayer(host+f.path+"/"+SIZE+"/{z}/{x}/{y}/"+COLOR+"/"+SMOOTH+"_"+SNOW+".png",
         {tileSize:SIZE,opacity:0,pane:"radar",crossOrigin:false,updateWhenZooming:false,
-         maxNativeZoom:7,maxZoom:12}); // RainViewer 圖磚最高 zoom 7，超過則放大顯示
+         maxNativeZoom:7,maxZoom:11}); // RainViewer 圖磚最高 zoom 7，超過則放大顯示
     });
-    layers.forEach(function(L_){ L_.addTo(map); });
+    layers.forEach(function(L_,k){
+      var errors=0;
+      L_.on("tileload",function(){if(k===idx)setRadarStatus("ok","雷達圖磚正常");});
+      L_.on("tileerror",function(){errors++;if(k===idx&&errors>=2)setRadarStatus("error","雷達影像載入失敗");});
+      L_.addTo(map);
+    });
 
-    // 時間軸：現在分隔點位置
+    // 時間軸：最新雷達圖資分隔點位置
     var liveAt = past.length? (past.length-1) : 0;
     liveIdx = liveAt;
     var split = frames.length>1 ? (liveAt/(frames.length-1))*100 : 100;
@@ -280,7 +351,7 @@
     // 時間軸左標籤：顯示實際涵蓋分鐘數（不再寫死「2 小時」）
     var spanMin = frames.length>1 ? Math.round((frames[liveAt].time - frames[0].time)/60) : 0;
     var lp=$("lblPast"); if(lp) lp.textContent = spanMin>0 ? ("過去 "+spanMin+" 分") : "過去";
-    // 預設停在「最新」那格（與上方雷達時間對齊）；不自動播，要看移動再按 ▶
+    // 停在最後一筆已發布雷達影像；雲層模式推估獨立繪製於地圖上。
     show(liveAt);
     if(playing) play(); // 5 分鐘 refresh 時若正在播放就續播，否則停在最新
   }
@@ -294,27 +365,24 @@
     $("slider").value=String(i);
     var tag=$("ftag");
     tag.className="ftag "+(f.kind==="live"?"live":f.kind==="fore"?"fore":"past");
-    tag.textContent=f.kind==="live"?"現在 · 實測":f.kind==="fore"?"預報":"過去";
+    tag.textContent=f.kind==="live"?"最新 · 雷達":"過去 · 雷達";
     var diffMin=Math.round((f.time - Date.now()/1000)/60);
-    $("fwhen").textContent = f.kind==="live" ? "剛剛觀測"
-      : (diffMin>=0?("+"+diffMin+" 分（推估）"):(diffMin+" 分"));
+    $("fwhen").textContent = f.kind==="live" ? (diffMin<0?Math.abs(diffMin)+" 分前更新":"最新圖資") : (diffMin+" 分");
     updateVerdict();
   }
 
   function updateVerdict(){
     var live=null; for(var k=0;k<frames.length;k++){ if(frames[k].kind==="live") live=frames[k]; }
-    var hasFore=frames.some(function(f){return f.kind==="fore"});
     var html='<span class="dot" style="background:var(--now)"></span>'
-      +'最新雷達 <b>'+(live?hhmm(live.time):"--:--")+'</b> 觀測。';
-    html+=' 按 ▶ 看最近半小時移動，判斷往哪走。';
-    html+='<br><span style="color:var(--tx3)">雷達只到「現在」（免費版無未來推估）；未來請看下方「降雨機率」（模型估算）。</span>';
+      +'最新雷達圖資 <b>'+(live?hhmm(live.time):"--:--")+'</b>。按播放檢視最近 60 分鐘回波。';
+    html+='<br><span style="color:var(--tx3)">虛線是風場與雲量模式推估；不代表未來雷達實測。</span>';
     $("verdict").innerHTML=html;
   }
 
   function play(){ if(!frames.length) return; playing=true; $("playIcon").textContent="❚❚"; $("playTxt").textContent="暫停";
     clearInterval(timer);
     var end=frames.length-1;
-    if(idx>=end) show(0); // 從 2 小時前（最左）開始整段播放到現在
+    if(idx>=end) show(0); // 從所保留的最早雷達影像播放至最新圖資
     timer=setInterval(function(){ var n=idx+1; if(n>end) n=0; show(n); }, 550);
   }
   function pause(){ playing=false; $("playIcon").textContent="▶"; $("playTxt").textContent="播放"; clearInterval(timer); }
@@ -324,9 +392,10 @@
     fetch(RV_API,{cache:"no-store"}).then(function(r){
       if(!r.ok) throw new Error("HTTP "+r.status); return r.json();
     }).then(function(data){
-      buildFrames(data); hideOverlay();
+      buildFrames(data); setRadarStatus("ok","雷達圖資已更新"); hideOverlay();
     }).catch(function(e){
-      fail("雷達讀取失敗","連不上雷達服務，稍後重試。("+e.message+")",function(){ $("overlay").classList.add("hidden"); start(); });
+      if(map){setRadarStatus("error","雷達資料暫不可用");$("verdict").textContent="暫時讀不到最新雷達資料；仍可查看雲層模式推估。";hideOverlay();}
+      else fail("雷達讀取失敗","連不上雷達服務，稍後重試。",start);
     });
   }
 
@@ -382,7 +451,7 @@
   }
 
   // ── 未來降雨機率：CWA 鄉鎮預報（模型，非雷達）──
-  var FCAST_HOURS=3; // 未來 3 小時，涵蓋 1-2 小時需求
+  var FCAST_HOURS=4; // 逐時降雨機率與雲層預估同看未來四小時
   function _hourKey(d){ // → "YYYY-MM-DDTHH"（本地台灣時間，對齊 CWA key）
     function p(n){return (n<10?"0":"")+n;}
     return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours());
@@ -407,9 +476,9 @@
          html+='<div class="fc-cell"><div class="fc-h">'+(cells[j].hour<10?"0":"")+cells[j].hour+'時</div><div class="fc-ic">'+ic+'</div><div class="fc-p '+cls+'">'+p+'%</div></div>';
        }
        box.className="fcbox";
-       box.innerHTML='<div class="fc-head"><span class="fc-title">未來降雨機率</span><span class="fc-src">中央氣象署 · 模型</span></div><div class="fc-grid">'+html+'</div><div class="fc-note">模型預報，非雷達實測；夏季對流常偏高，請以上方雷達實況為準。</div>';
+       box.innerHTML='<div class="fc-head"><span class="fc-title">未來降雨機率</span><span class="fc-src">中央氣象署 · 模型</span></div><div class="fc-grid">'+html+'</div><div class="fc-note">逐時模型機率，非雷達實況；目前仍以最新雷達回波與雨量站觀測為準。</div>';
        box.style.display="";
-       // 常駐精簡列：未來 1-2 小時最高機率
+       // 常駐精簡列：未來四小時最高降雨機率
        var mx=0; for(var k=0;k<cells.length;k++){ if(cells[k].pop>mx) mx=cells[k].pop; }
        $("fcMini").innerHTML='未來 <b class="'+(mx>=60?"mwet":"")+'">'+mx+'%</b>';
        $("miniStat").style.display="";
@@ -417,11 +486,50 @@
      .catch(function(){ box.style.display="none"; $("fcMini").textContent="未來 —"; });
   }
 
+  var COMPASS=["北","北北東","東北","東北東","東","東南東","東南","南南東","南","南南西","西南","西南西","西","西北西","西北","北北西"];
+  function compass(degrees){return degrees==null?"方向不明":COMPASS[Math.round(degrees/22.5)%16]}
+  function cloudArrow(degrees){return degrees==null?"•":"➤"}
+  function renderCloudForecast(result){
+    var summary=$("cloudSummary"), box=$("cloudBox");
+    if(cloudPathLayer)cloudPathLayer.clearLayers();
+    if(!result||!result.ok){
+      summary.className="cloud-summary error";
+      summary.innerHTML='<span class="cloud-summary-icon">☁</span><span class="cloud-summary-copy"><strong>雲流方向暫無法估算</strong><small>'+(result&&result.reason==="wind"?"模式未提供可用高空風場或雲層偏少":"雲況資料暫時無法取得")+'；稍後自動重試</small></span><span class="cloud-summary-arrow">↻</span>';
+      box.className="cloudbox err";box.innerHTML='<div class="cloud-head"><span class="cloud-title">未來 4 小時雲況</span><span class="cloud-src">模式資料</span></div><div class="cloud-conf">目前沒有足夠雲層與高空風場資料形成可靠路徑。這不影響雷達實測回波。</div>';box.style.display="";
+      return;
+    }
+    var end=result.points[result.points.length-1], direction=compass(result.bearing), distance=result.distanceKm<10?result.distanceKm.toFixed(1):Math.round(result.distanceKm), certainty={good:"方向一致",medium:"中等參考",low:"方向有分歧",sparse:"雲量偏少"}[result.confidence]||"模式推估";
+    summary.className="cloud-summary";
+    summary.innerHTML='<span class="cloud-summary-icon">☁</span><span class="cloud-summary-copy"><strong>'+(result.bearing===null?"目前雲流方向不明確":"雲層約往 "+direction+" 移動 · 4 小時約 "+distance+" km")+'</strong><small>末段雲量 '+(end.cloudCover==null?"—":Math.round(end.cloudCover)+"%")+' · '+certainty+' · 模式推估</small></span><span class="cloud-summary-arrow">'+cloudArrow(result.bearing)+'</span>';
+    var cells=result.points.slice(1).map(function(p){var bearing=p.bearing==null?"—":compass(p.bearing),speed=Math.round(p.speed);return '<div class="cloud-cell"><div class="cloud-hour">'+hhmmMs(p.time)+'</div><strong class="cloud-cover">'+(p.cloudCover==null?"—":Math.round(p.cloudCover)+"%")+'</strong><div class="cloud-wind">'+bearing+' '+speed+' km/h</div></div>';}).join("");
+    box.className="cloudbox";box.innerHTML='<div class="cloud-head"><span class="cloud-title">雲層路徑・每小時</span><span class="cloud-src">Open-Meteo 模式</span></div><div class="cloud-grid">'+cells+'</div><div class="cloud-conf"><span class="break-pill">'+certainty+'</span> 雲量與高空風場推估；虛線為移動方向示意，不是雲圖或雷達影像。</div>';box.style.display="";
+    if(!map||!cloudPathLayer)return;
+    if(result.bearing!==null){
+      var coords=result.points.map(function(p){return [p.lat,p.lon]});
+      L.polyline(coords,{pane:"forecast",color:"#78dfd0",weight:4,opacity:.88,dashArray:"8 9",lineCap:"round",className:"cloud-route-path"}).addTo(cloudPathLayer);
+      result.points.slice(1,4).forEach(function(p,i){
+        L.circleMarker([p.lat,p.lon],{pane:"forecast",radius:4+i*.8,color:"#d2fff6",weight:2,opacity:.9,fillColor:"#55cabb",fillOpacity:.9}).addTo(cloudPathLayer);
+      });
+      var endIcon=L.divIcon({className:"",html:'<div class="cloud-route-end"><span>＋4h</span><b style="--arrow:'+result.bearing+'deg">↑</b></div>',iconSize:[54,28],iconAnchor:[7,15]});
+      L.marker([end.lat,end.lon],{pane:"markerPane",icon:endIcon,interactive:false,zIndexOffset:1200}).addTo(cloudPathLayer);
+    }
+  }
+  function loadCloudForecast(){
+    if(!me||!window.CloudForecast)return;
+    if(cloudAbort)cloudAbort.abort();cloudAbort=new AbortController();var controller=cloudAbort,revision=++cloudRevision,summary=$("cloudSummary");
+    summary.className="cloud-summary pending";
+    fetch(CloudForecast.createUrl(me.lat,me.lon),{cache:"no-store",signal:controller.signal})
+      .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+      .then(function(data){if(revision!==cloudRevision)return;renderCloudForecast(CloudForecast.build(data,{lat:me.lat,lon:me.lon,now:Date.now()}));})
+      .catch(function(e){if(e&&e.name==="AbortError")return;if(revision!==cloudRevision)return;renderCloudForecast({ok:false,reason:"network"});});
+  }
+
   var cardOpen=false;
   function toggleCard(){
     cardOpen=!cardOpen;
     $("cardBody").style.display=cardOpen?"":"none";
-    $("cardToggle").textContent=cardOpen?"▴ 收合":"▾ 詳細雨量・未來機率";
+    $("cardToggle").textContent=cardOpen?"▴ 收合詳細資料":"▾ 雨量・逐時雲況・降雨機率";
+    $("cardToggle").setAttribute("aria-expanded",String(cardOpen));
   }
   // 把「你的位置」往畫面下方移，避開上方資訊卡，讓雲圖露出來
   function offsetMapForCard(zoom){
@@ -440,7 +548,8 @@
     loadRadar();
     loadRain();
     loadForecast();
-    clearInterval(refresh); refresh=setInterval(function(){ loadRadar(); loadForecast(); }, 5*60*1000); // 雷達／預報每 5 分鐘同步
+    loadCloudForecast();
+    clearInterval(refresh); refresh=setInterval(function(){ loadRadar(); loadForecast(); loadCloudForecast(); }, 5*60*1000); // 每 5 分鐘重抓模式與雷達資料
     clearInterval(refreshRain); refreshRain=setInterval(loadRain, 60*1000); // 官方雨量觀測每分鐘檢查一次，仍以觀測時間與距離判可信度
   }
   function geoError(err){
