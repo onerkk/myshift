@@ -2190,7 +2190,7 @@ function uiLeaveSummaryHtml(y,m){
 }
 function natureControlsHtml(){
   const zh=lang==='zh',quality=WxFx.getQuality(),volume=Math.round(WxSfx.getVolume()*100);
-  return `<section class="nature-controls"><div class="nature-controls-head"><span class="nature-emblem" aria-hidden="true">${studioIcon('sun',22)}</span><div><h3>${zh?'自然光景':'Suasana alam'}</h3><p>${zh?'光線有層次，聲音來自現場':'Cahaya berlapis, rekaman lapangan'}</p></div><span class="nature-live">${zh?'實地錄音':'Rekaman asli'}</span></div><div class="nature-level" role="group" aria-label="${zh?'動畫密度':'Kepadatan animasi'}">${[['subtle','輕柔','Lembut'],['balanced','自然','Alami'],['rich','豐富','Kaya']].map(([v,z,id])=>`<button onclick="WxFx.setQuality('${v}');render()" aria-pressed="${quality===v}" class="${quality===v?'active':''}">${zh?z:id}</button>`).join('')}</div><label class="nature-volume"><span>${zh?'環境音量':'Volume'}</span><input type="range" min="0" max="100" value="${volume}" aria-label="${zh?'環境音量':'Volume ambience'}" oninput="WxSfx.setVolume(this.value/100);this.nextElementSibling.value=this.value+'%'"/><output>${volume}%</output></label><small class="nature-audio-status">${WxSfx.isMuted()?(zh?'已靜音，開啟上方聲音開關即可聆聽':'Aktifkan suara di atas untuk mendengar'):(zh?'實地錄音依天氣與時段切換':'Rekaman mengikuti cuaca dan waktu')}</small><div class="nature-previews"><span>${zh?'試看 8 秒':'Pratinjau 8 dtk'}</span>${[['clear','日光','Cerah'],['rain','雨幕','Hujan'],['wind','風葉','Angin']].map(([v,z,id])=>`<button onclick="previewNature('${v}',this)">${zh?z:id}</button>`).join('')}</div><p class="nature-preview-state" role="status"></p><a href="./audio/nature/ATTRIBUTION.md" target="_blank" rel="noopener">${zh?'錄音來源與授權':'Sumber & lisensi rekaman'} ↗</a></section>`;
+  return `<section class="nature-controls"><div class="nature-controls-head"><span class="nature-emblem" aria-hidden="true">${studioIcon('sun',22)}</span><div><h3>${zh?'自然光景':'Suasana alam'}</h3><p>${zh?'光線有層次，聲音來自現場':'Cahaya berlapis, rekaman lapangan'}</p></div><span class="nature-live">${zh?'實地錄音':'Rekaman asli'}</span></div><div class="nature-level" role="group" aria-label="${zh?'動畫密度':'Kepadatan animasi'}">${[['subtle','輕柔','Lembut'],['balanced','自然','Alami'],['rich','沉浸','Imersif']].map(([v,z,id])=>`<button onclick="WxFx.setQuality('${v}');render()" aria-pressed="${quality===v}" class="${quality===v?'active':''}">${zh?z:id}</button>`).join('')}</div><label class="nature-volume"><span>${zh?'環境音量':'Volume'}</span><input type="range" min="0" max="100" value="${volume}" aria-label="${zh?'環境音量':'Volume ambience'}" oninput="WxSfx.setVolume(this.value/100);this.nextElementSibling.value=this.value+'%'"/><output>${volume}%</output></label><small class="nature-audio-status">${WxSfx.isMuted()?(zh?'已靜音，開啟上方聲音開關即可聆聽':'Aktifkan suara di atas untuk mendengar'):(zh?'實地錄音依天氣與時段切換':'Rekaman mengikuti cuaca dan waktu')}</small><div class="nature-previews"><span>${zh?'試看 8 秒':'Pratinjau 8 dtk'}</span>${[['clear','日光','Cerah'],['cloud','雲層','Awan'],['rain','雨幕','Hujan'],['wind','風葉','Angin']].map(([v,z,id])=>`<button onclick="previewNature('${v}',this)">${zh?z:id}</button>`).join('')}</div><p class="nature-preview-state" role="status"></p><a href="./audio/nature/ATTRIBUTION.md" target="_blank" rel="noopener">${zh?'錄音來源與授權':'Sumber & lisensi rekaman'} ↗</a></section>`;
 }
 function previewNature(mode,button){
   WxFx.preview(mode);const label=button.closest('.nature-controls').querySelector('.nature-preview-state');
@@ -4852,7 +4852,7 @@ function rStats(){
   <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--tx2);margin-top:4px"><span>${isZh?"已用":"Terpakai"} ${alUsedCalc}h</span><span>${isZh?"剩餘":"Sisa"} ${alRemCalc}h / ${alTotal}h</span></div>`:""}
   <button class="modal-done" data-a="closeStats" style="margin-top:14px">${t("done")}</button></div></div>`}
 
-// v309: one atmospheric renderer and one recorded-audio player.
+// v310: one atmospheric renderer and one recorded-audio player.
 const WxSfx=NatureAudio.create();
 const WxFx=NatureEffects.create();
 window.WxSfx=WxSfx;window.WxFx=WxFx;
@@ -5215,7 +5215,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v309</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v310</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }
