@@ -13,9 +13,9 @@ const pos={lat:23.32,lon:120.2672,ts:Date.now()};
 const hour=()=>Math.floor(Date.now()/3600000)*3600000;
 function forecast(){
   const start=hour(),times=Array.from({length:24},(_,i)=>new Date(start+i*3600000).toISOString().slice(0,16));
-  return {utc_offset_seconds:0,current:{time:times[0],temperature_2m:28,weather_code:2,wind_gusts_10m:18,precipitation:0},
+  return {utc_offset_seconds:0,current:{time:times[0],temperature_2m:28,weather_code:2,wind_gusts_10m:18,precipitation:0,cloud_cover:60},
     daily:{time:[times[0].slice(0,10)],weather_code:[2],temperature_2m_max:[31],temperature_2m_min:[24]},
-    hourly:{time:times,temperature_2m:times.map(()=>28),weather_code:times.map(()=>2),precipitation_probability:times.map(()=>40),precipitation:times.map(()=>.1),wind_speed_10m:times.map(()=>10),wind_gusts_10m:times.map(()=>18),relative_humidity_2m:times.map(()=>65)}};
+    hourly:{time:times,temperature_2m:times.map(()=>28),weather_code:times.map(()=>2),precipitation_probability:times.map(()=>40),precipitation:times.map(()=>.1),wind_speed_10m:times.map(()=>10),wind_gusts_10m:times.map(()=>18),relative_humidity_2m:times.map(()=>65),cloud_cover:times.map(()=>60)}};
 }
 function met(){return {properties:{meta:{updated_at:new Date(hour()-3600000).toISOString()},timeseries:Array.from({length:36},(_,i)=>({
   time:new Date(hour()+i*3600000).toISOString(),data:{instant:{details:{air_temperature:28,relative_humidity:60,wind_speed:5}},
@@ -33,6 +33,7 @@ function appEnv(){
   c.WeatherData.createClient=()=>({get(){calls++;return pending.promise}});
   vm.createContext(c);
   vm.runInContext(source.slice(source.indexOf('const WXI='),source.indexOf('// ═══════════════════════════════════════════════════════════════\n// CWA 資料載入')),c);
+  vm.runInContext(source.slice(source.indexOf('function _numRain('),source.indexOf('function _rainObservationAlert')),c);
   vm.runInContext(source.slice(source.lastIndexOf('function _wxTimeLabel('),source.lastIndexOf('function uiTideCurveHtml(')),c);
   c.getGeoPosition=async()=>({...pos,ts:Date.now()});
   c._refreshWxExtras=()=>{};
@@ -42,9 +43,16 @@ function appEnv(){
 
 test('Open-Meteo preserves source time and zero coordinates, but rejects null values',()=>{
   const raw=forecast(),d=W.openMeteo(raw,{lat:0,lon:0});
-  assert.equal(d.temp,28);assert.equal(d.sourceTime,hour());assert.equal(d.hPrec[0],40);assert.ok(W.validWeather(d));
+  assert.equal(d.temp,28);assert.equal(d.sourceTime,hour());assert.equal(d.hPrec[0],40);assert.equal(d.currentCloud,60);assert.equal(d.hCloud[0],60);assert.ok(W.validWeather(d));
   raw.current.temperature_2m=null;assert.throws(()=>W.openMeteo(raw,pos));
   assert.equal(W.validPosition({lat:null,lon:0}),false);
+});
+test('Open-Meteo request includes cloud cover for current rain-condition reconciliation',async()=>{
+  let requested;
+  const A=adapterEnv(async url=>{requested=new URL(url);return new Response(JSON.stringify(forecast()),{status:200})});
+  await A.createClient().get(pos);
+  assert.ok(requested.searchParams.get('current').split(',').includes('cloud_cover'));
+  assert.ok(requested.searchParams.get('hourly').split(',').includes('cloud_cover'));
 });
 test('missing daily values and malformed hourly arrays cannot replace a valid forecast',()=>{
   const a=forecast();a.daily.temperature_2m_max=[];assert.throws(()=>W.openMeteo(a,pos));
@@ -137,6 +145,31 @@ test('CWA missing probability uses provider backup and null weather code is not 
   const e=appEnv(),d=W.openMeteo(forecast(),pos);d.code=63;d.hCode=d.hCode.map(()=>63);e.c.wxData=d;
   const key=new Date(hour()+28800000).toISOString().slice(0,13);e.c._mergeCwaForecast(d,{hourly:{[key]:{pop:null,wmo:null}}});
   assert.equal(d.hPrec[0],40);assert.equal(d.hCode[0],63);
+});
+test('CWA weather phenomenon replaces the model even when that period has no rain probability',()=>{
+  const e=appEnv(),d=W.openMeteo(forecast(),pos);e.c.wxData=d;
+  const i=e.c._wxHourIndex(),key=new Date(Date.parse(d.hTime[i])+8*3600000).toISOString().slice(0,13);
+  assert.equal(e.c._mergeCwaForecast(d,{hourly:{[key]:{pop:null,wmo:0}}}),true);
+  assert.equal(d.code,0);assert.equal(d.currentWeatherSource,'cwa');assert.equal(d.hPrec[i],40);assert.equal(d.hPopSource[i],'open-meteo');
+});
+test('fresh local dry rain-gauge evidence suppresses a model-only rain condition without inventing sunshine',()=>{
+  const e=appEnv(),d=W.openMeteo(forecast(),pos);d.code=61;d.hCode=d.hCode.map(()=>61);d.hPrec[0]=54;d.currentCloud=60;d.hCloud[0]=60;e.c.wxData=d;
+  e.c.typhoonData={rainObservation:{obsTime:new Date().toISOString(),distanceKm:3,rain10Min:0,rain1h:.8}};
+  const view=e.c._wxCurrentView(d);assert.equal(view.stationDry,true);assert.equal(view.code,2);assert.match(view.note,/10分鐘 0 mm/);assert.match(view.note,/近1小時 0\.8 mm/);assert.equal(e.c._rainObsMeta().raining,false);assert.equal(d.hPrec[0],54);
+  e.c._wxStale=()=>false;const updates=[];e.c.window.WxFx={update:(...args)=>updates.push(args)};e.c._syncWeatherFx();
+  assert.equal(updates[0][0],2);assert.equal(updates[0][2],0);
+});
+test('local rain observation confirms rain; stale or distant stations cannot override the model',()=>{
+  const e=appEnv(),d=W.openMeteo(forecast(),pos);e.c.wxData=d;
+  e.c.typhoonData={rainObservation:{obsTime:new Date().toISOString(),distanceKm:3,rain10Min:.4,rain1h:.8}};
+  assert.equal(e.c._wxCurrentView(d).stationWet,true);assert.equal(e.c._wxCurrentView(d).code,61);
+  for(const observation of [
+    {obsTime:new Date(Date.now()-30*60000).toISOString(),distanceKm:3,rain10Min:0},
+    {obsTime:new Date().toISOString(),distanceKm:18,rain10Min:0}
+  ]){
+    d.code=61;d.hCode=d.hCode.map(()=>61);e.c.typhoonData={rainObservation:observation};
+    const view=e.c._wxCurrentView(d);assert.equal(view.stationDry,false);assert.equal(view.code,61);
+  }
 });
 function swEnv(){
   const events={},puts=[],store=new Map(),c={URL,Response,Promise,Date,Math,console,

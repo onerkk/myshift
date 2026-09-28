@@ -24,11 +24,12 @@ function env(lang='zh'){
     EVS:{},NOTES:{},TYD:{},ALD:{},SHIFT_OV:{},DP:null,IMG:{icon:'./icons/icon-192x192.png'},
     fbUser:null,fbLoginPending:false,admin:false,shift:'早',WxSfx:{isMuted:()=>true,getVolume:()=>.3},
     wxData:null,_wxLoading:false,_wxErrorCode:'',tideData:null,tideErr:true,tideCollapsed:false,
-    WXZ:{0:'晴天',3:'多雲',63:'中雨'},WXD:{0:'Cerah',3:'Mendung',63:'Hujan'},
+    WXZ:{0:'晴天',2:'局部多雲',3:'多雲',63:'中雨'},WXD:{0:'Cerah',2:'Berawan',3:'Mendung',63:'Hujan'},
     navigator:{onLine:true,userAgent:'test'},
     localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,String(v))},
     render(){},loadLeaves(){},loadAdminEv(){},notifyCtaHtml:()=>'',wxAlertHtml:()=>'',rainWarnHtml:()=>'',rainObsHtml:()=>'',
     _wxStale:()=>false,_wxErrorText:()=>lang==='zh'?'請選擇地點':'Pilih lokasi',_wxHourIndex:()=>0,
+    _wxCurrentView:d=>({code:d&&d.code,sourceLabel:'Open-Meteo 模式預報',note:'',stationFresh:false}),
     _normalPop:p=>p===null||p===undefined?null:Number(p),_popSourceAt:()=> 'open-meteo',
     _nowHourKey:()=> '2026-09-10T18',
     ek:(y,m,d)=>[y,String(m).padStart(2,'0'),String(d).padStart(2,'0')].join('-'),
@@ -103,6 +104,12 @@ test('salary shows configured amounts and only claims verification when the diff
 test('live weather retains chosen location, source time, refresh, daily detail and radar actions',()=>{
   const c=env();c.wxData=data();const h=c.wxHtml();assert.match(h,/臺南市 鹽水區/);assert.match(h,/開啟時每 5 分鐘更新/);assert.match(h,/09\/10\s+18:10/);assert.match(h,/data-a="wxR"/);assert.match(h,/href="radar2.html"/);assert.equal((h.match(/class="forecast-day/g)||[]).length,7);
   assert.notEqual(c.studioWeatherIcon(null),c.studioWeatherIcon(0));
+});
+test('weather screen and home preview show the local rain check beside model conditions',()=>{
+  const c=env();c.wxData=data();c._wxCurrentView=()=>({code:2,sourceLabel:'Open-Meteo 溫度＋CWA 雨量實測',note:'附近雨量站近10分鐘 0.0 mm；雲況依模式估算',stationFresh:true});
+  const weather=c.wxHtml(),home=c.uiWeatherPreviewHtml();
+  assert.match(weather,/局部多雲/);assert.match(weather,/附近雨量站近10分鐘 0\.0 mm/);assert.match(weather,/Open-Meteo 溫度＋CWA 雨量實測/);
+  assert.match(home,/附近雨量站近10分鐘 0\.0 mm/);assert.match(home,/局部多雲/);
 });
 test('more screen preserves account and role restrictions without duplicate admin controls',()=>{
   const c=env();c.UI_TAB='more';let h=c.rCal();assert.match(h,/id="loginBtn"/);assert.doesNotMatch(h,/data-a="leavesOv"/);
