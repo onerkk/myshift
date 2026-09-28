@@ -50,10 +50,10 @@
     const wx={
       lat:Number(pos.lat),lon:Number(pos.lon),temp:Math.round(c.temperature_2m),code:c.weather_code,
       provider:'open-meteo',source:'Open-Meteo',updatedAt:now,sourceTime:sourceMs,
-      currentPrecip:num(c.precipitation),gust:num(c.wind_gusts_10m),
+      currentPrecip:num(c.precipitation),currentCloud:num(c.cloud_cover),gust:num(c.wind_gusts_10m),
       days:d.time.map((date,i)=>({date,code:(d.weather_code||[])[i],hi:num(d.temperature_2m_max[i])===null?null:Math.round(d.temperature_2m_max[i]),lo:num(d.temperature_2m_min[i])===null?null:Math.round(d.temperature_2m_min[i])})),
       hTime:h.time.map(time=>localTime(Date.parse(time+'Z')-offset*1000)),hPrecModel:arr('precipitation_probability'),
-      hRain:arr('precipitation'),hRainOnly:arr('rain'),hShowers:arr('showers'),hTemp:arr('temperature_2m'),
+      hRain:arr('precipitation'),hRainOnly:arr('rain'),hShowers:arr('showers'),hTemp:arr('temperature_2m'),hCloud:arr('cloud_cover'),
       hCode:arr('weather_code'),hWind:arr('wind_speed_10m'),hGust:arr('wind_gusts_10m'),hHum:arr('relative_humidity_2m')
     };
     // Keep all displayed dates/times in the device timezone, as existing calendar helpers do.
@@ -107,7 +107,7 @@
       const lat=Number(pos.lat).toFixed(4),lon=Number(pos.lon).toFixed(4),key=lat+','+lon;
       const timezone=encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Taipei');
       const urls={
-        'open-meteo':`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_gusts_10m,precipitation&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability,precipitation,temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m&timezone=${timezone}&forecast_days=7`,
+        'open-meteo':`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_gusts_10m,precipitation,cloud_cover&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=precipitation_probability,precipitation,temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m,cloud_cover&timezone=${timezone}&forecast_days=7`,
         'met-no':`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`
       };
       const errors=[];

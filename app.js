@@ -2178,9 +2178,9 @@ function uiWeekStripHtml(){
 }
 function uiWeatherPreviewHtml(){
   if(!wxData)return `<button class="weather-preview is-loading" data-a="tabWeather"><div class="weather-symbol">•••</div><div><strong>${lang==="zh"?"正在取得即時天氣":"Memuat cuaca"}</strong><span>${lang==="zh"?"中央氣象署與即時雨量站":"CWA + stasiun hujan"}</span></div>${uiIcon("chevron",18)}</button>`;
-  const d=wxData,code=Number(d.code),glyph=code===0?"☀":code<=3?"◐":code>=95?"ϟ":code>=51?"☂":"☁";
-  const desc=(lang==="zh"?WXZ:WXD)[d.code]||"";
-  return `<button class="weather-preview" data-a="tabWeather"><div class="weather-symbol">${glyph}</div><div class="weather-preview-copy"><span>${lang==="zh"?"目前天氣":"Cuaca sekarang"}</span><strong>${d.temp}° <small>${esc(desc)}</small></strong></div><div class="weather-preview-source">${lang==="zh"?"官方資料":"Data resmi"}<br>${d.updatedAt?new Date(d.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):""}</div>${uiIcon("chevron",18)}</button>`;
+  const d=wxData,now=_wxCurrentView(d),code=now.code===null||now.code===undefined?NaN:Number(now.code),glyph=code===0?"☀":code<=1?"🌤":code<=3?"◐":code>=95?"ϟ":code>=51?"☂":"☁";
+  const desc=(lang==="zh"?WXZ:WXD)[now.code]||"";
+  return `<button class="weather-preview" data-a="tabWeather"><div class="weather-symbol">${glyph}</div><div class="weather-preview-copy"><span>${lang==="zh"?"目前天氣":"Cuaca sekarang"}</span><strong>${d.temp}° <small>${esc(desc)}</small></strong>${now.note?`<small class="weather-preview-note">${esc(now.note)}</small>`:''}</div><div class="weather-preview-source">${esc(now.sourceLabel)}<br>${d.sourceTime?new Date(d.sourceTime).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):""}</div>${uiIcon("chevron",18)}</button>`;
 }
 function uiPayPreviewHtml(y,m){
   const est=calcSalaryEst(y,m),pp=calcPayPeriod(y,m);
@@ -3210,11 +3210,16 @@ try{window._recomputeEffectivePop=_recomputeEffectivePop;window._rebuildForecast
 
 function _mergeCwaForecast(wx,fc){
   if(!wx||!Array.isArray(wx.hTime)||!fc||!fc.hourly)return false;
-  const H=fc.hourly;let hit=0;
+  const H=fc.hourly;let hit=0,codeHits=0;
   if(!Array.isArray(wx.hPrecModel))wx.hPrecModel=Array.isArray(wx.hPrec)?wx.hPrec.slice():[];
   if(!Array.isArray(wx.hCodeModel))wx.hCodeModel=Array.isArray(wx.hCode)?wx.hCode.slice():[];
+  if(wx.codeModel===undefined)wx.codeModel=wx.code;
+  wx.code=wx.codeModel;
+  wx.currentWeatherSource=wx.provider||'open-meteo';
+  wx.hCode=wx.hCodeModel.slice();
   wx.hPopCwa=new Array(wx.hTime.length).fill(null);
   wx.hPopCwaMeta=new Array(wx.hTime.length).fill(null);
+  wx.hCodeCwa=new Array(wx.hTime.length).fill(null);
   for(let i=0;i<wx.hTime.length;i++){
     const dt=new Date(wx.hTime[i]);
     const k=new Date(dt.getTime()+8*3600000).toISOString().slice(0,13); // CWA keys are always Taiwan local time.
@@ -3229,20 +3234,22 @@ function _mergeCwaForecast(wx,fc){
       };
     }
     const wmo=WeatherData.num(c.wmo);
-    if(wmo!==null&&Array.isArray(wx.hCode))wx.hCode[i]=wmo;
+    if(wmo!==null&&Array.isArray(wx.hCode)){
+      wx.hCodeCwa[i]=wmo;wx.hCode[i]=wmo;codeHits++;
+    }
   }
   wx._popWindowH=Number(fc.popWindowHours)||null;
   wx._cwaForecastReceivedAt=Date.now();
   wx._cwaForecastUpdatedAt=fc.updatedAt||fc.updateTime||fc.generatedAt||fc.issueTime||null;
   wx._cwaForecastPlace=fc.place||fc.location||null;
-  wx._cwaForecastOk=hit>0;
+  wx._cwaForecastOk=hit>0||codeHits>0;
   _rebuildForecastPop(wx);
-  if(hit>0){
-    // 目前圖示採 CWA 所在區間的官方天氣現象；降雨實況仍由雨量站獨立呈現。
-    const hi=_wxHourIndex();
-    if(hi>=0&&Array.isArray(wx.hCode)&&Number.isFinite(Number(wx.hCode[hi])))wx.code=Number(wx.hCode[hi]);
+  if(codeHits>0){
+    // 天氣現象與降雨機率是不同欄位；CWA 有現象碼時，即使該區間 PoP 缺值也要採用。
+    const hi=_wxHourIndex(),cwaCode=hi>=0?wx.hCodeCwa[hi]:null;
+    if(cwaCode!==null&&Number.isFinite(Number(cwaCode))){wx.code=Number(cwaCode);wx.currentWeatherSource='cwa'}
   }
-  return hit>0;
+  return hit>0||codeHits>0;
 }
 
 async function _applyCwaPop(wx,lat,lon,place,force){
@@ -3255,38 +3262,21 @@ async function _applyCwaPop(wx,lat,lon,place,force){
 }
 try{window._applyCwaPop=_applyCwaPop}catch(e){}
 
-// 將「預報＋即時雨量站＋官方警特報」同步到前景天氣動畫。
-// 原本動畫只在 Open-Meteo 完成時更新；CWA 資料稍後到達後雖會把降雨機率上修並顯示豪雨橫幅，
-// 卻沒有重新呼叫 WxFx.update，造成畫面已有 100% / 豪雨特報但動畫仍停在晴天或夜空模式。
+// 前景動畫只代表目前狀態；未來降雨機率與警報不能把尚未下雨的現在畫成雨天。
 function _syncWeatherFx(){
   try{
     const fx=window.WxFx;
     if(!fx||typeof fx.update!=='function')return;
     if(!wxData||_wxStale()){fx.update(null,0,0,0);return}
 
-    // 先找目前小時；若 API 小時字串因時區或更新延遲沒有完全對上，改抓距離現在最近的逐時資料。
-    let hi=_wxHourIndex();
-    if(hi<0&&Array.isArray(wxData.hTime)&&wxData.hTime.length){
-      const now=Date.now();let best=-1,bestDiff=Infinity;
-      for(let i=0;i<wxData.hTime.length;i++){
-        const ts=Date.parse(String(wxData.hTime[i]));
-        if(!Number.isFinite(ts))continue;
-        const diff=Math.abs(ts-now);
-        if(diff<bestDiff){bestDiff=diff;best=i}
-      }
-      if(best>=0&&bestDiff<=3*60*60*1000)hi=best;
-    }
-
+    const view=_wxCurrentView(wxData),hi=view.hourIndex,stationDry=view.stationDry,stationWet=view.stationWet;
     const rainCodes=[51,53,55,56,61,63,65,66,67,80,81,82,95,96,99];
     let curPrec=0,curWind=0,actualRain=Math.max(0,Number(wxData.currentPrecip)||0);
-    let code=Number(wxData.code);
+    let code=view.code===null||view.code===undefined?NaN:Number(view.code);
     if(hi>=0){
       curPrec=Number(wxData.hPrec&&wxData.hPrec[hi])||0;
       curWind=Number(wxData.hWind&&wxData.hWind[hi])||0;
       actualRain=Math.max(actualRain,Number(wxData.hRain&&wxData.hRain[hi])||0);
-      // current.weather_code 有時比逐時資料晚更新；動畫優先使用目前小時的 hCode。
-      const hourlyCode=Number(wxData.hCode&&wxData.hCode[hi]);
-      if(Number.isFinite(hourlyCode))code=hourlyCode;
     }
     if(!Number.isFinite(code))code=null;
 
@@ -3302,22 +3292,25 @@ function _syncWeatherFx(){
     let obsRain=0;
     try{
       const m=(typeof _rainObsMeta==='function')?_rainObsMeta():null;
-      if(m&&m.local){obsRain=Math.max(Number(m.r10)||0,Number(m.r1)||0);}
+      if(m&&m.local&&m.r10!==null){obsRain=Number(m.r10)||0;}
     }catch(e){}
+    // 本地測站近 10 分鐘明確回報 0mm 時，不能用模型的前一小時雨量或未來機率覆蓋實測。
+    if(stationDry){actualRain=0;obsRain=0;curPrec=0;nearRain=0;nearPrec=0;}
 
     const codeSaysRain=rainCodes.includes(code);
-    // 「現在下雨」只由目前天氣碼、目前降水量或可信本地雨量站判斷；預報機率不冒充實況。
-    const rainNow=codeSaysRain||actualRain>0.05||obsRain>0;
-    const rainNear=rainNow||nearRain>0.05||nearPrec>=60;
+    const rainNow=stationDry?false:(stationWet||codeSaysRain||actualRain>0.05||obsRain>0);
+    const rainNear=stationDry?false:(rainNow||nearRain>0.05||nearPrec>=60);
 
-    // 官方警特報、模型高降雨提醒與即時資料要共同驅動動畫；不能只有警報卡更新，畫面仍停在星空。
+    // 附近雨量站未明確回報乾燥時，可信警報與短時資料才可補足目前天氣狀態。
     let ids=new Set();
     try{
       if(typeof evaluateWxAlerts==='function')ids=new Set(evaluateWxAlerts().map(a=>a&&a.id).filter(Boolean));
     }catch(e){}
-    if(ids.has('storm')&&(rainNear||codeSaysRain)) code=95;
-    else if((ids.has('heavyRain')||ids.has('heavyRainModel'))&&rainNear) code=65;
-    else if(ids.has('rain')&&rainNear&&!rainCodes.includes(code)) code=61;
+    if(!stationDry){
+      if(ids.has('storm')&&(rainNear||codeSaysRain)) code=95;
+      else if((ids.has('heavyRain')||ids.has('heavyRainModel'))&&rainNear) code=65;
+      else if(ids.has('rain')&&rainNear&&!rainCodes.includes(code)) code=61;
+    }
 
     // 即時或目前小時已有降雨證據時，多雲/晴天碼不得把雨特效關掉。
     if(rainNow&&!rainCodes.includes(code)){
@@ -4012,7 +4005,48 @@ function _rainObsMeta(ro){
   const nearby=ageMin<=20&&hasDistance&&distanceKm<=20;
   const fresh=ageMin<=20;
   const r10=_numRain(ro.rain10Min!=null?ro.rain10Min:ro.precipitation),r1=_numRain(ro.rain1h),r3=_numRain(ro.rain3h),r24=_numRain(ro.rain24h);
-  return {ro,obsMs,ageMin,distanceKm,hasDistance,local,nearby,fresh,r10,r1,r3,r24,raining:local&&((r10!==null&&r10>0)||(r1!==null&&r1>0))};
+  return {ro,obsMs,ageMin,distanceKm,hasDistance,local,nearby,fresh,r10,r1,r3,r24,rainKnown:r10!==null||r1!==null,
+    rainNowKnown:local&&r10!==null,rainDryNow:local&&r10===0,
+    raining:local&&r10!==null&&r10>0};
+}
+function _wxCurrentView(d=wxData){
+  if(!d)return{code:null,modelCode:null,sourceLabel:lang==='zh'?'尚無資料':'No data',note:'',stationDry:false,stationWet:false,hourIndex:-1};
+  const times=Array.isArray(d.hTime)?d.hTime:[],now=Date.now();
+  let hourIndex=times.findIndex(t=>String(t).startsWith(_nowHourKey()));
+  if(hourIndex<0&&times.length){
+    let best=-1,diff=Infinity;
+    for(let i=0;i<times.length;i++){const ts=Date.parse(times[i]);if(!Number.isFinite(ts))continue;const delta=Math.abs(ts-now);if(delta<diff){best=i;diff=delta}}
+    if(best>=0&&diff<=90*60000)hourIndex=best;
+  }
+  const rainCodes=new Set([51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99]);
+  const cwaCode=hourIndex>=0&&Array.isArray(d.hCodeCwa)?WeatherData.num(d.hCodeCwa[hourIndex]):null;
+  const hourlyModelCode=hourIndex>=0&&Array.isArray(d.hCode)?WeatherData.num(d.hCode[hourIndex]):null;
+  const modelCode=hourlyModelCode===null?WeatherData.num(d.code):hourlyModelCode;
+  let code=cwaCode===null?modelCode:cwaCode;
+  const obs=_rainObsMeta(),stationFresh=!!(obs&&obs.local&&obs.fresh&&obs.r10!==null);
+  const stationWet=stationFresh&&obs.r10>0,stationDry=stationFresh&&obs.r10===0;
+  const tempSource=d.source||'Open-Meteo';
+  let sourceLabel=d.currentWeatherSource==='cwa'?(lang==='zh'?`${tempSource} 溫度＋CWA 鄉鎮預報`:`${tempSource} temperature + CWA township forecast`):(lang==='zh'?`${tempSource} 模式預報`:`${tempSource} model forecast`);
+  let note='';
+  if(stationWet){
+    if(code===null||!rainCodes.has(code))code=61;
+    sourceLabel=lang==='zh'?`${tempSource} 溫度＋CWA 附近雨量站實測`:`${tempSource} temperature + CWA nearby rain-gauge observation`;
+    note=lang==='zh'?`附近雨量站近10分鐘 ${obs.r10.toFixed(1)} mm`:`Nearby station: ${obs.r10.toFixed(1)} mm in 10 min`;
+  }else if(stationDry&&code!==null&&rainCodes.has(code)){
+    const cloud=WeatherData.num(hourIndex>=0&&Array.isArray(d.hCloud)?d.hCloud[hourIndex]:d.currentCloud);
+    // 雨量站只能核對有沒有量到雨，不能證明晴朗；無雲量資料時採保守多雲圖示。
+    code=cloud===null?3:(cloud<=10?0:cloud<=30?1:cloud<=70?2:3);
+    sourceLabel=lang==='zh'?`${tempSource} 溫度＋CWA 近站雨量實測＋雲量模式`:`${tempSource} temperature + CWA rain observation + cloud model`;
+    const recent=obs.r1!==null&&obs.r1>0?(lang==='zh'?`；近1小時 ${obs.r1.toFixed(1)} mm`:`; ${obs.r1.toFixed(1)} mm in the past hour`):'';
+    note=cloud===null
+      ?(lang==='zh'?`雨量站近10分鐘 0 mm${recent}；雲況資料不足，暫以多雲呈現`:`No rain in 10 min${recent}; cloud data unavailable, shown as cloudy`)
+      :(lang==='zh'?`雨量站近10分鐘 0 mm${recent}；雲況依模式估算`:`No rain in 10 min${recent}; cloud cover is model-estimated`);
+  }else if(stationFresh){
+    sourceLabel=lang==='zh'?`${tempSource} 模式預報＋CWA 雨量實測`:`${tempSource} model + CWA rain observation`;
+    if(obs.r1!==null&&obs.r1>0&&obs.r10===0)note=lang==='zh'?`近10分鐘無雨量；近1小時 ${obs.r1.toFixed(1)} mm`:`No rain in 10 min; ${obs.r1.toFixed(1)} mm in the past hour`;
+    else if(obs.r1!==null&&obs.r1===0)note=lang==='zh'?'附近雨量站近1小時未測得降雨':'Nearby station measured no rain in the past hour';
+  }
+  return{code,modelCode,sourceLabel,note,stationDry,stationWet,stationFresh,hourIndex};
 }
 function _rainObservationAlert(cfg,userItems,isZh){
   const m=_rainObsMeta();if(!m||!m.fresh||!m.hasDistance||!m.nearby)return null;
@@ -4058,7 +4092,7 @@ function evaluateWxAlerts(){
   const nh=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0")+"T"+String(n.getHours()).padStart(2,"0");
   const hi=wxData.hTime?wxData.hTime.findIndex(s=>s.startsWith(nh)):-1;
 
-  const curCode=wxData.code||0;
+  const curView=_wxCurrentView(wxData),curCode=curView.code||0;
   const curTemp=wxData.temp||0;
   const curWind=(hi>=0&&wxData.hWind)?(wxData.hWind[hi]||0):0;
   const curGust=(wxData.gust||((hi>=0&&wxData.hGust)?(wxData.hGust[hi]||0):curWind));
@@ -4656,7 +4690,11 @@ function rainObsHtml(){
   const dist=m.hasDistance?`${m.distanceKm.toFixed(m.distanceKm<10?1:0)}km`:'';
   const obs=ro.obsTime?`${isZh?'觀測':'Obs'} ${esc(_fmtTimeShort(ro.obsTime))}`:'';
   let trust,icon,bg,bc;
-  if(m.local){trust=isZh?'本地實測':'Local observation';icon=m.raining?'🌧':'✅';bg=m.raining?'rgba(41,128,185,0.10)':'rgba(46,125,50,0.08)';bc=m.raining?'#2980b9':'#2e7d32';}
+  if(m.local){
+    trust=!m.rainKnown?(isZh?'雨量資料缺漏，無法判定':'Rain values unavailable'):(m.raining?(isZh?'近10分鐘測得降雨':'Rain measured in the past 10 min'):(isZh?'近10分鐘未測得降雨':'No rain measured in the past 10 min'));
+    if(m.r1!==null&&m.r1>0&&m.r10===0)trust+=isZh?`；近1小時 ${m.r1.toFixed(1)}mm`:`; ${m.r1.toFixed(1)}mm in the past hour`;
+    icon=m.raining?'🌧':m.rainKnown?'✅':'📡';bg=m.raining?'rgba(41,128,185,0.10)':m.rainKnown?'rgba(46,125,50,0.08)':'rgba(127,140,141,0.08)';bc=m.raining?'#2980b9':m.rainKnown?'#2e7d32':'#95a5a6';
+  }
   else if(m.nearby){trust=isZh?'鄰近參考，不判定所在地正在下雨':'Nearby reference only';icon='📍';bg='rgba(245,124,0,0.08)';bc='#f57c00';}
   else if(!m.fresh){trust=isZh?`資料偏舊（約 ${Number.isFinite(m.ageMin)?m.ageMin:'--'} 分鐘）`:'Observation is stale';icon='🕒';bg='rgba(127,140,141,0.08)';bc='#95a5a6';}
   else{trust=isZh?'測站較遠，僅供參考':'Station too far; reference only';icon='📡';bg='rgba(127,140,141,0.08)';bc='#95a5a6';}
@@ -5011,8 +5049,8 @@ function uiWeekStripHtml(){
 }
 function uiWeatherPreviewHtml(){
   if(!wxData)return `<button class="insight-row insight-weather" data-a="tabWeather"><span class="insight-icon weather">${studioIcon('cloud',22)}</span><span class="insight-copy"><small>${lang==='zh'?'目前天氣':'Cuaca sekarang'}</small><strong>${_wxLoading?(lang==='zh'?'正在取得天氣':'Memuat cuaca'):(lang==='zh'?'查看天氣與位置':'Lihat cuaca dan lokasi')}</strong></span>${uiIcon('chevron',18)}</button>`;
-  const d=wxData,desc=(lang==='zh'?WXZ:WXD)[d.code]||'',updated=_wxTimeLabel(d.sourceTime||d.updatedAt);
-  return `<button class="insight-row insight-weather" data-a="tabWeather"><span class="insight-icon weather">${studioWeatherSculpture(d.code)}</span><span class="insight-copy"><small>${_wxStale()?(lang==='zh'?'上次天氣':'Cuaca tersimpan'):(lang==='zh'?'目前模式天氣':'Cuaca model')}</small><strong>${d.temp}° <em>${esc(desc)}</em></strong></span><span class="insight-meta">${esc(d.source||'Open-Meteo')}<b>${updated}</b></span>${uiIcon('chevron',18)}</button>`;
+  const d=wxData,now=_wxCurrentView(d),desc=(lang==='zh'?WXZ:WXD)[now.code]||'',updated=_wxTimeLabel(d.sourceTime||d.updatedAt);
+  return `<button class="insight-row insight-weather" data-a="tabWeather"><span class="insight-icon weather">${studioWeatherSculpture(now.code)}</span><span class="insight-copy"><small>${_wxStale()?(lang==='zh'?'上次天氣':'Cuaca tersimpan'):(now.stationFresh?(lang==='zh'?'雨量實測＋雲況推估':'Rain observation + cloud estimate'):(lang==='zh'?'目前模式預報':'Current model forecast'))}</small><strong>${d.temp}° <em>${esc(desc)}</em></strong>${now.note?`<small>${esc(now.note)}</small>`:''}</span><span class="insight-meta">${esc(now.sourceLabel)}<b>${updated}</b></span>${uiIcon('chevron',18)}</button>`;
 }
 function salaryForecastTitle(est){
   if(est.dataPending)return lang==='zh'?'請假資料同步中':'Menyinkronkan cuti';
@@ -5119,10 +5157,10 @@ function _wxStatusHtml(){
 function wxHtml(){
   const zh=lang==='zh';
   if(!wxData)return `<section class="weather-dashboard weather-unavailable" aria-busy="${_wxLoading}"><div class="weather-empty-icon">${_wxLoading?'<span class="weather-loader"></span>':studioIcon('cloud',30)}</div><strong>${_wxLoading?(zh?'正在取得天氣':'Memuat cuaca'):(zh?'暫時無法取得天氣':'Cuaca belum tersedia')}</strong><p>${_wxLoading?(zh?'正在取得所在地的最新預報。':'Mencari lokasi dan data cuaca gratis.'):_wxErrorText()}</p><div class="wx-empty-actions"><button type="button" data-a="wxR" ${_wxLoading?'disabled':''}>${uiIcon('refresh',16)} ${zh?'重新載入':'Muat ulang'}</button><button type="button" onclick="openWxLocation()">${zh?'選擇地點':'Pilih tempat'}</button></div></section>`;
-  const d=wxData,wk=t('wk'),desc=zh?WXZ:WXD,updated=_wxTimeLabel(d.sourceTime||d.updatedAt);
+  const d=wxData,now=_wxCurrentView(d),wk=t('wk'),desc=zh?WXZ:WXD,updated=_wxTimeLabel(d.sourceTime||d.updatedAt);
   const fc=d.days.map((f,i)=>{const dt=new Date(f.date+'T12:00:00'),dw=dt.getDay(),today=f.date===_nowHourKey().slice(0,10);return `<button class="forecast-day${today?' today':''}" aria-label="${f.date} ${esc(desc[f.code]||'')} ${f.lo}–${f.hi}°C" onclick="wxDetailShow=true;wxDetailDay=${i};render();event.stopPropagation()"><span>${today?(zh?'今天':'Hari ini'):wk[dw]}</span><i>${studioWeatherIcon(f.code,20)}</i><strong>${f.hi}°</strong><small>${f.lo}°</small></button>`}).join('');
   const sourceLink=d.provider==='met-no'?'https://www.met.no/en':'https://open-meteo.com/';
-  return `<section class="weather-dashboard" aria-busy="${_wxLoading}"><button class="weather-current" data-depth onclick="showWxDetail()"><span class="weather-current-icon">${studioWeatherSculpture(d.code)}</span><span class="weather-current-copy"><small>${_wxStale()?(zh?'上次模式天氣':'Cuaca model tersimpan'):(zh?'目前模式天氣':'Cuaca model')}</small><strong>${d.temp}<span>°C</span></strong><em>${esc(desc[d.code]||'')}</em></span><span class="weather-source"><b>${esc(d.source||'Open-Meteo')}</b><small>${zh?'資料時間':'Waktu data'}<br>${updated}</small></span></button>${_wxStatusHtml()}${uiPrecipChartHtml(d)}${rainObsHtml()}<div class="forecast-heading"><h3>${zh?d.days.length+' 日預報':'Prakiraan '+d.days.length+' hari'}</h3><span>${zh?'點選查看逐時':'Ketuk untuk per jam'}</span></div><div class="forecast-strip">${fc}</div>${d.dayRangeEstimated?`<div class="wx-source-credit">${zh?'備援高低溫取自可用預報時段；較遠日期未提供的逐時欄位保持空白。':'Suhu min/maks dari jam prakiraan tersedia; jam tanpa data tetap kosong.'}</div>`:''}<div class="wx-source-credit"><a href="${sourceLink}" target="_blank" rel="noopener noreferrer">${esc(d.source||'Open-Meteo')}</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a> · ${zh?'模式預報；數值已四捨五入':'Prakiraan model; angka dibulatkan'}</div><a class="radar-action" href="radar2.html">${studioIcon('shield',19)}<span><b>${zh?'即時雷達與降雨':'Radar & hujan langsung'}</b><small>${zh?'回波動畫 · 未來 4 小時雲流':'Animasi radar · arah awan 4 jam'}</small></span>${uiIcon('chevron',18)}</a></section>${tideHtml()}`;
+  return `<section class="weather-dashboard" aria-busy="${_wxLoading}"><button class="weather-current" data-depth onclick="showWxDetail()"><span class="weather-current-icon">${studioWeatherSculpture(now.code)}</span><span class="weather-current-copy"><small>${_wxStale()?(zh?'上次天氣資料':'Cuaca tersimpan'):(now.stationFresh?(zh?'附近雨量實測＋雲況推估':'Rain observation + cloud estimate'):(zh?'目前模式預報':'Current model forecast'))}</small><strong>${d.temp}<span>°C</span></strong><em>${esc(desc[now.code]|| (zh?'天氣狀態待確認':'Condition unconfirmed'))}</em>${now.note?`<small class="weather-current-note">${esc(now.note)}</small>`:''}</span><span class="weather-source"><b>${esc(now.sourceLabel)}</b><small>${zh?'溫度資料時間':'Temperature data'}<br>${updated}</small></span></button>${_wxStatusHtml()}${uiPrecipChartHtml(d)}${rainObsHtml()}<div class="forecast-heading"><h3>${zh?d.days.length+' 日預報':'Prakiraan '+d.days.length+' hari'}</h3><span>${zh?'點選查看逐時':'Ketuk untuk per jam'}</span></div><div class="forecast-strip">${fc}</div>${d.dayRangeEstimated?`<div class="wx-source-credit">${zh?'備援高低溫取自可用預報時段；較遠日期未提供的逐時欄位保持空白。':'Suhu min/maks dari jam prakiraan tersedia; jam tanpa data tetap kosong.'}</div>`:''}<div class="wx-source-credit"><a href="${sourceLink}" target="_blank" rel="noopener noreferrer">${esc(d.source||'Open-Meteo')}</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a> · ${zh?'模式預報；降雨機率與實況分開顯示':'Model forecast; rain probability and observations are separate'}</div><a class="radar-action" href="radar2.html">${studioIcon('shield',19)}<span><b>${zh?'即時雷達與降雨':'Radar & hujan langsung'}</b><small>${zh?'回波動畫 · 未來 4 小時雲流':'Animasi radar · arah awan 4 jam'}</small></span>${uiIcon('chevron',18)}</a></section>${tideHtml()}`;
 }
 function closeWxLocation(){_wxSearchVersion++;document.getElementById('wx-location-dialog')?.remove()}
 function openWxLocation(){
@@ -5242,7 +5280,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v311</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v312</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }
