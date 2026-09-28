@@ -13,6 +13,8 @@
     { cover: "cloud_cover_high", speed: "wind_speed_500hPa", direction: "wind_direction_500hPa" }
   ];
   const FIELDS = ["cloud_cover", ...LEVELS.flatMap(x => [x.cover, x.speed, x.direction])];
+  const CLOUD_MAP_COLS = 10, CLOUD_MAP_ROWS = 10, MAX_CLOUD_MAP_POINTS = 100;
+  const HIMAWARI_FRAME_MS = 10 * 60000, HIMAWARI_LATENCY_MS = 20 * 60000;
 
   function finite(value) {
     const n = Number(value);
@@ -23,6 +25,148 @@
     const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(String(value || ""));
     if (!m) return NaN;
     return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) - (finite(offsetSeconds) || 0) * 1000;
+  }
+
+  function mercatorY(latitude) {
+    const lat = Math.max(-85.05112878, Math.min(85.05112878, latitude)) * Math.PI / 180;
+    return Math.log(Math.tan(Math.PI / 4 + lat / 2));
+  }
+
+  function inverseMercatorY(y) {
+    return (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * 180 / Math.PI;
+  }
+
+  // Build an evenly spaced Web Mercator grid around the visible map. Open-Meteo
+  // accepts at most 100 coordinates in one request, so this stays one request.
+  function createCloudMapGrid(bounds, columns, rows) {
+    if (!bounds) throw new TypeError("Invalid map bounds");
+    const north = finite(bounds.north), south = finite(bounds.south);
+    const east = finite(bounds.east), west = finite(bounds.west);
+    if ([north, south, east, west].some(x => x === null) || north <= south || east <= west) {
+      throw new TypeError("Invalid map bounds");
+    }
+    columns = Math.max(2, Math.min(10, Math.floor(finite(columns) || CLOUD_MAP_COLS)));
+    rows = Math.max(2, Math.min(10, Math.floor(finite(rows) || CLOUD_MAP_ROWS)));
+    if (columns * rows > MAX_CLOUD_MAP_POINTS) throw new RangeError("Cloud map grid is too large");
+
+    const padLon = Math.max((east - west) * 0.12, 0.06);
+    const westEdge = Math.max(-180, west - padLon), eastEdge = Math.min(180, east + padLon);
+    const northEdge = Math.min(85, north + Math.max((north - south) * 0.12, 0.06));
+    const southEdge = Math.max(-85, south - Math.max((north - south) * 0.12, 0.06));
+    const northY = mercatorY(northEdge), southY = mercatorY(southEdge);
+    const latitudes = Array.from({ length: rows }, (_, y) => inverseMercatorY(northY + (southY - northY) * y / (rows - 1)));
+    const longitudes = Array.from({ length: columns }, (_, x) => westEdge + (eastEdge - westEdge) * x / (columns - 1));
+    const points = [];
+    latitudes.forEach((lat, row) => longitudes.forEach(lon => points.push({ lat, lon, row, col: points.length % columns })));
+    return {
+      north: latitudes[0], south: latitudes[latitudes.length - 1],
+      west: longitudes[0], east: longitudes[longitudes.length - 1],
+      columns, rows, points
+    };
+  }
+
+  function createCloudMapUrl(grid) {
+    if (!grid || !Array.isArray(grid.points) || !grid.points.length || grid.points.length > MAX_CLOUD_MAP_POINTS) {
+      throw new TypeError("Invalid cloud map grid");
+    }
+    const params = new URLSearchParams({
+      latitude: grid.points.map(p => Number(p.lat).toFixed(5)).join(","),
+      longitude: grid.points.map(p => Number(p.lon).toFixed(5)).join(","),
+      current: "cloud_cover", timezone: "auto"
+    });
+    return "https://api.open-meteo.com/v1/forecast?" + params.toString();
+  }
+
+  function nearestGridValue(grid, values, latitude, longitude) {
+    const lat = finite(latitude), lon = finite(longitude);
+    if (!grid || !Array.isArray(grid.points) || !Array.isArray(values) || lat === null || lon === null) return null;
+    let best = null, distance = Infinity;
+    grid.points.forEach((point, index) => {
+      const value = values[index];
+      if (value === null || value === undefined || !Number.isFinite(Number(value))) return;
+      const dx = (point.lon - lon) * Math.cos(lat * Math.PI / 180), dy = point.lat - lat;
+      const d = dx * dx + dy * dy;
+      if (d < distance) { distance = d; best = Number(value); }
+    });
+    return best;
+  }
+
+  function parseCloudMapData(data, grid, position) {
+    if (!grid || !Array.isArray(grid.points) || !grid.points.length || grid.points.length > MAX_CLOUD_MAP_POINTS) {
+      return { ok: false, reason: "grid" };
+    }
+    const records = Array.isArray(data) ? data : grid.points.length === 1 ? [data] : null;
+    if (!records || records.length !== grid.points.length) return { ok: false, reason: "shape" };
+    const values = [], times = [];
+    records.forEach(record => {
+      const current = record && record.current;
+      let cover = finite(current && current.cloud_cover);
+      if (cover === null && record && record.hourly && Array.isArray(record.hourly.cloud_cover)) {
+        cover = finite(record.hourly.cloud_cover[0]);
+      }
+      values.push(cover !== null && cover >= 0 && cover <= 100 ? cover : null);
+      const time = current && localTimeToEpoch(current.time, record.utc_offset_seconds);
+      if (Number.isFinite(time)) times.push(time);
+    });
+    const valid = values.filter(x => x !== null);
+    if (!valid.length) return { ok: false, reason: "cloud_cover" };
+    times.sort((a, b) => a - b);
+    return {
+      ok: true, grid, values,
+      cover: Math.round(valid.reduce((sum, value) => sum + value, 0) / valid.length),
+      time: times.length ? times[Math.floor(times.length / 2)] : null,
+      localCover: position ? nearestGridValue(grid, values, position.lat, position.lon) : null,
+      validPoints: valid.length
+    };
+  }
+
+  function interpolateGrid(values, columns, rows, x, y) {
+    if (!Array.isArray(values) || values.length !== columns * rows || columns < 2 || rows < 2) return null;
+    x = Math.max(0, Math.min(columns - 1, Number(x)));
+    y = Math.max(0, Math.min(rows - 1, Number(y)));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    const x0 = Math.floor(x), y0 = Math.floor(y), x1 = Math.min(columns - 1, x0 + 1), y1 = Math.min(rows - 1, y0 + 1);
+    const fx = x - x0, fy = y - y0;
+    const samples = [
+      [values[y0 * columns + x0], (1 - fx) * (1 - fy)],
+      [values[y0 * columns + x1], fx * (1 - fy)],
+      [values[y1 * columns + x0], (1 - fx) * fy],
+      [values[y1 * columns + x1], fx * fy]
+    ];
+    let total = 0, weight = 0;
+    samples.forEach(([value, part]) => {
+      if (part > 0 && value !== null && value !== undefined && Number.isFinite(Number(value))) {
+        total += Number(value) * part; weight += part;
+      }
+    });
+    return weight ? total / weight : null;
+  }
+
+  function himawariFrameTimes(now, attempts) {
+    const time = finite(now) || Date.now(), count = Math.max(1, Math.min(8, Math.floor(finite(attempts) || 4)));
+    const latest = Math.floor(time / HIMAWARI_FRAME_MS) * HIMAWARI_FRAME_MS - HIMAWARI_LATENCY_MS;
+    return Array.from({ length: count }, (_, i) => new Date(latest - i * HIMAWARI_FRAME_MS).toISOString().replace(".000Z", "Z"));
+  }
+
+  function himawariTileXY(latitude, longitude, zoom) {
+    const lat = finite(latitude), lon = finite(longitude), requestedZoom = finite(zoom);
+    const z = Math.max(0, Math.min(8, Math.floor(requestedZoom === null ? 7 : requestedZoom)));
+    if (lat === null || lon === null || Math.abs(lat) > 90 || Math.abs(lon) > 180) throw new TypeError("Invalid coordinates");
+    const n = Math.pow(2, z), clamped = Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI / 180;
+    return {
+      z,
+      x: Math.max(0, Math.min(n - 1, Math.floor((lon + 180) / 360 * n))),
+      y: Math.max(0, Math.min(n - 1, Math.floor((1 - Math.asinh(Math.tan(clamped)) / Math.PI) / 2 * n)))
+    };
+  }
+
+  function himawariTileUrl(time, tile) {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(time || "")) || !tile ||
+        !Number.isInteger(tile.z) || !Number.isInteger(tile.x) || !Number.isInteger(tile.y)) {
+      throw new TypeError("Invalid satellite tile");
+    }
+    return "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/Himawari_AHI_Band13_Clean_Infrared/default/" +
+      time + "/GoogleMapsCompatible_Level9/" + tile.z + "/" + tile.y + "/" + tile.x + ".png";
   }
 
   function createUrl(lat, lon) {
@@ -152,5 +296,9 @@
     return 2 * r * Math.asin(Math.min(1, Math.sqrt(h)));
   }
 
-  return { createUrl, build, readRows, localTimeToEpoch };
+  return {
+    createUrl, build, readRows, localTimeToEpoch,
+    createCloudMapGrid, createCloudMapUrl, parseCloudMapData, nearestGridValue, interpolateGrid,
+    himawariFrameTimes, himawariTileXY, himawariTileUrl
+  };
 });
