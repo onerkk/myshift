@@ -32,6 +32,7 @@ function env(){
   const chunks=[
     between('function _leaveId(', '// ═══ 班別覆寫'),
     between('function salPeriodKey(', '// 薪資年月不是'),
+    between('function latestClosedSalaryMonth(', 'function setSalPeriod('),
     between('function calcPayPeriod(', 'function payCardHtml('),
     between('function payrollHistoryEstimates(', 'function sNotes('),
     between('function calcSalaryEst(', 'function salaryEstHtml('),
@@ -115,6 +116,54 @@ test('26th through 25th payroll boundary, including new year',()=>{
     const c=env();c.shifts={};for(const date of inside.concat(outside)){c.shifts[date]='早';c.leavesCache[date]=[record('personal',0,720)]}
     const pp=c.calcPayPeriod(y,m);assert.equal(pp.wd,2);assert.equal(pp.leaveH,16);assert.equal(c.calcSalaryEst(y,m).leaveDed,1600);
   }
+});
+test('monthly pay periods default to the inclusive 26th-to-25th range across year boundaries',()=>{
+  const c=env(),sep=c.getSalaryPeriodRange(2026,9),jan=c.getSalaryPeriodRange(2027,1);
+  assert.equal(sep.start,'2026-08-26');assert.equal(sep.end,'2026-09-25');assert.equal(sep.custom,false);
+  assert.equal(jan.start,'2026-12-26');assert.equal(jan.end,'2027-01-25');
+  assert.deepEqual(Array.from(c.salaryCalendarMonths(sep.sd,sep.ed)),['2026-08','2026-09']);
+});
+test('custom period is saved by payroll month and changes the dates actually included in calculation',()=>{
+  const c=env();c.SAL.monthly['2026-09']={inputVersion:3,payPeriodStart:'2026-08-30',payPeriodEnd:'2026-10-02'};
+  c.shifts={'2026-08-29':'早','2026-08-30':'早','2026-09-25':'晚','2026-10-02':'早','2026-10-03':'早'};
+  c.leavesCache['2026-08-30']=[record('personal',0,720)];
+  const pp=c.calcPayPeriod(2026,9);assert.equal(pp.sd.getDate(),30);assert.equal(pp.sd.getMonth(),7);assert.equal(pp.ed.getDate(),2);assert.equal(pp.ed.getMonth(),9);
+  assert.equal(pp.wd,3);assert.equal(pp.tH,36);assert.equal(pp.leaveH,8);assert.equal(pp.oH,8);assert.equal(pp.unworkedOT,4);
+  const est=c.calcSalaryEst(2026,9),keys=est.days.map(d=>d.key);
+  assert.ok(keys.includes('2026-08-30'));assert.ok(keys.includes('2026-10-02'));
+  assert.ok(!keys.includes('2026-08-29'));assert.ok(!keys.includes('2026-10-03'));
+  assert.equal(est.workedDays,2);assert.equal(est.personalH,8);assert.equal(est.personalDed,800);
+  const next=c.getSalaryPeriodRange(2026,10);assert.equal(next.start,'2026-09-26');assert.equal(next.end,'2026-10-25');
+  assert.deepEqual(Array.from(c.salaryCalendarMonths(pp.sd,pp.ed)),['2026-08','2026-09','2026-10']);
+});
+test('invalid custom dates fall back to the default and custom close-date navigation follows the saved interval',()=>{
+  const c=env();c.SAL.monthly['2026-09']={payPeriodStart:'2026-02-30',payPeriodEnd:'2026-09-25'};
+  assert.equal(c.getSalaryPeriodRange(2026,9).start,'2026-08-26');
+  c.SAL.monthly['2026-09']={payPeriodStart:'2026-08-30',payPeriodEnd:'2026-10-02'};
+  assert.equal(c.latestClosedSalaryMonth(new Date(2026,8,30)).m,8);
+  c.PAY_VIEW={y:2026,m:8};c.payViewCurrent(new Date(2026,8,30));assert.equal(vm.runInContext('PAY_VIEW.m',c),10);
+  assert.equal(c.latestClosedSalaryMonth(new Date(2026,8,25)).m,8);
+});
+test('custom boundaries identify overlapping and unassigned days instead of silently double-counting them',()=>{
+  const c=env(),start=new Date(2026,7,30),end=new Date(2026,9,2);
+  let warnings=Array.from(c.salaryPeriodBoundaryWarnings(2026,9,start,end));
+  assert.equal(warnings.length,2);assert.match(warnings[0],/4 天未分配/);assert.match(warnings[1],/重疊 7 天/);
+  c.SAL.monthly['2026-08']={payPeriodStart:'2026-07-26',payPeriodEnd:'2026-08-29'};
+  c.SAL.monthly['2026-10']={payPeriodStart:'2026-10-03',payPeriodEnd:'2026-10-25'};
+  warnings=Array.from(c.salaryPeriodBoundaryWarnings(2026,9,start,end));assert.deepEqual(warnings,[]);
+});
+test('leave loading fetches every month in a custom period and safely batches longer intervals',async()=>{
+  const monthQueries=[],ctx={Date,Math,Promise,Set,console,fbUser:{uid:'me'},S:{yr:2026,mo:9,unit:'test'},TY:2026,TM:9,PAY_VIEW:{y:2026,m:9},ALD:{},AL_RESET_TS:{},
+    fsEnqueue:fn=>Promise.resolve().then(fn),latestClosedSalaryMonth:()=>({y:2026,m:8}),leaveNumber:()=>null,getLeaveTypes:()=>[],alYear:()=>2026,sAL(){},render(){},
+    salaryCalendarMonths(sd,ed){const out=[],d=new Date(sd.getFullYear(),sd.getMonth(),1),last=new Date(ed.getFullYear(),ed.getMonth(),1);while(d<=last){out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);d.setMonth(d.getMonth()+1)}return out;},
+    calcPayPeriod(y,m){return y===2026&&m===9?{sd:new Date(2025,10,1),ed:new Date(2026,9,31)}:{sd:new Date(y,m-2,26),ed:new Date(y,m-1,25)};},
+    fbDb:{collection(){return{where(field,op,value){if(field==='ym')monthQueries.push(value.slice());return{get:async()=>({forEach(){}})}}}}}};
+  vm.createContext(ctx);
+  vm.runInContext(between('let leavesCache={};','function _syncAnnualToALD(')+'\n'+between('function _syncAnnualToALD(','function _syncAnnualDateToALD('),ctx);
+  await vm.runInContext('loadLeaves()',ctx);
+  assert.equal(monthQueries.length,2);assert.ok(monthQueries.every(batch=>batch.length<=10));
+  const loaded=new Set(monthQueries.flat());for(const month of ['2025-11','2026-09','2026-10'])assert.ok(loaded.has(month),month);
+  assert.equal(vm.runInContext("payrollLeaveState.months.includes('2026-10')",ctx),true);
 });
 test('old calibration fixture no longer pays nights during full sick leave or claims complete verification',()=>{
   const c=env();Object.assign(c.SAL,{base:24000,night:300,
@@ -262,6 +311,7 @@ function formEnv(){
   c.studioMoney=n=>'$'+Math.round(n).toLocaleString('en-US');c.handle=()=>{};
   vm.runInContext(between('function normalizeSal(', 'normalizeSal();')+'\n'+between('function setSalPeriod(', 'function _leaveId(')+'\n'+between('function salaryFieldLabels(', 'setTimeout(()=>{const sp='),c);
   for(const k of ['base','meal','transport','position','night','union','welfare','laborIns','healthIns','otherDed','laborPensionWage','laborPensionSelfRate','laborPensionEmployerRate','otWageBase','leaveWageBase','otTier1Rate','otTier2Rate','sickRate','personalRate'])c.fields['sal_'+k]={value:String(c.SAL[k]??'')};
+  const range=c.defaultSalaryPeriod(c.PAY_VIEW.y,c.PAY_VIEW.m);c.fields.sal_periodStart={value:range.start};c.fields.sal_periodEnd={value:range.end};
   return c;
 }
 test('salary settings save atomic one-time rules and preserve archived records without an import',()=>{
@@ -272,8 +322,32 @@ test('salary settings save atomic one-time rules and preserve archived records w
   assert.equal(c.saveSalaryForm(),true);assert.equal(c.saved.length,1);
   assert.equal(c.SAL.night,0);assert.equal(c.SAL.nightRateSource,'configured');assert.equal(c.SAL.weeklyDayKinds[6],'rest');
   const p=c.getSalPeriod(2026,9);assert.equal(p.proposal,800);assert.equal(p.slip.net,123);assert.equal(p.days['2026-09-10'].workedHours,4);
+  assert.equal(p.payPeriodStart,'2026-08-26');assert.equal(p.payPeriodEnd,'2026-09-25');
   assert.equal(c.getSalPeriod(2026,10).proposal,0);
-  for(const lang of ['zh','id']){c.lang=lang;const html=c.rSalary();assert.doesNotMatch(html,/sal_importFile|sal_nightTotalOverride|sal_sickHoursOverride|NaN|undefined/);}
+  for(const lang of ['zh','id']){c.lang=lang;const html=c.rSalary();assert.match(html,/id="sal_periodStart"/);assert.match(html,/id="sal_periodEnd"/);assert.match(html,/pay-period-editor/);assert.doesNotMatch(html,/sal_importFile|sal_nightTotalOverride|sal_sickHoursOverride|NaN|undefined/);}
+});
+
+test('custom date form validates, saves only its selected month and preserves prior monthly data',()=>{
+  const c=formEnv();c.SAL.monthly['2026-09']={slip:{net:123},proposal:500,payPeriodStart:'2026-08-30',payPeriodEnd:'2026-10-02',days:{'2026-09-10':{kind:'rest',workedHours:4}}};
+  c.fields.sal_periodStart.value='2026-08-30';c.fields.sal_periodEnd.value='2026-10-02';
+  const preview=c.rSalary();assert.match(preview,/value="2026-08-30"/);assert.match(preview,/value="2026-10-02"/);assert.match(preview,/4 天未分配/);assert.match(preview,/重疊 7 天/);
+  assert.equal(c.saveSalaryForm(),true);
+  const p=c.SAL.monthly['2026-09'];assert.equal(p.payPeriodStart,'2026-08-30');assert.equal(p.payPeriodEnd,'2026-10-02');
+  assert.equal(p.slip.net,123);assert.equal(p.proposal,0);assert.equal(p.days['2026-09-10'].workedHours,4);
+  assert.equal(c.getSalaryPeriodRange(2026,10).start,'2026-09-26');
+  const before=JSON.stringify(c.SAL);c.fields.sal_periodStart.value='2026-10-05';c.fields.sal_periodEnd.value='2026-10-04';
+  assert.equal(c.saveSalaryForm(),false);assert.equal(JSON.stringify(c.SAL),before);
+  c.fields.sal_periodStart.value='2026-01-01';c.fields.sal_periodEnd.value='2027-01-06';
+  assert.equal(c.saveSalaryForm(),false);assert.equal(JSON.stringify(c.SAL),before);
+});
+
+test('period reset restores the selected payroll month default and refreshes the 3D range preview',()=>{
+  const c=formEnv();c.fields.sal_periodStart.value='2026-08-30';c.fields.sal_periodEnd.value='2026-10-02';
+  c.fields.salaryPeriodPreview={textContent:''};c.fields.salaryPeriodDays={textContent:''};
+  c.fields.salaryPeriodMessage={textContent:'',setAttribute(k,v){this[k]=v}};
+  c.fields.salaryPeriodState={textContent:'',classList:{toggle(){}}};c.fields.payPeriodEditor={classList:{toggle(){}}};
+  c.resetSalaryPeriodInputs();assert.equal(c.fields.sal_periodStart.value,'2026-08-26');assert.equal(c.fields.sal_periodEnd.value,'2026-09-25');
+  assert.equal(c.fields.salaryPeriodPreview.textContent,'2026/08/26 – 2026/09/25');assert.equal(c.fields.salaryPeriodDays.textContent,'31 天');
 });
 
 test('saving automatic days does not freeze a weekly rule to work on every date',()=>{

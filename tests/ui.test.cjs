@@ -13,7 +13,7 @@ function presenter(name){
   const b=source.indexOf('\nfunction ',a+9);
   return source.slice(a,b<0?source.length:b);
 }
-const names=['salaryHistoryHtml','natureControlsHtml','salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherSculpture','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','uiCalendarHolidaysHtml','uiCalendarNoticesHtml','calendarScopedLeaves','calendarLeaveStatus','calendarLeaveStatusText','calendarDayInfo','calendarLeaveLabel','calendarEventChipsHtml','calendarDaySummaryHtml','calendarHighlightsHtml','calendarDataNoticeHtml','calendarAgendaHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
+const names=['salaryHistoryHtml','natureControlsHtml','salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','salaryDateLabel','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherSculpture','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','uiCalendarHolidaysHtml','uiCalendarNoticesHtml','calendarScopedLeaves','calendarLeaveStatus','calendarLeaveStatusText','calendarDayInfo','calendarLeaveLabel','calendarEventChipsHtml','calendarDaySummaryHtml','calendarHighlightsHtml','calendarDataNoticeHtml','calendarAgendaHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
 const fixed=Date.parse('2026-09-10T10:10:00Z');
 class Clock extends Date{constructor(...args){super(...(args.length?args:[fixed]))}static now(){return fixed}}
 function env(lang='zh'){
@@ -41,7 +41,7 @@ function env(lang='zh'){
     gh:()=>null,isTWOff:()=>false,getPayDay:(y,m,d)=>d,getAL:()=>({total:80}),alRem:()=>56,curALY:()=>2025,alYRange:()=> '2025/12/26 – 2026/12/25',
     en:v=>v,sf:s=>s,lunarTodayStrip:()=>'<div class="alm-strip">農曆</div>',lunarCellText:()=>'<span class="lun-mini">初十</span>',
     latestClosedSalaryMonth:()=>({y:2026,m:8}),
-    calcPayPeriod:()=>({wd:22,tH:264,oH:64,rawOH:88}),
+    calcPayPeriod:()=>({sd:new Date(2026,6,26),ed:new Date(2026,7,25),wd:22,tH:264,oH:64,rawOH:88}),
     estimate:{net:27700,income:29000,deduction:1300,baseSum:24000,otH:64,fixedDed:1000,hourly:180,otHourly:180,leaveHourly:180},
     errors:[],alert:message=>c.errors.push(message),
   };
