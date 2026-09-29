@@ -13,13 +13,13 @@ function presenter(name){
   const b=source.indexOf('\nfunction ',a+9);
   return source.slice(a,b<0?source.length:b);
 }
-const names=['salaryHistoryHtml','natureControlsHtml','salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherSculpture','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
+const names=['salaryHistoryHtml','natureControlsHtml','salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherSculpture','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','calendarScopedLeaves','calendarLeaveStatus','calendarLeaveStatusText','calendarDayInfo','calendarLeaveLabel','calendarEventChipsHtml','calendarDaySummaryHtml','calendarHighlightsHtml','calendarDataNoticeHtml','calendarAgendaHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
 const fixed=Date.parse('2026-09-10T10:10:00Z');
 class Clock extends Date{constructor(...args){super(...(args.length?args:[fixed]))}static now(){return fixed}}
 function env(lang='zh'){
   const store=new Map();
   const c={salaryHistoryAudit:()=>({total:0}),WxFx:{getQuality:()=>"balanced"},Date:Clock,Math,Number,String,Array,Object,Set,console,Payroll:require('../payroll.js'),lang,TY:2026,TM:9,TD:10,
-    S:{step:'cal',yr:2026,mo:9,rt:'4on2off',unit:'測試單位',showLunar:false,instH:true},UI_TAB:'today',PAY_VIEW:{y:2026,m:8},
+    S:{step:'cal',yr:2026,mo:9,rt:'4on2off',unit:'測試單位',showLunar:false,instH:true},UI_TAB:'today',UI_CAL_VIEW:'month',UI_CAL_FILTER:'all',adminEvState:{months:['2026-09'],loading:false,error:false},payrollLeaveState:{uid:'me',unit:'測試單位',months:['2026-09'],loading:false,error:false},PAY_VIEW:{y:2026,m:8},
     RN:{zh:{'4on2off':'四休二'},id:{'4on2off':'4 kerja 2 libur'}},SC:{早:'e',晚:'n',中:'m',休:'o'},
     EVS:{},NOTES:{},TYD:{},ALD:{},SHIFT_OV:{},DP:null,IMG:{icon:'./icons/icon-192x192.png'},
     fbUser:null,fbLoginPending:false,admin:false,shift:'早',WxSfx:{isMuted:()=>true,getVolume:()=>.3},
@@ -131,4 +131,57 @@ test('unknown night components and loading never masquerade as a complete net',(
   assert.match(c.uiPayPreviewHtml(),/小計/);
   c.estimate.dataPending=true;h=c.uiSalaryDashboardHtml(2026,8);assert.match(h,/同步中/);assert.doesNotMatch(h,/\$25,000/);
   assert.doesNotMatch(c.uiPayPreviewHtml(),/\$25,000/);assert.match(h,/薪資紀錄 · 自動核算/);
+});
+
+test('daily agenda merges notices, personal notes and pay labels, without exposing colleague identities',()=>{
+  const c=env();c.fbUser={uid:'me'};
+  c.getAdminEv=key=>key==='2026-09-20'?['health','meeting','health']:[];
+  c.EVS['2026-09-20']=['meeting','custom','class'];c.NOTES['2026-09-20']='注意 <img src=x onerror=alert(1)>';
+  c.getLeaves=()=>[{uid:'a',unit:'測試單位',hours:2,name:'PRIVATE_NAME',reason:'PRIVATE_REASON'},{uid:'a',unit:'測試單位',hours:3},{uid:'b',unit:'測試單位',hours:4},{uid:'c',unit:'測試單位',hours:0}];
+  const day=c.calendarDayInfo(2026,9,20);
+  assert.equal(day.leaveCount,2);assert.equal(day.events.filter(e=>e.id==='meeting').length,1);assert.equal(day.events.filter(e=>e.id==='health').length,1);
+  const h=c.uiCalendarPageHtml();assert.match(h,/tone-meeting[^>]*>會議/);assert.match(h,/tone-health[^>]*>體檢/);assert.match(h,/>請假<\/span><b>2<\/b>/);
+  c.action('calendarFilter',{filter:'health'});assert.equal(c.UI_CAL_VIEW,'agenda');assert.equal(c.UI_CAL_FILTER,'health');
+  const agenda=c.uiCalendarPageHtml();assert.equal((agenda.match(/class="agenda-day[" ]/g)||[]).length,1);assert.match(agenda,/&lt;img/);assert.match(agenda,/績效獎金/);assert.doesNotMatch(agenda,/<img src=x|PRIVATE_NAME|PRIVATE_REASON/);
+  const brief=c.calendarDaySummaryHtml(2026,9,20);assert.match(brief,/2 人請假/);assert.match(brief,/class/);assert.match(brief,/&lt;img/);
+});
+test('unknown and failed leave loading do not masquerade as zero; loaded empty days are zero',()=>{
+  const c=env();c.fbUser={uid:'me'};c.payrollLeaveState.months=[];
+  assert.equal(c.calendarDayInfo(2026,9,1).leaveCount,null);
+  assert.match(c.uiCalendarPageHtml(),/>請假<\/span><b>—<\/b>/);
+  c.payrollLeaveState.error=true;assert.match(c.uiCalendarPageHtml(),/data-a="calendarReload"/);
+  c.payrollLeaveState.error=false;c.payrollLeaveState.months=['2026-09'];
+  assert.equal(c.calendarDayInfo(2026,9,1).leaveCount,0);
+  c.fbUser=null;assert.equal(c.calendarDayInfo(2026,9,1).leaveCount,null);assert.match(c.uiCalendarPageHtml(),/登入後/);
+});
+test('selected-unit counts exclude own history from other units and include separate manual placeholders across units',()=>{
+  const c=env();c.fbUser={uid:'me'};
+  c.getLeaves=()=>[{uid:'me',unit:'其他單位',hours:8},{uid:'a',unit:'測試單位',hours:3},{uid:'a',unit:'測試單位',hours:5},{uid:'admin_0',unit:'測試單位',hours:8},{uid:'admin_0',unit:'其他單位',hours:8}];
+  assert.equal(c.calendarDayInfo(2026,9,1).leaveCount,2);
+  c.S.unit='__all';assert.equal(c.calendarDayInfo(2026,9,1).leaveCount,null);
+  c.payrollLeaveState.unit='__all';assert.equal(c.calendarDayInfo(2026,9,1).leaveCount,4);
+});
+test('agenda contains all dates, filters leave days, handles empty months and preserves leap dates',()=>{
+  const c=env();c.fbUser={uid:'me'};c.action('calendarView',{view:'agenda'});
+  assert.equal((c.uiCalendarPageHtml().match(/class="agenda-day[" ]/g)||[]).length,30);
+  c.action('calendarFilter',{filter:'leave'});assert.match(c.uiCalendarPageHtml(),/目前沒有符合的日期/);
+  c.getLeaves=key=>key==='2026-09-03'?[{uid:'a',unit:'測試單位',hours:4}]:[];
+  assert.equal((c.uiCalendarPageHtml().match(/class="agenda-day[" ]/g)||[]).length,1);
+  c.S.yr=2028;c.S.mo=2;c.action('calendarView',{view:'month'});
+  assert.equal((c.uiCalendarPageHtml().match(/class="day /g)||[]).length,29);
+  c.action('today');assert.equal(c.UI_CAL_FILTER,'all');assert.equal(c.UI_CAL_VIEW,'month');
+});
+
+test('announcement loads reject out-of-order months, deduplicate dates and remove cancelled notices',async()=>{
+  const c=env(),pending=[];c.adminEvCache={};c.adminEvRequest=0;c.ADMIN_EV=['meeting','health'];
+  c.fsEnqueue=fn=>Promise.resolve().then(fn);
+  c.fbDb={collection:()=>({where:(field,op,ym)=>({get:()=>new Promise(resolve=>pending.push({ym,resolve}))})})};
+  vm.runInContext(presenter('loadAdminEv'),c);
+  const snapshot=rows=>({forEach:fn=>rows.forEach(data=>fn({data:()=>data}))});
+  const old=c.loadAdminEv();await Promise.resolve();c.S.mo=10;const recent=c.loadAdminEv();await Promise.resolve();
+  pending[1].resolve(snapshot([{date:'2026-10-19',type:'health'},{date:'2026-10-19',type:'health'}]));await recent;
+  pending[0].resolve(snapshot([{date:'2026-09-20',type:'meeting'}]));await old;
+  assert.equal(JSON.stringify(c.adminEvCache),JSON.stringify({'2026-10-19':['health']}));
+  const cancel=c.loadAdminEv();await Promise.resolve();pending[2].resolve(snapshot([]));await cancel;
+  assert.deepEqual(Object.keys(c.adminEvCache),[]);assert.ok(c.adminEvState.months.includes('2026-10'));
 });
