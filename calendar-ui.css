@@ -1,4 +1,4 @@
-/* v314 — daily information, readable at phone width. */
+/* Daily information, readable at phone width. Today emphasis updated in v317. */
 :root{--agenda-meeting:#215b8b;--agenda-meeting-bg:#e5f0fa;--agenda-health:#a34352;--agenda-health-bg:#fbe9ec;--agenda-personal:#68518b;--agenda-personal-bg:#f0eaf8}
 html[data-theme="dark"]{--agenda-meeting:#bbdcff;--agenda-meeting-bg:#243e54;--agenda-health:#ffc0c8;--agenda-health-bg:#50303b;--agenda-personal:#decbfb;--agenda-personal-bg:#40344f}
 /* The calendar is a reading surface. Keep the existing atmosphere behind it. */
@@ -43,9 +43,6 @@ html[data-theme="dark"] .calendar-view-switch button[aria-pressed="true"]{color:
 .calendar-v314 .day-top{min-height:21px;padding:0 1px}
 .calendar-v314 .shift-code{font-size:.68rem;padding:0 1px;line-height:1.3}
 .calendar-v314 .day.admin-ev{outline:none}
-.calendar-v314 .day.today{border:1px solid var(--brand);padding:7px 3px 5px;background:var(--surface);color:var(--brand);box-shadow:inset 0 0 0 1px var(--brand),0 3px 0 var(--line-strong)}
-.calendar-v314 .day.today .num{color:var(--brand)}
-.calendar-v314 .day.today .today-label{background:var(--brand);height:5px;width:5px}
 .calendar-v314 .day.break-day{border-bottom:3px solid #d2b675;padding-bottom:3px}
 .calendar-v314 .day.break-day::after{content:none}
 .calendar-v314 .day.public-holiday{border-top-color:#cf8b95}
@@ -73,7 +70,6 @@ html[data-theme="dark"] .calendar-view-switch button[aria-pressed="true"]{color:
 .agenda-date{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:42px;flex:none;color:var(--ink)}
 .agenda-date strong{font-size:1.6rem;line-height:1;font-weight:800;letter-spacing:-.055em;font-variant-numeric:tabular-nums}
 .agenda-date small{font-size:.66rem;color:var(--ink-2)}
-.agenda-day.is-today .agenda-date{color:var(--brand);border-radius:10px;background:var(--brand-soft);padding:10px 0}
 .agenda-body{display:block;min-width:0;flex:1}
 .agenda-day-head{display:flex;justify-content:space-between;align-items:center;gap:5px;flex-wrap:wrap}
 .agenda-shift{font-size:.8rem;font-weight:750}
@@ -133,5 +129,31 @@ html[data-theme="dark"] .calendar-view-switch button[aria-pressed="true"]{color:
 .calendar-holidays button:focus-visible,.restored-notice button:focus-visible{outline:3px solid var(--brand);outline-offset:3px}
 html[data-theme="dark"] .calendar-v314 .day.break-day::after{background:#60502c;border-color:#9e864c}
 html[data-theme="dark"] .calendar-v314 .break-day-tag{color:#ffe3a7}
+/* Today has a full-card treatment and a text label, independent of holiday tags. */
+.calendar-v314{--today-fill:linear-gradient(155deg,#28644f,#123e30);--today-ink:#fffdf3;--today-muted:#e0eee4;--today-outline:#6caa88;--today-divider:#aacbb75c;--today-badge:#f5dfa0;--today-badge-ink:#344426}
+html[data-theme="dark"] .calendar-v314{--today-fill:linear-gradient(155deg,#e0f1da,#bbdbc2);--today-ink:#163b2b;--today-muted:#345740;--today-outline:#a6d5b5;--today-divider:#34574040;--today-badge:#174631;--today-badge-ink:#fff0bd}
+.calendar-v314 .cal .day.today{z-index:1;background:var(--today-fill);color:var(--today-ink);border:1px solid var(--today-outline);box-shadow:inset 0 1px 0 #ffffff40,0 0 0 2px var(--today-outline),0 4px 0 #173e3038,0 8px 14px -7px #173e3080}
+.calendar-v314 .day.today .today-label{display:block;position:static;width:100%;height:auto;min-height:18px;margin:0;padding:2px 0;border-radius:4px;background:var(--today-badge);color:var(--today-badge-ink);font-size:.65rem;font-weight:850;line-height:1.3;text-align:center;white-space:nowrap;letter-spacing:0}
+.calendar-v314 .day.today .day-top{align-items:center;flex-wrap:wrap;row-gap:3px}
+.calendar-v314 .day.today .num{color:var(--today-ink);font-size:1.45rem;line-height:1.1;font-weight:850;letter-spacing:-.055em}
+.calendar-v314 .day.today .shift-code{width:100%;padding:3px 0;border-radius:4px;line-height:1.3;text-align:center;font-weight:800;box-shadow:inset 0 0 0 1px #ffffff35}
+.calendar-v314 .day.today.e .shift-code{color:#185541;background:#e1f2e6}
+.calendar-v314 .day.today.n .shift-code{color:#5b4384;background:#ede5fa}
+.calendar-v314 .day.today.m .shift-code{color:#805517;background:#fff0cb}
+.calendar-v314 .day.today.o .shift-code{color:#40574b;background:#e7efe9}
+.calendar-v314 .day.today .calendar-date-tag{background:#fbe7ec;color:#9d364c;border-radius:3px}
+.calendar-v314 .day.today .day-leave:not(.has-leave){color:var(--today-muted);border-color:var(--today-divider)}
+.calendar-v314 .day.today .day-leave:not(.has-leave) b{color:var(--today-ink)}
+.calendar-v314 .day.today .day-leave.has-leave{color:#80521d;background:#fff0cd;border-color:#f3d491}
+.calendar-v314 .day.today .day-leave.has-leave b{color:#80521d}
+.calendar-v314 .day.today .lun-mini{opacity:1;color:var(--today-muted)}
+.calendar-v314 .calendar-legend .legend-today{font-weight:800;color:var(--ink)}
+.calendar-v314 .calendar-legend .legend-today i{width:10px;height:12px;border-radius:3px;background:var(--today-fill);border-top:3px solid var(--today-badge);box-shadow:0 0 0 1px var(--today-outline)}
+.calendar-v314 .agenda-day.is-today{margin:8px 0;padding:12px 8px;border:1px solid var(--today-outline);border-radius:13px;background:var(--brand-soft);box-shadow:inset 3px 0 0 var(--today-outline)}
+.calendar-v314 .agenda-day.is-today .agenda-date{width:48px;gap:7px;padding:10px 2px;border-radius:9px;color:var(--today-ink);background:var(--today-fill);box-shadow:inset 0 1px 0 #ffffff30}
+.calendar-v314 .agenda-day.is-today .agenda-date small{padding:2px 4px;border-radius:4px;color:var(--today-badge-ink);background:var(--today-badge);font-weight:800;font-size:.62rem;line-height:1.4;white-space:nowrap}
+.calendar-v314 .calendar-today-anchor .today-anchor-date{padding:9px 11px;background:var(--today-fill);color:var(--today-ink);border:1px solid var(--today-outline);box-shadow:inset 0 1px 0 #ffffff30}
+@media(min-width:600px){.calendar-v314 .day.today .today-label{font-size:.75rem;min-height:22px}.calendar-v314 .day.today .num{font-size:1.8rem}}
+@media(max-width:350px){.calendar-v314 .day.today .today-label{font-size:.57rem}.calendar-v314 .day.today .num{font-size:1.25rem}}
 @media(min-width:600px){.calendar-v314 .calendar-break-list{grid-template-columns:repeat(2,minmax(0,1fr))}.calendar-v314 .break-day-tag{font-size:.67rem}.calendar-holiday-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}.calendar-section-head h2{font-size:1.05rem}}
 @media(max-width:350px){.calendar-v314 .calendar-breaks{padding:10px}.calendar-v314 .calendar-break-item{padding:8px;gap:3px 6px}.calendar-v314 .break-dates strong{font-size:.67rem}.calendar-v314 .break-length{font-size:.68rem;min-width:31px;padding:4px 5px}.calendar-v314 .break-name{font-size:.64rem}.calendar-v314 .break-day-tag{font-size:.49rem;gap:1px}.calendar-holidays{padding:15px 12px}.calendar-section-head{gap:8px;flex-wrap:wrap}.calendar-section-head h2{font-size:.87rem}.calendar-section-count{font-size:.61rem}.holiday-row-date{width:65px;gap:4px}.holiday-row-date b{font-size:.78rem}.holiday-row-date small{font-size:.6rem}.calendar-holiday-row{gap:8px}.calendar-holiday-row>strong{font-size:.77rem}}
