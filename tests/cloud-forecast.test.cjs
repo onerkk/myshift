@@ -71,7 +71,8 @@ test('Himawari tile requests use recent ten-minute observation times and Web Mer
   const now=Date.UTC(2026,8,28,9,41),times=CloudForecast.himawariFrameTimes(now,4);
   assert.deepEqual(times,['2026-09-28T09:20:00Z','2026-09-28T09:10:00Z','2026-09-28T09:00:00Z','2026-09-28T08:50:00Z']);
   const tile=CloudForecast.himawariTileXY(23.326,120.274,7);
-  assert.equal(tile.z,7);assert.ok(tile.x>=0&&tile.x<128);assert.ok(tile.y>=0&&tile.y<128);
-  assert.match(CloudForecast.himawariTileUrl(times[0],tile),/Himawari_AHI_Band13_Clean_Infrared\/default\/2026-09-28T09:20:00Z\/GoogleMapsCompatible_Level9\/7\//);
+  assert.equal(tile.z,6);assert.ok(tile.x>=0&&tile.x<64);assert.ok(tile.y>=0&&tile.y<64);
+  assert.match(CloudForecast.himawariTileUrl(times[0],tile),/Himawari_AHI_Band13_Clean_Infrared\/default\/2026-09-28T09:20:00Z\/GoogleMapsCompatible_Level6\/6\//);
+  assert.throws(()=>CloudForecast.himawariTileUrl(times[0],{z:7,x:106,y:55}),/tile/i);
   assert.throws(()=>CloudForecast.himawariTileXY(100,120,7),/coordinates/i);
 });
