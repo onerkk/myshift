@@ -412,3 +412,29 @@ html[data-theme="dark"] .bottom-nav{box-shadow:inset 0 1px 0 #ffffff16,0 3px 0 #
 .unit-config-warning{font-size:.73rem;line-height:1.65;margin:7px 0 0}
 #unitSel:disabled,#unitChg:disabled{opacity:.65;cursor:wait}
 #unitSel,#unitChg{min-height:44px;color:var(--ink);background:var(--surface)!important;border-color:var(--line-strong)!important}
+
+/* v318: monthly payroll period editor — layered glass, beveled controls and live range preview. */
+.pay-period-editor{position:relative;isolation:isolate;overflow:hidden;margin:18px 0!important;padding:20px!important;border:1px solid rgba(255,255,255,.92)!important;border-radius:22px!important;background:linear-gradient(148deg,#fff 0%,#f3f7fb 48%,#e5edf4 100%)!important;box-shadow:0 17px 30px rgba(24,43,65,.14),0 4px 8px rgba(24,43,65,.08),inset 0 1px 0 #fff,inset 0 -2px 0 rgba(54,77,100,.1)!important;color:var(--ink)}
+.pay-period-editor::before{content:"";position:absolute;z-index:-1;inset:0 0 auto;height:6px;background:linear-gradient(90deg,#58a99d,#4a87bb 55%,#9d83c4);box-shadow:0 2px 8px rgba(64,128,169,.24)}
+.pay-period-editor::after{content:"";position:absolute;z-index:-1;right:-45px;top:-68px;width:190px;height:150px;border-radius:50%;background:radial-gradient(ellipse,rgba(255,255,255,.86),rgba(255,255,255,0) 70%);pointer-events:none}
+.pay-period-editor-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:15px}
+.pay-period-editor-top h3{margin:3px 0 0!important;font-size:1.12rem!important;letter-spacing:.015em}
+.pay-period-kicker{font-size:.72rem;font-weight:750;letter-spacing:.1em;color:#52728b;text-transform:uppercase}
+.pay-period-state{flex:0 0 auto;padding:7px 10px;border:1px solid rgba(83,120,149,.2);border-radius:999px;background:linear-gradient(180deg,#fff,#edf3f8);box-shadow:0 3px 6px rgba(32,58,83,.1),inset 0 1px #fff;color:#536c82;font-size:.7rem;font-weight:750;white-space:nowrap}
+.pay-period-state.is-custom{border-color:rgba(33,125,118,.25);background:linear-gradient(180deg,#e9faf5,#cfece5);color:#176e66}
+.pay-period-inputs{display:grid;grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr);align-items:end;gap:9px}
+.pay-period-field{display:flex;min-width:0;flex-direction:column;gap:7px;color:#41596f;font-size:.79rem;font-weight:700}
+.pay-period-field input[type=date]{min-width:0;min-height:48px;padding:8px 9px!important;border:1px solid rgba(95,121,145,.3)!important;border-radius:13px!important;background:linear-gradient(180deg,#fff 0%,#f7faff 100%)!important;box-shadow:0 5px 10px rgba(32,55,79,.1),inset 0 2px 4px rgba(30,52,76,.07),inset 0 1px #fff!important;color:#1e3347!important;font-size:.84rem!important;font-variant-numeric:tabular-nums}
+.pay-period-field input[type=date]:focus{outline:2px solid rgba(60,137,166,.55)!important;outline-offset:2px}
+.pay-period-arrow{display:grid;place-items:center;min-height:46px;margin-bottom:1px;border-radius:13px;background:linear-gradient(145deg,#edf3f7,#dce6ef);box-shadow:0 4px 8px rgba(35,58,78,.12),inset 0 1px #fff;color:#527590;font-size:1.2rem;font-weight:800}
+.pay-period-preview{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:15px;padding:13px 14px;border:1px solid rgba(255,255,255,.85);border-radius:15px;background:linear-gradient(135deg,#eaf3f8,#f8fbfd 58%,#e5f1ef);box-shadow:0 6px 11px rgba(39,66,90,.08),inset 0 1px 0 #fff,inset 0 -2px 3px rgba(80,111,137,.07)}
+.pay-period-preview>div{min-width:0}.pay-period-preview small{display:block;margin-bottom:4px;color:#647c90;font-size:.7rem;font-weight:650}.pay-period-preview strong{display:block;overflow-wrap:anywhere;color:#1d435e;font-size:.93rem;font-variant-numeric:tabular-nums;line-height:1.45}
+.pay-period-preview>span{flex:0 0 auto;padding:7px 10px;border-radius:11px;background:linear-gradient(180deg,#fff,#eaf1f6);box-shadow:0 3px 6px rgba(33,55,75,.1),inset 0 1px #fff;color:#31566f;font-size:.78rem;font-weight:800;font-variant-numeric:tabular-nums}
+.pay-period-editor-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:13px;color:#64798b;font-size:.72rem;line-height:1.5}
+.pay-period-editor-foot button{flex:0 0 auto;min-height:38px;padding:7px 11px;border:1px solid rgba(66,112,143,.24);border-radius:11px;background:linear-gradient(180deg,#fff,#eaf1f6);box-shadow:0 4px 7px rgba(34,57,79,.1),inset 0 1px #fff;color:#315d79;font:inherit;font-weight:750;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease}
+.pay-period-editor-foot button:active{transform:translateY(2px);box-shadow:0 2px 3px rgba(34,57,79,.12),inset 0 1px #fff}
+.pay-period-message{min-height:1.5em;margin:8px 0 0!important;color:#39776d!important;font-size:.74rem!important}
+.pay-period-message[data-state="error"]{color:#ad4c43!important}.pay-period-message[data-state="warning"]{color:#8b5f13!important}.pay-period-editor.is-invalid{border-color:rgba(189,76,67,.48)!important;box-shadow:0 17px 30px rgba(24,43,65,.12),0 0 0 2px rgba(189,76,67,.1),inset 0 1px 0 #fff!important}.pay-period-editor.has-boundary-warning{border-color:rgba(179,129,52,.42)!important}
+.pay-period-note{margin:4px 0 0!important;padding-top:11px;border-top:1px solid rgba(87,113,137,.15);color:#607487!important;font-size:.75rem!important;line-height:1.7!important}
+@media(max-width:380px){.pay-period-editor{padding:16px!important}.pay-period-inputs{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px}.pay-period-arrow{display:none}.pay-period-field input[type=date]{padding:7px 5px!important;font-size:.75rem!important}.pay-period-editor-foot{align-items:flex-start;flex-direction:column}.pay-period-editor-foot button{width:100%}.pay-period-preview strong{font-size:.82rem}}
+@media(prefers-reduced-motion:reduce){.pay-period-editor-foot button{transition:none}}

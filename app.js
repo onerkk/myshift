@@ -526,13 +526,16 @@ function loadLeaves(){
     };
     const ymSet=new Set();
     addPair(ymSet,y,m);
-    // 薪資年月可能與目前日曆月不同；必須同時載入該計薪期的前月資料，否則 26～月底的請假會漏算。
+    // 薪資月份可自訂日期範圍；載入整段涵蓋的月份，避免跨月請假或加班紀錄漏算。
     if(typeof PAY_VIEW!=="undefined"&&PAY_VIEW)addPair(ymSet,PAY_VIEW.y,PAY_VIEW.m);
+    const addRange=range=>{if(range&&range.sd&&range.ed)salaryCalendarMonths(range.sd,range.ed).forEach(k=>ymSet.add(k))};
+    if(typeof PAY_VIEW!=="undefined"&&PAY_VIEW&&typeof calcPayPeriod==='function')addRange(calcPayPeriod(PAY_VIEW.y,PAY_VIEW.m));
     // Home always previews the latest closed period, even after browsing older pay.
-    const latest=latestClosedSalaryMonth();addPair(ymSet,latest.y,latest.m);
-    const ymList=Array.from(ymSet).slice(0,10);
-    const [snap,own]=await Promise.all([
-      fbDb.collection("leaves").where("ym","in",ymList).get(),
+    const latest=latestClosedSalaryMonth();addPair(ymSet,latest.y,latest.m);if(typeof calcPayPeriod==='function')addRange(calcPayPeriod(latest.y,latest.m));
+    const ymList=Array.from(ymSet),ymBatches=[];
+    for(let i=0;i<ymList.length;i+=10)ymBatches.push(ymList.slice(i,i+10));
+    const [monthSnaps,own]=await Promise.all([
+      Promise.all(ymBatches.map(batch=>fbDb.collection("leaves").where("ym","in",batch).get())),
       fbDb.collection("leaves").where("uid","==",requestUid).get()
     ]);
     const d={},seen=new Set();
@@ -544,7 +547,7 @@ function loadLeaves(){
       const k=v.date;
       if(!d[k])d[k]=[];
       d[k].push({docId:doc.id,uid:v.uid,name:v.name,type:v.type,leaveType:v.leaveType||"",hours:+v.hours||0,reason:v.reason||"",ts:v.ts,unit:v.unit||"",startOffset:leaveNumber(v.startOffset),endOffset:leaveNumber(v.endOffset),shiftStartMinute:leaveNumber(v.shiftStartMinute),shiftHours:leaveNumber(v.shiftHours),shiftCode:v.shiftCode||"",schemaVersion:+v.schemaVersion||1});
-    };snap.forEach(collect);own.forEach(collect);
+    };monthSnaps.forEach(snap=>snap.forEach(collect));own.forEach(collect);
     if(request!==payrollLeaveRequest||!fbUser||fbUser.uid!==requestUid||requestUnit!==(S.unit||""))return;
     leavesCache=d;
     payrollLeaveState={uid:requestUid,unit:requestUnit,loading:false,error:false,months:ymList,ownHistoryLoaded:true};
@@ -1351,11 +1354,70 @@ function getSalPeriod(y,m){
     reportedTaxFree:0,reportedTaxable:0,reportedLeaveDed:0,reportedGross:0,reportedDeduction:0,reportedNet:0},src);
 }
 
-// 薪資年月不是目前日曆月：1～25 日顯示上一個已結算薪資月，26 日起切換到本月薪資期。
-function latestClosedSalaryMonth(ref){
-  const d=ref instanceof Date?ref:new Date(),out={y:d.getFullYear(),m:d.getMonth()+1};
-  if(d.getDate()<=25){out.m--;if(out.m<1){out.m=12;out.y--}}
+function salaryDateKey(date){return ek(date.getFullYear(),date.getMonth()+1,date.getDate())}
+function parseSalaryDate(value){
+  const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));if(!match)return null;
+  const year=+match[1],month=+match[2],day=+match[3],date=new Date(0);
+  date.setHours(0,0,0,0);date.setFullYear(year,month-1,day);
+  if(date.getFullYear()!==year||date.getMonth()+1!==month||date.getDate()!==day)return null;
+  return date;
+}
+function defaultSalaryPeriod(y,m){
+  const sd=new Date(y,m-2,26),ed=new Date(y,m-1,25);
+  return{sd,ed,start:salaryDateKey(sd),end:salaryDateKey(ed)};
+}
+function salaryRangeDays(sd,ed){
+  if(!(sd instanceof Date)||!(ed instanceof Date))return 0;
+  return Math.floor((Date.UTC(ed.getFullYear(),ed.getMonth(),ed.getDate())-Date.UTC(sd.getFullYear(),sd.getMonth(),sd.getDate()))/86400000)+1;
+}
+function getSalaryPeriodRange(y,m){
+  const fallback=defaultSalaryPeriod(y,m),saved=(SAL.monthly&&SAL.monthly[salPeriodKey(y,m)])||{};
+  const sd=parseSalaryDate(saved.payPeriodStart),ed=parseSalaryDate(saved.payPeriodEnd);
+  if(!sd||!ed||salaryDateKey(ed)<salaryDateKey(sd)||salaryRangeDays(sd,ed)>MAX_SALARY_PERIOD_DAYS)return{...fallback,custom:false};
+  const start=salaryDateKey(sd),end=salaryDateKey(ed);
+  return{sd,ed,start,end,custom:start!==fallback.start||end!==fallback.end};
+}
+function salaryCalendarMonths(sd,ed){
+  if(!(sd instanceof Date)||!(ed instanceof Date)||ed<sd)return[];
+  const out=[],cursor=new Date(sd.getFullYear(),sd.getMonth(),1),last=new Date(ed.getFullYear(),ed.getMonth(),1);
+  while(cursor<=last){out.push(salPeriodKey(cursor.getFullYear(),cursor.getMonth()+1));cursor.setMonth(cursor.getMonth()+1)}
   return out;
+}
+function salaryMonthOffset(y,m,offset){const index=y*12+(m-1)+offset;return{y:Math.floor(index/12),m:((index%12)+12)%12+1}}
+function salaryDateDistance(a,b){
+  const first=a instanceof Date?a:parseSalaryDate(a),last=b instanceof Date?b:parseSalaryDate(b);
+  if(!first||!last)return null;
+  return Math.round((Date.UTC(last.getFullYear(),last.getMonth(),last.getDate())-Date.UTC(first.getFullYear(),first.getMonth(),first.getDate()))/86400000);
+}
+function salaryPeriodBoundaryWarnings(y,m,sd,ed){
+  const previousMonth=salaryMonthOffset(y,m,-1),nextMonth=salaryMonthOffset(y,m,1),previous=getSalaryPeriodRange(previousMonth.y,previousMonth.m),next=getSalaryPeriodRange(nextMonth.y,nextMonth.m),warnings=[];
+  const fromPrevious=salaryDateDistance(previous.ed,sd),toNext=salaryDateDistance(ed,next.sd);
+  if(fromPrevious!==null&&fromPrevious<=0)warnings.push(`${salPeriodKey(previousMonth.y,previousMonth.m)} ${salaryDateLabel(sd)} ${lang==='zh'?`與前期重疊 ${1-fromPrevious} 天，可能重複計入。`:'tumpang tindih dengan periode sebelumnya.'}`);
+  else if(fromPrevious!==null&&fromPrevious>1)warnings.push(`${salPeriodKey(previousMonth.y,previousMonth.m)} ${salaryDateLabel(previous.ed)}–${salaryDateLabel(sd)} ${lang==='zh'?'之間有':'memiliki jeda'} ${fromPrevious-1} ${lang==='zh'?'天未分配。':'hari yang tidak tercakup.'}`);
+  if(toNext!==null&&toNext<=0)warnings.push(`${salPeriodKey(nextMonth.y,nextMonth.m)} ${salaryDateLabel(ed)} ${lang==='zh'?`與後期重疊 ${1-toNext} 天，可能重複計入。`:'tumpang tindih dengan periode berikutnya.'}`);
+  else if(toNext!==null&&toNext>1)warnings.push(`${salPeriodKey(nextMonth.y,nextMonth.m)} ${salaryDateLabel(ed)}–${salaryDateLabel(next.sd)} ${lang==='zh'?'之間有':'memiliki jeda'} ${toNext-1} ${lang==='zh'?'天未分配。':'hari yang tidak tercakup.'}`);
+  return warnings;
+}
+function salaryDateLabel(value){
+  const date=value&&typeof value.getFullYear==='function'?value:parseSalaryDate(value);if(!date)return'';
+  const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');
+  return lang==='zh'?`${y}/${m}/${d}`:`${d}/${m}/${y}`;
+}
+const MAX_SALARY_PERIOD_DAYS=370;
+
+// 薪資年月不是目前日曆月：最新已結算與目前薪資年月依每期實際迄日及日期範圍判定。
+function latestClosedSalaryMonth(ref){
+  const d=ref instanceof Date?new Date(ref):new Date(),today=new Date(d.getFullYear(),d.getMonth(),d.getDate()),todayKey=salaryDateKey(today);
+  const anchor=d.getFullYear()*12+d.getMonth();let best=null;
+  for(let offset=-48;offset<=1;offset++){
+    const index=anchor+offset,y=Math.floor(index/12),m=((index%12)+12)%12+1,range=getSalaryPeriodRange(y,m);
+    if(range.end>=todayKey)continue;
+    if(!best||range.end>best.end||(range.end===best.end&&index>best.index))best={y,m,end:range.end,index};
+  }
+  if(best)return{y:best.y,m:best.m};
+  const fallback={y:d.getFullYear(),m:d.getMonth()+1};
+  if(d.getDate()<=25){fallback.m--;if(fallback.m<1){fallback.m=12;fallback.y--}}
+  return fallback;
 }
 let PAY_VIEW=latestClosedSalaryMonth();
 function payViewMove(delta){
@@ -1363,7 +1425,17 @@ function payViewMove(delta){
   PAY_VIEW={y:Math.floor(idx/12),m:(idx%12+12)%12+1};
 }
 function payViewLatest(){PAY_VIEW=latestClosedSalaryMonth()}
-function payViewCurrent(){const d=new Date();if(d.getDate()>25)d.setMonth(d.getMonth()+1,1);PAY_VIEW={y:d.getFullYear(),m:d.getMonth()+1}}
+function payViewCurrent(ref){
+  const d=ref instanceof Date?new Date(ref):new Date(),today=new Date(d.getFullYear(),d.getMonth(),d.getDate()),todayKey=salaryDateKey(today),anchor=d.getFullYear()*12+d.getMonth();
+  const containing=[],future=[];
+  for(let offset=-14;offset<=14;offset++){
+    const index=anchor+offset,y=Math.floor(index/12),m=((index%12)+12)%12+1,range=getSalaryPeriodRange(y,m);
+    if(range.start<=todayKey&&range.end>=todayKey)containing.push({y,m,start:range.start,index});
+    else if(range.start>todayKey)future.push({y,m,start:range.start,index});
+  }
+  const selected=containing.sort((a,b)=>b.start.localeCompare(a.start)||b.index-a.index)[0]||future.sort((a,b)=>a.start.localeCompare(b.start)||a.index-b.index)[0]||latestClosedSalaryMonth(d);
+  PAY_VIEW={y:selected.y,m:selected.m};
+}
 function setSalPeriod(y,m,data){
   if(!SAL.monthly||typeof SAL.monthly!=="object")SAL.monthly={};
   const key=salPeriodKey(y,m),prev=(SAL.monthly[key]&&typeof SAL.monthly[key]==="object")?SAL.monthly[key]:{};
@@ -1645,8 +1717,7 @@ function calcOT(y,m,wd,sh){
   return{tH,oH:Math.round(oH*10)/10,rH};
 }
 function calcPayPeriod(y,m){
-  const pm=m===1?12:m-1,py=m===1?y-1:y;
-  const sd=new Date(py,pm-1,26),ed=new Date(y,m-1,25);
+  const range=getSalaryPeriodRange(y,m),sd=new Date(range.sd),ed=new Date(range.ed);
   const r=rot();
   if(!r)return{sd,ed,wd:0,tH:0,oH:0,rH:0,sh:12,leaveH:0,unworkedOT:0,otDeductTotal:0,typhoonH:0,typhoonOtDed:0,rawOH:0};
   const sh=r.h,dailyOT=Math.max(0,sh-8),uid=fbUser&&fbUser.uid;
@@ -1680,8 +1751,7 @@ function payCardHtml(y,m){
   const pp=calcPayPeriod(y,m);
   if(!pp||!rot())return"";
   const isZh=lang==="zh";
-  const pm=m===1?12:m-1,py=m===1?y-1:y;
-  const pLabel=isZh?`${py}/${pm}/26 ~ ${y}/${m}/25`:`${pm}/26/${py} ~ ${m}/25/${y}`;
+  const pLabel=`${salaryDateLabel(pp.sd)} – ${salaryDateLabel(pp.ed)}`;
   const pay5d=getPayDay(y,m,5),pay20d=getPayDay(y,m,20);
   const pay5=isZh?`${m}/${pay5d} 發薪`:`${m}/${pay5d} Gaji`;
   const pay20=isZh?`${m}/${pay20d} 績效獎金`:`${m}/${pay20d} Bonus`;
@@ -1803,7 +1873,7 @@ function calcSalaryEst(y,m,options={}){
   if(n(official.holidayH)>0&&Math.abs(holidayH-n(official.holidayH))>.001)notes.push('holidayHoursMismatch');
   if(n(official.weekdayH)!==null&&Math.abs(weekdayH-n(official.weekdayH))>.001)notes.push('weekdayHoursMismatch');
   if(typeof payrollLeaveState!=='undefined'&&uid){
-    const prev=new Date(y,m-2,1),months=[salPeriodKey(y,m),salPeriodKey(prev.getFullYear(),prev.getMonth()+1)];
+    const months=salaryCalendarMonths(pp.sd,pp.ed);
     if(payrollLeaveState.uid!==uid||payrollLeaveState.loading||payrollLeaveState.error||(!payrollLeaveState.ownHistoryLoaded&&months.some(k=>!payrollLeaveState.months.includes(k))))notes.push('leaveNotReady');
   }
   const est={annualH,disasterH,legacyLeaveCount,hourly,otHourly,leaveHourly,baseSum,proposal,otherIncome,nightCount,sickH,personalH,sickPayH,personalPayH,
@@ -1861,14 +1931,38 @@ function salaryDaysForm(y,m){
     out.push(`<div class="payroll-day"><strong>${key.slice(5).replace('-','/')} · ${esc(shift||'—')}</strong><label>${zh?'計薪類別':'Jenis hari'}<select id="sal_kind_${key}" onchange="document.getElementById('sal_worked_${key}').disabled=['auto','work'].includes(this.value)">${[['auto',zh?'自動依固定規則':'Aturan otomatis'],['work',zh?'平日（本日例外）':'Biasa (pengecualian)'],['rest',zh?'休息日出勤':'Hari istirahat'],['holiday',zh?'有薪休假日出勤':'Libur berbayar']].map(([v,l])=>`<option value="${v}"${kind===v?' selected':''}>${l}</option>`).join('')}</select></label><label>${zh?'特殊出勤 h':'Jam kerja khusus'}<input id="sal_worked_${key}" type="number" min="0" max="12" step="0.5" inputmode="decimal" value="${Payroll.number(o.workedHours)===null?'':o.workedHours}" placeholder="${zh?'自動依班表扣除請假':'Otomatis dari jadwal'}"${['auto','work'].includes(kind)?' disabled':''}></label></div>`);
   }return out.join('');
 }
+function updateSalaryPeriodPreview(){
+  const startEl=document.getElementById('sal_periodStart'),endEl=document.getElementById('sal_periodEnd'),preview=document.getElementById('salaryPeriodPreview'),count=document.getElementById('salaryPeriodDays'),message=document.getElementById('salaryPeriodMessage'),state=document.getElementById('salaryPeriodState'),card=document.getElementById('payPeriodEditor');
+  if(!startEl||!endEl)return;
+  const sd=parseSalaryDate(startEl.value),ed=parseSalaryDate(endEl.value),days=sd&&ed?salaryRangeDays(sd,ed):0,zh=lang==='zh';
+  let error='';
+  if(!sd||!ed)error=zh?'請選擇有效的起日與迄日。':'Pilih tanggal mulai dan akhir yang valid.';
+  else if(ed<sd)error=zh?'迄日不可早於起日。':'Tanggal akhir harus setelah tanggal mulai.';
+  else if(days>MAX_SALARY_PERIOD_DAYS)error=zh?`計薪區間最多 ${MAX_SALARY_PERIOD_DAYS} 天。`:`Maksimal ${MAX_SALARY_PERIOD_DAYS} hari.`;
+  if(preview)preview.textContent=sd&&ed?`${salaryDateLabel(sd)} – ${salaryDateLabel(ed)}`:'—';
+  if(count)count.textContent=!error&&days?`${days} ${zh?'天':'hari'}`:'—';
+  const warnings=!error&&sd&&ed?salaryPeriodBoundaryWarnings(PAY_VIEW.y,PAY_VIEW.m,sd,ed):[];
+  if(message){message.textContent=error||(warnings.length?warnings.join(' '):(zh?'起日與迄日當天都會納入計算。':'Tanggal mulai dan akhir ikut dihitung.'));message.setAttribute('data-state',error?'error':warnings.length?'warning':'ready');}
+  if(card){card.classList.toggle('is-invalid',!!error);card.classList.toggle('has-boundary-warning',!error&&warnings.length>0)}
+  if(state){
+    const defaults=defaultSalaryPeriod(PAY_VIEW.y,PAY_VIEW.m),custom=!!sd&&!!ed&&(salaryDateKey(sd)!==defaults.start||salaryDateKey(ed)!==defaults.end);
+    state.textContent=custom?(zh?'本月自訂':'Khusus bulan ini'):(zh?'預設區間':'Periode default');
+    state.classList.toggle('is-custom',custom);
+  }
+}
+function resetSalaryPeriodInputs(){
+  const start=document.getElementById('sal_periodStart'),end=document.getElementById('sal_periodEnd');if(!start||!end)return;
+  const defaults=defaultSalaryPeriod(PAY_VIEW.y,PAY_VIEW.m);start.value=defaults.start;end.value=defaults.end;updateSalaryPeriodPreview();
+}
 function rSalary(){
-  const zh=lang==='zh',y=PAY_VIEW.y,m=PAY_VIEW.m,p=getSalPeriod(y,m);
+  const zh=lang==='zh',y=PAY_VIEW.y,m=PAY_VIEW.m,p=getSalPeriod(y,m),range=getSalaryPeriodRange(y,m),boundaryWarnings=salaryPeriodBoundaryWarnings(y,m,range.sd,range.ed);
+  const periodEditor=`<section class="payroll-form-section pay-period-editor${boundaryWarnings.length?' has-boundary-warning':''}" id="payPeriodEditor" data-depth><div class="pay-period-editor-top"><div><span class="pay-period-kicker">${salPeriodKey(y,m)} · ${zh?'薪資月':'Bulan gaji'}</span><h3>${zh?'本月計薪區間':'Periode hitung bulan ini'}</h3></div><span class="pay-period-state${range.custom?' is-custom':''}" id="salaryPeriodState">${range.custom?(zh?'本月自訂':'Khusus bulan ini'):(zh?'預設區間':'Periode default')}</span></div><div class="pay-period-inputs"><label class="pay-period-field" for="sal_periodStart"><span>${zh?'計薪起日':'Tanggal mulai'}</span><input type="date" id="sal_periodStart" value="${range.start}" oninput="updateSalaryPeriodPreview()" onchange="updateSalaryPeriodPreview()" required></label><span class="pay-period-arrow" aria-hidden="true">→</span><label class="pay-period-field" for="sal_periodEnd"><span>${zh?'計薪迄日':'Tanggal akhir'}</span><input type="date" id="sal_periodEnd" value="${range.end}" oninput="updateSalaryPeriodPreview()" onchange="updateSalaryPeriodPreview()" required></label></div><div class="pay-period-preview" aria-live="polite"><div><small>${zh?'實際計算範圍':'Rentang yang dihitung'}</small><strong id="salaryPeriodPreview">${salaryDateLabel(range.sd)} – ${salaryDateLabel(range.ed)}</strong></div><span id="salaryPeriodDays">${salaryRangeDays(range.sd,range.ed)} ${zh?'天':'hari'}</span></div><div class="pay-period-editor-foot"><span>${zh?'此設定只套用於本薪資月':'Hanya untuk bulan gaji ini'}</span><button type="button" onclick="resetSalaryPeriodInputs()">${zh?'恢復本月預設':'Pulihkan default'}</button></div><p class="pay-period-message" id="salaryPeriodMessage" data-state="${boundaryWarnings.length?'warning':'ready'}">${boundaryWarnings.join(' ')||(zh?'起日與迄日當天都會納入計算。':'Tanggal mulai dan akhir ikut dihitung.')}</p><p class="pay-period-note">${zh?'這段日期會重算每日班表、請假、加班與夜點；固定月薪、月獎金及薪資條仍按上方薪資年月保存。':'Rentang ini menghitung ulang jadwal, cuti, lembur dan tunjangan malam. Gaji tetap, bonus bulanan, dan slip tetap tersimpan pada bulan gaji di atas.'}</p></section>`;
   const num=(key,title,value,hint='')=>`<label class="payroll-field" for="sal_${key}"><span>${title}</span><input type="number" id="sal_${key}" value="${Payroll.number(value)===null?'':value}" min="0" step="0.01" inputmode="decimal" class="sal-in">${hint?`<small>${hint}</small>`:''}</label>`;
   const select=(key,title,value,options)=>`<label class="payroll-field" for="sal_${key}"><span>${title}</span><select id="sal_${key}">${options.map(([v,l])=>`<option value="${v}"${v===value?' selected':''}>${l}</option>`).join('')}</select></label>`;
   const fixed=[['base','職能俸','Gaji pokok'],['meal','伙食津貼','Makan'],['transport','交通津貼','Transport'],['position','崗位津貼','Posisi'],['union','工會會費','Iuran serikat'],['welfare','福利金','Kesejahteraan'],['laborIns','勞保自付','Asuransi kerja'],['healthIns','健保自付','Asuransi kesehatan'],['otherDed','其他固定扣款','Potongan lain']];
   return `<div class="modal-bg" data-a="salClose"><div class="modal-sheet help-sheet payroll-form" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="payroll-form-heading"><h2>${zh?'自動計薪依據':'Dasar hitungan otomatis'}</h2><button class="icon-action" data-a="salClose" aria-label="${zh?'關閉':'Tutup'}">×</button></div>
   <p>${zh?'已保存的薪資、調薪日期與請假紀錄會自動套用。正常使用只需維護班表與請假。':'Data gaji, tanggal perubahan dan cuti diterapkan otomatis. Cukup perbarui jadwal dan cuti.'}</p>
-  <section class="payroll-form-section payroll-basis"><h3>${zh?'目前計算依據':'Dasar saat ini'}</h3><dl><div><dt>${zh?'固定應領':'Gaji tetap'}</dt><dd>${studioMoney(Payroll.salaryAt(SAL,salPeriodKey(y,m)+'-25').baseSum)}</dd></div><div><dt>${zh?'計薪區間':'Periode'}</dt><dd>${zh?'上月26日～本月25日':'26 bulan lalu – 25 bulan ini'}</dd></div><div><dt>${zh?'跨月調薪':'Perubahan gaji'}</dt><dd>${zh?'按生效日期逐日計算':'Mengikuti tanggal berlaku'}</dd></div><div><dt>${zh?'晚班請假':'Cuti shift malam'}</dt><dd>${zh?'扣除未出勤，再算夜點':'Kurangi ketidakhadiran'}</dd></div></dl><p>${zh?'下方只保留日後調薪或公司制度變更時的修正入口，不必逐項確認才能計算。':'Bagian bawah hanya untuk perubahan gaji atau aturan; tidak perlu konfirmasi satu per satu.'}</p></section>
+  ${periodEditor}<section class="payroll-form-section payroll-basis"><h3>${zh?'目前計算依據':'Dasar saat ini'}</h3><dl><div><dt>${zh?'固定應領':'Gaji tetap'}</dt><dd>${studioMoney(Payroll.salaryAt(SAL,salPeriodKey(y,m)+'-25').baseSum)}</dd></div><div><dt>${zh?'本期日期':'Periode'}</dt><dd>${salaryDateLabel(range.sd)} – ${salaryDateLabel(range.ed)}</dd></div><div><dt>${zh?'跨月調薪':'Perubahan gaji'}</dt><dd>${zh?'按生效日期逐日計算':'Mengikuti tanggal berlaku'}</dd></div><div><dt>${zh?'晚班請假':'Cuti shift malam'}</dt><dd>${zh?'扣除未出勤，再算夜點':'Kurangi ketidakhadiran'}</dd></div></dl><p>${zh?'固定月薪、固定扣款與月獎金維持按薪資年月保存；下方為公司制度變更時的修正入口。':'Gaji, potongan tetap, dan bonus tersimpan per bulan; bagian bawah untuk perubahan aturan perusahaan.'}</p></section>
   <details class="payroll-form-section"><summary>${zh?'薪資或制度變更（選填）':'Perubahan gaji / aturan (opsional)'}</summary>
   <section class="payroll-form-section"><h3>${zh?'夜點給付規則':'Aturan tunjangan malam'}</h3><div class="payroll-form-grid">${num('night',zh?'完整一班夜點費':'Tarif shift penuh',SAL.night)}${select('nightPolicy',zh?'部分出勤晚班':'Shift malam parsial',SAL.nightPolicy||'auto',[
     ['auto',zh?'自動分析既有資料':'Analisis data tersimpan'],['attendance',zh?'有出勤即給一班':'Hadir = satu unit'],['prorated',zh?'依出勤工時比例':'Proporsi jam kerja'],['full',zh?'完整出勤才給付':'Hanya shift penuh']])}</div>
@@ -1894,6 +1988,11 @@ function saveSalaryForm(){
     const n=Payroll.number(value);if(n===null)throw Error(lang==='zh'?'請填非負數字':'Isi angka non-negatif');return n;};
   const choice=(key,allowed,fallback)=>{const el=document.getElementById('sal_'+key),v=el?el.value:fallback;if(!allowed.includes(v))throw Error('計薪規則無效');return v;};
   try{
+    const startField=document.getElementById('sal_periodStart'),endField=document.getElementById('sal_periodEnd');
+    const periodStart=parseSalaryDate(startField&&startField.value),periodEnd=parseSalaryDate(endField&&endField.value);
+    if(!periodStart||!periodEnd)throw Error(lang==='zh'?'請選擇有效的計薪起日與迄日。':'Pilih tanggal mulai dan akhir yang valid.');
+    if(periodEnd<periodStart)throw Error(lang==='zh'?'計薪迄日不可早於起日。':'Tanggal akhir harus setelah tanggal mulai.');
+    if(salaryRangeDays(periodStart,periodEnd)>MAX_SALARY_PERIOD_DAYS)throw Error(lang==='zh'?`計薪區間最多 ${MAX_SALARY_PERIOD_DAYS} 天。`:`Maksimal ${MAX_SALARY_PERIOD_DAYS} hari.`);
     const next=Object.assign({},SAL),globals=['base','meal','transport','position','night','union','welfare','laborIns','healthIns','otherDed','laborPensionWage','laborPensionSelfRate','laborPensionEmployerRate','otWageBase','leaveWageBase','otTier1Rate','otTier2Rate','sickRate','personalRate'];
     for(const k of globals){const value=read('sal_'+k);next[k]=value===null?(k==='otTier1Rate'?1.3334:k==='otTier2Rate'?1.6667:0):value;}
     if(!(next.base>0))throw Error(lang==='zh'?'請先填職能俸':'Isi gaji pokok');
@@ -1908,15 +2007,18 @@ function saveSalaryForm(){
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(new Date(date+'T00:00:00').getTime()))throw Error(lang==='zh'?'生效日期無效':'Tanggal berlaku tidak valid');
       next.wageHistory=(SAL.wageHistory||[]).filter(r=>r.effectiveFrom!==date).concat({effectiveFrom:date,...Object.fromEntries(Payroll.fixedKeys.map(k=>[k,next[k]])),source:'user-change'});
     }
-    const data={inputVersion:3,proposal:read('sal_proposal')||0,otherIncome:read('sal_otherIncome')||0,days:{}};
-    const previous=getSalPeriod(PAY_VIEW.y,PAY_VIEW.m),pp=calcPayPeriod(PAY_VIEW.y,PAY_VIEW.m);
+    const data={inputVersion:3,proposal:read('sal_proposal')||0,otherIncome:read('sal_otherIncome')||0,
+      payPeriodStart:salaryDateKey(periodStart),payPeriodEnd:salaryDateKey(periodEnd),days:{}};
+    const previous=getSalPeriod(PAY_VIEW.y,PAY_VIEW.m);data.days=Object.assign({},previous.days||{});
+    const pp=calcPayPeriod(PAY_VIEW.y,PAY_VIEW.m);
     if(pp)for(let d=new Date(pp.sd);d<=pp.ed;d.setDate(d.getDate()+1)){
       const key=ek(d.getFullYear(),d.getMonth()+1,d.getDate()),el=document.getElementById('sal_kind_'+key);
       if(!el){if(previous.days[key])data.days[key]=previous.days[key];continue;}
       const kind=el.value,h=read('sal_worked_'+key);
       if(h>12)throw Error(lang==='zh'?'每日出勤最多 12h。':'Jam harian 0–12.');
       if(!['auto','work','rest','holiday'].includes(kind))throw Error('計薪類別無效');
-      if(kind!=='auto')data.days[key]={kind,workedHours:kind==='work'?null:h};
+      if(kind==='auto')delete data.days[key];
+      else data.days[key]={kind,workedHours:kind==='work'?null:h};
     }
     SAL=next;setSalPeriod(PAY_VIEW.y,PAY_VIEW.m,data);normalizeSal();SAL.enabled=true;sSAL();S.showSal=false;return true;
   }catch(e){alert(e.message);return false;}
@@ -2646,7 +2748,7 @@ function rHelp(){
       <div class="help-num" style="background:#1565c0">$</div>
       <div class="help-txt">
         <h3>${isZh?"薪資計算週期":"Periode Perhitungan"}</h3>
-        <p>${isZh?"每月薪資計算區間為上月 26 日至當月 25 日。例如 3 月薪水計算的是 2/26 ~ 3/25 的出勤與加班時數。":"Periode gaji dihitung dari tanggal 26 bulan lalu sampai tanggal 25 bulan ini."}</p>
+        <p>${isZh?"每月預設計薪區間為上月 26 日至當月 25 日（例如 3 月為 2/26～3/25）。公司某月結算日若有變動，可在「薪資」設定中的「本月計薪區間」單獨調整，起日與迄日都會計入。":"Periode default adalah tanggal 26 bulan lalu sampai tanggal 25 bulan ini. Jika tanggal perusahaan berubah pada bulan tertentu, atur masing-masing di pengaturan gaji; tanggal awal dan akhir ikut dihitung."}</p>
       </div>
     </div>
     <div class="help-step" style="background:rgba(21,101,194,.05);border-left:3px solid #1565c0">
@@ -5097,10 +5199,10 @@ function salaryDailyAuditHtml(est){
 }
 function uiSalaryDashboardHtml(y,m){
   const isZh=lang==='zh',pp=calcPayPeriod(y,m);if(!pp||!rot())return'';
-  const pm=m===1?12:m-1,py=m===1?y-1:y,payMY=m===12?{y:y+1,m:1}:{y,m:m+1};
+  const payMY=m===12?{y:y+1,m:1}:{y,m:m+1};
   const pay5=getPayDay(payMY.y,payMY.m,5),pay20=getPayDay(payMY.y,payMY.m,20);
   const label=isZh?`${y} 年 ${m} 月`:`${String(m).padStart(2,'0')} / ${y}`;
-  const period=`${py}/${String(pm).padStart(2,'0')}/26 – ${y}/${String(m).padStart(2,'0')}/25`;
+  const period=`${salaryDateLabel(pp.sd)} – ${salaryDateLabel(pp.ed)}`;
   const head=`<div class="salary-dashboard-head"><div class="period-navigation"><button class="icon-action previous" data-a="payPrev" aria-label="${isZh?'上個薪資月':'Bulan gaji sebelumnya'}">${uiIcon('chevron',18)}</button><h2>${label}</h2><button class="icon-action" data-a="payNext" aria-label="${isZh?'下個薪資月':'Bulan gaji berikutnya'}">${uiIcon('chevron',18)}</button></div><div class="period-caption"><span>${period}</span><button class="text-action" data-a="payLatest">${isZh?'最近已結算':'Terbaru'}</button></div><button class="pay-current-action" data-a="payCurrent">${uiIcon('clock',15)}${isZh?'本期試算 · 請假後自動更新':'Periode aktif · otomatis setelah cuti'}${uiIcon('chevron',14)}</button></div>`;
   const est=calcSalaryEst(y,m);
   if(!est)return `<section class="salary-dashboard salary-empty">${head}<div class="salary-empty-copy">${studioIcon('money',34)}<h3>${isZh?'先設定，再掌握薪資':'Atur data gaji Anda'}</h3><p>${isZh?'填入固定應領、扣款與加班規則，即可查看預估實領。':'Masukkan data tetap untuk estimasi.'}</p><button class="salary-primary-action" data-a="salOpen">${isZh?'設定薪資資料':'Atur data gaji'}${uiIcon('arrow',17)}</button></div></section>`;
@@ -5377,7 +5479,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v317</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v318</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }
