@@ -13,7 +13,7 @@ function presenter(name){
   const b=source.indexOf('\nfunction ',a+9);
   return source.slice(a,b<0?source.length:b);
 }
-const names=['salaryHistoryHtml','natureControlsHtml','salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherSculpture','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','calendarScopedLeaves','calendarLeaveStatus','calendarLeaveStatusText','calendarDayInfo','calendarLeaveLabel','calendarEventChipsHtml','calendarDaySummaryHtml','calendarHighlightsHtml','calendarDataNoticeHtml','calendarAgendaHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
+const names=['salaryHistoryHtml','natureControlsHtml','salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherSculpture','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','uiCalendarHolidaysHtml','uiCalendarNoticesHtml','calendarScopedLeaves','calendarLeaveStatus','calendarLeaveStatusText','calendarDayInfo','calendarLeaveLabel','calendarEventChipsHtml','calendarDaySummaryHtml','calendarHighlightsHtml','calendarDataNoticeHtml','calendarAgendaHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
 const fixed=Date.parse('2026-09-10T10:10:00Z');
 class Clock extends Date{constructor(...args){super(...(args.length?args:[fixed]))}static now(){return fixed}}
 function env(lang='zh'){
@@ -184,4 +184,42 @@ test('announcement loads reject out-of-order months, deduplicate dates and remov
   assert.equal(JSON.stringify(c.adminEvCache),JSON.stringify({'2026-10-19':['health']}));
   const cancel=c.loadAdminEv();await Promise.resolve();pending[2].resolve(snapshot([]));await cancel;
   assert.deepEqual(Object.keys(c.adminEvCache),[]);assert.ok(c.adminEvState.months.includes('2026-10'));
+});
+
+test('holiday ranges, full-month names and original calendar sections are visible without expanding anything',()=>{
+  for(const lang of ['zh','id']){
+    const c=env(lang);c.fbUser={uid:'me'};c.S.mo=10;c.payrollLeaveState.months=['2026-10'];
+    const holidays={9:lang==='zh'?'國慶日(補假)':'Libur Pengganti',10:lang==='zh'?'國慶日':'Hari Nasional TW',18:lang==='zh'?'重陽節':'Chongyang',25:lang==='zh'?'光復節':'Hari Retrosesi',26:lang==='zh'?'光復節(補假)':'Libur Pengganti',31:lang==='zh'?'萬聖節':'Halloween'};
+    c.gh=(y,m,d)=>y===2026&&m===10?holidays[d]||null:null;
+    c.isTWOff=(y,m,d)=>y===2026&&m===10&&[9,26].includes(d);
+    c.getAdminEv=key=>key==='2026-10-19'?['health']:[];
+    c.getLeaves=key=>key==='2026-10-19'?[{uid:'a',hours:8,unit:'測試單位'}]:[];
+    c.EVS['2026-10-20']=['custom'];c.NOTES['2026-10-20']='PERSONAL_NOTE';
+    for(const view of ['month','agenda']){
+      c.UI_CAL_VIEW=view;const h=c.uiCalendarPageHtml();
+      assert.doesNotMatch(h,/<details|calendar-holiday-details|\shidden(?:[\s=>])/);
+      assert.equal((h.match(/class="calendar-break-item"/g)||[]).length,2);
+      const names=h.match(/<div class="calendar-holiday-list">([\s\S]*?)<p class="holiday-work-note">/)[1];
+      for(const name of Object.values(holidays))assert.ok(names.includes(name));
+      assert.equal((names.match(/class="calendar-holiday-row"/g)||[]).length,6);
+      for(const marker of ['calendar-today-anchor','restored-notice','rem-list','PERSONAL_NOTE'])assert.ok(h.includes(marker),marker);
+      if(view==='month'){
+        assert.ok(h.indexOf('class="calendar-breaks"')<h.indexOf('class="wk-row"'));
+        assert.equal((h.match(/class="break-day-tag"/g)||[]).length,6);
+        assert.match(h,/1\/3/);assert.match(h,/3\/3/);
+      }
+    }
+  }
+});
+test('holiday list remains for past dates and months without long weekends',()=>{
+  const c=env();c.S.mo=8;c.gh=(y,m,d)=>m===8&&d===8?'父親節':null;c.isTWOff=()=>false;
+  const h=c.uiCalendarPageHtml();assert.doesNotMatch(h,/class="calendar-breaks"/);assert.match(h,/class="calendar-holiday-row" data-a="open" data-d="8"/);assert.match(h,/父親節/);
+  c.gh=()=>null;assert.match(c.uiCalendarPageHtml(),/本月沒有已收錄的假日或節日/);
+});
+test('cross-year holiday ranges keep both dates and holiday rows open the selected calendar month',()=>{
+  const c=env();c.S.yr=2027;c.S.mo=12;
+  c.isTWOff=(y,m,d)=>y===2027&&m===12&&d===31;
+  c.gh=(y,m,d)=>y===2027&&m===12&&d===31?'元旦(補假)':y===2028&&m===1&&d===1?'元旦':null;
+  const h=c.uiCalendarPageHtml();assert.match(h,/12\/31（五）/);assert.match(h,/1\/2（日）/);
+  c.action('open',{d:'31'});assert.equal(JSON.stringify(c.S.modal),JSON.stringify({y:2027,m:12,d:31}));
 });
