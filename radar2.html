@@ -7,16 +7,17 @@
 <title>即時雷達與雲層預估 · 我的班表</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<link rel="stylesheet" href="./radar-ui.css?v=313-cloud-map">
+<link rel="stylesheet" href="./radar-ui.css?v=316-satellite">
 </head>
 <body>
 <div id="map"></div>
 
 <div class="top">
   <section class="topcard" aria-label="雷達與雲流">
-    <header class="radar-topbar"><a class="backchip" href="./" aria-label="回到班表" onclick="if(history.length>1){history.back();return false}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 6-6 6 6 6"/></svg></a><div class="radar-title"><h1>即時雷達</h1><span>衛星雲圖・雨區觀測・雲流預估</span></div><span class="radar-status" id="radarStatus"><i></i><span>雷達連線中</span></span></header>
+    <header class="radar-topbar"><a class="backchip" href="./" aria-label="回到班表" onclick="if(history.length>1){history.back();return false}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 6-6 6 6 6"/></svg></a><div class="radar-title"><h1>衛星與雷達</h1><span>衛星雲圖・雨區觀測・雲流預估</span></div><span class="radar-status" id="radarStatus"><i></i><span>雷達連線中</span></span></header>
     <div class="loc"><span class="pin"></span><span id="locName">定位中…</span><span class="coords" id="coords"></span></div>
-    <button type="button" class="cloud-summary pending" id="cloudSummary" aria-controls="cardBody" aria-expanded="false"><span class="cloud-summary-icon">☁</span><span class="cloud-summary-copy"><strong>正在載入衛星雲圖</strong><small>取得 Himawari 衛星影像…</small></span><span class="cloud-summary-arrow">↻</span></button>
+    <button type="button" class="cloud-summary pending" id="cloudSummary" aria-controls="cardBody" aria-expanded="false"><span class="cloud-summary-icon">☁</span><span class="cloud-summary-copy"><strong>正在載入衛星雲圖</strong><small>取得 Himawari 衛星影像…</small></span><span class="cloud-summary-arrow">⌄</span></button>
+    <div class="cloud-tools" aria-label="地圖圖層"><button id="cloudToggle" type="button" aria-pressed="true">☁ 雲圖</button><button id="radarToggle" type="button" aria-pressed="true">◉ 雷達</button><button id="taiwanView" type="button">全臺雲況</button><button id="cloudReload" type="button" aria-label="重新載入衛星雲圖">↻ 更新</button></div>
     <div class="topcard-foot"><div class="ministat" id="miniStat" style="display:none"><span id="rainMini">雨量 —</span><span id="fcMini">未來 —</span></div><button class="cardtoggle" id="cardToggle" aria-controls="cardBody" aria-expanded="false">逐時詳情 ＋</button></div>
     <div id="cardBody" style="display:none" tabindex="-1">
       <div class="verdict" id="verdict">正在取得最新雷達圖資…</div>
@@ -30,6 +31,7 @@
 
 <div class="ctrl">
   <div class="ctrlcard" aria-label="雷達播放控制">
+    <div class="cloud-map-caption" id="cloudMapCaption" role="status">正在取得衛星觀測影像…</div>
     <div class="frameline">
       <span class="ftime" id="ftime">--:--</span>
       <span class="ftag past" id="ftag">—</span>
@@ -50,7 +52,7 @@
       <span class="txt">弱</span>
       <span class="sw universal" aria-label="RainViewer Universal Blue 強度色階"></span>
       <span class="txt">強</span>
-      <span class="txt" style="margin-left:8px;color:var(--tx2)">雲圖（衛星／模式） · 彩色雷達實測</span>
+      <span class="txt" style="margin-left:8px;color:var(--tx2)">時間軸：雷達回波</span>
     </div>
   </div>
 </div>
@@ -64,7 +66,8 @@
   </div>
 </div>
 
-<script src="./cloud-forecast.js?v=313-himawari-cloud-map"></script>
+<script src="./cloud-forecast.js?v=316-satellite"></script>
+<script src="./satellite-cloud.js?v=316-satellite"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
@@ -75,7 +78,8 @@
   var map, meMarker, frames=[], layers=[], cloudPathLayer=null, cloudFieldLayer=null, satelliteLayer=null, satelliteProbe=null,
       idx=0, playing=false, timer=null, refresh=null, refreshRain=null, cloudMapRefresh=null, me=null, liveIdx=0,
       cloudAbort=null, cloudRevision=0, cloudMapAbort=null, cloudMapRevision=0, cloudMapState=null, cloudMapUpdatedAt=0,
-      satelliteRefreshAt=0, satelliteRevision=0, satellitePending=false;
+      satelliteRefreshAt=0, satelliteRevision=0, satellitePending=false, satelliteAbort=null, pendingSatelliteLayer=null,
+      cloudVisible=true, radarVisible=true, cloudSummaryState=null;
 
   var $=function(id){return document.getElementById(id)};
   function pad(n){return (n<10?"0":"")+n}
@@ -92,7 +96,7 @@
   function hideOverlay(){ $("overlay").classList.add("hidden"); }
 
   function initMap(lat,lon){
-    map=L.map("map",{zoomControl:false,attributionControl:true,minZoom:5,maxZoom:11}).setView([lat,lon],8);
+    map=L.map("map",{zoomControl:false,attributionControl:true,minZoom:5,maxZoom:11}).setView([lat,lon],6);
     if(map.attributionControl)map.attributionControl.setPrefix(false);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       {maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(map);
@@ -151,7 +155,7 @@
   function show(i){
     if(!frames.length) return;
     i=Math.max(0,Math.min(frames.length-1,i)); idx=i;
-    layers.forEach(function(L_,k){ if(L_) L_.setOpacity(k===i?0.72:0); });
+    layers.forEach(function(L_,k){ if(L_) L_.setOpacity(k===i&&radarVisible?0.72:0); });
     var f=frames[i];
     $("ftime").textContent=hhmm(f.time);
     $("slider").value=String(i);
@@ -303,13 +307,28 @@
     }
   }
 
-  var CLOUD_MAP_CACHE="myshift-cloud-map-v1", CLOUD_MAP_TTL=15*60*1000, CLOUDSAT_MIN_REFRESH=9*60*1000;
+  var CLOUD_MAP_CACHE="myshift-cloud-map-v2", CLOUD_MAP_TTL=15*60*1000, CLOUDSAT_MIN_REFRESH=9*60*1000;
   function setCloudSummary(kind,title,detail){
+    cloudSummaryState={kind:kind,title:title,detail:detail};
     var summary=$("cloudSummary");
     summary.className="cloud-summary"+(kind?" "+kind:"");
-    summary.innerHTML='<span class="cloud-summary-icon">☁</span><span class="cloud-summary-copy"><strong>'+title+'</strong><small>'+detail+'</small></span><span class="cloud-summary-arrow">↻</span>';
+    summary.querySelector("strong").textContent=cloudVisible?title:"雲圖已隱藏";
+    summary.querySelector("small").textContent=cloudVisible?detail:"點選下方「雲圖」重新顯示；"+detail;
+    $("cloudReload").disabled=kind==="pending";
   }
-  function cloudMapTime(time){return time!==null&&time!==undefined&&Number.isFinite(Number(time))?hhmmMs(Number(time)):"時間不明"}
+  function cloudMapTime(time){
+    if(time===null||time===undefined||!Number.isFinite(Number(time)))return "時間不明";
+    var d=new Date(Number(time));return (d.getMonth()+1)+"/"+d.getDate()+" "+hhmmMs(Number(time));
+  }
+  function syncCloudVisibility(){
+    map.getPane("cloudsat").style.display=cloudVisible?"":"none";
+    map.getPane("cloudmap").style.display=cloudVisible?"":"none";
+    document.body.classList.toggle("has-satellite",!!satelliteLayer&&cloudVisible);
+    $("cloudToggle").setAttribute("aria-pressed",String(cloudVisible));
+    $("radarToggle").setAttribute("aria-pressed",String(radarVisible));
+    layers.forEach(function(layer,k){layer.setOpacity((k===idx&&radarVisible)?0.72:0)});
+    if(cloudSummaryState)setCloudSummary(cloudSummaryState.kind,cloudSummaryState.title,cloudSummaryState.detail);
+  }
   function modelCloudImage(result){
     var grid=result.grid, canvas=document.createElement("canvas"), size=256;
     canvas.width=size;canvas.height=size;
@@ -320,21 +339,29 @@
         var gx=x/(size-1)*(grid.columns-1), cover=CloudForecast.interpolateGrid(result.values,grid.columns,grid.rows,gx,gy);
         var p=(y*size+x)*4;
         if(cover===null||cover<3){pixels[p+3]=0;continue;}
-        pixels[p]=237;pixels[p+1]=245;pixels[p+2]=246;
-        pixels[p+3]=Math.round(180*Math.pow(Math.max(0,Math.min(100,cover))/100,1.12));
+        pixels[p]=69;pixels[p+1]=102;pixels[p+2]=140;
+        pixels[p+3]=Math.round(195*Math.pow(Math.max(0,Math.min(100,cover))/100,.72));
       }
     }
     ctx.putImageData(image,0,0);
     return canvas.toDataURL("image/png");
   }
   function renderModelCloudMap(result,stale){
-    if(!map||!cloudFieldLayer||!result||!result.ok)return;
+    if(!map||!cloudFieldLayer||!result||!result.ok||satelliteLayer)return;
     cloudFieldLayer.clearLayers();
     var overlay=L.imageOverlay(modelCloudImage(result),[[result.grid.south,result.grid.west],[result.grid.north,result.grid.east]],
       {pane:"cloudmap",opacity:1,interactive:false,alt:"Open-Meteo 模式雲量圖"});
-    overlay.addTo(cloudFieldLayer);cloudMapState=result;
-    var nearby=result.localCover==null?"周邊—":("附近雲量 "+Math.round(result.localCover)+"%"), detail="Open-Meteo 模式 · "+nearby+" · "+cloudMapTime(result.time)+(stale?" · 暫存":"");
-    setCloudSummary(stale?"error":"","模式雲量圖已載入",detail);
+    overlay.on("load",function(){
+      if(satelliteLayer||!cloudFieldLayer.hasLayer(overlay))return;
+      cloudMapState=result;
+      var nearby=result.localCover==null?"周邊—":("附近雲量 "+Math.round(result.localCover)+"%"), detail="Open-Meteo 模式 · "+nearby+" · "+cloudMapTime(result.time)+(stale?" · 暫存":"");
+      setCloudSummary("error","衛星未取得・目前為模式雲量",detail);
+      $("cloudMapCaption").textContent="模式推估：藍灰越深，雲量越多；非衛星照片";
+      document.body.dataset.cloudSource="model";
+      syncCloudVisibility();
+    });
+    overlay.on("error",function(){if(!satelliteLayer)setCloudSummary("error","雲量圖繪製失敗","請點「更新」重新取得資料。");});
+    overlay.addTo(cloudFieldLayer);
   }
   function cloudGridCoversView(grid,bounds){
     return !!(grid&&bounds&&grid.west<=bounds.getWest()&&grid.east>=bounds.getEast()&&grid.south<=bounds.getSouth()&&grid.north>=bounds.getNorth());
@@ -342,12 +369,12 @@
   function readCloudMapCache(){
     try{
       var value=JSON.parse(localStorage.getItem(CLOUD_MAP_CACHE)||"null");
-      return value&&value.result&&value.result.ok&&Number.isFinite(value.savedAt)?value:null;
+      return value&&value.result&&value.result.ok&&Number.isFinite(value.savedAt)&&Date.now()-value.savedAt<90*60000?value:null;
     }catch(_){return null;}
   }
   function scheduleCloudMapRefresh(){
     clearTimeout(cloudMapRefresh);
-    cloudMapRefresh=setTimeout(function(){if(!satelliteLayer&&!satellitePending)loadCloudMap(false);},450);
+    cloudMapRefresh=setTimeout(function(){if(!satelliteLayer&&!satellitePending){loadSatelliteCloud(false);loadCloudMap(false);}},450);
   }
   function loadCloudMap(force){
     if(!map||!me||!window.CloudForecast||satelliteLayer||satellitePending)return;
@@ -362,10 +389,14 @@
     cloudMapAbort=new AbortController();var controller=cloudMapAbort,revision=++cloudMapRevision,b=view;
     var grid=CloudForecast.createCloudMapGrid({north:b.getNorth(),south:b.getSouth(),east:b.getEast(),west:b.getWest()});
     if(!satelliteLayer&&!cloudMapState)setCloudSummary("pending","雲圖載入中","衛星暫不可用，改讀取免費雲量模式…");
+    var requestTimeout=setTimeout(function(){
+      if(revision!==cloudMapRevision||satelliteLayer)return;
+      controller.abort();setCloudSummary("error","雲量資料連線逾時","衛星影像未取得；請點「更新」重試。");
+    },12000);
     fetch(CloudForecast.createCloudMapUrl(grid),{cache:"no-store",signal:controller.signal})
       .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
       .then(function(data){
-        if(revision!==cloudMapRevision)return;
+        if(revision!==cloudMapRevision||satelliteLayer)return;
         var result=CloudForecast.parseCloudMapData(data,grid,{lat:me.lat,lon:me.lon});
         if(!result.ok)throw new Error(result.reason||"cloud map unavailable");
         cloudMapUpdatedAt=Date.now();
@@ -373,56 +404,113 @@
         renderModelCloudMap(result,false);
       })
       .catch(function(error){
-        if(error&&error.name==="AbortError")return;if(revision!==cloudMapRevision)return;
+        if(error&&error.name==="AbortError")return;if(revision!==cloudMapRevision||satelliteLayer)return;
         if(!cloudMapState)setCloudSummary("error","雲圖資料暫不可用","衛星影像與模式雲量目前都連不上，稍後自動重試。");
         else setCloudSummary("error","雲量模式圖沿用舊資料","Open-Meteo 更新失敗 · 資料時間 "+cloudMapTime(cloudMapState.time));
-      });
+      }).finally(function(){clearTimeout(requestTimeout)});
   }
-  function loadSatelliteCloud(force){
-    if(!map||!me||!window.CloudForecast)return;
-    var now=Date.now();if(!force&&now-satelliteRefreshAt<CLOUDSAT_MIN_REFRESH)return;
-    satelliteRefreshAt=now;var revision=++satelliteRevision;
-    satellitePending=true;
-    if(satelliteProbe){satelliteProbe.onload=null;satelliteProbe.onerror=null;satelliteProbe.src="";satelliteProbe=null;}
-    var tile=CloudForecast.himawariTileXY(me.lat,me.lon,7),times=CloudForecast.himawariFrameTimes(now,4),candidate=0;
-    function failCandidate(){
-      if(revision!==satelliteRevision)return;
-      candidate++;
-      if(candidate<times.length){probe();return;}
-      satellitePending=false;
-      if(!satelliteLayer)loadCloudMap(false);
-      else setCloudSummary("error","衛星圖暫未更新","沿用 "+cloudMapTime(satelliteLayer._cloudTime)+" 的 Himawari 雲圖。");
+  function reportSatellite(layer,frame){
+    if(layer!==satelliteLayer||satellitePending)return;
+    var tiles=Object.keys(layer._tiles||{}).map(function(k){return layer._tiles[k]}).filter(function(t){return t.current;});
+    var valid=tiles.filter(function(t){return t.el.dataset.cloudValid==="true";}).length;
+    var missing=tiles.length-valid,age=Math.max(0,Math.round((Date.now()-frame.time)/60000));
+    var title=valid?(missing?"衛星雲圖部分載入":age>60?"衛星影像更新延遲":"衛星實拍雲圖") : "此區衛星影像未載入";
+    var detail=frame.name+" · "+cloudMapTime(frame.time)+" · "+age+" 分前";
+    if(missing)detail+=" · 可點更新重試";
+    setCloudSummary(!valid||missing||age>60?"error":"",title,detail);
+    $("cloudMapCaption").textContent=valid?"紅外線實拍 "+hhmmMs(frame.time)+"｜白亮：較冷雲頂；深灰：較暖區域":"目前區域無可用衛星影像，請更新或縮小地圖";
+  }
+  function probeSatellite(frame,position,signal){
+    return new Promise(function(resolve,reject){
+      var img=new Image(),settled=false,timeout;
+      satelliteProbe=img;img.crossOrigin="anonymous";
+      function finish(error){
+        if(settled)return;settled=true;clearTimeout(timeout);
+        img.onload=null;img.onerror=null;signal.removeEventListener("abort",abort);
+        if(satelliteProbe===img)satelliteProbe=null;
+        if(error){img.src="";reject(error)}else resolve();
+      }
+      function abort(){finish(new Error("Satellite request cancelled"))}
+      if(signal.aborted){abort();return;}
+      signal.addEventListener("abort",abort,{once:true});
+      timeout=setTimeout(function(){finish(new Error("Satellite image timeout"))},12000);
+      img.onload=function(){try{SatelliteCloud.inspectImage(img);finish()}catch(error){finish(error)}};
+      img.onerror=function(){finish(new Error("Satellite image unavailable"))};
+      img.src=SatelliteCloud.tileUrl(frame,SatelliteCloud.tileAt(frame,position.lat,position.lng));
+    });
+  }
+  function displaySatellite(frame,revision,signal){
+    return new Promise(function(resolve,reject){
+      var settled=false,timeout;
+      var layer=L.tileLayer(frame.url,{pane:"cloudsat",opacity:0,tileSize:256,maxNativeZoom:frame.maxNativeZoom,maxZoom:11,
+        crossOrigin:"anonymous",updateWhenZooming:false,keepBuffer:1,
+        attribution:frame.source==="gibs"?'Satellite &copy; NASA GIBS / JMA Himawari':'Satellite &copy; Japan Meteorological Agency / Himawari'});
+      pendingSatelliteLayer=layer;layer._cloudTime=frame.time;layer._cloudFrame=frame;
+      function finish(error){
+        if(settled)return;settled=true;clearTimeout(timeout);signal.removeEventListener("abort",abort);
+        if(pendingSatelliteLayer===layer)pendingSatelliteLayer=null;
+        if(error){map.removeLayer(layer);reject(error);return;}
+        var old=satelliteLayer;satelliteLayer=layer;satellitePending=false;
+        layer.setOpacity(1);
+        if(old&&old!==layer)map.removeLayer(old);
+        ++cloudMapRevision;if(cloudMapAbort)cloudMapAbort.abort();
+        cloudFieldLayer.clearLayers();
+        document.body.dataset.cloudSource=frame.source;
+        syncCloudVisibility();reportSatellite(layer,frame);resolve();
+      }
+      function abort(){finish(new Error("Satellite request cancelled"))}
+      if(signal.aborted){abort();return;}
+      signal.addEventListener("abort",abort,{once:true});
+      layer.on("tileload",function(event){
+        try{SatelliteCloud.inspectImage(event.tile);event.tile.dataset.cloudValid="true";}
+        catch(_){event.tile.dataset.cloudValid="false";event.tile.style.visibility="hidden";}
+      });
+      layer.on("tileerror",function(event){event.tile.dataset.cloudValid="false";event.tile.style.visibility="hidden";});
+      layer.on("load",function(){
+        if(revision!==satelliteRevision&&!settled){abort();return;}
+        var current=Object.keys(layer._tiles||{}).map(function(k){return layer._tiles[k]}).filter(function(t){return t.current;});
+        var complete=current.length>0&&current.every(function(t){return t.el.dataset.cloudValid==="true";});
+        // Leaflet finishes its tile/fade bookkeeping after firing "load".
+        // Remove rejected frames on the next turn, never during that callback.
+        if(!settled)setTimeout(function(){finish(complete?null:new Error("Incomplete satellite frame"))},0);
+        else reportSatellite(layer,frame);
+      });
+      timeout=setTimeout(function(){finish(new Error("Satellite tiles timeout"))},15000);
+      map.addLayer(layer);
+    });
+  }
+  async function loadSatelliteCloud(force){
+    if(!map||!me||!window.SatelliteCloud)return;
+    var now=Date.now();if(!force&&(satellitePending||now-satelliteRefreshAt<CLOUDSAT_MIN_REFRESH))return;
+    if(satelliteAbort)satelliteAbort.abort();
+    satelliteAbort=new AbortController();var signal=satelliteAbort.signal,revision=++satelliteRevision;
+    satelliteRefreshAt=now;satellitePending=true;
+    setCloudSummary("pending",satelliteLayer?"正在更新衛星雲圖":"正在載入衛星實拍","核對已發布時間與影像內容…");
+    var results=await Promise.all(["gibs","jma"].map(function(source){return SatelliteCloud.publishedFrames(source,now,signal).catch(function(){return []})}));
+    if(signal.aborted||revision!==satelliteRevision)return;
+    // Try both independent observation sources before stepping back one frame.
+    var candidates=[results[0][0],results[1][0],results[0][1],results[1][1]].filter(Boolean);
+    for(var i=0;i<candidates.length;i++){
+      if(signal.aborted||revision!==satelliteRevision)return;
+      var frame=candidates[i];
+      // A previous HTTP-200 empty tile can remain in the browser image cache.
+      // An explicit retry must fetch the pixels again, even for the same frame.
+      if(force)frame=Object.assign({},frame,{url:frame.url+"?refresh="+Math.floor(now/1000)+"-"+revision});
+      try{
+        await probeSatellite(frame,map.getCenter(),signal);
+        if(signal.aborted||revision!==satelliteRevision)return;
+        await displaySatellite(frame,revision,signal);
+        return;
+      }catch(_){if(signal.aborted||revision!==satelliteRevision)return;}
     }
-    function probe(){
-      if(revision!==satelliteRevision||candidate>=times.length)return;
-      var time=times[candidate],img=new Image(),timedOut=false;
-      satelliteProbe=img;
-      var timeout=setTimeout(function(){timedOut=true;img.onload=null;img.onerror=null;img.src="";failCandidate();},5000);
-      img.onload=function(){
-        if(timedOut||revision!==satelliteRevision)return;clearTimeout(timeout);
-        var url=CloudForecast.himawariTileUrl(time,tile),old=satelliteLayer,loaded=false;
-        var layer=L.tileLayer(url.replace(/\/7\/\d+\/\d+\.png$/,"/{z}/{y}/{x}.png"),{
-          pane:"cloudsat",opacity:.72,maxNativeZoom:8,maxZoom:11,updateWhenZooming:false,
-          attribution:'<a href="https://earthdata.nasa.gov/" target="_blank" rel="noopener">NASA GIBS</a> · JMA Himawari-9'
-        });
-        layer._cloudTime=Date.parse(time);layer._cloudRevision=revision;
-        layer.on("tileload",function(){
-          if(loaded||revision!==satelliteRevision)return;loaded=true;satelliteLayer=layer;
-          satellitePending=false;
-          if(cloudFieldLayer)cloudFieldLayer.clearLayers();
-          if(old&&old!==layer)map.removeLayer(old);
-          setCloudSummary("","衛星雲圖已載入","Himawari-9 紅外線觀測 · "+cloudMapTime(layer._cloudTime)+" · 每 10 分鐘一筆");
-        });
-        layer.on("load",function(){if(!loaded){map.removeLayer(layer);failCandidate();}});
-        map.addLayer(layer);
-        setCloudSummary("pending","衛星雲圖載入中","Himawari-9 紅外線觀測 · "+cloudMapTime(Date.parse(time)));
-        setTimeout(function(){if(revision===satelliteRevision&&!loaded&&map.hasLayer(layer)){map.removeLayer(layer);failCandidate();}},7000);
-      };
-      img.onerror=function(){if(timedOut||revision!==satelliteRevision)return;clearTimeout(timeout);failCandidate();};
-      img.src=CloudForecast.himawariTileUrl(time,tile);
+    satellitePending=false;
+    if(satelliteLayer){
+      setCloudSummary("error","衛星未更新・保留上次影像",satelliteLayer._cloudFrame.name+" · "+cloudMapTime(satelliteLayer._cloudTime));
+    }else{
+      setCloudSummary("error","衛星實拍暫時無法取得","正在讀取模式雲量備援；可點「更新」重試。");
+      $("cloudMapCaption").textContent="衛星影像未取得；模式雲量將明確標示";
+      loadCloudMap(true);
     }
-    if(!satelliteLayer)setCloudSummary("pending","正在載入衛星雲圖","Himawari-9 紅外線觀測 · 最新可用影像…");
-    probe();
   }
   function loadCloudForecast(){
     if(!me||!window.CloudForecast)return;
@@ -485,7 +573,11 @@
   $("prev").onclick=function(){ pause(); show(idx-1); };
   $("next").onclick=function(){ pause(); show(idx+1); };
   $("slider").oninput=function(){ pause(); show(parseInt(this.value,10)||0); };
-  $("recenter").onclick=function(){ if(map&&me) offsetMapForCard(Math.min(Math.max(map.getZoom(),8),9)); };
+  $("recenter").onclick=function(){ if(map&&me) offsetMapForCard(Math.min(Math.max(map.getZoom(),7),9)); };
+  $("cloudToggle").onclick=function(){if(!map)return;cloudVisible=!cloudVisible;syncCloudVisibility()};
+  $("radarToggle").onclick=function(){if(!map)return;radarVisible=!radarVisible;syncCloudVisibility()};
+  $("taiwanView").onclick=function(){if(!map)return;map.fitBounds([[21.7,119.2],[25.7,122.5]],{paddingTopLeft:[20,document.querySelector(".top").getBoundingClientRect().bottom+12],paddingBottomRight:[20,document.querySelector(".ctrl").getBoundingClientRect().height+12],maxZoom:7});};
+  $("cloudReload").onclick=function(){loadSatelliteCloud(true)};
   $("cardToggle").onclick=toggleCard;
   $("cloudSummary").onclick=toggleCard;
   function syncControls(){document.documentElement.style.setProperty("--ctrl-height",Math.ceil(document.querySelector(".ctrl").getBoundingClientRect().height)+"px")}

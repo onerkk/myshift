@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v315-calendar-complete';
+const CACHE_NAME = 'myshift-v316-satellite';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache

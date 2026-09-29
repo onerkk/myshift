@@ -150,7 +150,7 @@
 
   function himawariTileXY(latitude, longitude, zoom) {
     const lat = finite(latitude), lon = finite(longitude), requestedZoom = finite(zoom);
-    const z = Math.max(0, Math.min(8, Math.floor(requestedZoom === null ? 7 : requestedZoom)));
+    const z = Math.max(0, Math.min(6, Math.floor(requestedZoom === null ? 6 : requestedZoom)));
     if (lat === null || lon === null || Math.abs(lat) > 90 || Math.abs(lon) > 180) throw new TypeError("Invalid coordinates");
     const n = Math.pow(2, z), clamped = Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI / 180;
     return {
@@ -162,11 +162,12 @@
 
   function himawariTileUrl(time, tile) {
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(time || "")) || !tile ||
-        !Number.isInteger(tile.z) || !Number.isInteger(tile.x) || !Number.isInteger(tile.y)) {
+        !Number.isInteger(tile.z) || tile.z < 0 || tile.z > 6 || !Number.isInteger(tile.x) || !Number.isInteger(tile.y) ||
+        tile.x < 0 || tile.y < 0 || tile.x >= 2 ** tile.z || tile.y >= 2 ** tile.z) {
       throw new TypeError("Invalid satellite tile");
     }
     return "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/Himawari_AHI_Band13_Clean_Infrared/default/" +
-      time + "/GoogleMapsCompatible_Level9/" + tile.z + "/" + tile.y + "/" + tile.x + ".png";
+      time + "/GoogleMapsCompatible_Level6/" + tile.z + "/" + tile.y + "/" + tile.x + ".png";
   }
 
   function createUrl(lat, lon) {
