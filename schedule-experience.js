@@ -1,5 +1,14 @@
 /* v319: read-only schedule views. Existing roster, leave and payroll remain authoritative. */
 'use strict';
+// v323: one continuous Sunday-to-Saturday date range for the app and PNG.
+function experienceMonthDates(y,m){
+  if(!Number.isInteger(y)||!Number.isInteger(m)||m<1||m>12)throw Error('Invalid calendar month');
+  const first=new Date(y,m-1,1,12).getDay(),length=new Date(y,m,0,12).getDate(),size=Math.ceil((first+length)/7)*7;
+  return Array.from({length:size},(_,i)=>{
+    const date=new Date(y,m-1,1-first+i,12),yy=date.getFullYear(),mm=date.getMonth()+1;
+    return{y:yy,m:mm,d:date.getDate(),inMonth:yy===y&&mm===m,monthOffset:(yy-y)*12+mm-m};
+  });
+}
 function experienceOwnLeaveEvents(key){
   if(!fbUser)return[];
   const grouped=new Map();

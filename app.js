@@ -526,6 +526,7 @@ function loadLeaves(){
     };
     const ymSet=new Set();
     addPair(ymSet,y,m);
+    experienceMonthDates(y,m).forEach(date=>ymSet.add(date.y+"-"+String(date.m).padStart(2,"0")));
     // 薪資月份可自訂日期範圍；載入整段涵蓋的月份，避免跨月請假或加班紀錄漏算。
     if(typeof PAY_VIEW!=="undefined"&&PAY_VIEW)addPair(ymSet,PAY_VIEW.y,PAY_VIEW.m);
     const addRange=range=>{if(range&&range.sd&&range.ed)salaryCalendarMonths(range.sd,range.ed).forEach(k=>ymSet.add(k))};
@@ -771,17 +772,18 @@ function rLeavesOv(){
 let adminEvCache={};
 let adminEvState={months:[],loading:false,error:false},adminEvRequest=0;
 function loadAdminEv(){
-  const request=++adminEvRequest,y=S.yr||TY,m=S.mo||TM,ym=ek(y,m,1).slice(0,7);
+  const request=++adminEvRequest,y=S.yr||TY,m=S.mo||TM;
+  const ymList=[...new Set(experienceMonthDates(y,m).map(date=>ek(date.y,date.m,1).slice(0,7)))];
   adminEvState.loading=true;adminEvState.error=false;
   return fsEnqueue(async()=>{
-    const snap=await fbDb.collection("adminEvents").where("ym","==",ym).get();
+    const snaps=await Promise.all(ymList.map(ym=>fbDb.collection("adminEvents").where("ym","==",ym).get()));
     const d={};
-    snap.forEach(doc=>{const v=doc.data();if(typeof v.date!=="string"||!v.date.startsWith(ym+"-")||!ADMIN_EV.includes(v.type))return;if(!d[v.date])d[v.date]=[];if(!d[v.date].includes(v.type))d[v.date].push(v.type)});
+    snaps.forEach((snap,i)=>snap.forEach(doc=>{const v=doc.data();if(typeof v.date!=="string"||!v.date.startsWith(ymList[i]+"-")||!ADMIN_EV.includes(v.type))return;if(!d[v.date])d[v.date]=[];if(!d[v.date].includes(v.type))d[v.date].push(v.type)}));
     if(request!==adminEvRequest)return;
-    // Keep previously viewed months; remove this month's deleted announcements.
-    for(const key of Object.keys(adminEvCache))if(key.startsWith(ym+"-"))delete adminEvCache[key];
+    // Refresh every visible month's notices, retaining other cached months.
+    for(const key of Object.keys(adminEvCache))if(ymList.includes(key.slice(0,7)))delete adminEvCache[key];
     Object.assign(adminEvCache,d);
-    adminEvState={months:[...new Set([...adminEvState.months,ym])],loading:false,error:false};
+    adminEvState={months:[...new Set([...adminEvState.months,...ymList])],loading:false,error:false};
     render();
   },"loadAdminEv").catch(e=>{if(request!==adminEvRequest)return;adminEvState.loading=false;adminEvState.error=true;console.log("loadAdminEv err",e);render()});
 }
@@ -5392,26 +5394,29 @@ function calendarAgendaHtml(days){
   }).join('')||`<div class="agenda-empty"><strong>${unavailable?(zh?'資料尚未取得':'Data belum tersedia'):(zh?'目前沒有符合的日期':'Belum ada tanggal yang sesuai')}</strong><p>${filter==='leave'&&!days[0].status.known?esc(calendarLeaveStatusText(days[0].status)):(zh?'可切換「全部」查看完整班表。':'Pilih Semua untuk jadwal lengkap.')}</p></div>`}</div>`;
 }
 function uiCalendarPageHtml(){
-  const zh=lang==='zh',y=S.yr,m=S.mo,dm=dim(y,m),fd=fdw(y,m),WK=t('wk');
-  const days=Array.from({length:dm},(_,i)=>calendarDayInfo(y,m,i+1)),st={};days.forEach(day=>{if(day.shift)st[day.shift]=(st[day.shift]||0)+1});
+  const zh=lang==='zh',y=S.yr,m=S.mo,WK=t('wk');
+  const gridDays=experienceMonthDates(y,m).map(date=>({...calendarDayInfo(date.y,date.m,date.d),inMonth:date.inMonth,monthOffset:date.monthOffset}));
+  const days=gridDays.filter(day=>day.inMonth),st={};days.forEach(day=>{if(day.shift)st[day.shift]=(st[day.shift]||0)+1});
   const workDays=Object.entries(st).filter(([s])=>s!=='休').reduce((n,[,v])=>n+v,0);
   const breakByDate=new Map();calendarHolidayRuns(y,m).forEach(run=>run.dates.forEach((key,index)=>breakByDate.set(key,{run,index})));
-  let cells=Array.from({length:fd},()=>'<div class="calendar-empty-cell" aria-hidden="true"></div>').join('');
-  days.forEach(day=>{
-    const {d,key,shift:s,today:td,holiday:hol}=day,dw=new Date(y,m-1,d).getDay(),isWeekend=dw===0||dw===6,isPublicOff=isTWOff(y,m,d),breakInfo=breakByDate.get(key);
+  let cells='';
+  gridDays.forEach(day=>{
+    const {y:dy,m:dm,d,key,shift:s,today:td,holiday:hol,inMonth}=day,dw=new Date(dy,dm-1,d).getDay(),isWeekend=dw===0||dw===6,isPublicOff=isTWOff(dy,dm,d),breakInfo=breakByDate.get(key);
     const dateTag=isPublicOff?(zh?'假':'L'):isWeekend?(zh?(dw===0?'日':'六'):(dw===0?'M':'S')):'';
     const dateTitle=isPublicOff?(hol||(zh?'國定假日':'Libur nasional')):isWeekend?(zh?'星期'+WK[dw]:WK[dw]):'';
     const ariaRun=breakInfo?(zh?`連假第 ${breakInfo.index+1} 天，共 ${breakInfo.run.length} 天`:`Libur panjang hari ${breakInfo.index+1} dari ${breakInfo.run.length}`):'';
-    const aria=[`${td?(zh?'今天 ':'Hari ini '):''}${d} ${studioShiftLabel(s)}`,dateTitle,hol,...day.events.map(e=>e.label),day.adjusted?(zh?'已調班':'Shift diubah'):'',calendarLeaveLabel(day),ariaRun].filter(Boolean).join(', ');
+    const aria=[`${td?(zh?'今天 ':'Hari ini '):''}${inMonth?d:`${dy}/${dm}/${d}`} ${studioShiftLabel(s)}`,!inMonth?(zh?(day.monthOffset<0?'上個月':'下個月'):(day.monthOffset<0?'Bulan sebelumnya':'Bulan berikutnya')):'',dateTitle,hol,...day.events.map(e=>e.label),day.adjusted?(zh?'已調班':'Shift diubah'):'',calendarLeaveLabel(day),ariaRun].filter(Boolean).join(', ');
     const cellEvents=day.events;
     const holidayLabel=hol?`<span class="day-holiday tone-holiday" title="${esc(hol)}">${esc(hol)}</span>`:'';
     const labels=cellEvents.slice(0,2).map(e=>`<span class="day-event tone-${e.tone}" title="${esc(e.label)}">${esc(e.short)}</span>`).join('');
     const more=cellEvents.length>2?`<span class="day-event-more">+${cellEvents.length-2}</span>`:'';
-    cells+=`<button type="button" class="day ${SC[s]}${td?' today':''}${day.events.length?' has-ev':''}${isWeekend?' weekend '+(dw===0?'weekend-sun':'weekend-sat'):''}${isPublicOff?' public-holiday':''}${breakInfo?' break-day':''}${breakInfo&&breakInfo.index===0?' break-start':''}${breakInfo&&breakInfo.index===breakInfo.run.length-1?' break-end':''}" data-a="open" data-d="${d}" aria-current="${td?'date':'false'}" aria-label="${esc(aria)}">${td?`<span class="today-label">${zh?'今天':'Hari ini'}</span>`:''}<span class="day-top"><span class="num">${d}</span>${dateTag?`<span class="calendar-date-tag${isPublicOff?' official':''}" title="${esc(dateTitle)}">${dateTag}</span>`:''}</span><span class="shift-code">${s==='休'?(zh?'輪班休':'Libur shift'):uiShiftShort(s)}</span>${holidayLabel}${S.showLunar?lunarCellText(y,m,d):''}<span class="day-event-stack">${labels}${more}${day.adjusted?`<span class="day-adjusted">${zh?'調班':'Ubah'}</span>`:''}</span><span class="day-leave${day.leaveCount>0?' has-leave':''}${day.leaveCount===null?' unknown':''}"><span>${zh?'請假':'Cuti'}</span><b>${day.leaveCount===null?'—':day.leaveCount}</b></span>${breakInfo?`<span class="break-day-tag" title="${esc(ariaRun)}"><span>${zh?'連假':'Libur'}</span><b>${breakInfo.index+1}/${breakInfo.run.length}</b></span>`:''}</button>`;
+    const monthLabel=zh?`${dm}月`:['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][dm-1];
+    const action=inMonth?`data-a="open" data-d="${d}"`:`data-a="openDate" data-y="${dy}" data-m="${dm}" data-d="${d}"`;
+    cells+=`<button type="button" class="day ${SC[s]}${!inMonth?' adjacent-month':''}${td?' today':''}${day.events.length?' has-ev':''}${isWeekend?' weekend '+(dw===0?'weekend-sun':'weekend-sat'):''}${isPublicOff?' public-holiday':''}${breakInfo?' break-day':''}${breakInfo&&breakInfo.index===0?' break-start':''}${breakInfo&&breakInfo.index===breakInfo.run.length-1?' break-end':''}" ${action} aria-current="${td?'date':'false'}" aria-label="${esc(aria)}" data-date="${key}" data-month-offset="${day.monthOffset}">${td?`<span class="today-label">${zh?'今天':'Hari ini'}</span>`:''}${!inMonth?`<span class="day-month-label" title="${dy}/${dm}">${monthLabel}</span>`:''}<span class="day-top"><span class="num">${d}</span>${dateTag?`<span class="calendar-date-tag${isPublicOff?' official':''}" title="${esc(dateTitle)}">${dateTag}</span>`:''}</span><span class="shift-code">${s==='休'?(zh?'輪班休':'Libur shift'):uiShiftShort(s)}</span>${holidayLabel}${S.showLunar?lunarCellText(dy,dm,d):''}<span class="day-event-stack">${labels}${more}${day.adjusted?`<span class="day-adjusted">${zh?'調班':'Ubah'}</span>`:''}</span><span class="day-leave${day.leaveCount>0?' has-leave':''}${day.leaveCount===null?' unknown':''}"><span>${zh?'請假':'Cuti'}</span><b>${day.leaveCount===null?'—':day.leaveCount}</b></span>${breakInfo?`<span class="break-day-tag" title="${esc(ariaRun)}"><span>${zh?'連假':'Libur'}</span><b>${breakInfo.index+1}/${breakInfo.run.length}</b></span>`:''}</button>`;
   });
   const ml=zh?`${y} 年 ${m} 月`:`${String(m).padStart(2,'0')} / ${y}`;
   const context=[(RN[lang]&&RN[lang][S.rt])||S.rt||'',S.unit&&S.unit!=='__all'?S.unit:S.unit==='__all'?(zh?'全部單位':'Semua unit'):''].filter(Boolean).join(' · ');
-  const grid=`<div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join('')}</div><div class="cal">${cells}</div><p class="calendar-reading-hint">${zh?'請假數字＝當日人數；—＝尚未取得。點日期看全部事項。':'Angka cuti = orang; — = belum tersedia. Ketuk tanggal untuk detail.'}</p>${studioCalendarLegendHtml()}`;
+  const grid=`<div class="wk-row">${WK.map((w,i)=>`<div class="wk-cell${i===0||i===6?' we':''}">${w}</div>`).join('')}</div><div class="cal">${cells}</div><p class="calendar-reading-hint">${zh?'月份標籤為前後月，不計入本月統計。請假數字＝當日人數；—＝尚未取得。點日期看全部事項。':'Label bulan = tanggal di luar bulan ini, tidak masuk statistik. Cuti = orang; — = belum tersedia. Ketuk tanggal untuk detail.'}</p>${studioCalendarLegendHtml()}`;
   const breaks=uiCalendarBreakStripHtml(y,m);
   return `${uiScreenHeading(zh?'班表':'Jadwal',esc(context),`<button class="text-action" data-a="today">${studioIcon('event',16)}${zh?'今天':'Hari ini'}</button>`)}<section class="calendar-shell calendar-v314" aria-label="${ml}"><div class="mnav"><button class="mnav-btn previous" data-a="prev" aria-label="${zh?'上個月':'Bulan sebelumnya'}">${uiIcon('chevron',18)}</button><div><h2 class="mnav-title">${ml}</h2><p class="month-caption">${zh?'班別・事項・當日人力':'Shift · Agenda · Cuti'}</p></div><button class="mnav-btn" data-a="next" aria-label="${zh?'下個月':'Bulan berikutnya'}">${uiIcon('chevron',18)}</button></div>${uiQuickToolsHtml()}${uiCalendarRestPlanHtml(y,m)}${breaks}${calendarHighlightsHtml(days)}<div class="calendar-view-switch" role="group" aria-label="${zh?'班表顯示方式':'Tampilan jadwal'}"><button id="calendar-view-month" data-a="calendarView" data-view="month" aria-pressed="${UI_CAL_VIEW==='month'}">${studioIcon('calendar',16)}${zh?'月曆總覽':'Kalender'}</button><button id="calendar-view-agenda" data-a="calendarView" data-view="agenda" aria-pressed="${UI_CAL_VIEW==='agenda'}">${studioIcon('event',16)}${zh?'每日清單':'Agenda harian'}</button></div>${calendarDataNoticeHtml(y,m)}${S.showLunar?lunarTodayStrip():''}${UI_CAL_VIEW==='agenda'?calendarAgendaHtml(days):grid}${uiCalendarTodayAnchorHtml()}</section>${uiCalendarHolidaysHtml(days)}${uiMonthSummaryHtml(st,workDays)}${uiCalendarNoticesHtml(days)}${uiUpcomingEventsHtml(y,m)}`;
 }
@@ -5426,7 +5431,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiAtmosphereSceneHtml()}${uiShiftWeatherHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v322</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v323</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${uiQuickToolsHtml()}${uiDayFocusHtml()}${uiAtmosphereSceneHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${uiShiftWeatherHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }

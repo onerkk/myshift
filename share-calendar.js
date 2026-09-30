@@ -1,4 +1,4 @@
-/* v322 · A compact monthly poster, drawn directly at 3840 px wide. */
+/* v323 · Continuous calendar weeks, drawn directly at 3840 px wide. */
 'use strict';
 const MyShiftShare=(()=>{
   const themes={
@@ -16,19 +16,20 @@ const MyShiftShare=(()=>{
   function shiftLabel(shift,language){return (language==='zh'?{早:'早班',晚:'晚班',中:'中班',休:'輪班休假'}:{早:'Pagi',晚:'Malam',中:'Siang',休:'Libur shift'})[shift]||(language==='zh'?'未排班':'Belum ada')}
   function buildModel(y,m){
     if(!Number.isInteger(y)||!Number.isInteger(m)||m<1||m>12||y<1900||y>9999)throw Error('Invalid calendar month');
-    const language=lang==='zh'?'zh':'id',zh=language==='zh',days=[];
-    for(let d=1;d<=dim(y,m);d++){
-      const source=calendarDayInfo(y,m,d),parts=[];
+    const language=lang==='zh'?'zh':'id',zh=language==='zh';
+    const cells=experienceMonthDates(y,m).map(date=>{
+      const source=calendarDayInfo(date.y,date.m,date.d),parts=[];
       if(source.holiday)parts.push({label:String(source.holiday),short:String(source.holiday),tone:'holiday'});
       for(const e of source.events||[])parts.push({label:String(e.label||e.short||''),short:String(e.short||e.label||''),tone:e.tone||'personal',own:!!e.own,hours:Number(e.hours)||0,id:e.id||''});
       if(source.adjusted)parts.push({label:zh?'已調班':'Shift diubah',short:zh?'已調班':'Diubah',tone:'adjusted'});
       // Copy presenters only: never export raw leave records, UIDs, reasons, or colleague names.
-      days.push({d,key:source.key,shift:source.shift,today:!!source.today,leaveCount:source.leaveCount===null||source.leaveCount===undefined?null:source.leaveCount,parts});
-    }
+      return{...date,key:source.key,shift:source.shift,today:!!source.today,leaveCount:source.leaveCount===null||source.leaveCount===undefined?null:source.leaveCount,parts};
+    });
+    const days=cells.filter(day=>day.inMonth);
     const counts={早:0,晚:0,中:0,休:0,unknown:0};days.forEach(day=>counts[Object.hasOwn(counts,day.shift)?day.shift:'unknown']++);
     const rotation=(RN[language]&&RN[language][S.rt])||S.rt||'',unit=S.unit==='__all'?(zh?'全部單位':'Semua unit'):S.unit||'';
     const now=new Date(),stamp=`${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    return{y,m,language,zh,days,first:fdw(y,m),rows:Math.ceil((fdw(y,m)+days.length)/7),counts,rotation,unit,stamp,weekdays:[...t('wk')],
+    return{y,m,language,zh,days,cells,first:fdw(y,m),rows:cells.length/7,counts,rotation,unit,stamp,weekdays:[...t('wk')],
       ownHours:Math.round(days.reduce((n,day)=>n+day.parts.filter(e=>e.own&&e.id!=='own-overtime').reduce((s,e)=>s+e.hours,0),0)*100)/100};
   }
   function textLines(c,value,width){
@@ -111,13 +112,12 @@ const MyShiftShare=(()=>{
     c.font='650 23px '+font;c.textAlign='center';model.weekdays.forEach((s,i)=>{c.fillStyle=i===0||i===6?(night?'#eab7bc':'#a76164'):p.muted;c.fillText(s,pad+24+i*(cellW+gap)+cellW/2,calTop+128)});c.textAlign='left';
     const gridY=calTop+148;
     for(let index=0;index<model.rows*7;index++){
-      const x=pad+24+(index%7)*(cellW+gap),y=gridY+Math.floor(index/7)*(cellH+gap),day=model.days[index-model.first];
-      if(!day){c.save();c.strokeStyle=night?'#7a947229':'#94ab852e';c.setLineDash([4,7]);round(c,x,y,cellW,cellH,18);c.stroke();c.restore();continue}
-      const colors=p.shifts[day.shift]||p.shifts.unknown;
+      const x=pad+24+(index%7)*(cellW+gap),y=gridY+Math.floor(index/7)*(cellH+gap),day=model.cells[index];
+      const colors=day.inMonth?(p.shifts[day.shift]||p.shifts.unknown):p.shifts.unknown;
       const today=day.today;
       panel(c,x,y,cellW,cellH,19,today?'#35735a':colors[0],today?'#144631':colors[1],{...p,line:today?'#d6db9d':p.line,highlight:today?'#faf6c775':p.highlight});
       if(today){c.strokeStyle='#d7df9d';c.lineWidth=3;round(c,x+1,y+1,cellW-2,cellH-2,18);c.stroke();c.lineWidth=1}
-      c.fillStyle=today?'#fffae4':colors[2];c.font='750 50px '+font;c.fillText(String(day.d),x+13,y+58);
+      c.fillStyle=today?'#fffae4':day.inMonth?colors[2]:p.muted;c.font='750 '+(day.inMonth?50:today?32:38)+'px '+font;c.fillText(day.inMonth?String(day.d):`${day.m}/${day.d}`,x+13,y+58);
       if(today){c.fillStyle='#e9dfad';round(c,x+cellW-63,y+14,51,26,8);c.fill();c.font='700 17px '+font;c.textAlign='center';c.fillStyle='#365038';c.fillText(zh?'今天':'Kini',x+cellW-37.5,y+33);c.textAlign='left'}
       else if(index%7===0||index%7===6){c.fillStyle=night?'#e9aeb5':'#b66c75';c.beginPath();c.arc(x+cellW-18,y+25,3.5,0,Math.PI*2);c.fill()}
       c.font='650 25px '+font;c.fillStyle=today?'#e7f2d7':colors[2];c.fillText(shiftLabel(day.shift,model.language),x+13,y+94);
@@ -131,7 +131,7 @@ const MyShiftShare=(()=>{
       c.fillStyle=today?'#fff5db':day.leaveCount>0?p.gold:p.ink;c.font='600 21px '+font;
       c.fillText(zh?'請假':'Cuti',x+13,y+cellH-11);c.textAlign='right';c.font='750 25px '+font;c.fillText(day.leaveCount===null?'—':String(day.leaveCount),x+cellW-13,y+cellH-11);c.textAlign='left';
     }
-    c.font='500 21px '+font;c.fillStyle=p.muted;c.fillText(zh?'請假為當日人數；— 尚未取得；＋N 與省略內容請至 App 查看。':'Cuti = jumlah orang; — belum tersedia. +N dan rincian ada di aplikasi.',pad+28,calTop+calH-28);
+    c.font='500 21px '+font;c.fillStyle=p.muted;c.fillText(zh?'淡色日期為前後月，不計入本月統計；— 未取得人數；＋N 明細至 App 查看。':'Tanggal redup di luar bulan ini, tidak masuk statistik; — belum tersedia. +N di aplikasi.',pad+28,calTop+calH-28);
     if(textures[1]){c.save();c.translate(W-35,calTop+20);c.rotate(.45);c.globalAlpha=.67;c.drawImage(textures[1],-52,-52,104,104);c.restore();c.save();c.translate(25,calTop+calH-28);c.rotate(-.55);c.globalAlpha=.57;c.drawImage(textures[1],-36,-36,72,72);c.restore()}
     line(c,pad,footerTop,inner,p.line);c.fillStyle=p.muted;c.font='500 23px '+font;footerLines.forEach((s,i)=>c.fillText(s,pad+4,footerTop+40+i*32));
     const stampY=footerTop+66+footerLines.length*32;c.font='600 20px '+font;c.fillStyle=p.gold;c.fillText('MY SHIFT',pad+4,stampY);c.textAlign='right';c.fillStyle=p.muted;c.font='500 20px '+font;c.fillText((zh?'匯出 ':'Dibuat ')+model.stamp,W-pad-4,stampY);c.textAlign='left';

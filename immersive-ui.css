@@ -97,3 +97,16 @@ html.ui-still .ui-enter>*{animation:none;transform:none;opacity:1}html.ui-still 
 .day-sheet-nav{top:calc(var(--sheet-return-height,60px) + 2px);z-index:7}.modal-sheet .modal-section,.modal-sheet .leave-entry{scroll-margin-top:135px}.app-main{padding-bottom:calc(max(128px,var(--nav-clearance,128px)) + env(safe-area-inset-bottom))}
 .wx-detail-sheet>div:has(>button[onclick*="DetailDay"]){scrollbar-width:thin;padding-bottom:6px}.wx-detail-sheet button[onclick*="DetailDay"]{min-height:44px;min-width:44px;background:var(--surface-2)!important;color:var(--ink)!important;border:1px solid var(--line)!important}.wx-detail-sheet button[onclick*="DetailDay"][style*="var(--pri)"]{background:var(--brand-soft)!important;color:var(--brand-dark)!important;border-color:var(--brand)!important}
 @media(max-width:370px){.hero-leave-overview{gap:6px;padding:9px 10px}.hero-leave-overview>span:first-child{font-size:.66rem}.hero-leave-overview>em{font-size:.57rem}.week-leave-count{gap:3px;font-size:.52rem}.week-leave-count b{font-size:.65rem}.page-returnbar{padding-left:12px;padding-right:12px}.calendar-today-anchor .today-anchor-leave{font-size:.6rem}}
+
+/* v323: adjacent dates keep a readable, quiet relief instead of empty slots. */
+.calendar-v314 .cal .day .day-top{flex-wrap:wrap;column-gap:2px;row-gap:2px}
+.calendar-v314 .cal .day .calendar-date-tag{margin-left:auto}
+.calendar-v314 .cal .day .shift-code{white-space:normal;overflow-wrap:anywhere;max-width:100%}
+.calendar-v314 .cal .day.today .today-label{white-space:normal;overflow-wrap:anywhere}
+.calendar-v314:lang(id) .day.break-day,.calendar-v314:lang(id) .day.break-day.today{padding-bottom:36px}
+.calendar-v314:lang(id) .day.break-day::after{height:32px}
+.calendar-v314:lang(id) .break-day-tag{height:32px;flex-direction:column;justify-content:center;gap:1px;padding:2px 1px;white-space:normal;line-height:1.1}
+.calendar-v314 .cal>.day.adjacent-month:not(.today){background:linear-gradient(145deg,var(--surface-2),var(--surface));color:var(--ink-2);border-color:var(--line)}
+.calendar-v314 .day.adjacent-month:not(.today) .num,.calendar-v314 .day.adjacent-month:not(.today) .shift-code{color:var(--ink-2)}
+.calendar-v314 .day-month-label{display:block;width:100%;min-height:18px;padding:2px 0;border:1px solid var(--line);border-radius:5px;background:var(--surface-2);color:var(--ink-2);font-size:.58rem;font-weight:750;line-height:1.3;text-align:center;letter-spacing:0;overflow-wrap:anywhere}
+.calendar-v314 .day.today .day-month-label{color:var(--today-ink);background:#073a2bdd;border-color:var(--today-divider)}
