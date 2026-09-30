@@ -52,7 +52,7 @@ test('location selection returns to its underlying settings sheet, then to its o
   c.nav.back();assert.equal(c.showUserPrefs,false);assert.equal(c.UI_TAB,'more');
 });
 test('all overlay families support native back without clearing business data',()=>{
-  for(const flag of ['showH','showStats','showSal','showLeavesOv']){const c=env('more');c.S[flag]=true;c.S.unit='原本單位';c.render();c.history.back();assert.equal(c.S[flag],false);assert.equal(c.S.unit,'原本單位');assert.equal(c.UI_TAB,'more')}
+  for(const flag of ['showH','showStats','showSal','showLeavesOv','showShare']){const c=env('more');c.S[flag]=true;c.S.unit='原本單位';c.render();c.history.back();assert.equal(c.S[flag],false);assert.equal(c.S.unit,'原本單位');assert.equal(c.UI_TAB,'more')}
   for(const flag of ['showUserPrefs','showAdmin','wxDetailShow','tideDetailShow']){const c=env('weather');c[flag]=true;c.render();c.history.back();assert.equal(c[flag],false);assert.equal(c.UI_TAB,'weather')}
 });
 test('history payload contains IDs only; dates, units, field values and drafts remain private in memory',()=>{
