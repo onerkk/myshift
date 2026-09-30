@@ -1,4 +1,4 @@
-/* v321 · A complete, read-only monthly poster and an explicit export preview. */
+/* v322 · A compact monthly poster, drawn directly at 3840 px wide. */
 'use strict';
 const MyShiftShare=(()=>{
   const themes={
@@ -53,7 +53,7 @@ const MyShiftShare=(()=>{
   function round(c,x,y,w,h,r){c.beginPath();c.roundRect(x,y,w,h,r)}
   function gradient(c,x,y,w,h,a,b){const g=c.createLinearGradient(x,y,x+w,y+h);g.addColorStop(0,a);g.addColorStop(1,b);return g}
   function panel(c,x,y,w,h,r,a,b,p,raised=true){
-    c.save();if(raised){c.shadowColor=p.shadow;c.shadowBlur=20;c.shadowOffsetY=9;c.fillStyle=p.line;round(c,x,y+4,w,h,r);c.fill();c.shadowColor='transparent'}c.fillStyle=gradient(c,x,y,w,h,a,b);round(c,x,y,w,h,r);c.fill();c.restore();
+    c.save();if(raised){c.shadowColor=p.shadow;c.shadowBlur=20*(p.renderScale||1);c.shadowOffsetY=9*(p.renderScale||1);c.fillStyle=p.line;round(c,x,y+4,w,h,r);c.fill();c.shadowColor='transparent'}c.fillStyle=gradient(c,x,y,w,h,a,b);round(c,x,y,w,h,r);c.fill();c.restore();
     c.strokeStyle=p.line;c.lineWidth=1;round(c,x+.5,y+.5,w-1,h-1,r);c.stroke();
     c.save();round(c,x+1,y+1,w-2,h-2,r);c.clip();c.strokeStyle=p.highlight;c.lineWidth=2;c.beginPath();c.moveTo(x+r,y+2);c.lineTo(x+w-r,y+2);c.stroke();c.restore();
   }
@@ -67,30 +67,20 @@ const MyShiftShare=(()=>{
     else{c.arc(12,12,4,0,Math.PI*2);for(let i=0;i<8;i++){const a=i*Math.PI/4;c.moveTo(12+Math.cos(a)*7,12+Math.sin(a)*7);c.lineTo(12+Math.cos(a)*9,12+Math.sin(a)*9)}}
     c.stroke();c.restore();
   }
-  function chipLayout(c,parts,width,font){
-    c.font='600 24px '+font;const rows=[];let row=[],used=0,height=0;
-    for(const part of parts){const lines=textLines(c,part.label,width-32),w=Math.min(width,c.measureText(part.label).width+32),h=lines.length*30+18;
-      if(row.length&&used+w+10>width){rows.push({items:row,height});row=[];used=0;height=0}
-      row.push({part,lines,w,h,x:used});used+=w+10;height=Math.max(height,h);
-    }
-    if(row.length)rows.push({items:row,height});return rows;
-  }
   async function renderCanvas(model,style='jade'){
     if(document.fonts)await Promise.race([document.fonts.ready,new Promise(resolve=>setTimeout(resolve,1800))]);
     const leafSrc=model.m>=9&&model.m<=11?'./images/fx/maple/maple-01.png':model.m>=3&&model.m<=5?'./images/fx/blossom/blossom-01.png':null;
     const textures=await Promise.all([loadImage('./images/fx/cloud/cloud-02.png'),leafSrc?loadImage(leafSrc):Promise.resolve(null)]);
-    const p=themes[style]||themes.jade,night=style==='night',{zh}=model,W=1440,pad=52,inner=W-pad*2,gap=12,cellW=(inner-48-gap*6)/7,cellH=292;
+    const outputWidth=3840,W=1440,renderScale=outputWidth/W,p={...(themes[style]||themes.jade),renderScale},night=style==='night',{zh}=model,pad=52,inner=W-pad*2,gap=12,cellW=(inner-48-gap*6)/7,cellH=292;
     const cv=document.createElement('canvas'),c=cv.getContext('2d'),font=getComputedStyle(document.body).fontFamily||'system-ui, sans-serif';
     if(!c)throw Error(zh?'瀏覽器無法繪製圖片':'Browser tidak dapat membuat gambar');
     c.font='500 25px '+font;const contextLines=textLines(c,[model.rotation,model.unit].filter(Boolean).join(' · '),inner-100);
     const heroH=294+Math.max(0,contextLines.length-1)*32,statsY=pad+heroH+24,calTop=statsY+126,calH=148+model.rows*(cellH+gap)-gap+68;
-    const agenda=model.days.filter(day=>day.parts.length).map(day=>({day,rows:chipLayout(c,day.parts,inner-172,font)}));
-    const agendaH=agenda.length?100+agenda.reduce((n,entry)=>n+Math.max(84,entry.rows.reduce((s,row)=>s+row.height+10,0)-10)+36,0)+10:0;
-    const agendaTop=calTop+calH+26,footerTop=agendaTop+agendaH+(agenda.length?26:0);
-    const footers=[zh?'節日與輪班休假分開標示，實際出勤依班表。':'Hari libur nasional dan libur shift terpisah. Ikuti jadwal kerja.',zh?'請假為匿名人數；— 表示尚未取得。含本人假別與個人事項。':'Cuti = jumlah anonim; — = belum tersedia. Memuat cuti dan agenda pribadi.'];
+    const footerTop=calTop+calH+26;
+    const footers=[zh?'節日與輪班休假分開標示，實際出勤依班表。':'Hari libur nasional dan libur shift terpisah. Ikuti jadwal kerja.',zh?'月曆包含本人假別與事項標示；完整明細請至 App 查看。':'Kalender memuat tanda cuti pribadi & agenda. Rincian ada di aplikasi.'];
     c.font='500 23px '+font;const footerLines=footers.flatMap(s=>textLines(c,s,inner-40)),H=footerTop+100+footerLines.length*32+pad;
-    if(H>24000)throw Error(zh?'本月事項過多，圖片超出瀏覽器可繪製大小':'Terlalu banyak agenda untuk satu gambar');
-    cv.width=W;cv.height=H;c.textBaseline='alphabetic';c.fillStyle=gradient(c,0,0,W,H,p.paper,p.paperEnd);c.fillRect(0,0,W,H);
+    if(Math.ceil(H*renderScale)>24000)throw Error(zh?'圖片超出瀏覽器可繪製大小':'Gambar melebihi ukuran yang didukung browser');
+    cv.width=outputWidth;cv.height=Math.ceil(H*renderScale);c.scale(renderScale,renderScale);c.textBaseline='alphabetic';c.fillStyle=gradient(c,0,0,W,H,p.paper,p.paperEnd);c.fillRect(0,0,W,H);
     const halo=c.createRadialGradient(1210,160,0,1210,160,1050);halo.addColorStop(0,night?'#d9c98218':'#fff8d47c');halo.addColorStop(1,'#fff8d400');c.fillStyle=halo;c.fillRect(0,0,W,H);
     // Deterministic paper grain, independent of the animation layer and export timing.
     c.fillStyle=night?'#d7e9b706':'#123b2610';for(let i=0;i<900;i++)c.fillRect((i*137.31)%W,(i*541.73)%H,.8,.8);
@@ -141,23 +131,8 @@ const MyShiftShare=(()=>{
       c.fillStyle=today?'#fff5db':day.leaveCount>0?p.gold:p.ink;c.font='600 21px '+font;
       c.fillText(zh?'請假':'Cuti',x+13,y+cellH-11);c.textAlign='right';c.font='750 25px '+font;c.fillText(day.leaveCount===null?'—':String(day.leaveCount),x+cellW-13,y+cellH-11);c.textAlign='left';
     }
-    c.font='500 21px '+font;c.fillStyle=p.muted;c.fillText(zh?'請假數字為當日人數。＋與省略內容完整列於下方；— 尚未取得。':'Cuti = jumlah orang. Rincian lengkap di bawah; — belum tersedia.',pad+28,calTop+calH-28);
-    if(agenda.length){
-      panel(c,pad,agendaTop,inner,agendaH,32,p.panel,p.panelEnd,p);
-      c.fillStyle=p.ink;c.font='700 30px '+font;c.fillText(zh?'本月事項與假別':'Agenda & cuti bulan ini',pad+28,agendaTop+48);
-      c.fillStyle=p.muted;c.font='500 22px '+font;c.fillText(zh?'節日、本人請假、調班與標記完整列出':'Hari libur, cuti sendiri, perubahan shift & catatan lengkap',pad+28,agendaTop+80);
-      let yy=agendaTop+100;
-      for(const entry of agenda){
-        const h=Math.max(84,entry.rows.reduce((s,row)=>s+row.height+10,0)-10),{day}=entry;
-        if(yy>agendaTop+100)line(c,pad+28,yy-12,inner-56,p.line);
-        c.fillStyle=day.today?(night?'#47664a':'#d5e7d8'):(night?'#2c4938':'#e9eee3');round(c,pad+25,yy+1,105,78,16);c.fill();
-        c.fillStyle=p.ink;c.font='750 28px '+font;c.textAlign='center';c.fillText(`${model.m}/${day.d}`,pad+77.5,yy+34);c.fillStyle=p.muted;c.font='500 18px '+font;c.fillText(shiftLabel(day.shift,model.language),pad+77.5,yy+62);c.textAlign='left';
-        let cy=yy;
-        for(const row of entry.rows){for(const item of row.items){const xx=pad+144+item.x,tone=p.tones[item.part.tone]||p.tones.personal;c.fillStyle=tone[0];round(c,xx,cy,item.w,item.h,12);c.fill();c.fillStyle=tone[1];c.font='600 24px '+font;item.lines.forEach((s,i)=>c.fillText(s,xx+16,cy+31+i*30))}cy+=row.height+10}
-        yy+=h+36;
-      }
-    }
-    if(textures[1]){c.save();c.translate(W-35,calTop+20);c.rotate(.45);c.globalAlpha=.67;c.drawImage(textures[1],-52,-52,104,104);c.restore();c.save();c.translate(25,agendaTop+115);c.rotate(-.55);c.globalAlpha=.57;c.drawImage(textures[1],-36,-36,72,72);c.restore()}
+    c.font='500 21px '+font;c.fillStyle=p.muted;c.fillText(zh?'請假為當日人數；— 尚未取得；＋N 與省略內容請至 App 查看。':'Cuti = jumlah orang; — belum tersedia. +N dan rincian ada di aplikasi.',pad+28,calTop+calH-28);
+    if(textures[1]){c.save();c.translate(W-35,calTop+20);c.rotate(.45);c.globalAlpha=.67;c.drawImage(textures[1],-52,-52,104,104);c.restore();c.save();c.translate(25,calTop+calH-28);c.rotate(-.55);c.globalAlpha=.57;c.drawImage(textures[1],-36,-36,72,72);c.restore()}
     line(c,pad,footerTop,inner,p.line);c.fillStyle=p.muted;c.font='500 23px '+font;footerLines.forEach((s,i)=>c.fillText(s,pad+4,footerTop+40+i*32));
     const stampY=footerTop+66+footerLines.length*32;c.font='600 20px '+font;c.fillStyle=p.gold;c.fillText('MY SHIFT',pad+4,stampY);c.textAlign='right';c.fillStyle=p.muted;c.font='500 20px '+font;c.fillText((zh?'匯出 ':'Dibuat ')+model.stamp,W-pad-4,stampY);c.textAlign='left';
     cv.setAttribute('data-share-theme',style);return cv;
@@ -173,7 +148,7 @@ const MyShiftShare=(()=>{
   function refresh(){if(!active||active.owner!==owner())return;restore(active.y,active.m);afterRender()}
   function html(){
     const zh=lang==='zh',style=S.shareStyle==='night'?'night':'jade',model=active?.model;
-    return `<div class="modal-bg" data-a="closeShare"><section class="modal-sheet share-sheet" onclick="event.stopPropagation()" aria-labelledby="share-title"><header class="share-title-row"><span class="share-emblem">${studioIcon('calendar',24)}</span><div><h2 id="share-title">${zh?'分享班表':'Bagikan jadwal'}</h2><p>${model?`${model.y} / ${String(model.m).padStart(2,'0')}`:''} · ${zh?'個人月份海報':'Poster bulanan pribadi'}</p></div><button class="share-close" data-a="closeShare" aria-label="${zh?'關閉分享預覽':'Tutup pratinjau'}">×</button></header><div class="share-style-picker" role="group" aria-label="${zh?'圖片風格':'Gaya gambar'}"><button data-a="shareStyle" data-style="jade" aria-pressed="${style==='jade'}"><i class="share-style-swatch jade"></i><span><b>${zh?'晨光翡翠':'Giok pagi'}</b><small>${zh?'柔光・陶瓷立體':'Cahaya lembut'}</small></span></button><button data-a="shareStyle" data-style="night" aria-pressed="${style==='night'}"><i class="share-style-swatch night"></i><span><b>${zh?'暮色金邊':'Giok malam'}</b><small>${zh?'深綠・香檳光澤':'Hijau & emas'}</small></span></button></div><div class="share-preview-head"><span>${zh?'完整圖片預覽':'Pratinjau gambar'}</span><div class="share-preview-tools"><button data-a="shareRefresh" aria-label="${zh?'使用最新資料更新預覽':'Perbarui pratinjau'}">${uiIcon('refresh',14)}</button><button id="share-zoom" data-a="shareZoom" aria-expanded="false">${uiIcon('search',14)}<span>${zh?'放大檢視':'Perbesar'}</span></button></div></div><div class="share-preview-frame" id="share-preview-frame" aria-busy="true"><div class="share-placeholder">${studioIcon('calendar',34)}<span>${zh?'正在製作班表…':'Menyiapkan jadwal…'}</span></div></div><p class="share-content-note">${zh?'包含你的假別與個人事項；同事只顯示匿名請假人數。':'Memuat cuti & agenda pribadi; rekan hanya ditampilkan sebagai jumlah anonim.'}</p><p id="share-status" class="share-status" role="status" aria-live="polite"></p><div class="share-actions"><button data-a="shareSave" disabled>${uiIcon('download',19)}${zh?'儲存圖片':'Simpan gambar'}</button><button class="share-primary" data-a="shareSend" disabled>${uiIcon('share',19)}${zh?'分享圖片':'Bagikan gambar'}</button></div></section></div>`;
+    return `<div class="modal-bg" data-a="closeShare"><section class="modal-sheet share-sheet" onclick="event.stopPropagation()" aria-labelledby="share-title"><header class="share-title-row"><span class="share-emblem">${studioIcon('calendar',24)}</span><div><h2 id="share-title">${zh?'分享班表':'Bagikan jadwal'}</h2><p>${model?`${model.y} / ${String(model.m).padStart(2,'0')}`:''} · ${zh?'個人月份海報':'Poster bulanan pribadi'}</p></div><button class="share-close" data-a="closeShare" aria-label="${zh?'關閉分享預覽':'Tutup pratinjau'}">×</button></header><div class="share-style-picker" role="group" aria-label="${zh?'圖片風格':'Gaya gambar'}"><button data-a="shareStyle" data-style="jade" aria-pressed="${style==='jade'}"><i class="share-style-swatch jade"></i><span><b>${zh?'晨光翡翠':'Giok pagi'}</b><small>${zh?'柔光・陶瓷立體':'Cahaya lembut'}</small></span></button><button data-a="shareStyle" data-style="night" aria-pressed="${style==='night'}"><i class="share-style-swatch night"></i><span><b>${zh?'暮色金邊':'Giok malam'}</b><small>${zh?'深綠・香檳光澤':'Hijau & emas'}</small></span></button></div><div class="share-preview-head"><span>4K PNG · 3840 px</span><div class="share-preview-tools"><button data-a="shareRefresh" aria-label="${zh?'使用最新資料更新預覽':'Perbarui pratinjau'}">${uiIcon('refresh',14)}</button><button id="share-zoom" data-a="shareZoom" aria-expanded="false">${uiIcon('search',14)}<span>${zh?'放大檢視':'Perbesar'}</span></button></div></div><div class="share-preview-frame" id="share-preview-frame" aria-busy="true"><div class="share-placeholder">${studioIcon('calendar',34)}<span>${zh?'正在製作班表…':'Menyiapkan jadwal…'}</span></div></div><p class="share-content-note">${zh?'包含你的假別與個人事項；同事只顯示匿名請假人數。':'Memuat cuti & agenda pribadi; rekan hanya ditampilkan sebagai jumlah anonim.'}</p><p id="share-status" class="share-status" role="status" aria-live="polite"></p><div class="share-actions"><button data-a="shareSave" disabled>${uiIcon('download',19)}${zh?'儲存圖片':'Simpan gambar'}</button><button class="share-primary" data-a="shareSend" disabled>${uiIcon('share',19)}${zh?'分享圖片':'Bagikan gambar'}</button></div></section></div>`;
   }
   function setStatus(message,error=false){const el=document.getElementById('share-status');if(el){el.textContent=message;el.classList.toggle('is-error',error)}}
   function controls(ready){document.querySelectorAll('.share-actions button').forEach(el=>{el.disabled=!ready||busy})}
@@ -198,7 +173,7 @@ const MyShiftShare=(()=>{
   }
   function mount(frame){
     frame.setAttribute('aria-busy','false');frame.dataset.shareStyle=S.shareStyle;let img=frame.querySelector('img');
-    if(!img){img=document.createElement('img');img.alt=lang==='zh'?'完整月份班表，包含班別、請假人數及事項清單':'Jadwal lengkap, jumlah cuti dan agenda';img.draggable=false;frame.replaceChildren(img)}
+    if(!img){img=document.createElement('img');img.alt=lang==='zh'?'4K 月份班表，包含班別、請假人數及月曆標示':'Kalender 4K, shift, jumlah cuti dan tanda agenda';img.draggable=false;frame.replaceChildren(img)}
     if(img.src!==imageUrl)img.src=imageUrl;
   }
   function changeStyle(style){if(!['jade','night'].includes(style))return;S.shareStyle=style;busy=false;render()}
