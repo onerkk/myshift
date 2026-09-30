@@ -14,6 +14,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body translate="no">
+<nav aria-label="返回班表" style="position:sticky;top:0;z-index:20;max-width:720px;margin:auto;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:#0f0f1af5;border-bottom:1px solid #3a4652">
+  <a href="../" style="display:inline-flex;align-items:center;min-height:44px;padding:8px 14px;border:1px solid #66806e;border-radius:12px;background:linear-gradient(145deg,#284a3c,#183027);box-shadow:inset 0 1px 0 #ffffff33,0 3px 0 #061c14;color:#e9f6e8;text-decoration:none;font-weight:700" onclick="try{const from=new URL(document.referrer),root=new URL('../',location.href);if(from.origin===root.origin&amp;&amp;(from.pathname===root.pathname||from.pathname===root.pathname+'index.html')&amp;&amp;history.length&gt;1){history.back();return false}}catch(e){}">‹ 返回班表</a>
+</nav>
 <div id="app"></div>
 <div id="toast" class="toast"></div>
 <script src="/myshift/admin/admin.js?v=6-unified-leave"></script>
