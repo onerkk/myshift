@@ -18,7 +18,7 @@ test('poster dates and weekday alignment cover leap years and four, five and six
   }
   assert.throws(()=>c.share.buildModel(2026,13));assert.throws(()=>c.share.buildModel(2026,0));
 });
-test('export retains exact holidays, own leave hours, adjustment and long notes without colleague private data',()=>{
+test('calendar model preserves exact holidays, own leave hours and notes without colleague private data',()=>{
   const c=env();c.calendarDayInfo=(y,m,d)=>({key:`${y}-${m}-${d}`,shift:'晚',today:d===30,leaveCount:2,holiday:d===5?'教師節（補假）':'',adjusted:d===6,uid:'COLLEAGUE_UID',reason:'PRIVATE_REASON',events:d===6?[{id:'own-sick',tone:'own-leave',own:true,label:'本人 病假 8h',short:'病假 8h',hours:8},{id:'own-overtime',tone:'own-leave',own:true,label:'本人 未加班 4h',short:'未加班 4h',hours:4},{id:'custom',label:'完整個人備註不可省略',short:'備註',tone:'personal'}]:[]});
   const m=c.share.buildModel(2026,9);assert.equal(m.ownHours,8);assert.equal(m.days[5].parts.length,4);
   assert.equal(m.days[4].parts[0].label,'教師節（補假）');assert.equal(m.days[5].parts[2].label,'完整個人備註不可省略');assert.equal(m.days[5].parts[3].label,'已調班');
