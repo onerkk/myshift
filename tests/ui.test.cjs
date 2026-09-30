@@ -48,7 +48,8 @@ function env(lang='zh'){
   c.t=key=>key==='wk'?(lang==='zh'?['日','一','二','三','四','五','六']:['Min','Sen','Sel','Rab','Kam','Jum','Sab']):({app:lang==='zh'?'我的班表':'Jadwal Saya',hr:lang==='zh'?'小時':'jam',alRem:lang==='zh'?'特休餘額':'Sisa cuti',rem:lang==='zh'?'接下來的行程':'Agenda'})[key]||key;
   c.gs=()=>c.shift;c.getShiftWorkRule=()=>({isWork:c.shift!=='休',startMinute:c.shift==='晚'?1200:480,shiftHours:12});
   c.isAdmin=()=>c.admin;c.calcSalaryEst=()=>c.estimate;
-  vm.createContext(c);vm.runInContext(names.map(presenter).join('\n'),c);
+  c.window={addEventListener(){}};c.getSeason=()=>"autumn";c.WxSfx.getButtonVolume=()=>.45;c.isFxEnabled=()=>true;c.isFxMasterEnabled=()=>true;c.isFxAdminEnabled=()=>true;c.leaveHoursDetail=l=>({regularHours:l.hours||0,overtimeHours:0});c._popSourceLabel=()=>"Open-Meteo 模式預報";
+  vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../schedule-experience.js'),'utf8'),c);vm.runInContext(names.map(presenter).join('\n'),c);
   const ha=source.indexOf('function handle('),hb=source.indexOf('let wxData=null',ha);
   vm.runInContext(source.slice(ha,hb),c);
   c.action=(a,data={})=>c.handle({currentTarget:{dataset:{a,...data}}});
@@ -80,7 +81,7 @@ test('weekends are individually tagged and Taiwan holiday weekends become a visi
   assert.equal((h.match(/class="day [^"]* break-day/g)||[]).length,4);
   assert.match(h,/data-d="26" aria-current="false" aria-label="26 早班, 星期六/);
   assert.match(h,/data-d="27" aria-current="false" aria-label="27 早班, 星期日/);
-  assert.match(h,/class="calendar-date-tag official"[^>]*title="國定假日"[^>]*>假/);
+  assert.match(h,/class="calendar-date-tag official"[^>]*title="中秋節"[^>]*>假/);
   c.isTWOff=()=>false;c.gh=()=>null;c.S.mo=11;
   assert.doesNotMatch(c.uiCalendarPageHtml(),/class="calendar-breaks"/);
 });
@@ -113,7 +114,7 @@ test('weather screen and home preview show the local rain check beside model con
 });
 test('more screen preserves account and role restrictions without duplicate admin controls',()=>{
   const c=env();c.UI_TAB='more';let h=c.rCal();assert.match(h,/id="loginBtn"/);assert.doesNotMatch(h,/data-a="leavesOv"/);
-  c.fbUser={uid:'me',displayName:'測試 <名字>'};c.admin=true;h=c.rCal();assert.match(h,/測試 &lt;名字&gt;/);assert.equal((h.match(/data-a="leavesOv"/g)||[]).length,1);assert.equal((h.match(/role="switch"/g)||[]).length,2);
+  c.fbUser={uid:'me',displayName:'測試 <名字>'};c.admin=true;h=c.rCal();assert.match(h,/測試 &lt;名字&gt;/);assert.equal((h.match(/data-a="leavesOv"/g)||[]).length,1);assert.equal((h.match(/role="switch"/g)||[]).length,3);
   const toggle=c._miniSwitch(true,'setUserPref()',true,'#fff','警報通知');assert.match(toggle,/role="switch" aria-checked="true" aria-label="警報通知" disabled/);
 });
 
@@ -140,7 +141,7 @@ test('daily agenda merges notices, personal notes and pay labels, without exposi
   c.getLeaves=()=>[{uid:'a',unit:'測試單位',hours:2,name:'PRIVATE_NAME',reason:'PRIVATE_REASON'},{uid:'a',unit:'測試單位',hours:3},{uid:'b',unit:'測試單位',hours:4},{uid:'c',unit:'測試單位',hours:0}];
   const day=c.calendarDayInfo(2026,9,20);
   assert.equal(day.leaveCount,2);assert.equal(day.events.filter(e=>e.id==='meeting').length,1);assert.equal(day.events.filter(e=>e.id==='health').length,1);
-  const h=c.uiCalendarPageHtml();assert.match(h,/tone-meeting[^>]*>會議/);assert.match(h,/tone-health[^>]*>體檢/);assert.match(h,/>請假<\/span><b>2<\/b>/);
+  const h=c.uiCalendarPageHtml();assert.match(h,/tone-meeting[^>]*>班股會議/);assert.match(h,/tone-health[^>]*>健康檢查/);assert.match(h,/>請假<\/span><b>2<\/b>/);
   c.action('calendarFilter',{filter:'health'});assert.equal(c.UI_CAL_VIEW,'agenda');assert.equal(c.UI_CAL_FILTER,'health');
   const agenda=c.uiCalendarPageHtml();assert.equal((agenda.match(/class="agenda-day[" ]/g)||[]).length,1);assert.match(agenda,/&lt;img/);assert.match(agenda,/績效獎金/);assert.doesNotMatch(agenda,/<img src=x|PRIVATE_NAME|PRIVATE_REASON/);
   const brief=c.calendarDaySummaryHtml(2026,9,20);assert.match(brief,/2 人請假/);assert.match(brief,/class/);assert.match(brief,/&lt;img/);
@@ -222,4 +223,11 @@ test('cross-year holiday ranges keep both dates and holiday rows open the select
   c.gh=(y,m,d)=>y===2027&&m===12&&d===31?'元旦(補假)':y===2028&&m===1&&d===1?'元旦':null;
   const h=c.uiCalendarPageHtml();assert.match(h,/12\/31（五）/);assert.match(h,/1\/2（日）/);
   c.action('open',{d:'31'});assert.equal(JSON.stringify(c.S.modal),JSON.stringify({y:2027,m:12,d:31}));
+});
+
+test('exact holiday names, own leave and commute helpers remain prominent without revealing colleagues',()=>{
+ const c=env();c.fbUser={uid:'me'};c.gh=(y,m,d)=>d===25?'中秋節':null;c.myLeave=key=>key.endsWith('-25')?[{uid:'me',leaveType:'sick',hours:8}]:[];c.getLT=()=>({name:'病假',nameId:'Cuti sakit'});
+ const html=c.uiCalendarPageHtml();assert.match(html,/class="[^"]*day-holiday[^"]*"[^>]*>中秋節/);assert.match(html,/病假 8h/);assert.match(html,/experienceOpenDay\('leave'\)/);assert.match(html,/data-a="share"/);
+ const day=c.calendarDayInfo(2026,9,25);assert.equal(day.events[0].label,'本人 病假 8h');
+ c.isFxMasterEnabled=()=>false;c.isFxEnabled=()=>false;const controls=c.natureControlsHtml();assert.match(controls,/role="switch" aria-checked="false"/);assert.match(controls,/已關閉，輕觸恢復/);assert.match(controls,/previewNature\('rain',this\)" disabled/);
 });

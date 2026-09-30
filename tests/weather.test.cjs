@@ -215,3 +215,12 @@ test('optional tide is selected by distance, filtered by date and sorted without
   await e.c._refreshWxExtras(wx,pos,0);
   const tide=e.run('tideData');assert.equal(tide.station,'Near');assert.equal(tide.tides.length,2);assert.equal(tide.tides[0].height,80);assert.equal(tide.tides[1].height,90);
 });
+
+test('future rain probability and forecast reminders cannot manufacture current rain effects',()=>{
+ const {c}=appEnv(),wx=W.openMeteo(forecast(),pos),values=[];
+ wx.code=2;wx.currentPrecip=0;wx.hRain=wx.hTime.map(()=>0);wx.hCode=wx.hTime.map(()=>2);wx.hPrec=wx.hTime.map(()=>90);wx.hPrecModel=wx.hPrec.slice();c.wxData=wx;
+ c.evaluateWxAlerts=()=>[{id:'rain'},{id:'heavyRainModel'}];c.window.WxFx={update:(...args)=>values.push(args)};
+ c._syncWeatherFx();assert.equal(values.at(-1)[0],2);
+ wx.currentPrecip=1;c._syncWeatherFx();assert.equal(values.at(-1)[0],61);
+ c.evaluateWxAlerts=()=>[{id:'storm'}];c._syncWeatherFx();assert.equal(values.at(-1)[0],95);
+});
