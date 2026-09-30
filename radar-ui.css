@@ -43,3 +43,6 @@ input[type=range]{position:relative;display:block;width:100%;height:32px;-webkit
 @media(max-height:600px){.cloud-tools button{min-height:28px}.cloud-tools{margin-top:6px}.cloud-map-caption{padding-bottom:5px;margin-bottom:5px}#cardBody{max-height:calc(100dvh - var(--ctrl-height) - 254px)}}
 
 body[data-cloud-source="jma"] .leaflet-cloudsat-pane{filter:grayscale(1) contrast(.9) brightness(1.6)}
+
+/* Keep an exit available while location, map or network loading is blocked. */
+.overlay-back{display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:20px;border:1px solid #799382;border-radius:13px;color:#e5efcf;background:#142d23;text-decoration:none;font-size:14px}

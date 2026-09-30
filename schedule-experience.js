@@ -93,6 +93,12 @@ function uiQuickToolsHtml(){
   const zh=lang==='zh';
   return `<section class="quick-launch" aria-label="${zh?'常用操作':'Tindakan cepat'}"><button onclick="experienceOpenDay('leave')"><span>${studioIcon('leave',20)}</span><b>${zh?'新增請假':'Tambah cuti'}</b></button><button onclick="experienceOpenDay('shift')"><span>${uiIcon('refresh',20)}</span><b>${zh?'調班／事項':'Shift / agenda'}</b></button><button data-a="share"><span>${uiIcon('share',20)}</span><b>${zh?'分享班表':'Bagikan'}</b></button><button data-a="stats"><span>${uiIcon('chart',20)}</span><b>${zh?'年度統計':'Statistik'}</b></button></section>`;
 }
+function uiDayLeaveCountHtml(day,placement='hero'){
+  const zh=lang==='zh',unknown=day.leaveCount===null,value=unknown?'—':day.leaveCount;
+  const description=unknown?calendarLeaveStatusText(day.status):(zh?`${day.leaveCount} 人請假`:`${day.leaveCount} orang cuti`);
+  if(placement==='week')return `<span class="week-leave-count${day.leaveCount>0?' has-leave':''}${unknown?' unknown':''}" aria-label="${esc(description)}"><span>${zh?'請假':'Cuti'}</span><b>${value}</b></span>`;
+  return `<button class="hero-leave-overview${day.leaveCount>0?' has-leave':''}${unknown?' unknown':''}" data-a="openDate" data-y="${day.y}" data-m="${day.m}" data-d="${day.d}" aria-label="${esc(`${day.m}/${day.d} ${description}`)}"><span>${day.m}/${day.d} ${zh?'當日請假':'Cuti tanggal ini'}</span><span class="hero-leave-number"><b>${value}</b><small>${zh?'人':'orang'}</small></span>${unknown?`<em>${zh?'資料未取得':'Belum tersedia'}</em>`:''}${uiIcon('chevron',15)}</button>`;
+}
 function uiDaySheetNavigationHtml(){
   const zh=lang==='zh';
   return `<nav class="day-sheet-nav" aria-label="${zh?'日期操作捷徑':'Pintasan tanggal'}">${[['leave',zh?'請假':'Cuti'],['shift',zh?'調班':'Ubah shift'],['events',zh?'標記事項':'Tandai agenda']].map(([id,label])=>`<button onclick="experienceJumpDay('${id}')">${label}</button>`).join('')}<button class="day-nav-close" data-a="close" aria-label="${zh?'關閉日期視窗':'Tutup detail tanggal'}">×</button></nav>`;

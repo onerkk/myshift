@@ -7,14 +7,14 @@
 <title>即時雷達與雲層預估 · 我的班表</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<link rel="stylesheet" href="./radar-ui.css?v=316-satellite">
+<link rel="stylesheet" href="./radar-ui.css?v=320-return">
 </head>
 <body>
 <div id="map"></div>
 
 <div class="top">
   <section class="topcard" aria-label="雷達與雲流">
-    <header class="radar-topbar"><a class="backchip" href="./" aria-label="回到班表" onclick="if(history.length>1){history.back();return false}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 6-6 6 6 6"/></svg></a><div class="radar-title"><h1>衛星與雷達</h1><span>衛星雲圖・雨區觀測・雲流預估</span></div><span class="radar-status" id="radarStatus"><i></i><span>雷達連線中</span></span></header>
+    <header class="radar-topbar"><a class="backchip" href="./" aria-label="回到班表" onclick="return returnToSchedule()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 6-6 6 6 6"/></svg></a><div class="radar-title"><h1>衛星與雷達</h1><span>衛星雲圖・雨區觀測・雲流預估</span></div><span class="radar-status" id="radarStatus"><i></i><span>雷達連線中</span></span></header>
     <div class="loc"><span class="pin"></span><span id="locName">定位中…</span><span class="coords" id="coords"></span></div>
     <button type="button" class="cloud-summary pending" id="cloudSummary" aria-controls="cardBody" aria-expanded="false"><span class="cloud-summary-icon">☁</span><span class="cloud-summary-copy"><strong>正在載入衛星雲圖</strong><small>取得 Himawari 衛星影像…</small></span><span class="cloud-summary-arrow">⌄</span></button>
     <div class="cloud-tools" aria-label="地圖圖層"><button id="cloudToggle" type="button" aria-pressed="true">☁ 雲圖</button><button id="radarToggle" type="button" aria-pressed="true">◉ 雷達</button><button id="taiwanView" type="button">全臺雲況</button><button id="cloudReload" type="button" aria-label="重新載入衛星雲圖">↻ 更新</button></div>
@@ -63,6 +63,7 @@
     <h1 id="ovTitle">取得你的位置</h1>
     <p id="ovText">需要定位權限才能顯示你頭上的雷達。請允許定位。</p>
     <button class="retry hidden" id="ovBtn">重試</button>
+    <a class="overlay-back" href="./" onclick="return returnToSchedule()">‹ 返回班表</a>
   </div>
 </div>
 
@@ -71,6 +72,10 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
+function returnToSchedule(){
+  try{const from=new URL(document.referrer),root=new URL('./',location.href);if(from.origin===root.origin&&(from.pathname===root.pathname||from.pathname===root.pathname+'index.html')&&history.length>1){history.back();return false}}catch(e){}
+  return true;
+}
 (function(){
   "use strict";
   var RV_API="https://api.rainviewer.com/public/weather-maps.json";
