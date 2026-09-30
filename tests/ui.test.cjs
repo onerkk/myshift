@@ -155,6 +155,15 @@ test('unknown and failed leave loading do not masquerade as zero; loaded empty d
   assert.equal(c.calendarDayInfo(2026,9,1).leaveCount,0);
   c.fbUser=null;assert.equal(c.calendarDayInfo(2026,9,1).leaveCount,null);assert.match(c.uiCalendarPageHtml(),/登入後/);
 });
+test('today console and seven-day cards always show anonymous leave counts, including zero and unknown',()=>{
+  const c=env();c.fbUser={uid:'me'};
+  let hero=c.uiTodayHeroHtml();assert.match(hero,/hero-leave-overview/);assert.match(hero,/9\/10 當日請假/);assert.match(hero,/hero-leave-number"><b>0<\/b>/);
+  assert.equal((c.uiWeekStripHtml().match(/class="week-leave-count/g)||[]).length,7);
+  c.getLeaves=key=>key==='2026-09-10'?[{uid:'other',unit:'測試單位',hours:4,name:'PRIVATE_NAME'}]:[];
+  hero=c.uiTodayHeroHtml();assert.match(hero,/hero-leave-number"><b>1<\/b>/);assert.doesNotMatch(hero,/PRIVATE_NAME/);assert.match(c.uiCalendarTodayAnchorHtml(),/1 人請假/);
+  c.payrollLeaveState.months=[];hero=c.uiTodayHeroHtml();assert.match(hero,/hero-leave-number"><b>—<\/b>/);assert.match(hero,/資料未取得/);assert.doesNotMatch(hero,/hero-leave-number"><b>0<\/b>/);
+  c.lang='id';assert.match(c.uiTodayHeroHtml(),/Cuti tanggal ini/);assert.match(c.uiWeekStripHtml(),/>Cuti<\/span><b>—/);
+});
 test('selected-unit counts exclude own history from other units and include separate manual placeholders across units',()=>{
   const c=env();c.fbUser={uid:'me'};
   c.getLeaves=()=>[{uid:'me',unit:'其他單位',hours:8},{uid:'a',unit:'測試單位',hours:3},{uid:'a',unit:'測試單位',hours:5},{uid:'admin_0',unit:'測試單位',hours:8},{uid:'admin_0',unit:'其他單位',hours:8}];
