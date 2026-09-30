@@ -132,43 +132,10 @@ function experienceWrapCanvasText(context,text,maxWidth){
   for(const char of Array.from(String(text))){if(line&&context.measureText(line+char).width>maxWidth){lines.push(line);line=char}else line+=char}
   if(line)lines.push(line);return lines;
 }
-async function experienceShareCanvas(y,m){
-  if(document.fonts)await document.fonts.ready;
-  const zh=lang==='zh',days=Array.from({length:dim(y,m)},(_,i)=>calendarDayInfo(y,m,i+1)),first=fdw(y,m),W=980,pad=24,gap=7,cellW=(W-pad*2-gap*6)/7;
-  const cv=document.createElement('canvas'),c=cv.getContext('2d'),font=getComputedStyle(document.body).fontFamily||'system-ui, "Noto Sans TC", sans-serif';
-  c.font='600 20px '+font;
-  const rows=Math.ceil((first+days.length)/7),rowHeights=Array(rows).fill(154),texts=new Map();
-  for(const day of days){const parts=[...(day.holiday?[{label:day.holiday,tone:'holiday'}]:[]),...day.events.map(e=>({label:e.short,tone:e.tone}))];
-    const items=parts.map(part=>({...part,lines:experienceWrapCanvasText(c,part.label,cellW-15)}));texts.set(day.d,items);
-    const height=127+items.reduce((n,item)=>n+item.lines.length*25+12,0);
-    rowHeights[Math.floor((first+day.d-1)/7)]=Math.max(rowHeights[Math.floor((first+day.d-1)/7)],height);
-  }
-  const footerTexts=[zh?'節日名稱、本人假別與事項已列出；出勤依班表。':'Perayaan, cuti sendiri dan agenda tercantum; ikuti jadwal.',zh?'請假人數依目前資料；— 表示未取得。圖片含本人請假資訊。':'Jumlah cuti dari data tersedia; — belum diketahui. Termasuk cuti Anda.',zh?'雲端更新後可重新分享最新月份。':'Bagikan ulang setelah pembaruan data.'];
-  c.font='600 21px '+font;const footerLines=footerTexts.map(text=>experienceWrapCanvasText(c,text,W-pad*2-10));
-  const header=155,week=42,calY=header+week,footer=35+footerLines.reduce((n,lines)=>n+lines.length*27+6,0),H=calY+rowHeights.reduce((n,h)=>n+h+gap,0)+footer;
-  cv.width=W;cv.height=H;c.fillStyle='#edf2e9';c.fillRect(0,0,W,H);
-  const gradient=c.createLinearGradient(0,0,W,header);gradient.addColorStop(0,'#416e51');gradient.addColorStop(1,'#123f30');c.fillStyle=gradient;c.fillRect(0,0,W,header);
-  c.textAlign='left';c.fillStyle='#e4edbc';c.font='600 21px '+font;c.fillText(zh?'我的班表 · 個人月份總覽':'My Shift · Jadwal pribadi',pad+8,43);
-  c.fillStyle='#fffcef';c.font='800 38px '+font;c.fillText(zh?`${y} 年 ${m} 月`:`${m} / ${y}`,pad+8,97);
-  c.fillStyle='#d6e5d3';c.font='500 20px '+font;const rotation=(RN[lang]&&RN[lang][S.rt])||S.rt||'';c.fillText([rotation,S.unit&&S.unit!=='__all'?S.unit:''].filter(Boolean).join(' · '),pad+8,131);
-  const weekdays=t('wk');c.textAlign='center';c.font='700 20px '+font;weekdays.forEach((label,i)=>{c.fillStyle=i===0||i===6?'#ac5c55':'#506b5e';c.fillText(label,pad+i*(cellW+gap)+cellW/2,header+30)});
-  const palette={早:['#e0eee3','#186449'],晚:['#ece6f4','#5c4c7b'],中:['#f7ecd6','#7c5826'],休:['#e7ede7','#536c5b']};
-  const box=(x,y,w,h,r)=>{c.beginPath();c.roundRect(x,y,w,h,r);c.fill()};
-  for(const day of days){
-    const index=first+day.d-1,col=index%7,row=Math.floor(index/7),x=pad+col*(cellW+gap),yy=calY+rowHeights.slice(0,row).reduce((n,h)=>n+h+gap,0),h=rowHeights[row],colors=palette[day.shift]||['#fff','#526b62'];
-    c.fillStyle='#aabbab';box(x,yy+3,cellW,h-5,12);c.fillStyle=day.today?'#1d5940':colors[0];box(x,yy,cellW,h-5,12);
-    c.fillStyle=day.today?'#f7ffea':colors[1];c.font='800 33px '+font;c.textAlign='left';c.fillText(String(day.d),x+10,yy+38);
-    c.font='600 20px '+font;c.fillText(day.shift==='休'?(zh?'輪班休':'Libur shift'):studioShiftLabel(day.shift),x+10,yy+70);
-    let pos=yy+83;
-    for(const item of texts.get(day.d)){
-      const holiday=item.tone==='holiday',own=item.tone==='own-leave';c.fillStyle=holiday?'#f3dacf':own?'#efdcae':'#ffffffa3';box(x+5,pos,cellW-10,item.lines.length*25+7,6);
-      c.fillStyle=holiday?'#85433b':own?'#765021':'#385446';c.font='600 20px '+font;c.textAlign='center';item.lines.forEach((line,i)=>c.fillText(line,x+cellW/2,pos+23+i*25));pos+=item.lines.length*25+12;
-    }
-    c.textAlign='center';c.fillStyle=day.today?'#daeacb':'#5b7164';c.font='500 18px '+font;c.fillText(zh?`請假 ${day.leaveCount===null?'—':day.leaveCount} 人`:`Cuti ${day.leaveCount===null?'—':day.leaveCount}`,x+cellW/2,yy+h-18);
-  }
-  let fy=H-footer+35;c.textAlign='left';footerLines.forEach((lines,index)=>{c.fillStyle=index?'#647a69':'#45654f';c.font=(index?'500 18px ':'600 21px ')+font;lines.forEach(line=>{c.fillText(line,pad+5,fy);fy+=27});fy+=6});
-  return cv;
+async function experienceShareCanvas(y,m,options={}){
+  return MyShiftShare.canvas(y,m,options);
 }
+
 function uiUnitControlHtml(){
   if(!fbUser||typeof APP_CFG==='undefined')return'';const zh=lang==='zh',locked=!!S.lockedUnit;
   return `<section class="unit-control"><span>${studioIcon('shield',19)}</span><div><strong>${zh?'查看單位':'Unit yang ditampilkan'}</strong>${locked?`<small>${esc(S.unit)} · ${zh?'由管理員指定':'Diatur admin'}</small>`:`<select id="unitChg" aria-label="${zh?'選擇查看單位':'Pilih unit'}" onchange="if(changeSelectedUnit(this.value))render()">${isAdmin()?`<option value="__all"${S.unit==='__all'?' selected':''}>${zh?'全部單位':'Semua unit'}</option>`:''}${(APP_CFG.units||[]).map(unit=>`<option value="${esc(unit)}"${unit===S.unit?' selected':''}>${esc(unit)}</option>`).join('')}</select>`}</div></section>`;

@@ -8,6 +8,7 @@ const MyShiftNavigation=(()=>{
     if(wxDetailShow)return 'wx';
     if(tideDetailShow)return 'tide';
     if(S.modal)return 'day';
+    if(S.showShare)return 'share';
     if(showUserPrefs)return 'prefs';
     if(S.showH)return 'help';
     if(S.showStats)return 'stats';
@@ -19,16 +20,17 @@ const MyShiftNavigation=(()=>{
   function snapshot(){
     return {tab:UI_TAB,kind:kind(),year:S.yr,month:S.mo,calendarView:UI_CAL_VIEW,calendarFilter:UI_CAL_FILTER,
       pay:{y:PAY_VIEW.y,m:PAY_VIEW.m},day:S.modal?{...S.modal}:null,help:!!S.showH,stats:!!S.showStats,statsYear:S.statsYr,
-      salary:!!S.showSal,leaves:!!S.showLeavesOv,prefs:!!showUserPrefs,admin:!!showAdmin,
+      salary:!!S.showSal,leaves:!!S.showLeavesOv,share:!!S.showShare,shareStyle:S.shareStyle||'jade',prefs:!!showUserPrefs,admin:!!showAdmin,
       wx:!!wxDetailShow,wxDay:wxDetailDay,tide:!!tideDetailShow,tideDay:tideDetailDay};
   }
   function view(route){return route.kind?'sheet:'+route.kind:'page:'+route.tab}
   function title(route){
     const zh=lang==='zh',names=zh?{today:'今天',calendar:'班表',pay:'薪資',weather:'天氣',more:'更多',day:'日期明細',wx:'逐時天氣',tide:'潮汐明細',location:'天氣地點',prefs:'個人設定',help:'使用說明',stats:'年度統計',salary:'計薪設定',leaves:'請假總覽',admin:'管理設定'}:
       {today:'Hari ini',calendar:'Jadwal',pay:'Gaji',weather:'Cuaca',more:'Lainnya',day:'Detail tanggal',wx:'Cuaca per jam',tide:'Detail pasut',location:'Lokasi cuaca',prefs:'Pengaturan',help:'Panduan',stats:'Statistik',salary:'Aturan gaji',leaves:'Ringkasan cuti',admin:'Admin'};
+    if(route?.kind==='share')return zh?'分享班表':'Bagikan jadwal';
     return names[route?.kind||route?.tab]||names.today;
   }
-  function base(route){return {...route,tab:'today',kind:'',day:null,help:false,stats:false,salary:false,leaves:false,prefs:false,admin:false,wx:false,tide:false}}
+  function base(route){return {...route,tab:'today',kind:'',day:null,help:false,stats:false,salary:false,leaves:false,share:false,prefs:false,admin:false,wx:false,tide:false}}
   function state(entry){return {...(history.state&&typeof history.state==='object'?history.state:{}),myshiftNavigation:{session,key:entry.key}}}
   function owner(){return typeof fbUser!=='undefined'&&fbUser?fbUser.uid:''}
   function entry(route){return {key:++nextId,owner:owner(),route,ui:{scroll:0,focus:null,form:null}}}
@@ -53,6 +55,8 @@ const MyShiftNavigation=(()=>{
     clearLocation();UI_TAB=r.tab;S.yr=r.year;S.mo=r.month;UI_CAL_VIEW=r.calendarView;UI_CAL_FILTER=r.calendarFilter;
     PAY_VIEW.y=r.pay.y;PAY_VIEW.m=r.pay.m;S.modal=r.day?{...r.day}:null;S.showH=r.help;S.showStats=r.stats;S.statsYr=r.statsYear;
     S.showSal=r.salary;S.showLeavesOv=r.leaves;showUserPrefs=r.prefs;showAdmin=r.admin;wxDetailShow=r.wx;wxDetailDay=r.wxDay;tideDetailShow=r.tide;tideDetailDay=r.tideDay;
+    S.showShare=!!r.share;S.shareStyle=r.shareStyle||'jade';
+    if(S.showShare&&typeof MyShiftShare!=='undefined')MyShiftShare.restore(S.yr,S.mo);
     try{localStorage.setItem('myshift_ui_tab',UI_TAB)}catch(e){}
     if(oldMonth!==S.yr+'-'+S.mo||oldPay!==PAY_VIEW.y+'-'+PAY_VIEW.m){loadLeaves();loadAdminEv()}
     if(r.kind==='location')openWxLocation();
