@@ -32,8 +32,10 @@
 
   document.addEventListener('pointerdown', event => {
     if (motionOff() || (event.button !== undefined && event.button !== 0)) return;
-    const button = event.target.closest('.bottom-nav-item,.insight-row,.settings-row,.schedule-day,.day');
+    const button = event.target.closest('button,summary,[role="button"]');
     if (!button || button.disabled) return;
+    button.classList.add('ui-pressed');
+    const release=()=>button.classList.remove('ui-pressed');document.addEventListener('pointerup',release,{once:true});document.addEventListener('pointercancel',release,{once:true});setTimeout(release,750);
     const box = button.getBoundingClientRect();
     const size = Math.max(box.width, box.height) * 1.6;
     const ripple = document.createElement('span');
@@ -64,6 +66,9 @@
       const r = card.getBoundingClientRect();
       card.style.setProperty('--light-x', ((event.clientX-r.left)/r.width*100).toFixed(1)+'%');
       card.style.setProperty('--light-y', ((event.clientY-r.top)/r.height*100).toFixed(1)+'%');
+      card.style.setProperty('--tilt-x', ((.5-(event.clientY-r.top)/r.height)*2.4).toFixed(2)+'deg');
+      card.style.setProperty('--tilt-y', (((event.clientX-r.left)/r.width-.5)*2.4).toFixed(2)+'deg');
     });
   }, { passive: true });
+  document.addEventListener('pointerout',event=>{const card=event.target.closest('[data-depth]');if(card&&!card.contains(event.relatedTarget)){card.style.setProperty('--tilt-x','0deg');card.style.setProperty('--tilt-y','0deg')}},{passive:true});
 })();
