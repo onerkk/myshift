@@ -19,6 +19,17 @@ test('an overnight shift belongs to yesterday, even when today is a roster rest 
  const x=c.experienceShiftTimeline();assert.equal(x.row.key,'2026-09-29');assert.equal(x.previous,true);assert.equal(x.phase,'running');assert.equal(x.remaining,120);assert.equal(x.stage,'overtime');assert.ok(Math.abs(x.progress-100*10/12)<1e-9);assert.equal(x.next.key,'2026-10-01');
  c.setNow('2026-09-30T08:00:00+08:00');assert.equal(c.experienceShiftTimeline().phase,'off');assert.equal(c.experienceShiftTimeline().row,null);
 });
+test('month dates form complete continuous weeks for four, five, six weeks, leap years and December to January',()=>{
+ const c=env();
+ for(const [y,m,size,start,end,count] of [[2026,10,35,'2026-09-27','2026-10-31',31],[2026,9,35,'2026-08-30','2026-10-03',30],[2027,1,42,'2026-12-27','2027-02-06',31],[2026,2,28,'2026-02-01','2026-02-28',28],[2028,2,35,'2028-01-30','2028-03-04',29]]){
+  const days=c.experienceMonthDates(y,m),key=date=>c.ek(date.y,date.m,date.d);
+  assert.equal(days.length,size);assert.equal(key(days[0]),start);assert.equal(key(days.at(-1)),end);assert.equal(days.filter(d=>d.inMonth).length,count);
+  assert.equal(new Date(days[0].y,days[0].m-1,days[0].d).getDay(),0);assert.equal(new Date(days.at(-1).y,days.at(-1).m-1,days.at(-1).d).getDay(),6);
+  for(let i=1;i<days.length;i++){const prev=days[i-1],next=new Date(prev.y,prev.m-1,prev.d+1);assert.equal(key(days[i]),c.ek(next.getFullYear(),next.getMonth()+1,next.getDate()));}
+  assert.equal(new Set(days.map(key)).size,size);
+ }
+ assert.throws(()=>c.experienceMonthDates(2026,13));assert.throws(()=>c.experienceMonthDates(2026,0));
+});
 test('a night shift later today is not treated as an already finished shift before sunrise',()=>{
  const c=env();c.roster['2026-09-30']='晚';const x=c.experienceShiftTimeline();assert.equal(x.phase,'upcoming');assert.equal(x.remaining,840);assert.equal(x.progress,0);assert.equal(x.previous,false);
 });

@@ -66,11 +66,21 @@ test('all five production screens render in both languages with optional service
 });
 test('calendar has every real date, correct December/January navigation and native date buttons',()=>{
   const c=env();c.S.yr=2026;c.S.mo=12;
-  let h=c.uiCalendarPageHtml();assert.equal((h.match(/class="day /g)||[]).length,31);assert.equal((h.match(/<button type="button" class="day /g)||[]).length,31);
+  let h=c.uiCalendarPageHtml();assert.equal((h.match(/class="day /g)||[]).length,35);assert.equal((h.match(/<button type="button" class="day /g)||[]).length,35);assert.equal((h.match(/data-month-offset="0"/g)||[]).length,31);assert.doesNotMatch(h,/calendar-empty-cell/);
   c.action('next');assert.equal(c.S.yr,2027);assert.equal(c.S.mo,1);
   c.action('prev');assert.equal(c.S.yr,2026);assert.equal(c.S.mo,12);
   c.action('today');assert.equal(c.S.yr,2026);assert.equal(c.S.mo,9);
   c.action('open',{d:'25'});assert.equal(JSON.stringify(c.S.modal),JSON.stringify({y:2026,m:9,d:25}));assert.deepEqual(c.errors,[]);
+});
+test('adjacent calendar cells open their actual date and leave main-month summaries unchanged',()=>{
+  for(const language of ['zh','id']){
+    const c=env(language);c.fbUser={uid:'me'};c.S.yr=2027;c.S.mo=1;
+    c.gs=(y,m)=>m===1?'早':'晚';c.payrollLeaveState.months=['2027-01'];
+    const html=c.uiCalendarPageHtml();assert.equal((html.match(/data-month-offset="0"/g)||[]).length,31);assert.equal((html.match(/adjacent-month/g)||[]).length,11);
+    assert.match(html,/data-a="openDate" data-y="2026" data-m="12" data-d="27"/);assert.match(html,/data-a="openDate" data-y="2027" data-m="2" data-d="6"/);assert.doesNotMatch(html,/calendar-empty-cell/);
+    const first=html.match(/<button type="button" class="day [^>]*data-date="2026-12-27"[\s\S]*?<\/button>/)[0];assert.match(first,/day-month-label/);assert.match(first,language==='zh'?/>12月</:/>Des</);assert.match(first,/unknown/);assert.match(first,/>—</);
+    c.action('openDate',{y:'2026',m:'12',d:'27'});assert.equal(JSON.stringify(c.S.modal),JSON.stringify({y:2026,m:12,d:27}));
+  }
 });
 test('weekends are individually tagged and Taiwan holiday weekends become a visible multi-day break',()=>{
   const c=env();c.S.yr=2026;c.S.mo=9;
@@ -178,7 +188,7 @@ test('agenda contains all dates, filters leave days, handles empty months and pr
   c.getLeaves=key=>key==='2026-09-03'?[{uid:'a',unit:'測試單位',hours:4}]:[];
   assert.equal((c.uiCalendarPageHtml().match(/class="agenda-day[" ]/g)||[]).length,1);
   c.S.yr=2028;c.S.mo=2;c.action('calendarView',{view:'month'});
-  assert.equal((c.uiCalendarPageHtml().match(/class="day /g)||[]).length,29);
+  assert.equal((c.uiCalendarPageHtml().match(/class="day /g)||[]).length,35);assert.equal((c.uiCalendarPageHtml().match(/data-month-offset="0"/g)||[]).length,29);
   c.action('today');assert.equal(c.UI_CAL_FILTER,'all');assert.equal(c.UI_CAL_VIEW,'month');
 });
 
@@ -188,11 +198,12 @@ test('announcement loads reject out-of-order months, deduplicate dates and remov
   c.fbDb={collection:()=>({where:(field,op,ym)=>({get:()=>new Promise(resolve=>pending.push({ym,resolve}))})})};
   vm.runInContext(presenter('loadAdminEv'),c);
   const snapshot=rows=>({forEach:fn=>rows.forEach(data=>fn({data:()=>data}))});
-  const old=c.loadAdminEv();await Promise.resolve();c.S.mo=10;const recent=c.loadAdminEv();await Promise.resolve();
-  pending[1].resolve(snapshot([{date:'2026-10-19',type:'health'},{date:'2026-10-19',type:'health'}]));await recent;
-  pending[0].resolve(snapshot([{date:'2026-09-20',type:'meeting'}]));await old;
+  const old=c.loadAdminEv();await Promise.resolve();const oldRequests=pending.splice(0);assert.deepEqual(oldRequests.map(p=>p.ym),['2026-08','2026-09','2026-10']);
+  c.S.mo=10;const recent=c.loadAdminEv();await Promise.resolve();const newRequests=pending.splice(0);assert.deepEqual(newRequests.map(p=>p.ym),['2026-09','2026-10']);
+  newRequests.forEach(p=>p.resolve(snapshot(p.ym==='2026-10'?[{date:'2026-10-19',type:'health'},{date:'2026-10-19',type:'health'}]:[])));await recent;
+  oldRequests.forEach(p=>p.resolve(snapshot(p.ym==='2026-09'?[{date:'2026-09-20',type:'meeting'}]:[])));await old;
   assert.equal(JSON.stringify(c.adminEvCache),JSON.stringify({'2026-10-19':['health']}));
-  const cancel=c.loadAdminEv();await Promise.resolve();pending[2].resolve(snapshot([]));await cancel;
+  const cancel=c.loadAdminEv();await Promise.resolve();pending.splice(0).forEach(p=>p.resolve(snapshot([])));await cancel;
   assert.deepEqual(Object.keys(c.adminEvCache),[]);assert.ok(c.adminEvState.months.includes('2026-10'));
 });
 

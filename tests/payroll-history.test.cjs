@@ -45,12 +45,18 @@ test('historical own leaves survive month and unit filters without duplicate ent
   const doc=(id,date,uid,unit)=>({id,data:()=>({date,uid,unit,hours:8,leaveType:'sick'})});
   const current=doc('current','2026-08-03','owner-test','current'),old=doc('older','2026-06-30','owner-test','old-unit');
   const other=doc('other','2026-08-03','colleague','different-unit');
-  c.fbDb={collection:()=>({where:field=>({get:async()=>({forEach:f=>(field==='uid'?[current,old]:[current,other]).forEach(f)})})})};
+  const queried=[];
+  c.fbDb={collection:()=>({where:(field,op,value)=>{
+    if(field==='ym')queried.push(...value);
+    return{get:async()=>({forEach:f=>(field==='uid'?[current,old]:[current,other]).forEach(f)})};
+  }})};
+  const dates=fs.readFileSync(path.join(__dirname,'../schedule-experience.js'),'utf8');vm.runInContext(dates.slice(dates.indexOf('function experienceMonthDates('),dates.indexOf('function experienceOwnLeaveEvents(')),c);
   vm.runInContext(source.slice(source.indexOf('let leavesCache={};'),source.indexOf('function _syncAnnualToALD(){')),c);
   await c.loadLeaves();
   assert.equal(vm.runInContext("leavesCache['2026-08-03'].length",c),1);
   assert.equal(vm.runInContext("leavesCache['2026-06-30'][0].docId",c),'older');
   assert.equal(vm.runInContext('payrollLeaveState.ownHistoryLoaded',c),true);
+  assert.ok(queried.includes('2026-10'));assert.ok(queried.includes('2026-08'));assert.equal(new Set(queried).size,queried.length);
 });
 test('queued payroll saves retain their originating uid and snapshot',async()=>{
   const c=context(),jobs=[],saved=[];

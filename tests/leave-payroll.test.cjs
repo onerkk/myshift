@@ -159,6 +159,7 @@ test('leave loading fetches every month in a custom period and safely batches lo
     calcPayPeriod(y,m){return y===2026&&m===9?{sd:new Date(2025,10,1),ed:new Date(2026,9,31)}:{sd:new Date(y,m-2,26),ed:new Date(y,m-1,25)};},
     fbDb:{collection(){return{where(field,op,value){if(field==='ym')monthQueries.push(value.slice());return{get:async()=>({forEach(){}})}}}}}};
   vm.createContext(ctx);
+  const dates=fs.readFileSync(path.join(__dirname,'../schedule-experience.js'),'utf8');vm.runInContext(dates.slice(dates.indexOf('function experienceMonthDates('),dates.indexOf('function experienceOwnLeaveEvents(')),ctx);
   vm.runInContext(between('let leavesCache={};','function _syncAnnualToALD(')+'\n'+between('function _syncAnnualToALD(','function _syncAnnualDateToALD('),ctx);
   await vm.runInContext('loadLeaves()',ctx);
   assert.equal(monthQueries.length,2);assert.ok(monthQueries.every(batch=>batch.length<=10));

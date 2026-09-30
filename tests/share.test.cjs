@@ -7,8 +7,8 @@ function env(language='zh'){
     RN:{zh:{four:'四休二'},id:{four:'4 kerja 2 libur'}},dim:(y,m)=>new Date(y,m,0).getDate(),fdw:(y,m)=>new Date(y,m-1,1).getDay(),
     t:()=>language==='zh'?['日','一','二','三','四','五','六']:['Min','Sen','Sel','Rab','Kam','Jum','Sab'],
     calendarDayInfo:(y,m,d)=>({d,key:[y,m,d].join('-'),shift:['早','中','晚','休'][d%4],today:d===30,leaveCount:d===1?null:d===2?2:0,holiday:d===5?'完整節日名稱':'',events:[],adjusted:d===10}),
-    document:{},getComputedStyle:()=>({fontFamily:'sans-serif'})};
-  vm.createContext(c);vm.runInContext(source+'\nthis.share=MyShiftShare;',c);return c;
+    document:{},window:{addEventListener(){}},getComputedStyle:()=>({fontFamily:'sans-serif'})};
+  vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../schedule-experience.js'),'utf8'),c);vm.runInContext(source+'\nthis.share=MyShiftShare;',c);return c;
 }
 test('poster dates and weekday alignment cover leap years and four, five and six week calendars',()=>{
   const c=env();
@@ -17,6 +17,14 @@ test('poster dates and weekday alignment cover leap years and four, five and six
     assert.equal(Object.values(model.counts).reduce((a,b)=>a+b,0),days);
   }
   assert.throws(()=>c.share.buildModel(2026,13));assert.throws(()=>c.share.buildModel(2026,0));
+});
+test('poster fills adjacent dates across year boundaries while month totals exclude those dates',()=>{
+  const c=env();c.calendarDayInfo=(y,m,d)=>({key:`${y}-${m}-${d}`,shift:m===1?'早':'晚',leaveCount:m===1?0:null,events:[{id:'own-sick',own:true,hours:m===1?1:100,short:'病假',tone:'own-leave'}]});
+  const model=c.share.buildModel(2027,1);
+  assert.equal(model.cells.length,42);assert.equal(model.days.length,31);assert.equal(model.counts.早,31);assert.equal(model.counts.晚,0);assert.equal(model.ownHours,31);
+  assert.equal(model.cells[0].key,'2026-12-27');assert.equal(model.cells[41].key,'2027-2-6');
+  assert.equal(model.cells[0].monthOffset,-1);assert.equal(model.cells[41].monthOffset,1);assert.equal(model.cells[0].leaveCount,null);
+  assert.ok(model.days.every(day=>day.inMonth&&day.y===2027&&day.m===1));
 });
 test('calendar model preserves exact holidays, own leave hours and notes without colleague private data',()=>{
   const c=env();c.calendarDayInfo=(y,m,d)=>({key:`${y}-${m}-${d}`,shift:'晚',today:d===30,leaveCount:2,holiday:d===5?'教師節（補假）':'',adjusted:d===6,uid:'COLLEAGUE_UID',reason:'PRIVATE_REASON',events:d===6?[{id:'own-sick',tone:'own-leave',own:true,label:'本人 病假 8h',short:'病假 8h',hours:8},{id:'own-overtime',tone:'own-leave',own:true,label:'本人 未加班 4h',short:'未加班 4h',hours:4},{id:'custom',label:'完整個人備註不可省略',short:'備註',tone:'personal'}]:[]});
