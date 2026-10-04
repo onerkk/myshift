@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v323-full-weeks';
+const CACHE_NAME = 'myshift-v325-night-auto';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache

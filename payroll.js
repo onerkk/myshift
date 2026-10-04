@@ -1,4 +1,4 @@
-/* Payroll v306. Dated wages, validated history and independent daily forecasts. */
+/* Payroll v325. Immutable night calibration, dated rules and slip audits. */
 (function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -56,7 +56,7 @@
       if(!s.dayRuleMode||s.dayRuleMode==='unconfirmed')s.dayRuleMode='roster';
       if(!s.nightPolicy||s.nightPolicy==='unconfirmed')s.nightPolicy='auto';
     }
-    s.schemaVersion=7;
+    s.schemaVersion=8;
     return s;
   }
   function period(source){
@@ -112,6 +112,102 @@
   }
   function roundPay(value,policy){return policy==='floor'?Math.floor(value+1e-7):Math.round(value+1e-7);}
   const fixedKeys=['base','meal','transport','position','union','welfare','laborIns','healthIns','otherDed'];
+  const ruleDefaults={night:0,nightMode:'shift',nightWindowStart:1200,nightWindowEnd:480,nightPolicy:'auto',nightRateSource:'unconfirmed',
+    otWageBase:0,leaveWageBase:0,otTier1Rate:1.3334,otTier2Rate:1.6667,sickRate:.5,personalRate:1,
+    payRounding:'nearest',dayRuleMode:'roster',weeklyDayKinds:[],laborPensionWage:0,laborPensionSelfRate:0,laborPensionEmployerRate:6};
+  const ruleKeys=Object.keys(ruleDefaults);
+  function ruleSnapshot(source){
+    const out={};
+    for(const k of ruleKeys){const value=source&&source[k];out[k]=value===undefined?ruleDefaults[k]:Array.isArray(value)?value.slice():value;}
+    if(out.nightPolicy==='unconfirmed')out.nightPolicy='auto';
+    out.weeklyDayKinds=Array.from({length:7},(_,i)=>(out.weeklyDayKinds||[])[i]||'work');
+    return out;
+  }
+  function ruleAt(source,date){
+    const rows=(Array.isArray(source.ruleHistory)?source.ruleHistory:[]).filter(r=>r&&/^\d{4}-\d{2}-\d{2}$/.test(r.effectiveFrom||''))
+      .sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom));
+    const out=ruleSnapshot(rows.length?source.ruleBaseline||source:source);
+    for(const row of rows)if(row.effectiveFrom<=date)for(const key of ruleKeys)if(row[key]!==undefined)out[key]=Array.isArray(row[key])?row[key].slice():row[key];
+    return out;
+  }
+  // Clock ranges are relative to the start of the shift. Null means their location
+  // is unknown: a legacy "4 hours" record cannot establish which night hours were worked.
+  function attendanceRanges(shiftHours,absences,workedHours){
+    const minutes=Math.round(shiftHours*60),missed=new Uint8Array(minutes);
+    for(const leave of absences||[]){
+      if(number(leave.startOffset)===null||number(leave.endOffset)===null||leave.endOffset<=leave.startOffset)return null;
+      for(let i=Math.max(0,Math.round(leave.startOffset));i<Math.min(minutes,Math.round(leave.endOffset));i++)missed[i]=1;
+    }
+    const ranges=[];let start=null,count=0;
+    for(let i=0;i<=minutes;i++){
+      const present=i<minutes&&!missed[i];if(present){count++;if(start===null)start=i;}
+      else if(start!==null){ranges.push([start,i]);start=null;}
+    }
+    return Math.abs(count/60-workedHours)<1e-7?ranges:null;
+  }
+  function nightAllowance(day,rule){
+    const sh=number(day.shiftHours)||0,worked=Math.min(sh,number(day.worked)||0),rate=number(rule.night)||0;
+    if(rule.nightMode!=='hour'){
+      const result=day.shift==='晚'?nightUnits(worked,sh,rule.nightPolicy):{units:0,unknown:false};
+      return{...result,amount:result.units*rate,hours:0,scheduledHours:day.shift==='晚'?sh:0,basis:'shift'};
+    }
+    const start=number(rule.nightWindowStart),end=number(rule.nightWindowEnd);
+    if(start===null||end===null||start>=1440||end>=1440)return{units:0,hours:0,amount:0,unknown:true,scheduledHours:0,basis:'hour'};
+    const clock=number(day.startMinute)||0,limit=Math.round(sh*60),eligible=new Uint8Array(limit);
+    for(let i=0;i<limit;i++){
+      const t=(clock+i)%1440;eligible[i]=start===end|| (start<end?t>=start&&t<end:t>=start||t<end)?1:0;
+    }
+    const scheduledHours=eligible.reduce((a,b)=>a+b,0)/60;
+    if(!worked||!scheduledHours)return{units:0,hours:0,amount:0,unknown:false,scheduledHours,basis:'hour'};
+    const ranges=day.workRanges;
+    if(!Array.isArray(ranges)){
+      const hours=scheduledHours*worked/sh;
+      return{units:hours,hours,amount:hours*rate,unknown:true,scheduledHours,basis:'hour'};
+    }
+    const counted=new Uint8Array(limit);
+    for(const range of ranges)for(let i=Math.max(0,Math.round(range[0]));i<Math.min(limit,Math.round(range[1]));i++)counted[i]=eligible[i];
+    const hours=counted.reduce((a,b)=>a+b,0)/60;
+    return{units:hours,hours,amount:hours*rate,unknown:false,scheduledHours,basis:'hour'};
+  }
+  // A screenshot can establish an observed attendance unit, but cannot prove a
+  // company's complete policy. Keep that original observation immutable. Never
+  // divide the slip amount by today's editable roster or leave totals.
+  function calibrateNight(month,official,baseline){
+    const check=slip(official),b=baseline||{};
+    if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month||'')||!check.valid||b.version!==1||b.source!=='app-screenshot'||
+        !['attendance','prorated','full'].includes(b.policy))return null;
+    const validDate=value=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(value||''))return false;
+      const date=new Date(value+'T00:00:00Z');return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value;};
+    if(!validDate(b.periodStart)||!validDate(b.periodEnd)||b.periodStart>b.periodEnd)return null;
+    const oldRate=number(b.nightRate),oldPay=number(b.nightPay),shiftHours=number(b.shiftHours),workedDays=number(b.workedDays),workedHours=number(b.workedHours);
+    if(!(oldRate>0)||!(oldPay>0)||!(shiftHours>0)||shiftHours>12||!(workedDays>0)||!Number.isInteger(workedDays)||
+        workedHours===null||workedHours>workedDays*shiftHours+1e-7)return null;
+    const units=oldPay/oldRate,span=(Date.parse(b.periodEnd)-Date.parse(b.periodStart))/86400000+1;
+    if(units>workedDays+1e-7||workedDays>span||check.data.nightPay<=0)return null;
+    // Known non-night components and company hours must agree. Unknown fields
+    // remain unknown and are never filled with zero to validate a policy.
+    const pairs={baseSum:check.data.baseSum,otPay:check.data.otTaxFree+check.data.otTaxable,holidayPay:check.data.holidayPay,
+      fixedDed:check.data.fixedDed,leaveDed:check.data.leaveDed,weekdayH:check.data.weekdayH,sickH:check.data.sickH};
+    if(Object.entries(pairs).some(([key,value])=>value===null||number(b[key])===null||Math.abs(number(b[key])-value)>1e-7))return null;
+    const snapshot={version:1,source:'app-screenshot',policy:b.policy,periodStart:b.periodStart,periodEnd:b.periodEnd,
+      nightRate:oldRate,nightPay:oldPay,shiftHours,workedDays,workedHours};
+    for(const key of Object.keys(pairs))snapshot[key]=number(b[key]);
+    return{version:1,source:'payslip-calibrated',sourceMonth:month,sourceNightPay:check.data.nightPay,
+      sourceUnits:units,shiftHours,rate:check.data.nightPay/units,policy:b.policy,verified:false,baseline:snapshot};
+  }
+  function automaticNightCalibration(source,month){
+    if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month||''))return null;
+    const monthly=source.monthly||{},keys=Object.keys(monthly).filter(k=>/^\d{4}-(0[1-9]|1[0-2])$/.test(k)&&k<=month).sort().reverse();
+    for(const key of keys){
+      const record=monthly[key]||{},saved=record.nightCalibration;
+      if(!saved||saved.source!=='payslip-calibrated'||saved.sourceMonth!==key)continue;
+      const result=calibrateNight(key,record.slip,saved.baseline);
+      // A later edited statement invalidates the original observation; it must
+      // not silently re-fit the original baseline to a different payment.
+      if(result&&result.sourceNightPay===saved.sourceNightPay&&result.sourceUnits===saved.sourceUnits)return result;
+    }
+    return null;
+  }
   function salaryAt(source,date){
     const rows=(Array.isArray(source.wageHistory)?source.wageHistory:[])
       .filter(r=>r&&/^\d{4}-\d{2}-\d{2}$/.test(r.effectiveFrom||''))
@@ -119,12 +215,13 @@
     const row=rows.filter(r=>r.effectiveFrom<=date).pop();
     // Future explicit changes in the normal salary form take precedence. Historical
     // rows remain immutable; editing today's salary must not rewrite previous pay.
-    const out=Object.assign({},source);
+    const out=Object.assign({},source,source.wageBaseline||{});
     // For dates after the last historical statement, a differing current setting
     // is retained without inventing a retrospective effective date.
     const hasDatedChange=rows.some(r=>r.source==='user-change'&&r.effectiveFrom>source.wageHistoryCutoff);
     const live=source.wageHistoryCutoff&&!hasDatedChange&&date>source.wageHistoryCutoff&&row&&row.effectiveFrom<=source.wageHistoryCutoff;
-    if(row&&!live)for(const k of fixedKeys)if(number(row[k])!==null)out[k]=number(row[k]);
+    if(live){for(const k of fixedKeys)if(number(source[k])!==null)out[k]=number(source[k]);}
+    else {for(const r of rows)if(r.effectiveFrom<=date)for(const k of fixedKeys)if(number(r[k])!==null)out[k]=number(r[k]);}
     out.baseSum=['base','meal','transport','position'].reduce((v,k)=>v+(number(out[k])||0),0);
     out.fixedDed=['union','welfare','laborIns','healthIns','otherDed'].reduce((v,k)=>v+(number(out[k])||0),0);
     out.effectiveFrom=row?row.effectiveFrom:null;
@@ -137,9 +234,16 @@
     s.monthly[parsed.month]={...previous};
     if(!slip(previous.slip).valid)Object.assign(s.monthly[parsed.month],{slip:parsed.slip,referenceSource:'provided-payslip',inputVersion:3});
     const target=s.monthly[parsed.month];
-    if(!number(previous.proposal))target.proposal=parsed.slip.proposal;
-    if(!number(previous.otherIncome))target.otherIncome=parsed.slip.otherIncome;
+    const calibration=calibrateNight(parsed.month,target.slip,details.nightBaseline);
+    if(calibration&&slip(target.slip).data.nightPay===parsed.slip.nightPay&&!target.nightCalibration)target.nightCalibration=calibration;
     const current={...(details.fixedIncome||{}),...(details.fixedDeduction||{})};
+    if(!previous.fixedSalary&&Object.keys(current).length)target.fixedSalary={...current};
+    target.bonusSources={...previous.bonusSources};
+    for(const key of ['proposal','otherIncome']){
+      if(target.bonusSources[key]!=='manual'&&!(number(previous[key])>0)){
+        target[key]=slip(target.slip).data[key];target.bonusSources[key]='provided-payslip';
+      }
+    }
     for(const k of fixedKeys)if(number(current[k])!==null&&(!(number(s[k])>0)||(details.fixedIncomeHistory||[]).some(r=>number(r[k])===number(s[k]))))s[k]=number(current[k]);
     const history=Array.isArray(s.wageHistory)?s.wageHistory.slice():[];
     for(const r of details.fixedIncomeHistory||[]){
@@ -154,8 +258,15 @@
     if(!(number(s.night)>0)&&s.nightRateSource!=='configured'&&number(details.nightEstimate&&details.nightEstimate.rate)>0){
       s.night=number(details.nightEstimate.rate);s.nightPolicy='auto';s.nightRateSource='unconfirmed';
     }
-    s.wageHistory=history;s.wageHistoryCutoff=parsed.month+'-25';s.enabled=number(s.base)>0;s.referenceVersion=306;
+    s.wageHistory=history;s.wageHistoryCutoff=[s.wageHistoryCutoff||'',parsed.month+'-25'].sort().pop();s.enabled=number(s.base)>0;
     return s;
+  }
+  function monthSalary(source,month){
+    const result=salaryAt(source,month+'-25'),saved=source.monthly&&source.monthly[month]&&source.monthly[month].fixedSalary;
+    if(saved){for(const key of fixedKeys)if(number(saved[key])!==null)result[key]=number(saved[key]);
+      result.baseSum=['base','meal','transport','position'].reduce((v,k)=>v+(number(result[k])||0),0);
+      result.fixedDed=['union','welfare','laborIns','healthIns','otherDed'].reduce((v,k)=>v+(number(result[k])||0),0);}
+    return result;
   }
   function inferNightRule(observations){
     const rows=(observations||[]).filter(r=>r&&r.complete===true&&number(r.amount)!==null&&Array.isArray(r.days));
@@ -209,7 +320,9 @@
     const ordinary=s.otTaxFree!==null&&s.otTaxable!==null?s.otTaxFree+s.otTaxable:null;
     rows.splice(3,2,{key:'otPay',estimate:est.otPay,actual:ordinary,delta:ordinary===null?null:est.otPay-ordinary,deduction:false});
     const deltas={};for(const k of totalKeys)deltas[k]=s[k]===null?null:est[k]-s[k];
-    return{...checked,rows,deltas,matched:checked.valid&&!est.incomplete&&rows.every(r=>r.delta===0)};
+    const hourValues={weekdayH:est.weekdayH,holidayH:est.holidayH,sickH:est.sickPayH,personalH:est.personalPayH,annualH:est.annualH,disasterH:est.disasterH};
+    const hourMismatches=Object.keys(hourValues).filter(k=>s[k]!==null&&number(hourValues[k])!==null&&Math.abs(s[k]-hourValues[k])>.001);
+    return{...checked,rows,deltas,hourMismatches,matched:checked.valid&&!est.incomplete&&!hourMismatches.length&&rows.every(r=>r.delta===0)&&totalKeys.every(k=>deltas[k]===0)};
   }
-  return{number,money,migrate,period,slip,parseImport,dailyOT,nightUnits,roundPay,salaryAt,attachReference,inferNightRule,validateNightRule,historyAudit,fixedKeys,reconcile,incomeKeys,deductionKeys,totalKeys,hourKeys,optionalKeys};
+  return{number,money,migrate,period,slip,parseImport,dailyOT,nightUnits,roundPay,salaryAt,monthSalary,ruleAt,ruleSnapshot,ruleKeys,attendanceRanges,nightAllowance,calibrateNight,automaticNightCalibration,attachReference,inferNightRule,validateNightRule,historyAudit,fixedKeys,reconcile,incomeKeys,deductionKeys,totalKeys,hourKeys,optionalKeys};
 });
