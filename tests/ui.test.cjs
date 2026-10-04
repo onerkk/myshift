@@ -13,7 +13,7 @@ function presenter(name){
   const b=source.indexOf('\nfunction ',a+9);
   return source.slice(a,b<0?source.length:b);
 }
-const names=['salaryHistoryHtml','natureControlsHtml','salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','salaryDateLabel','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherSculpture','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','uiCalendarHolidaysHtml','uiCalendarNoticesHtml','calendarScopedLeaves','calendarLeaveStatus','calendarLeaveStatusText','calendarDayInfo','calendarLeaveLabel','calendarEventChipsHtml','calendarDaySummaryHtml','calendarHighlightsHtml','calendarDataNoticeHtml','calendarAgendaHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
+const names=['salaryNightCalibrationHtml','salaryHistoryHtml','natureControlsHtml','salaryForecastTitle','salaryFieldLabels','salaryNoteText','salaryReconciliationHtml','salaryDailyAuditHtml','salaryDateLabel','uiIcon','uiShiftClass','uiShiftShort','uiFormatDuration','uiHeaderHtml','uiBottomNavHtml','uiScreenHeading','studioIcon','studioWeatherSculpture','studioWeatherIcon','studioShiftLabel','studioShiftTime','uiTodayHeroHtml','uiWeekStripHtml','uiWeatherPreviewHtml','uiPayPreviewHtml','studioMoney','studioSalaryRows','uiSalaryDashboardHtml','uiPrecipChartHtml','_wxTimeLabel','_wxStatusHtml','wxHtml','uiTideCurveHtml','tideHtml','studioCalendarLegendHtml','uiCalendarTodayAnchorHtml','uiMonthSummaryHtml','uiUpcomingEventsHtml','calendarHolidayRuns','uiCalendarBreakStripHtml','uiCalendarHolidaysHtml','uiCalendarNoticesHtml','calendarScopedLeaves','calendarLeaveStatus','calendarLeaveStatusText','calendarDayInfo','calendarLeaveLabel','calendarEventChipsHtml','calendarDaySummaryHtml','calendarHighlightsHtml','calendarDataNoticeHtml','calendarAgendaHtml','uiCalendarPageHtml','rCal','uiMoreHtml','fbBarHtml','uiLeaveSummaryHtml','_miniSwitch'];
 const fixed=Date.parse('2026-09-10T10:10:00Z');
 class Clock extends Date{constructor(...args){super(...(args.length?args:[fixed]))}static now(){return fixed}}
 function env(lang='zh'){
@@ -135,6 +135,27 @@ test('saved company records display consistently while the independent estimate 
   const h=c.uiSalaryDashboardHtml(2026,8);assert.match(h,/<strong class="salary-net">\$27,600<\/strong>/);assert.match(h,/公司實領 · 既有薪資條/);
   assert.match(h,/班表自動計算與公司差額/);assert.match(h,/班表估算實領<strong>\$27,700/);assert.match(h,/\+\$100/);assert.doesNotMatch(h,/公司實領 · 薪資條記錄|加入薪資條|undefined|NaN/);
   const home=c.uiPayPreviewHtml();assert.match(home,/\$27,600/);assert.doesNotMatch(home,/\$27,700/);
+});
+test('September company net is 52302 while the remaining unknown night-rule difference is shown explicitly',()=>{
+  const c=env(),slip=JSON.parse(fs.readFileSync(path.join(__dirname,'../private-import/2026-09-payroll.json'),'utf8')).slip;
+  Object.assign(c.estimate,{baseSum:39590,proposal:400,otherIncome:0,otPay:12867,holidayPay:0,nightPay:3423,fixedDed:2540,leaveDed:2639,laborPensionSelf:0,
+    income:56280,deduction:5179,net:51101,hasSlip:true,official:slip,incomplete:true,notes:['nightEstimate','nightAmountMismatch']});
+  c.estimate.reconciliation=c.Payroll.reconcile(c.estimate,slip);
+  for(const lang of ['zh','id']){c.lang=lang;const html=c.uiSalaryDashboardHtml(2026,9);
+    assert.match(html,/<strong class="salary-net">\$52,302<\/strong>/);assert.match(html,/\$51,101/);assert.match(html,/−\$1,201/);
+    assert.doesNotMatch(html,/NaN|undefined/);}
+});
+test('calibrated night amounts display their immutable source and cannot claim an independently verified match',()=>{
+  const c=env(),raw=JSON.parse(fs.readFileSync(path.join(__dirname,'../private-import/2026-09-payroll.json'),'utf8'));
+  const model=c.Payroll.calibrateNight(raw.month,raw.slip,raw.sourceDetails.nightBaseline);
+  Object.assign(c.estimate,{baseSum:39590,proposal:400,otherIncome:0,otPay:12867,holidayPay:0,nightPay:4624,nightCount:7,
+    fixedDed:2540,leaveDed:2639,laborPensionSelf:0,income:57481,deduction:5179,net:52302,hasSlip:true,official:raw.slip,
+    incomplete:true,notes:['nightCalibratedEstimate'],nightCalibration:model});
+  c.estimate.reconciliation=c.Payroll.reconcile(c.estimate,raw.slip);
+  for(const lang of ['zh','id']){c.lang=lang;const html=c.uiSalaryDashboardHtml(2026,9);
+    assert.match(html,/\$52,302/);assert.match(html,/\$4,624/);assert.match(html,/660\.5714/);
+    assert.match(html,lang==='zh'?/校準估算/:/Estimasi terkalibrasi/);assert.doesNotMatch(html,/分項一致|已核對|NaN|undefined/);
+  }
 });
 test('unknown night components and loading never masquerade as a complete net',()=>{
   const c=env();Object.assign(c.estimate,{net:25000,nightPay:0,missingComponents:true,incomplete:true,notes:['nightRate']});

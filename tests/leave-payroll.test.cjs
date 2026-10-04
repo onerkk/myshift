@@ -307,6 +307,7 @@ test('salary forecast is explicitly incomplete until both payroll months finish 
 
 function formEnv(){
   const c=env();c.TY=2026;c.TM=9;c.TD=10;c.PAY_VIEW={y:2026,m:9};c.SAL_DEFAULT={...c.SAL,schemaVersion:5};c.saved=[];
+  vm.runInContext('PAY_VIEW={y:2026,m:9}',c);
   c.sSAL=()=>c.saved.push(JSON.parse(JSON.stringify(c.SAL)));c.S.showSal=true;
   c.esc=x=>String(x??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[s]);
   c.studioMoney=n=>'$'+Math.round(n).toLocaleString('en-US');c.handle=()=>{};
@@ -334,7 +335,7 @@ test('custom date form validates, saves only its selected month and preserves pr
   const preview=c.rSalary();assert.match(preview,/value="2026-08-30"/);assert.match(preview,/value="2026-10-02"/);assert.match(preview,/4 天未分配/);assert.match(preview,/重疊 7 天/);
   assert.equal(c.saveSalaryForm(),true);
   const p=c.SAL.monthly['2026-09'];assert.equal(p.payPeriodStart,'2026-08-30');assert.equal(p.payPeriodEnd,'2026-10-02');
-  assert.equal(p.slip.net,123);assert.equal(p.proposal,0);assert.equal(p.days['2026-09-10'].workedHours,4);
+  assert.equal(p.slip.net,123);assert.equal(p.proposal,500);assert.equal(p.days['2026-09-10'].workedHours,4);
   assert.equal(c.getSalaryPeriodRange(2026,10).start,'2026-09-26');
   const before=JSON.stringify(c.SAL);c.fields.sal_periodStart.value='2026-10-05';c.fields.sal_periodEnd.value='2026-10-04';
   assert.equal(c.saveSalaryForm(),false);assert.equal(JSON.stringify(c.SAL),before);
@@ -353,6 +354,7 @@ test('period reset restores the selected payroll month default and refreshes the
 
 test('saving automatic days does not freeze a weekly rule to work on every date',()=>{
   const c=formEnv();c.fields.sal_dayRuleMode={value:'weekly'};c.fields.sal_week_4={value:'rest'};
+  c.fields.sal_effectiveFrom={value:'2026-09-01'};
   c.fields.sal_kind_2026={value:'auto'};c.fields['sal_kind_2026-09-10']={value:'auto'};
   assert.equal(c.saveSalaryForm(),true);assert.equal(Object.keys(c.getSalPeriod(2026,9).days).length,0);
   assert.equal(c.calcSalaryEst(2026,9).holidayH,12);assert.equal(c.calcSalaryEst(2026,9).otPay,0);
@@ -441,4 +443,109 @@ test('history audit and payroll use the same night rule, trained only on earlier
   const fit=c.automaticNightRule('2026-08');assert.equal(fit.policy,'prorated');assert.equal(fit.rate,300);assert.equal(fit.validatedMonth,'2026-07');
   const audit=c.salaryHistoryAudit().rows.find(r=>r.month==='2026-08');
   assert.equal(audit.matched,true);assert.equal(audit.estimate,c.calcSalaryEst(2026,8).net);
+});
+
+function septemberEnv(){
+  const c=env(),reference=JSON.parse(fs.readFileSync(path.join(__dirname,'../private-import/2026-09-payroll.json'),'utf8'));
+  Object.assign(c.SAL,{base:35090,meal:3000,transport:1000,position:500,night:489,nightPolicy:'auto',nightRateSource:'unconfirmed',union:88,welfare:178,laborIns:1145,healthIns:1129});
+  c.SAL.monthly['2026-09']={inputVersion:3,payPeriodStart:'2026-08-26',payPeriodEnd:'2026-09-20',proposal:0};
+  // Synthetic dates reconstruct screenshot totals only; the upload does not contain the actual day-by-day roster.
+  c.shifts={};for(let i=0;i<17;i++){const date=new Date(2026,7,26+i),key=c.ek(2026,date.getMonth()+1,date.getDate());c.shifts[key]=i<7?'晚':'早';
+    if(i>=13)c.leavesCache[key]=[record('sick',0,720)];}
+  return{c,reference};
+}
+test('September calibrates the observed night baseline automatically, imports its bonus and keeps official totals separate',()=>{
+  const {c,reference}=septemberEnv();
+  let e=c.calcSalaryEst(2026,9);assert.equal(e.net,50701);assert.equal(e.otPay,12867);assert.equal(e.nightPay,3423);assert.equal(e.leaveDed,2639);
+  c.SAL=c.Payroll.attachReference(c.SAL,reference);e=c.calcSalaryEst(2026,9);
+  assert.equal(e.proposal,400);assert.equal(e.net,52302);assert.equal(e.official.net,52302);assert.equal(e.nightPay,4624);
+  assert.equal(e.verificationDelta,0);assert.equal(e.verified,false);assert.ok(e.notes.includes('nightCalibratedEstimate'));
+  assert.ok(!e.notes.includes('nightAmountMismatch'));assert.equal(e.nightCalibration.sourceUnits,7);near(e.nightRate,4624/7);
+  assert.equal(e.workedDays,13);assert.equal(e.workedHours,156);assert.equal(e.otH,52);assert.equal(e.sickPayH,32);
+  assert.equal(c.getSalaryPeriodRange(2026,9).end,'2026-09-20');assert.equal(c.getSalPeriod(2026,10).proposal,0);
+  const saved=JSON.stringify(c.SAL.monthly['2026-09'].slip),nightDate=Object.keys(c.shifts)[0];
+  c.leavesCache[nightDate]=[record('sick',0,720)];e=c.calcSalaryEst(2026,9);
+  assert.equal(e.nightPay,3963);assert.equal(e.otH,48);assert.equal(JSON.stringify(c.SAL.monthly['2026-09'].slip),saved);
+  delete c.leavesCache[nightDate];assert.equal(c.calcSalaryEst(2026,9).nightPay,4624);
+});
+test('calibrated night preview equals saved calculation for every half-hour leave range and rounds only the monthly sum',()=>{
+  const {c,reference}=septemberEnv();c.SAL=c.Payroll.attachReference(c.SAL,reference);
+  const date=Object.keys(c.shifts)[0],baseline=JSON.stringify(c.SAL.monthly['2026-09'].nightCalibration);
+  for(let start=0;start<720;start+=30)for(let end=start+30;end<=720;end+=30){
+    delete c.leavesCache[date];const entry=record('annual',start,end,{shiftStartMinute:1200}),preview=c.leaveSalaryImpact(date,entry);
+    c.leavesCache[date]=[entry];const e=c.calcSalaryEst(2026,9),expected=Math.round((7-(end-start)/720)*4624/7);
+    assert.equal(e.nightPay,expected);assert.equal(e.nightPay,preview.after.nightPay);assert.equal(e.net,preview.after.net);
+    assert.equal(JSON.stringify(c.SAL.monthly['2026-09'].nightCalibration),baseline);
+  }
+  delete c.leavesCache[date];const e=c.calcSalaryEst(2026,9);
+  assert.equal(e.nightPay,4624);assert.notEqual(e.nightPay,e.days.reduce((sum,d)=>sum+Math.round(d.nightAmount),0));
+});
+test('shift changes, zero attendance and later periods use fixed calibration units without backfilling earlier months',()=>{
+  const {c,reference}=septemberEnv();c.SAL=c.Payroll.attachReference(c.SAL,reference);
+  const dates=Object.keys(c.shifts).slice(0,7);c.shifts[dates[0]]='早';assert.equal(c.calcSalaryEst(2026,9).nightPay,3963);
+  c.shifts[dates[0]]='晚';for(const date of dates)c.leavesCache[date]=[record('annual',0,720)];
+  assert.equal(c.calcSalaryEst(2026,9).nightPay,0);
+  c.shifts={'2026-08-10':'晚','2026-10-10':'晚','2026-10-11':'晚'};c.leavesCache={};
+  assert.equal(c.calcSalaryEst(2026,8).nightPay,489);assert.equal(c.calcSalaryEst(2026,8).nightCalibration,null);
+  assert.equal(c.calcSalaryEst(2026,10).nightPay,1321);assert.equal(c.calcSalaryEst(2026,10).proposal,0);
+  c.SAL.monthly['2026-10']={payPeriodStart:'2026-10-11',payPeriodEnd:'2026-10-11'};
+  assert.equal(c.calcSalaryEst(2026,10).nightPay,661);
+});
+test('configured night rules override calibration by effective date, and a different shift duration is not silently fitted',()=>{
+  const {c,reference}=septemberEnv();c.SAL=c.Payroll.attachReference(c.SAL,reference);
+  c.SAL.ruleBaseline=c.Payroll.ruleSnapshot(c.SAL);
+  c.SAL.ruleHistory=[{effectiveFrom:'2026-08-28',night:500,nightPolicy:'attendance',nightRateSource:'configured'}];
+  const e=c.calcSalaryEst(2026,9);assert.equal(e.nightPay,3821);
+  assert.equal(e.days.find(d=>d.key==='2026-08-27').nightSource,'payslip-calibrated');
+  assert.equal(e.days.find(d=>d.key==='2026-08-28').nightSource,'configured');
+  c.SAL.ruleHistory=[{effectiveFrom:'2026-08-26',nightMode:'hour',night:50,nightWindowStart:1320,nightWindowEnd:360,nightRateSource:'configured'}];
+  assert.equal(c.calcSalaryEst(2026,9).nightPay,2800);assert.equal(c.calcSalaryEst(2026,9).nightCalibration,null);
+  c.SAL.ruleHistory=[];c.shiftHours=8;
+  assert.equal(c.calcSalaryEst(2026,9).nightPay,3423);assert.equal(c.calcSalaryEst(2026,9).nightCalibration,null);
+});
+test('history shows the same calibrated estimate without using it to invent independently verified company rules',()=>{
+  const {c,reference}=septemberEnv();c.SAL=c.Payroll.attachReference(c.SAL,reference);
+  c.payrollLeaveState={uid:'me',ownHistoryLoaded:true,months:[],loading:false,error:false};
+  const raw=c.payrollHistoryEstimates()[0].estimate;assert.equal(raw.nightPay,3423);assert.equal(raw.nightCalibration,null);
+  const audit=c.salaryHistoryAudit().rows.find(r=>r.month==='2026-09');
+  assert.equal(audit.estimate,52302);assert.equal(audit.matched,false);assert.equal(c.automaticNightRule('2026-10'),null);
+});
+test('saving a new night rate and wage bases cannot rewrite the prior month forecast',()=>{
+  const c=formEnv();c.shifts={'2026-09-10':'晚','2026-10-10':'晚'};c.PAY_VIEW={y:2026,m:10};
+  vm.runInContext('PAY_VIEW={y:2026,m:10}',c);
+  c.SAL.night=300;c.SAL.nightPolicy='prorated';c.SAL.nightRateSource='configured';
+  const before=c.calcSalaryEst(2026,9).net;
+  c.fields.sal_night.value='500';c.fields.sal_nightPolicy={value:'prorated'};c.fields.sal_otWageBase.value='30000';
+  c.fields.sal_leaveWageBase.value='30000';c.fields.sal_effectiveFrom={value:'2026-10-01'};
+  c.fields.sal_periodStart.value='2026-09-26';c.fields.sal_periodEnd.value='2026-10-25';
+  assert.equal(c.saveSalaryForm(),true);assert.equal(c.calcSalaryEst(2026,9).net,before);
+  assert.equal(c.calcSalaryEst(2026,10).nightPay,500);assert.equal(c.calcSalaryEst(2026,10).otPay,750);
+  c.leavesCache['2026-09-10']=[record('sick',0,720)];assert.equal(c.calcSalaryEst(2026,9).leaveDed,400);
+  c.leavesCache['2026-10-10']=[record('sick',0,720)];assert.equal(c.calcSalaryEst(2026,10).leaveDed,500);
+});
+test('a night rate change inside a period is summed daily, not multiplied by the closing-date rate',()=>{
+  const c=env();c.shifts={'2026-09-09':'晚','2026-09-10':'晚'};
+  Object.assign(c.SAL,{night:500,nightPolicy:'prorated',nightRateSource:'configured',ruleBaseline:{night:300,nightPolicy:'prorated',nightRateSource:'configured'},ruleHistory:[{effectiveFrom:'2026-09-10',night:500}]});
+  const e=c.calcSalaryEst(2026,9);assert.equal(e.nightPay,800);assert.equal(e.nightCount,2);assert.equal(e.days.find(d=>d.key==='2026-09-09').nightAmount,300);
+});
+test('precise nighttime leave drives hourly night pay and preview through the same production engine',()=>{
+  const c=env();c.shifts={'2026-09-10':'晚'};
+  Object.assign(c.SAL,{nightMode:'hour',night:50,nightWindowStart:1320,nightWindowEnd:360,nightRateSource:'configured',nightPolicy:'auto'});
+  assert.equal(c.calcSalaryEst(2026,9).nightPay,400);
+  const entry=record('annual',240,480),impact=c.leaveSalaryImpact('2026-09-10',entry);
+  assert.equal(impact.delta.nightPay,-200);c.leavesCache['2026-09-10']=[entry];
+  assert.equal(c.calcSalaryEst(2026,9).nightPay,200);assert.equal(c.calcSalaryEst(2026,9).net,impact.after.net);
+  assert.ok(!c.calcSalaryEst(2026,9).notes.includes('nightEstimate'));
+  c.leavesCache['2026-09-10']=[{uid:'me',leaveType:'annual',hours:4}];assert.ok(c.calcSalaryEst(2026,9).notes.includes('nightAttendanceUnknown'));
+});
+test('rule-only changes require a real calendar effective date and remain atomic on failure',()=>{
+  const c=formEnv();c.fields.sal_night.value='500';c.fields.sal_effectiveFrom={value:'2026-02-30'};
+  const before=JSON.stringify(c.SAL);assert.equal(c.saveSalaryForm(),false);assert.equal(JSON.stringify(c.SAL),before);assert.equal(c.saved.length,0);
+});
+test('saving only a custom period and unchanged bonus does not create a dated rule change',()=>{
+  const c=formEnv();c.SAL.nightPolicy='auto';c.fields.sal_nightPolicy={value:'auto'};
+  for(let i=0;i<7;i++)c.fields['sal_week_'+i]={value:'work'};
+  c.SAL.monthly['2026-09']={proposal:400};c.fields.sal_proposal={value:'400'};
+  c.fields.sal_periodEnd.value='2026-09-20';assert.equal(c.saveSalaryForm(),true);
+  assert.equal(c.SAL.ruleHistory,undefined);assert.equal(c.SAL.monthly['2026-09'].proposal,400);
 });

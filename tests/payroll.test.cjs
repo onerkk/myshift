@@ -127,3 +127,87 @@ test('the provided August sick deduction is reproduced without calibrating a fre
   // Independent cents-scale arithmetic, before rounding to whole dollars.
   assert.equal(Math.round(r.slip.baseSum*r.slip.sickH/480),r.slip.leaveDed);
 });
+
+test('September supplied slip explains the original 1601 difference and preserves the old setting beside an observed calibration',()=>{
+  const r=JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname,'../private-import/2026-09-payroll.json'),'utf8'));
+  assert.equal(Payroll.slip(r.slip).valid,true);
+  assert.equal(39590+400+9898+2969+4624,57481);
+  assert.equal(88+178+1145+1129+2639,5179);
+  assert.equal(57481-5179,52302);
+  const e={baseSum:39590,proposal:0,otherIncome:0,otPay:12867,holidayPay:0,nightPay:3423,fixedDed:2540,leaveDed:2639,laborPensionSelf:0,
+    income:55880,deduction:5179,net:50701,weekdayH:52,holidayH:0,sickPayH:32};
+  const check=Payroll.reconcile(e,r.slip),diff=Object.fromEntries(check.rows.map(row=>[row.key,row.delta]));
+  assert.equal(diff.proposal,-400);assert.equal(diff.nightPay,-1201);assert.equal(check.deltas.net,-1601);
+  for(const key of ['baseSum','otPay','holidayPay','fixedDed','leaveDed','laborPensionSelf'])assert.equal(diff[key],0);
+  const saved=Payroll.attachReference({base:35090,night:489,nightRateSource:'unconfirmed',monthly:{}},r);
+  assert.equal(saved.night,489);assert.equal(saved.nightRateSource,'unconfirmed');
+  assert.equal(saved.monthly['2026-09'].proposal,400);assert.equal(saved.monthly['2026-10'],undefined);
+  assert.equal(saved.monthly['2026-09'].payPeriodEnd,undefined);
+  assert.equal(saved.monthly['2026-09'].nightCalibration.sourceUnits,7);
+  assert.equal(saved.monthly['2026-09'].nightCalibration.verified,false);
+});
+test('night calibration validates known components, uses a fixed observation and never mutates source data',()=>{
+  const r=JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname,'../private-import/2026-09-payroll.json'),'utf8'));
+  const original=JSON.stringify(r),calibration=Payroll.calibrateNight(r.month,r.slip,r.sourceDetails.nightBaseline);
+  assert.equal(calibration.rate,4624/7);assert.equal(calibration.source,'payslip-calibrated');assert.equal(calibration.verified,false);
+  assert.equal(JSON.stringify(r),original);
+  for(const change of [{nightRate:0},{nightPay:0},{workedDays:6},{workedHours:157},{otPay:12868},{sickH:0},{periodStart:'2026-02-30'},{policy:'auto'}]){
+    assert.equal(Payroll.calibrateNight(r.month,r.slip,{...r.sourceDetails.nightBaseline,...change}),null);
+  }
+  assert.equal(Payroll.calibrateNight(r.month,{...r.slip,net:1},r.sourceDetails.nightBaseline),null);
+  const missing={...r.slip,sickH:null};assert.equal(Payroll.calibrateNight(r.month,missing,r.sourceDetails.nightBaseline),null);
+});
+test('automatic calibration excludes future and stale statements, preserves attachment identity and ignores editable attendance totals',()=>{
+  const r=JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname,'../private-import/2026-09-payroll.json'),'utf8'));
+  const s=Payroll.attachReference({monthly:{}},r),original=JSON.stringify(s);
+  assert.equal(Payroll.automaticNightCalibration(s,'2026-08'),null);
+  assert.equal(Payroll.automaticNightCalibration(s,'2026-10').rate,4624/7);
+  assert.deepEqual(Payroll.attachReference(s,r),s);assert.equal(JSON.stringify(s),original);
+  s.monthly['2026-09'].payPeriodEnd='2026-09-19';s.monthly['2026-09'].nightCountOverride=100;s.monthly['2026-10']=null;
+  assert.equal(Payroll.automaticNightCalibration(s,'2026-10').rate,4624/7);
+  Object.assign(s.monthly['2026-09'].slip,{nightPay:4724,income:57581,net:52402});
+  assert.equal(Payroll.automaticNightCalibration(s,'2026-10'),null);
+  const newer=Payroll.attachReference({monthly:{'2026-09':{slip:s.monthly['2026-09'].slip}}},r);
+  assert.equal(newer.monthly['2026-09'].nightCalibration,undefined);
+});
+test('reference attachment preserves an explicitly changed bonus zero, current wages and saved company records',()=>{
+  const r={kind:'myshift-payroll',month:'2026-08',slip:official,sourceDetails:{fixedIncome:{base:24000}}};
+  const source={schemaVersion:8,base:30000,monthly:{'2026-08':{proposal:0,bonusSources:{proposal:'manual'}}}};
+  const s=Payroll.attachReference(source,r);assert.equal(s.monthly['2026-08'].proposal,0);assert.equal(s.base,30000);
+  assert.equal(Payroll.monthSalary(s,'2026-08').baseSum,24000);assert.equal(Payroll.monthSalary(s,'2026-09').baseSum,30000);
+  assert.equal(Payroll.attachReference(s,r).monthly['2026-08'].proposal,0);
+});
+test('dated rule changes apply daily, preserve the pre-change baseline and inherit partial changes',()=>{
+  const s={night:500,otWageBase:33000,ruleBaseline:{night:300,otWageBase:24000,nightPolicy:'prorated'},ruleHistory:[
+    {effectiveFrom:'2026-10-01',night:500},{effectiveFrom:'2026-07-01',otWageBase:30000}]};
+  const before=JSON.stringify(s);
+  assert.equal(Payroll.ruleAt(s,'2026-06-30').night,300);assert.equal(Payroll.ruleAt(s,'2026-06-30').otWageBase,24000);
+  assert.equal(Payroll.ruleAt(s,'2026-07-01').otWageBase,30000);assert.equal(Payroll.ruleAt(s,'2026-09-30').night,300);
+  assert.equal(Payroll.ruleAt(s,'2026-10-01').night,500);assert.equal(Payroll.ruleAt(s,'2026-10-01').otWageBase,30000);
+  assert.equal(JSON.stringify(s),before);
+});
+test('night hourly pay uses clock intersection across midnight, including middle shifts and exact leave location',()=>{
+  const rule={nightMode:'hour',night:50,nightWindowStart:1320,nightWindowEnd:360}; // 22:00–06:00
+  const day={shift:'晚',startMinute:1200,shiftHours:12,worked:12,workRanges:[[0,720]]};
+  assert.equal(Payroll.nightAllowance(day,rule).amount,400);
+  // Equal four-hour absences at different times have different night-pay effects.
+  assert.equal(Payroll.nightAllowance({...day,worked:8,workRanges:[[240,720]]},rule).amount,300);
+  assert.equal(Payroll.nightAllowance({...day,worked:8,workRanges:[[0,240],[480,720]]},rule).amount,200);
+  assert.equal(Payroll.nightAllowance({shift:'中',startMinute:960,shiftHours:8,worked:8,workRanges:[[0,480]]},rule).amount,100);
+  assert.equal(Payroll.nightAllowance({shift:'早',startMinute:480,shiftHours:12,worked:12,workRanges:[[0,720]]},rule).amount,0);
+  assert.equal(Payroll.nightAllowance({...day,worked:0,workRanges:[]},rule).amount,0);
+  const incomplete=Payroll.nightAllowance({...day,worked:8,workRanges:null},rule);assert.equal(incomplete.unknown,true);
+});
+test('hourly ranges handle half hours, overlapping leaves, ordinary OT total without a clock range and unknown legacy times',()=>{
+  assert.deepEqual(Payroll.attendanceRanges(12,[{startOffset:120,endOffset:270},{startOffset:240,endOffset:360}],8),[[0,120],[360,720]]);
+  assert.equal(Payroll.attendanceRanges(12,[{hours:4}],8),null);
+  assert.equal(Payroll.attendanceRanges(12,[],10),null);
+  const rule={nightMode:'hour',night:40,nightWindowStart:60,nightWindowEnd:330};
+  assert.equal(Payroll.nightAllowance({shift:'晚',startMinute:1200,shiftHours:12,worked:12,workRanges:[[0,720]]},rule).amount,180);
+});
+test('matching component values cannot hide wrong totals or contradictory attendance hours',()=>{
+  const est={...official,otPay:2400,sickPayH:8,incomplete:false};
+  assert.equal(Payroll.reconcile(est,official).matched,true);
+  assert.equal(Payroll.reconcile({...est,net:27601},official).matched,false);
+  const result=Payroll.reconcile({...est,sickPayH:7},official);assert.equal(result.matched,false);assert.deepEqual(result.hourMismatches,['sickH']);
+});
