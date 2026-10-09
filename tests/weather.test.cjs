@@ -172,7 +172,7 @@ test('local rain observation confirms rain; stale or distant stations cannot ove
   }
 });
 function swEnv(){
-  const events={},puts=[],store=new Map(),c={URL,Response,Promise,Date,Math,console,
+  const events={},puts=[],store=new Map(),c={URL,Response,Promise,Date,Math,console,setTimeout,clearTimeout,
     self:{location:{origin:'https://myshift.example'},registration:{scope:'https://myshift.example/app/'},addEventListener:(name,fn)=>events[name]=fn},
     caches:{open:async()=>({put:async(k,v)=>{puts.push(k);store.set(k,v)},match:async k=>store.get(k),delete:async k=>store.delete(k)})}};
   c.fetch=async()=>new Response('ok');vm.createContext(c);vm.runInContext(swSource,c);
