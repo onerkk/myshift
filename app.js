@@ -2135,9 +2135,16 @@ function saveSalaryForm(){
     SAL=next;setSalPeriod(PAY_VIEW.y,PAY_VIEW.m,data);normalizeSal();SAL.enabled=true;sSAL();S.showSal=false;return true;
   }catch(e){alert(e.message);return false;}
 }
-// Keep the complete 2.6s opening presentation, counting time already visible
-// while the deferred scripts download instead of adding another 2.6s wait.
-setTimeout(()=>{const sp=document.getElementById("splash");if(sp)sp.remove()},Math.max(0,2600-(typeof window.myshiftShellStartedAt==='number'?performance.now()-window.myshiftShellStartedAt:0)));
+// Keep every part of the opening and its full 2.6s, measured from first paint.
+// Dismiss only after the complete styles and the first application view exist.
+let _openingTimer=null;
+function finishOpeningPresentation(){
+  if(_openingTimer!==null||!document.getElementById('splash'))return;
+  const paint=performance.getEntriesByType('paint').find(p=>p.name==='first-paint');
+  const started=paint?paint.startTime:window.myshiftShellStartedAt;
+  _openingTimer=setTimeout(()=>{const sp=document.getElementById('splash');if(sp)sp.remove()},Math.max(0,2600-(typeof started==='number'?performance.now()-started:0)));
+}
+window.addEventListener('myshift:styles-ready',()=>render());
 
 let _renderRAF=null;
 let _dashPainted=false; // 首次 dashboard 繪製後設 true；之後重繪移除 fi 入場淡入，避免開機資料分批到達時整片重播淡入(抖動)
@@ -2215,6 +2222,7 @@ function _bindActions(root){
 }
 function _doRender(){
   _renderRAF=null;
+  if(window.myshiftStylesReady===false)return;
   document.documentElement.lang=lang==='zh'?'zh-Hant':'id';
   const a=document.getElementById("app"),mr=document.getElementById("mr");
   // ═══ WIDGET MODE：URL ?w=1 → 只渲染巨型今日顯示 ═══
@@ -2227,11 +2235,13 @@ function _doRender(){
     if(mr&&mr.innerHTML){mr.innerHTML="";_lastOverlayHtml="";_lastOverlayKind=""}
     _setModalLock(false);
     _bindActions(document);
+    finishOpeningPresentation();
     return;
   }
   if(!fbAuthReady||_cloudLoading){
     const h=`<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--tx3);font-size:13px">⏳ ${lang==="zh"?"載入中...":"Loading..."}</div>`;
     if(h!==_lastAppHtml){a.innerHTML=h;_lastAppHtml=h}
+    finishOpeningPresentation();
     return;
   }
   try{
@@ -2282,6 +2292,7 @@ function _doRender(){
     applyGustAdminUiCompat();
     if(typeof MyShiftShare!=='undefined')MyShiftShare.afterRender();
     if(typeof MyShiftNavigation!=='undefined')MyShiftNavigation.afterRender();
+    finishOpeningPresentation();
   }catch(err){
     console.log("render err",err);
     a.innerHTML=`<div style="padding:30px;color:#e74c3c;font-size:13px;line-height:1.6">
@@ -2290,6 +2301,7 @@ function _doRender(){
       <button onclick="location.reload()" style="background:#00897b;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">${lang==="zh"?"重新載入":"Reload"}</button>
     </div>`;
     _lastAppHtml=null;
+    finishOpeningPresentation();
   }
 }
 
@@ -5546,7 +5558,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiAtmosphereSceneHtml()}${uiShiftWeatherHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v326</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v327</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${uiQuickToolsHtml()}${uiDayFocusHtml()}${uiAtmosphereSceneHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${uiShiftWeatherHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }
