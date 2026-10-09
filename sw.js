@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myshift-v325-night-auto';
+const CACHE_NAME = 'myshift-v326-login-fast';
 
 self.addEventListener('install', event => {
   // 立即接管：避免 PWA 卡在舊 SW + 舊 cache
@@ -56,36 +56,54 @@ self.addEventListener('fetch', event => {
   // API caching belongs to each data client, where coordinates and data age are known.
   // Never strip API query parameters or return HTML/weather for a different location.
   const url = new URL(event.request.url);
-  if(event.request.method!=='GET'||url.origin!==self.location.origin)return;
+  const isSdk=url.origin==='https://www.gstatic.com'&&/^\/firebasejs\/10\.12\.0\/firebase-(?:app|auth|firestore)-compat\.js$/.test(url.pathname);
+  if(event.request.method!=='GET'||(url.origin!==self.location.origin&&!isSdk))return;
   const isNavigation=event.request.mode==='navigate';
   const isAsset=/\.(?:js|html|css|json|png|jpe?g|svg|webp|ico|mp3|md|woff2?)$/i.test(url.pathname);
-  if(!isNavigation&&!isAsset)return;
+  if(!isNavigation&&!isAsset&&!isSdk)return;
   // Only shell navigations ignore UI query parameters; versioned assets keep theirs.
   if(isNavigation)url.search='';
   const cacheKey=url.toString();
 
-  // 對 app 核心檔（.js / .html / .css）強制 bypass HTTP cache，避免 GitHub Pages 10 分鐘 cache 鎖住舊版
-  const path = url.pathname;
-  const isCore = /\.(?:js|html|css)$/i.test(path) || path.endsWith('/') || path.endsWith('/myshift') || path.endsWith('/myshift/');
-  const fetchOpts = isCore ? { cache: 'no-store' } : undefined;
-
-  event.respondWith(
-    fetch(event.request, fetchOpts)
-      .then(response => {
-        if (!response || response.status !== 200) return response;
-        const clone = response.clone();
-        event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.put(cacheKey,clone)).catch(()=>{}));
-        return response;
-      })
-      .catch(() => {
-        return caches.open(CACHE_NAME).then(async cache=>{
-          const cached=await cache.match(cacheKey);
-          if(cached)return cached;
-          if(isNavigation){const shell=await cache.match(new URL('index.html',self.registration.scope).href);if(shell)return shell;}
-          return Response.error();
-        });
-      })
-  );
+  const isShell=isNavigation||/\.html$/i.test(url.pathname);
+  const isCore=/\.(?:js|css)$/i.test(url.pathname);
+  const immutable=isSdk||(!isShell&&(!isCore||url.searchParams.has('v')));
+  const cachePromise=caches.open(CACHE_NAME);
+  let cacheWrite=Promise.resolve(),refresh=null;
+  const fromNetwork=()=>{
+    if(!refresh)refresh=fetch(event.request,isShell||isCore&&!immutable?{cache:'no-store'}:undefined).then(response=>{
+      if(response&&(response.status===200||isSdk&&response.type==='opaque')){
+        const clone=response.clone();
+        cacheWrite=cachePromise.then(cache=>cache.put(cacheKey,clone)).catch(()=>{});
+      }
+      return response;
+    });
+    return refresh;
+  };
+  const responseTask=(async()=>{
+    let cached=null;
+    try{
+      const cache=await cachePromise;
+      cached=await cache.match(cacheKey);
+      if(!cached&&isNavigation)cached=await cache.match(new URL('index.html',self.registration.scope).href);
+    }catch(e){}
+    // Versioned code, all photographs and recordings retain their exact bytes.
+    // A cache hit needs no network round trip; a new ?v= always fetches new code.
+    if(immutable&&cached)return cached;
+    const network=fromNetwork();
+    if(cached&&!isShell)return cached; // unversioned code refreshes in background
+    if(!cached)return network.catch(()=>Response.error());
+    // HTML still checks for releases on every navigation, with a bounded wait
+    // on a weak connection. The late response updates the next launch's shell.
+    return new Promise(resolve=>{
+      const timer=setTimeout(()=>resolve(cached),1500);
+      network.then(response=>{clearTimeout(timer);resolve(response&&response.status<500?response:cached)},()=>{clearTimeout(timer);resolve(cached)});
+    });
+  })();
+  event.respondWith(responseTask);
+  // Register lifetime work synchronously so late HTML/cache writes survive even
+  // after an immediately cached response has already been sent to the page.
+  event.waitUntil(responseTask.then(()=>refresh&&refresh.catch(()=>{})).then(()=>cacheWrite).catch(()=>{}));
 });
 
 // ════════════════════════════════════════════════════════════════

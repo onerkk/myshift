@@ -362,8 +362,31 @@ function _scheduleCloudSave(){
   _cloudSaveTimer=setTimeout(()=>{_cloudSaveTimer=null;cloudSave()},800);
 }
 
-let _initDone=false;let _cloudLoading=false;
-function _doAuthInit(){if(_initDone)return;_initDone=true;_cloudLoading=true;render();loadAppConfig().then(()=>{cloudLoad().then(()=>loadPayrollReference()).then(()=>{_cloudLoading=false;render();loadLeaves();loadAdminEv();syncALYearLeaves();_autoLocateOnLogin()}).catch(()=>{_cloudLoading=false;render();_autoLocateOnLogin()})})}
+let _authInitUid="",_authInitRequest=0,_cloudLoadRequest=0;
+let _cloudLoading=false;
+function _doAuthInit(){
+  const user=fbUser;
+  if(!user||_authInitUid===user.uid)return;
+  _authInitUid=user.uid;
+  const request=++_authInitRequest;
+  const current=()=>request===_authInitRequest&&fbUser&&fbUser.uid===user.uid;
+  _cloudLoading=true;render();
+  // Configuration and location have their own live state; neither blocks the
+  // user's roster. Only restore the user document before showing/editing it.
+  loadAppConfig();
+  _autoLocateOnLogin();
+  return cloudLoad().then(()=>{
+    if(!current())return;
+    _cloudLoading=false;render();
+    // Touch this document only after its restore has finished: even the SDK's
+    // pending local mutation must not sit in front of the initial user read.
+    fsEnqueue(()=>fbDb.collection("users").doc(user.uid).set({displayName:user.displayName||"",email:user.email||"",photoURL:user.photoURL||"",lastLogin:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),"loginTouch").catch(()=>{});
+    // These reads must not wait for loginTouch/salary writes or each other.
+    // loadLeaves already includes the full own history and synchronizes ALD.
+    loadLeaves();loadAdminEv();
+    loadPayrollReference().then(()=>{if(current())render()});
+  }).catch(e=>{if(current()){_cloudLoading=false;render();console.log("auth init err",e)}});
+}
 // 登入後自動定位：權限已授予就重抓最新位置，確保天氣對應實際所在地
 function _autoLocateOnLogin(){
   try{
@@ -381,14 +404,16 @@ function _autoLocateOnLogin(){
 }
 function syncALYearLeaves(){
   if(!fbUser)return Promise.resolve();
-  return fsEnqueue(async()=>{
+  const uid=fbUser.uid;
+  return Promise.resolve().then(async()=>{
     const ay=curALY();
     const start=`${ay}-12-26`,end=`${ay+1}-12-25`;
     const rst=AL_RESET_TS[ay]||0;
     const annualIds=new Set();
     getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});
     if(!annualIds.size)annualIds.add("annual");
-    const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).get();
+    const snap=await fbDb.collection("leaves").where("uid","==",uid).get();
+    if(!fbUser||fbUser.uid!==uid)return;
     let changed=false;
     const found={};
     snap.forEach(doc=>{
@@ -400,31 +425,52 @@ function syncALYearLeaves(){
     });
     for(const date in found){if(ALD[date]!==found[date]){ALD[date]=found[date];changed=true}}
     if(changed){sAL();render()}
-  },"syncALYear").catch(e=>console.log("syncALYear err",e));
+  }).catch(e=>console.log("syncALYear err",e));
 }
-fbAuth.onAuthStateChanged(u=>{if(SAL.referenceOwnerUid&&(!u||u.uid!==SAL.referenceOwnerUid)){SAL=Object.assign({},SAL_DEFAULT,{monthly:{}});try{localStorage.removeItem("sb_sal")}catch(e){}}fbUser=u;fbAuthReady=true;loadAppConfig(true);if(u){
-  // Immediately save display name for admin panel
-  fsEnqueue(()=>fbDb.collection("users").doc(u.uid).set({displayName:u.displayName||"",email:u.email||"",photoURL:u.photoURL||"",lastLogin:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),"loginTouch").catch(()=>{});
-  _doAuthInit()}else{loadAdminEv()}render()});
-fbAuth.getRedirectResult().then(r=>{if(r&&r.user){fbUser=r.user;fbAuthReady=true;render();_doAuthInit()}}).catch(()=>{});
+function _acceptAuthUser(u){
+  const changed=(fbUser&&fbUser.uid||"")!==(u&&u.uid||"");
+  if(SAL.referenceOwnerUid&&(!u||u.uid!==SAL.referenceOwnerUid)){SAL=Object.assign({},SAL_DEFAULT,{monthly:{}});try{localStorage.removeItem("sb_sal")}catch(e){}}
+  fbUser=u;fbAuthReady=true;
+  if(changed){
+    // Ignore late reads from a previous session, even when logging back into
+    // the same uid. Popup, redirect and auth callbacks share one initializer.
+    _authInitUid="";_authInitRequest++;_cloudLoadRequest++;
+    _loading=false;_cloudLoading=false;
+    payrollLeaveRequest++;leavesCache={};
+    payrollLeaveState={uid:"",unit:"",loading:false,error:false,months:[]};
+    payrollReferenceRequest++;payrollReferenceState='idle';
+    loadAppConfig(true);
+  }
+  if(u){
+    _doAuthInit();
+  }else if(changed){loadAdminEv()}
+  render();
+}
+fbAuth.onAuthStateChanged(_acceptAuthUser);
+fbAuth.getRedirectResult().then(r=>{if(r&&r.user)_acceptAuthUser(r.user)}).catch(()=>{});
 setTimeout(()=>{if(!fbAuthReady){fbAuthReady=true;render()}},3000);
 let _loading=false;
 function cloudSave(force){
   if(!fbUser||(!force&&_loading))return Promise.resolve();
+  const uid=fbUser.uid;
+  const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",displayName:fbUser.displayName||"",email:fbUser.email||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),tyd:JSON.stringify(TYD),otd:JSON.stringify(OTD),notes:JSON.stringify(NOTES),shiftov:JSON.stringify(SHIFT_OV),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};
+  if(payload.notes==='{}')delete payload.notes;
+  if(payload.shiftov==='{}')delete payload.shiftov;
   return fsEnqueue(async()=>{
-    const payload={rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",displayName:fbUser.displayName||"",email:fbUser.email||"",ev:JSON.stringify(EVS),al:JSON.stringify(AL),ald:JSON.stringify(ALD),tyd:JSON.stringify(TYD),otd:JSON.stringify(OTD),notes:JSON.stringify(NOTES),shiftov:JSON.stringify(SHIFT_OV),lang:lang,ts:firebase.firestore.FieldValue.serverTimestamp()};
-    if(JSON.stringify(NOTES)==='{}')delete payload.notes;
-    if(JSON.stringify(SHIFT_OV)==='{}')delete payload.shiftov;
-    await fbDb.collection("users").doc(fbUser.uid).set(payload,{merge:true});
+    await fbDb.collection("users").doc(uid).set(payload,{merge:true});
   },"cloudSave");
 }
 function cloudLoad(){
   if(!fbUser)return Promise.resolve();
+  const uid=fbUser.uid,request=++_cloudLoadRequest;
+  const current=()=>request===_cloudLoadRequest&&fbUser&&fbUser.uid===uid;
   _loading=true;
-  return fsEnqueue(async()=>{
-    const doc=await fbDb.collection("users").doc(fbUser.uid).get();
+  return Promise.resolve().then(async()=>{
+    const doc=await fbDb.collection("users").doc(uid).get();
+    if(!current())return;
     if(!doc.exists)return;
     const d=doc.data();
+    S.lockedUnit=d.lockedUnit||"";S.lockedRt=d.lockedRt||"";
     if(d.rt&&d.pos!==null&&d.pos!==undefined){
       S.rt=d.rt;S.pos=d.pos;S.step="cal";
       const dd=JSON.stringify({rt:S.rt,pos:S.pos,ep:true,unit:S.unit||""});
@@ -469,12 +515,12 @@ function cloudLoad(){
     else if(d.unit){S.unit=d.unit}
     if(d.lockedRt){
       S.lockedRt=d.lockedRt;
-      if(R[d.lockedRt]){
-        S.rt=d.lockedRt;
-        if(S.pos===null&&d.pos!==null&&d.pos!==undefined)S.pos=d.pos;
-        if(S.pos===null)S.pos=0;
-        S.step="cal";
-      }
+      // The live config may arrive after this document. Preserve its actual
+      // rule id now; gs() shows unknown until rebuildR receives that rule.
+      S.rt=d.lockedRt;
+      if(S.pos===null&&d.pos!==null&&d.pos!==undefined)S.pos=d.pos;
+      if(S.pos===null)S.pos=0;
+      S.step="cal";
     }
     if(d.lang){lang=d.lang;try{localStorage.setItem("sb_l",lang)}catch(e){}sCk("sb_l",lang,3650)}
     // 薪資：從雲端拉回（隱私資料，僅自己可讀）
@@ -486,10 +532,12 @@ function cloudLoad(){
       localStorage.setItem("sb_ald",JSON.stringify(ALD));
       localStorage.setItem("sb_notes",JSON.stringify(NOTES));
     }catch(e){}
-  },"cloudLoad").then(()=>{
+  }).then(()=>{
+    if(!current())return;
     _loading=false;
     render();
   }).catch(e=>{
+    if(!current())return;
     _loading=false;
     console.log("cloudLoad err",e);
     render();
@@ -500,7 +548,7 @@ function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
   fbLoginPending=true;render();
   fbAuth.signInWithPopup(p).then(r=>{
     fbLoginPending=false;
-    if(r&&r.user){fbUser=r.user;fbAuthReady=true;_initDone=false;render();_doAuthInit()}
+    if(r&&r.user)_acceptAuthUser(r.user);
   }).catch(e=>{
     fbLoginPending=false;render();
     if(e.code==='auth/popup-blocked'){
@@ -508,7 +556,7 @@ function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
     }
   });
 }
-function fbLogout(){_initDone=false;fbAuth.signOut()}
+function fbLogout(){return fbAuth.signOut()}
 let leavesCache={};
 let payrollLeaveState={uid:"",unit:"",loading:false,error:false,months:[]};
 let payrollLeaveRequest=0;
@@ -517,7 +565,7 @@ function loadLeaves(){
   if(!requestUid)return Promise.resolve();
   const request=++payrollLeaveRequest,requestUnit=S.unit||"";
   payrollLeaveState.loading=true;payrollLeaveState.error=false;
-  return fsEnqueue(async()=>{
+  return Promise.resolve().then(async()=>{
     const y=S.yr||TY,m=S.mo||TM;
     const addPair=(set,yy,mm)=>{
       set.add(yy+"-"+String(mm).padStart(2,"0"));
@@ -554,7 +602,7 @@ function loadLeaves(){
     payrollLeaveState={uid:requestUid,unit:requestUnit,loading:false,error:false,months:ymList,ownHistoryLoaded:true};
     _syncAnnualToALD();
     render();
-  },"loadLeaves").catch(e=>{if(request!==payrollLeaveRequest)return;payrollLeaveState.loading=false;payrollLeaveState.error=true;console.log("loadLeaves err",e);render()});
+  }).catch(e=>{if(request!==payrollLeaveRequest)return;payrollLeaveState.loading=false;payrollLeaveState.error=true;console.log("loadLeaves err",e);render()});
 }
 function _syncAnnualToALD(){if(!fbUser)return;const annualIds=new Set();getLeaveTypes().forEach(lt=>{if(lt.id==="annual"||lt.name==="特休"||lt.nameId==="Cuti Tahunan")annualIds.add(lt.id)});if(!annualIds.size)annualIds.add("annual");let changed=false;for(const date in leavesCache){let h=0;leavesCache[date].forEach(l=>{if(l.uid!==fbUser.uid||!annualIds.has(l.leaveType))return;const ay=alYear(+date.slice(0,4),+date.slice(5,7),+date.slice(8,10));const rst=AL_RESET_TS[ay]||0;const lts=l.ts&&l.ts.seconds?l.ts.seconds*1000:0;if(rst&&lts&&lts<rst)return;h+=l.hours||0});if(h>0){if(ALD[date]!==h){ALD[date]=h;changed=true}}}if(changed)sAL()}
 function _syncAnnualDateToALD(date){
@@ -775,7 +823,7 @@ function loadAdminEv(){
   const request=++adminEvRequest,y=S.yr||TY,m=S.mo||TM;
   const ymList=[...new Set(experienceMonthDates(y,m).map(date=>ek(date.y,date.m,1).slice(0,7)))];
   adminEvState.loading=true;adminEvState.error=false;
-  return fsEnqueue(async()=>{
+  return Promise.resolve().then(async()=>{
     const snaps=await Promise.all(ymList.map(ym=>fbDb.collection("adminEvents").where("ym","==",ym).get()));
     const d={};
     snaps.forEach((snap,i)=>snap.forEach(doc=>{const v=doc.data();if(typeof v.date!=="string"||!v.date.startsWith(ymList[i]+"-")||!ADMIN_EV.includes(v.type))return;if(!d[v.date])d[v.date]=[];if(!d[v.date].includes(v.type))d[v.date].push(v.type)}));
@@ -785,7 +833,7 @@ function loadAdminEv(){
     Object.assign(adminEvCache,d);
     adminEvState={months:[...new Set([...adminEvState.months,...ymList])],loading:false,error:false};
     render();
-  },"loadAdminEv").catch(e=>{if(request!==adminEvRequest)return;adminEvState.loading=false;adminEvState.error=true;console.log("loadAdminEv err",e);render()});
+  }).catch(e=>{if(request!==adminEvRequest)return;adminEvState.loading=false;adminEvState.error=true;console.log("loadAdminEv err",e);render()});
 }
 function setAdminEv(date,type,add){
   if(!isAdmin())return Promise.resolve();
@@ -1225,6 +1273,9 @@ function applyAppConfig(d){
   }
   normalizeWxAlertConfig();
   rebuildR();
+  // Login no longer waits for this public config: reconcile annual leave if
+  // the administrator's leave-type mapping arrives after the own history.
+  if(fbUser&&typeof _syncAnnualToALD==='function')_syncAnnualToALD();
   applyVisualFxSetting();
 }
 function loadAppConfig(force=false){
@@ -2084,7 +2135,9 @@ function saveSalaryForm(){
     SAL=next;setSalPeriod(PAY_VIEW.y,PAY_VIEW.m,data);normalizeSal();SAL.enabled=true;sSAL();S.showSal=false;return true;
   }catch(e){alert(e.message);return false;}
 }
-setTimeout(()=>{const sp=document.getElementById("splash");if(sp)sp.remove()},2600);
+// Keep the complete 2.6s opening presentation, counting time already visible
+// while the deferred scripts download instead of adding another 2.6s wait.
+setTimeout(()=>{const sp=document.getElementById("splash");if(sp)sp.remove()},Math.max(0,2600-(typeof window.myshiftShellStartedAt==='number'?performance.now()-window.myshiftShellStartedAt:0)));
 
 let _renderRAF=null;
 let _dashPainted=false; // 首次 dashboard 繪製後設 true；之後重繪移除 fi 入場淡入，避免開機資料分批到達時整片重播淡入(抖動)
@@ -5069,15 +5122,19 @@ try{_syncWeatherFx()}catch(e){}
 
 if('serviceWorker' in navigator){
   let _swRefreshing=false;
+  let _swController=navigator.serviceWorker.controller;
   navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{
-    reg.update();
     try{syncAlertPrefsToServiceWorker()}catch(e){}
-    // 每 5 分鐘檢查一次；新版本會在下次使用者完全關閉 app 後自動生效
+    // 每 5 分鐘檢查新版；真正替換現有 controller 時重載一次。
     setInterval(()=>reg.update(),300000);
   }).catch(()=>{});
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
     try{syncAlertPrefsToServiceWorker()}catch(e){}
-    if(_swRefreshing)return;
+    const previous=_swController;
+    _swController=navigator.serviceWorker.controller;
+    // First installation only claims this already-current page. Reload only
+    // when an existing controller is replaced by a real update.
+    if(!previous||previous===_swController||_swRefreshing)return;
     _swRefreshing=true;
     location.reload();
   })
@@ -5489,7 +5546,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiAtmosphereSceneHtml()}${uiShiftWeatherHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v325</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v326</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${uiQuickToolsHtml()}${uiDayFocusHtml()}${uiAtmosphereSceneHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${uiShiftWeatherHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }
