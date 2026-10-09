@@ -311,7 +311,7 @@ function formEnv(){
   c.sSAL=()=>c.saved.push(JSON.parse(JSON.stringify(c.SAL)));c.S.showSal=true;
   c.esc=x=>String(x??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[s]);
   c.studioMoney=n=>'$'+Math.round(n).toLocaleString('en-US');c.handle=()=>{};
-  vm.runInContext(between('function normalizeSal(', 'normalizeSal();')+'\n'+between('function setSalPeriod(', 'function _leaveId(')+'\n'+between('function salaryFieldLabels(', 'setTimeout(()=>{const sp='),c);
+  vm.runInContext(between('function normalizeSal(', 'normalizeSal();')+'\n'+between('function setSalPeriod(', 'function _leaveId(')+'\n'+between('function salaryFieldLabels(', 'let _openingTimer='),c);
   for(const k of ['base','meal','transport','position','night','union','welfare','laborIns','healthIns','otherDed','laborPensionWage','laborPensionSelfRate','laborPensionEmployerRate','otWageBase','leaveWageBase','otTier1Rate','otTier2Rate','sickRate','personalRate'])c.fields['sal_'+k]={value:String(c.SAL[k]??'')};
   const range=c.defaultSalaryPeriod(c.PAY_VIEW.y,c.PAY_VIEW.m);c.fields.sal_periodStart={value:range.start};c.fields.sal_periodEnd={value:range.end};
   return c;

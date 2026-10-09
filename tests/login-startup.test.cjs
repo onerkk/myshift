@@ -124,11 +124,17 @@ test('leave and announcement reads run independently while any serialized write 
 });
 
 function worker(){
-  const events={},store=new Map(),network=[],writes=[],timers=[];
-  const c={URL,Response,Promise,Date,Math,console,
+  const events={},store=new Map(),network=[],writes=[],timers=[],deleted=[],lifecycle=[];
+  const cacheName=swSource.match(/const CACHE_NAME = '([^']+)'/)[1];
+  const stores=new Map([[cacheName,store]]);
+  const c={URL,Response,Promise,Date,Math,console,Uint8Array,crypto:require('node:crypto').webcrypto,
     setTimeout(fn,ms){const timer={fn,ms,cancelled:false};timers.push(timer);return timer},clearTimeout(timer){timer.cancelled=true},
-    self:{location:{origin:'https://test.invalid'},registration:{scope:'https://test.invalid/app/'},addEventListener:(k,f)=>events[k]=f},
-    caches:{open:async()=>({match:async k=>store.get(k)?.clone(),put:async(k,v)=>{writes.push(k);store.set(k,v)}})},
+    self:{location:{origin:'https://test.invalid'},registration:{scope:'https://test.invalid/app/'},addEventListener:(k,f)=>events[k]=f,
+      skipWaiting:async()=>lifecycle.push('skipWaiting'),clients:{claim:async()=>lifecycle.push('claim'),matchAll:async()=>[]}},
+    caches:{keys:async()=>[...stores.keys()],delete:async name=>{deleted.push(name);return stores.delete(name)},open:async name=>{
+      if(!stores.has(name))stores.set(name,new Map());const entries=stores.get(name);
+      return{match:async k=>entries.get(k)?.clone(),put:async(k,v)=>{writes.push(k);entries.set(k,v)}};
+    }},
     fetch(request){const d=deferred();network.push({request,d});return d.promise}
   };
   vm.createContext(c);vm.runInContext(swSource,c);
@@ -137,12 +143,13 @@ function worker(){
     events.fetch({request:{url,mode,method},respondWith:p=>response=p,waitUntil:p=>tasks.push(p)});
     return{response,tasks};
   }
-  return{c,store,network,writes,timers,request};
+  function dispatch(type){const tasks=[];events[type]({waitUntil:p=>tasks.push(p)});return Promise.all(tasks)}
+  return{c,store,stores,network,writes,timers,request,dispatch,deleted,lifecycle};
 }
 const origin='https://test.invalid/app/';
 
 test('warm versioned scripts, photographic images and recordings return without a fetch',async()=>{
-  for(const asset of ['app.js?v=326-login-fast','immersive-ui.css?v=325-night-auto','images/fx/cloud/cloud-01.png','audio/nature/rain.mp3']){
+  for(const asset of ['app.js?v=327-startup','vendor/firebase/10.12.0/firebase-auth-compat.js','immersive-ui.css?v=325-night-auto','images/fx/cloud/cloud-01.png','audio/nature/rain.mp3']){
     const e=worker();e.store.set(origin+asset,new Response('exact original bytes'));
     const r=e.request(origin+asset);assert.equal(await(await r.response).text(),'exact original bytes');
     await Promise.all(r.tasks);assert.equal(e.network.length,0);
@@ -158,33 +165,93 @@ test('a new asset version fetches fresh code and never uses another version or H
   assert.equal(await e.store.get(origin+'app.js?v=325-night-auto').text(),'old');
 });
 
-test('slow navigation serves the complete cached shell after the deadline and still saves the late release',async()=>{
+test('home navigation uses the installed complete release without a network request or fallback delay',async()=>{
   const e=worker();e.store.set(origin+'index.html',new Response('cached shell'));
   const r=e.request(origin+'?w=1','navigate');await flush();
-  assert.equal(e.network.length,1);assert.equal(e.timers[0].ms,1500);
-  e.timers[0].fn();assert.equal(await(await r.response).text(),'cached shell');
-  e.network[0].d.resolve(new Response('new release'));await Promise.all(r.tasks);
-  assert.equal(await e.store.get(origin).text(),'new release');
+  assert.equal(await(await r.response).text(),'cached shell');await Promise.all(r.tasks);
+  assert.equal(e.network.length,0);assert.equal(e.timers.length,0);
   assert.ok(!e.writes.some(k=>k.includes('?w=')));
 });
 
-test('fast navigation gets the newest HTML and cancels its fallback timer',async()=>{
-  const e=worker();e.store.set(origin,new Response('cached'));
-  const r=e.request(origin,'navigate');await flush();e.network[0].d.resolve(new Response('fresh'));
+test('secondary pages still check the network, and a fast response cancels its fallback timer',async()=>{
+  const e=worker();e.store.set(origin+'admin.html',new Response('cached'));
+  const r=e.request(origin+'admin.html','navigate');await flush();e.network[0].d.resolve(new Response('fresh'));
   assert.equal(await(await r.response).text(),'fresh');await Promise.all(r.tasks);
   assert.equal(e.timers[0].cancelled,true);
 });
 
 test('offline navigation and server failures use cache while a missing script remains an error',async()=>{
   for(const result of ['offline','server']){
-    const e=worker();e.store.set(origin+'index.html',new Response('shell'));
-    const r=e.request(origin,'navigate');await flush();
+    const e=worker();e.store.set(origin+'admin.html',new Response('admin'));
+    const r=e.request(origin+'admin.html','navigate');await flush();
     if(result==='offline')e.network[0].d.reject(Error('offline'));else e.network[0].d.resolve(new Response('error',{status:503}));
-    assert.equal(await(await r.response).text(),'shell');await Promise.all(r.tasks);
+    assert.equal(await(await r.response).text(),'admin');await Promise.all(r.tasks);
   }
   const e=worker();e.store.set(origin+'index.html',new Response('shell'));
   const r=e.request(origin+'missing.js?v=326');await flush();e.network[0].d.reject(Error('offline'));
   assert.equal((await r.response).type,'error');await Promise.all(r.tasks);
+});
+
+test('secondary page slow responses use only their own cache and keep the late network write alive',async()=>{
+  const e=worker();e.store.set(origin+'index.html',new Response('home'));e.store.set(origin+'admin.html',new Response('cached admin'));
+  const r=e.request(origin+'admin.html','navigate');await flush();
+  assert.equal(e.timers[0].ms,1500);e.timers[0].fn();assert.equal(await(await r.response).text(),'cached admin');
+  e.network[0].d.resolve(new Response('fresh admin'));await Promise.all(r.tasks);
+  assert.equal(await e.store.get(origin+'admin.html').text(),'fresh admin');
+});
+
+test('missing secondary pages never fall back to the home page',async()=>{
+  const e=worker();e.store.set(origin+'index.html',new Response('home'));
+  const r=e.request(origin+'admin.html','navigate');await flush();e.network[0].d.reject(Error('offline'));
+  assert.equal((await r.response).type,'error');await Promise.all(r.tasks);
+});
+
+test('upgrade reuses exact cached effect images and recordings from the previous release',async()=>{
+  for(const asset of ['images/fx/cloud/cloud-01.png','audio/nature/rain.mp3']){
+    const e=worker();e.stores.set('myshift-v326-login-fast',new Map([[origin+asset,new Response('all original bytes')]]));
+    const r=e.request(origin+asset);assert.equal(await(await r.response).text(),'all original bytes');await Promise.all(r.tasks);
+    assert.equal(e.network.length,0);assert.equal(await e.store.get(origin+asset).text(),'all original bytes');
+  }
+});
+
+const shellEntries=()=>JSON.parse(swSource.match(/const CORE_SHELL = (\[[\s\S]*?\]);/)[1]);
+test('release integrity includes every stylesheet, effect module and local official login SDK',()=>{
+  const assets=shellEntries();assert.equal(assets.length,24);
+  for(const asset of assets){
+    const bytes=fs.readFileSync(path.join(__dirname,'..',asset.path.split('?')[0]));
+    assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'),asset.sha256,asset.path);
+  }
+  const refs=[...html.matchAll(/(?:href|src)="\.\/([^"?]+(?:\?v=[^"]+)?)"/g)].map(m=>m[1]);
+  assert.ok(refs.every(ref=>assets.some(a=>a.path===ref)));
+});
+
+test('a complete upgrade reuses verified styles and activates only after all required downloads finish',async()=>{
+  const e=worker(),assets=shellEntries(),old=new Map([[origin+'styles.css?v=325-night-auto',new Response(fs.readFileSync(path.join(__dirname,'../styles.css')))]]);
+  e.stores.set('myshift-v326-login-fast',old);const install=e.dispatch('install');
+  await new Promise(r=>setImmediate(r));
+  for(let n=0;e.network.length<assets.length-1&&n<100;n++)await new Promise(r=>setImmediate(r));
+  assert.equal(e.network.length,assets.length-1);assert.deepEqual(e.lifecycle,[]);assert.deepEqual(e.deleted,[]);
+  assert.equal(old.size,1);
+  const last=e.network.at(-1);
+  for(const item of e.network.slice(0,-1))item.d.resolve(new Response(fs.readFileSync(path.join(__dirname,'..',new URL(item.request).pathname.replace('/app/','')))));
+  await new Promise(r=>setImmediate(r));assert.deepEqual(e.lifecycle,[]);
+  last.d.resolve(new Response(fs.readFileSync(path.join(__dirname,'..',new URL(last.request).pathname.replace('/app/','')))));
+  await install;assert.deepEqual(e.lifecycle,['skipWaiting']);assert.equal(e.store.size,25);assert.equal(old.size,1);
+});
+
+test('a missing or mismatched release cannot activate or remove the previous working cache',async()=>{
+  const e=worker();e.stores.set('myshift-v326-login-fast',new Map([[origin+'index.html',new Response('working')]]));
+  const install=e.dispatch('install');const rejected=assert.rejects(install,/Incomplete My Shift release/);
+  for(let n=0;e.network.length<shellEntries().length&&n<100;n++)await new Promise(r=>setImmediate(r));
+  e.network.forEach(item=>item.d.resolve(new Response('<html>partial deployment</html>')));
+  await rejected;assert.deepEqual(e.lifecycle,[]);assert.deepEqual(e.deleted,[]);
+  assert.equal(await e.stores.get('myshift-v326-login-fast').get(origin+'index.html').text(),'working');
+});
+
+test('activation preserves notification state, unrelated caches and the two recent release caches',async()=>{
+  const e=worker();for(const name of ['unrelated','wx-notify-state-v2','myshift-v323','myshift-v325','myshift-v326'])e.stores.set(name,new Map());
+  await e.dispatch('activate');assert.deepEqual(e.deleted,['myshift-v323']);assert.deepEqual(e.lifecycle,['claim']);
+  for(const name of ['unrelated','wx-notify-state-v2','myshift-v325','myshift-v326'])assert.ok(e.stores.has(name));
 });
 
 test('unversioned code refreshes in background and SDK URLs are cached without intercepting APIs',async()=>{
@@ -224,9 +291,19 @@ test('all effect and dependency scripts download in parallel with their original
   assert.equal([...html.matchAll(/<link rel="stylesheet"/g)].length,6);
 });
 
-test('the whole opening presentation remains 2.6 seconds without adding the script download again',()=>{
+test('the full opening lasts 2.6 seconds from first paint without adding stylesheet delay again',()=>{
   for(const [elapsed,expected] of [[0,2600],[1600,1000],[4000,0]]){
-    let delay;const c={window:{myshiftShellStartedAt:100},performance:{now:()=>100+elapsed},Math,setTimeout:(f,ms)=>{delay=ms}};
-    vm.createContext(c);vm.runInContext(slice('setTimeout(()=>{const sp=', 'let _renderRAF='),c);assert.equal(delay,expected);
+    let delay,calls=0;const c={window:{myshiftShellStartedAt:0,addEventListener(){}},document:{getElementById:()=>({remove(){}})},
+      performance:{now:()=>100+elapsed,getEntriesByType:()=>[{name:'first-paint',startTime:100}]},Math,setTimeout:(f,ms)=>{calls++;delay=ms;return 1}};
+    vm.createContext(c);vm.runInContext(slice('let _openingTimer=', 'let _renderRAF='),c);c.finishOpeningPresentation();assert.equal(delay,expected);
+    c.finishOpeningPresentation();assert.equal(calls,1);
   }
+});
+
+test('no unstyled application render or splash dismissal occurs before all full styles are loaded',()=>{
+  const c={window:{myshiftStylesReady:false},_renderRAF:1};vm.createContext(c);
+  vm.runInContext(slice('function _doRender(){','function rType(){'),c);c._doRender();assert.equal(c._renderRAF,null);
+  assert.ok(html.indexOf('myshiftShellStartedAt=')<html.indexOf('<link rel="stylesheet"'));
+  const links=[...html.matchAll(/<link rel="stylesheet"[^>]+>/g)];
+  assert.equal(links.length,6);links.forEach(l=>{assert.match(l[0],/media="print"/);assert.match(l[0],/onload="myshiftStyleLoaded\(this\)"/)});
 });
