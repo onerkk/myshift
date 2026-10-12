@@ -704,27 +704,36 @@ let leavesOvLoading=false;
 let leavesOvUnitF="";
 let leavesOvTypeF="";
 let leavesOvSearch="";
+let leavesOvRequest=0;
+let leavesOvError=false;
 function loadLeavesOvData(ym){
   if(!isAdmin())return;
+  const request=++leavesOvRequest;
   leavesOvLoading=true;
+  leavesOvError=false;
+  LEAVES_OV_DATA=[];
   if(S.showLeavesOv)render();
-  fbDb.collection("leaves").where("ym","==",ym).get().then(snap=>{
-    LEAVES_OV_DATA=[];
+  return fbDb.collection("leaves").where("ym","==",ym).get().then(snap=>{
+    if(request!==leavesOvRequest||ym!==leavesOvYM||!isAdmin())return;
+    const rows=[];
     snap.forEach(d=>{
       const v=d.data();
       if(v.uid&&v.uid.startsWith("admin_"))return;
-      LEAVES_OV_DATA.push(Object.assign({docId:d.id},v));
+      rows.push(Object.assign({docId:d.id},v));
     });
-    LEAVES_OV_DATA.sort((a,b)=>{
+    rows.sort((a,b)=>{
       const c=(a.date||"").localeCompare(b.date||"");
       if(c!==0)return c;
       const ta=a.ts&&a.ts.seconds||0,tb=b.ts&&b.ts.seconds||0;
       return ta-tb;
     });
+    LEAVES_OV_DATA=rows;
   }).catch(e=>{
-    LEAVES_OV_DATA=[];
+    if(request!==leavesOvRequest||ym!==leavesOvYM)return;
+    leavesOvError=true;
     console.log("loadLeavesOvData err",e);
   }).then(()=>{
+    if(request!==leavesOvRequest||ym!==leavesOvYM)return;
     leavesOvLoading=false;
     if(S.showLeavesOv)render();
   });
@@ -744,6 +753,7 @@ function setLeavesOvSearch(v){
 }
 function _renderLeavesOvList(container){
   const isZh=lang==="zh";
+  if(leavesOvLoading||leavesOvError)return;
   let filtered=LEAVES_OV_DATA.slice();
   if(leavesOvUnitF)filtered=filtered.filter(l=>(l.unit||"")===leavesOvUnitF);
   if(leavesOvTypeF)filtered=filtered.filter(l=>(l.leaveType||"")===leavesOvTypeF);
@@ -752,13 +762,13 @@ function _renderLeavesOvList(container){
     filtered=filtered.filter(l=>(l.name||"").toLowerCase().includes(q)||(l.reason||"").toLowerCase().includes(q));
   }
   if(!filtered.length){
-    container.innerHTML='<div style="text-align:center;padding:24px;color:var(--tx3);font-size:12px">'+(isZh?"本月沒有符合條件的請假紀錄":"Tidak ada cuti bulan ini")+'</div>';
+    container.innerHTML='<p class="leaves-empty" role="status">'+(isZh?"本月沒有符合條件的請假紀錄":"Tidak ada cuti yang sesuai")+'</p>';
     return;
   }
   const byDate={};
   filtered.forEach(l=>{const d=l.date||"";if(!byDate[d])byDate[d]=[];byDate[d].push(l)});
   const dates=Object.keys(byDate).sort();
-  const today=(new Date()).toISOString().slice(0,10);
+  const now=new Date(),today=ek(now.getFullYear(),now.getMonth()+1,now.getDate());
   const wkZh=["日","一","二","三","四","五","六"];
   const wkId=["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
   const wk=isZh?wkZh:wkId;
@@ -769,9 +779,8 @@ function _renderLeavesOvList(container){
     const wkS=wk[dayObj.getDay()];
     const isToday=d===today;
     const isFuture=d>today;
-    const dateBg=isToday?'#1565c0':(isFuture?'#2e7d32':'#666');
     const totalHrs=byDate[d].reduce((s,l)=>s+(l.hours||0),0),people=new Set(byDate[d].filter(isRegularLeave).map(l=>l.uid)).size;
-    html+='<div style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:'+dateBg+';border-radius:6px;color:#fff;margin-bottom:6px"><span style="font-size:13px;font-weight:800">'+d.slice(5)+' ('+wkS+')'+(isToday?(isZh?" 今天":" Hari ini"):"")+'</span><span style="font-size:11px;opacity:0.85">'+people+(isZh?" 人 · 共 ":" org · ")+totalHrs+'h</span></div>';
+    html+='<section class="leave-date-group"><h3 class="leave-date-head'+(isToday?' is-today':isFuture?' is-future':'')+'"><span>'+esc(d.slice(5))+' ('+wkS+')'+(isToday?(isZh?" 今天":" Hari ini"):"")+'</span><small>'+people+(isZh?" 人 · 共 ":" org · ")+totalHrs+'h</small></h3>';
     byDate[d].forEach(l=>{
       const lt=lts.find(x=>x.id===l.leaveType);
       const ltName=lt?(isZh?lt.name:(lt.nameId||lt.name)):(l.leaveType||(isZh?"未知":"?"));
@@ -781,10 +790,10 @@ function _renderLeavesOvList(container){
         const dt=new Date(l.ts.seconds*1000);
         timeStr=(dt.getMonth()+1)+"/"+dt.getDate()+" "+String(dt.getHours()).padStart(2,"0")+":"+String(dt.getMinutes()).padStart(2,"0");
       }
-      const reasonRow=l.reason?'<div style="margin-top:5px;padding:6px 8px;background:rgba(33,150,243,0.12);border-left:3px solid #2196f3;border-radius:4px;font-size:12px;color:#1565c0">💬 '+esc(l.reason)+'</div>':'';
-      html+='<div style="background:rgba(0,0,0,0.04);border-radius:6px;padding:8px 10px;margin-bottom:5px;border-left:4px solid '+esc(color)+'"><div style="display:flex;justify-content:space-between;align-items:start;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--tx)">'+esc(l.name||(isZh?"未知":"?"))+' <span style="font-size:11px;font-weight:500;color:var(--tx3)">'+esc(l.unit||(isZh?"無單位":"-"))+'</span></div><div style="font-size:12px;color:var(--tx2);margin-top:2px"><span style="color:'+esc(color)+';font-weight:600">'+esc(leaveRecordLabel(l))+'</span> · 🕒 '+esc(formatLeaveRange(l,d))+(timeStr?' · <span style="color:var(--tx3)">'+(isZh?"提交於 ":"")+timeStr+'</span>':'')+'</div></div></div>'+reasonRow+'</div>';
+      const reasonRow=l.reason?'<p class="leave-reason">💬 '+esc(l.reason)+'</p>':'';
+      html+='<article class="leave-record" style="--leave-accent:'+esc(color)+'"><div class="leave-record-name"><strong>'+esc(l.name||(isZh?"未知":"?"))+'</strong><span>'+esc(l.unit||(isZh?"無單位":"-"))+'</span></div><div class="leave-record-meta"><span class="leave-type-label">'+esc(leaveRecordLabel(l))+'</span><span>🕒 '+esc(formatLeaveRange(l,d))+'</span>'+(timeStr?'<span class="leave-submitted">'+(isZh?"提交於 ":"Dikirim ")+timeStr+'</span>':'')+'</div>'+reasonRow+'</article>';
     });
-    html+='</div>';
+    html+='</section>';
   });
   container.innerHTML=html;
 }
@@ -807,13 +816,14 @@ function rLeavesOv(){
   const typeOpts='<option value="">'+(isZh?"所有假別":"Semua Jenis")+'</option>'+lts.map(lt=>'<option value="'+esc(lt.id)+'"'+(leavesOvTypeF===lt.id?' selected':'')+'>'+esc(isZh?lt.name:(lt.nameId||lt.name))+(byType[lt.id]?' ('+byType[lt.id]+')':'')+'</option>').join("");
   const[y,m]=leavesOvYM.split("-");
   const monthLabel=isZh?(y+" 年 "+parseInt(m)+" 月"):(parseInt(m)+"/"+y);
-  return '<div class="modal-bg" data-a="closeLeavesOv"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap"><div style="font-size:16px;font-weight:900">📅 '+(isZh?"請假總覽":"Ringkasan Cuti")+'</div><div style="display:flex;align-items:center;gap:4px"><button onclick="changeLeavesOvMonth(-1)" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">◀</button><span style="font-size:13px;font-weight:700;min-width:90px;text-align:center">'+monthLabel+'</span><button onclick="changeLeavesOvMonth(1)" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">▶</button><button onclick="loadLeavesOvData(leavesOvYM)" title="'+(isZh?"重新載入":"Reload")+'" style="width:28px;height:28px;border-radius:6px;background:var(--pri);color:#fff;border:none;font-size:12px;cursor:pointer;margin-left:2px">🔄</button></div></div>'
-    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px"><div style="background:#1565c0;padding:10px;border-radius:6px;text-align:center;color:#fff"><div style="font-size:20px;font-weight:900">'+realCount+'</div><div style="font-size:10px;opacity:0.9">'+(isZh?"總筆數":"Total")+'</div></div><div style="background:#2e7d32;padding:10px;border-radius:6px;text-align:center;color:#fff"><div style="font-size:20px;font-weight:900">'+totalHrs+'h</div><div style="font-size:10px;opacity:0.9">'+(isZh?"總時數":"Jam")+'</div></div><div style="background:#6a1b9a;padding:10px;border-radius:6px;text-align:center;color:#fff"><div style="font-size:20px;font-weight:900">'+reasonCount+'</div><div style="font-size:10px;opacity:0.9">'+(isZh?"有填原因":"Beralasan")+'</div></div></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px"><select onchange="setLeavesOvUnitF(this.value)" style="padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:var(--card);color:var(--tx)">'+unitOpts+'</select><select onchange="setLeavesOvTypeF(this.value)" style="padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:var(--card);color:var(--tx)">'+typeOpts+'</select></div>'
-    +'<input placeholder="🔍 '+(isZh?"搜尋姓名或原因...":"Cari nama/alasan...")+'" value="'+esc(leavesOvSearch)+'" oninput="setLeavesOvSearch(this.value)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:10px;box-sizing:border-box;background:var(--card);color:var(--tx)">'
-    +'<div id="leavesOvListBody">'+(leavesOvLoading?'<div style="text-align:center;padding:24px;color:var(--tx3);font-size:12px">'+(isZh?"載入中...":"Loading...")+'</div>':(LEAVES_OV_DATA.length?'':'<div style="text-align:center;padding:24px;color:var(--tx3);font-size:12px">'+(isZh?"本月尚無請假紀錄":"Belum ada cuti")+'</div>'))+'</div>'
-    +'<div style="color:var(--tx3);font-size:10px;margin-top:12px;line-height:1.5;padding:8px;background:rgba(33,150,243,0.08);border-radius:6px;border-left:3px solid #2196f3">🔒 '+(isZh?"此頁面僅管理員可見。員工只能看到當天請假人數（無姓名無原因）。":"Hanya admin yang dapat melihat halaman ini.")+'</div>'
+  const known=!leavesOvLoading&&!leavesOvError;
+  return '<div class="modal-bg" data-a="closeLeavesOv"><div class="modal-sheet help-sheet leaves-overview-sheet" role="dialog" aria-modal="true" aria-labelledby="leaves-overview-title" onclick="event.stopPropagation()"><div class="modal-handle"></div>'
+    +'<header class="leaves-overview-header"><h2 id="leaves-overview-title">📅 '+(isZh?"請假總覽":"Ringkasan Cuti")+'</h2><div class="period-nav" role="group" aria-label="'+(isZh?"切換請假月份":"Pilih bulan cuti")+'"><button type="button" class="period-step previous" onclick="changeLeavesOvMonth(-1)" aria-label="'+(isZh?"上個月":"Bulan sebelumnya")+'" title="'+(isZh?"上個月":"Bulan sebelumnya")+'">'+uiIcon('chevron',20)+'</button><strong class="period-label" aria-live="polite">'+monthLabel+'</strong><button type="button" class="period-step" onclick="changeLeavesOvMonth(1)" aria-label="'+(isZh?"下個月":"Bulan berikutnya")+'" title="'+(isZh?"下個月":"Bulan berikutnya")+'">'+uiIcon('chevron',20)+'</button><button type="button" class="period-step period-refresh'+(leavesOvLoading?' is-loading':'')+'" onclick="loadLeavesOvData(leavesOvYM)" aria-label="'+(isZh?"重新載入請假紀錄":"Muat ulang cuti")+'" title="'+(isZh?"重新載入":"Muat ulang")+'"'+(leavesOvLoading?' disabled':'')+'>'+uiIcon('refresh',19)+'</button></div></header>'
+    +'<div class="leaves-summary"><div class="leaves-summary-card"><strong>'+(known?realCount:'—')+'</strong><span>'+(isZh?"總筆數":"Total")+'</span></div><div class="leaves-summary-card"><strong>'+(known?totalHrs+'h':'—')+'</strong><span>'+(isZh?"總時數":"Jam")+'</span></div><div class="leaves-summary-card"><strong>'+(known?reasonCount:'—')+'</strong><span>'+(isZh?"有填原因":"Beralasan")+'</span></div></div>'
+    +'<div class="leaves-filters"><label><span>'+(isZh?"單位":"Unit")+'</span><select id="leavesOvUnit" onchange="setLeavesOvUnitF(this.value)">'+unitOpts+'</select></label><label><span>'+(isZh?"假別":"Jenis cuti")+'</span><select id="leavesOvType" onchange="setLeavesOvTypeF(this.value)">'+typeOpts+'</select></label></div>'
+    +'<label class="leaves-search"><span class="sr-only">'+(isZh?"搜尋姓名或原因":"Cari nama atau alasan")+'</span>'+uiIcon('search',19)+'<input id="leavesOvSearch" type="search" autocomplete="off" placeholder="'+(isZh?"搜尋姓名或原因…":"Cari nama atau alasan…")+'" value="'+esc(leavesOvSearch)+'" oninput="setLeavesOvSearch(this.value)"></label>'
+    +'<div id="leavesOvListBody" aria-busy="'+leavesOvLoading+'">'+(leavesOvLoading?'<p class="leaves-empty" role="status">'+(isZh?"正在載入本月請假紀錄…":"Memuat cuti bulan ini…")+'</p>':leavesOvError?'<div class="leaves-load-error" role="alert"><p>'+(isZh?"請假資料載入失敗，請重試。":"Cuti gagal dimuat. Coba lagi.")+'</p><button type="button" class="control-primary" onclick="loadLeavesOvData(leavesOvYM)">'+(isZh?"重新載入":"Muat ulang")+'</button></div>':(LEAVES_OV_DATA.length?'':'<p class="leaves-empty" role="status">'+(isZh?"本月尚無請假紀錄":"Belum ada cuti")+'</p>'))+'</div>'
+    +'<p class="leaves-privacy-note">🔒 '+(isZh?"此頁面僅管理員可見。員工只能看到當天請假人數（無姓名無原因）。":"Hanya admin dapat melihat nama dan alasan. Karyawan hanya melihat jumlah cuti.")+'</p>'
     +'<button class="modal-done" data-a="closeLeavesOv" style="margin-top:12px">'+t("done")+'</button></div></div>';
 }
 
@@ -1287,7 +1297,7 @@ function loadAppConfig(force=false){
   return appConfigSync.start(force);
 }
 function unitConfigAvailable(){return appConfigState.hasData&&getUnits().length>0;}
-function unitConfigStatusHtml(){
+function unitConfigStatusHtml(hintId='unitConfigHint'){
   const zh=lang==='zh',st=appConfigState,phase=st.phase;
   const denied=['permission-denied','unauthenticated'].includes(st.errorCode);
   let text=phase==='ready'?(getUnits().length?(zh?`已與後台同步 · ${getUnits().length} 個單位`:`Tersinkron · ${getUnits().length} unit`):(zh?'後台尚未設定單位，請管理員新增。':'Belum ada unit; hubungi admin.')):
@@ -2055,7 +2065,7 @@ function rSalary(){
   const num=(key,title,value,hint='')=>`<label class="payroll-field" for="sal_${key}"><span>${title}</span><input type="number" id="sal_${key}" value="${Payroll.number(value)===null?'':value}" min="0" step="0.01" inputmode="decimal" class="sal-in">${hint?`<small>${hint}</small>`:''}</label>`;
   const select=(key,title,value,options)=>`<label class="payroll-field" for="sal_${key}"><span>${title}</span><select id="sal_${key}">${options.map(([v,l])=>`<option value="${v}"${v===value?' selected':''}>${l}</option>`).join('')}</select></label>`;
   const fixed=[['base','職能俸','Gaji pokok'],['meal','伙食津貼','Makan'],['transport','交通津貼','Transport'],['position','崗位津貼','Posisi'],['union','工會會費','Iuran serikat'],['welfare','福利金','Kesejahteraan'],['laborIns','勞保自付','Asuransi kerja'],['healthIns','健保自付','Asuransi kesehatan'],['otherDed','其他固定扣款','Potongan lain']];
-  return `<div class="modal-bg" data-a="salClose"><div class="modal-sheet help-sheet payroll-form" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="payroll-form-heading"><h2>${zh?'自動計薪依據':'Dasar hitungan otomatis'}</h2><button class="icon-action" data-a="salClose" aria-label="${zh?'關閉':'Tutup'}">×</button></div>
+  return `<div class="modal-bg" data-a="salClose"><div class="modal-sheet help-sheet payroll-form" role="dialog" aria-modal="true" aria-label="${zh?'自動計薪依據':'Dasar hitungan otomatis'}" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="payroll-form-heading"><h2>${zh?'自動計薪依據':'Dasar hitungan otomatis'}</h2><button class="icon-action" data-a="salClose" aria-label="${zh?'關閉':'Tutup'}">×</button></div>
   <p>${zh?'已保存的薪資、調薪日期與請假紀錄會自動套用。正常使用只需維護班表與請假。':'Data gaji, tanggal perubahan dan cuti diterapkan otomatis. Cukup perbarui jadwal dan cuti.'}</p>
   ${periodEditor}<section class="payroll-form-section payroll-basis"><h3>${zh?'目前計算依據':'Dasar saat ini'}</h3><dl><div><dt>${zh?'固定應領':'Gaji tetap'}</dt><dd>${studioMoney(Payroll.monthSalary(SAL,salPeriodKey(y,m)).baseSum)}</dd></div><div><dt>${zh?'本期日期':'Periode'}</dt><dd>${salaryDateLabel(range.sd)} – ${salaryDateLabel(range.ed)}</dd></div><div><dt>${zh?'跨月調薪':'Perubahan gaji'}</dt><dd>${zh?'按生效日期逐日計算':'Mengikuti tanggal berlaku'}</dd></div><div><dt>${zh?'晚班請假':'Cuti shift malam'}</dt><dd>${zh?'扣除未出勤，再算夜點':'Kurangi ketidakhadiran'}</dd></div></dl><p>${zh?'固定月薪、固定扣款與月獎金維持按薪資年月保存；下方為公司制度變更時的修正入口。':'Gaji, potongan tetap, dan bonus tersimpan per bulan; bagian bawah untuk perubahan aturan perusahaan.'}</p></section>
   ${salaryNightCalibrationHtml(calcSalaryEst(y,m))}<section class="payroll-form-section"><h3>${salPeriodKey(y,m)} · ${zh?'本月浮動獎金':'Bonus bulan ini'}</h3><p>${zh?'已提供薪資單的獎金會自動記入所屬月份；尚未結算的獎金需在本月登錄，班表無法推算獎金金額。':'Bonus dari slip dicatat pada bulan yang sesuai. Bonus baru perlu dicatat bulan ini.'}</p><div class="payroll-form-grid">${num('proposal',zh?'提案獎金':'Bonus proposal',p.proposal)}${num('otherIncome',zh?'其他加項':'Pendapatan lain',p.otherIncome)}</div></section>
@@ -2297,7 +2307,7 @@ function _doRender(){
     console.log("render err",err);
     a.innerHTML=`<div style="padding:30px;color:#e74c3c;font-size:13px;line-height:1.6">
       <div style="font-size:16px;font-weight:700;margin-bottom:10px">⚠️ ${lang==="zh"?"畫面渲染出錯":"Render error"}</div>
-      <div style="background:#fff3e0;padding:10px;border-radius:6px;margin-bottom:12px;word-break:break-all;font-family:monospace;font-size:11px">${esc(err&&err.message||"unknown")}</div>
+      <div style="background:var(--amber-soft);color:var(--amber);padding:10px;border-radius:6px;margin-bottom:12px;word-break:break-all;font-family:monospace;font-size:11px">${esc(err&&err.message||"unknown")}</div>
       <button onclick="location.reload()" style="background:#00897b;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">${lang==="zh"?"重新載入":"Reload"}</button>
     </div>`;
     _lastAppHtml=null;
@@ -2309,13 +2319,13 @@ function rType(){
   const unitOpts=getUnits().map(u=>`<option value="${esc(u)}"${S.unit===u?' selected':''}>${esc(u)}</option>`).join('');
   return`<div class="page"><div class="hero fu"><img src="${IMG.icon}"><h1>${t("app")}</h1><p>${t("desc")}</p></div>
   <div class="al-setup fu d1" style="margin-bottom:10px"><h3>🏭 ${lang==="zh"?"選擇單位":"Pilih Unit"}</h3>
-    <select id="unitSel" ${unitConfigAvailable()?'':' disabled'} aria-describedby="unitConfigHint" onchange="if(!changeSelectedUnit(this.value))this.value=getUnits().includes(S.unit)?S.unit:''" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:#fff">
+    <select id="unitSel" ${unitConfigAvailable()?'':' disabled'} aria-describedby="unitConfigHint" onchange="if(!changeSelectedUnit(this.value))this.value=getUnits().includes(S.unit)?S.unit:''" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;background:var(--surface)">
       <option value="">${lang==="zh"?"-- 請選擇 --":"-- Pilih --"}</option>${unitOpts}
     </select><div id="unitConfigHint">${unitConfigStatusHtml()}</div>
   </div>
   ${Object.keys(R).length?Object.entries(R).map(([k,v],i)=>`<button class="rcard fu d${(i%3)+1}" data-a="pick" data-k="${k}"><div class="rcard-icon">${v.c.filter(x=>x!=="休").length>9?"":v.c.filter(x=>x!=="休").length}${v.c.filter(x=>x!=="休").length>9?k.substring(0,3):":"+v.c.filter(x=>x==="休").length}</div><div class="rcard-info"><div class="rcard-name">${RN[lang]&&RN[lang][k]||k}</div><div class="rcard-sub">${v.h}h · ${v.c.length}${t("cyc")}</div></div><div class="rcard-arrow">›</div></button>`).join(""):`<div style="padding:20px;text-align:center;color:var(--tx3);font-size:13px">${lang==="zh"?"⚠️ 尚未設定輪班規則，請管理員到後台設定":"⚠️ Belum ada aturan shift"}</div>`}
   <div class="al-setup fu d3"><h3>${t("alSetup")}</h3><div class="al-setup-hint" style="margin-bottom:8px;font-size:11px;color:var(--green);font-weight:600">${alYRange(curALY())}</div><div class="al-setup-row"><label>${t("alTotal")}</label><input type="number" id="alTI" value="${getAL().total||''}" placeholder="0" min="0" step="0.5"></div><div class="al-setup-hint">${t("alSkip")}</div></div>
-  ${!fbUser&&fbAuthReady?`<div style="text-align:center;margin-top:14px"><button onclick="fbLogin()" style="background:#fff;border:1px solid #ddd;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,.08)"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px">${lang==="zh"?"Google 登入":"Login Google"}</button></div>`:fbUser?`<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--green);font-weight:600">✅ ${fbUser.displayName||fbUser.email}</div>`:""}<div style="text-align:center;margin-top:14px"><span class="lang-tog" style="display:inline-flex;height:36px;border-color:#ddd"><button class="lt-btn${lang==='zh'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='zh'?'var(--pri-d)':'var(--tx3)'}" data-a="lzh">中文</button><button class="lt-btn${lang==='id'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='id'?'var(--pri-d)':'var(--tx3)'}" data-a="lid">ID</button></span></div></div>`;
+  ${!fbUser&&fbAuthReady?`<div style="text-align:center;margin-top:14px"><button onclick="fbLogin()" class="auth-signin" style="background:var(--surface);border:1px solid var(--line-strong);padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,.08)"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px">${lang==="zh"?"Google 登入":"Login Google"}</button></div>`:fbUser?`<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--green);font-weight:600">✅ ${fbUser.displayName||fbUser.email}</div>`:""}<div style="text-align:center;margin-top:14px"><span class="lang-tog" style="display:inline-flex;height:36px;border-color:#ddd"><button class="lt-btn${lang==='zh'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='zh'?'var(--pri-d)':'var(--tx3)'}" data-a="lzh">中文</button><button class="lt-btn${lang==='id'?' lt-on':''}" style="font-size:12px;padding:0 14px;color:${lang==='id'?'var(--pri-d)':'var(--tx3)'}" data-a="lid">ID</button></span></div></div>`;
 }
 
 function rWiz(){
@@ -2327,7 +2337,7 @@ function rWiz(){
     const allSh=[...new Set(c)];
     const shiftBtns=allSh.filter(x=>x!=="休").map(s=>`<button class="opt-btn" data-a="wizShift" data-v="${s}"><img class="oi" src="${SI[s]}">${sf(s)}</button>`).join("");
     const offBtn=`<button class="opt-btn" data-a="wizOff"><img class="oi" src="${IMG.off}">${t("off")}</button>`;
-    let loginBtn="";if(!fbAuthReady){loginBtn=`<div style="margin-top:12px;text-align:center;color:var(--tx3);font-size:11px">${lang==="zh"?"⏳ 檢查登入狀態...":"⏳ Checking login..."}</div>`}else if(!fbUser){loginBtn=`<div style="margin-top:12px;text-align:center"><button onclick="fbLogin()" style="background:#fff;border:1px solid #ddd;padding:10px 20px;border-radius:8px;font-size:12px;font-weight:600;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,.1)"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:18px;height:18px">${lang==="zh"?"Google 登入恢復設定":"Login Google untuk restore"}</button></div>`}
+    let loginBtn="";if(!fbAuthReady){loginBtn=`<div style="margin-top:12px;text-align:center;color:var(--tx3);font-size:11px">${lang==="zh"?"⏳ 檢查登入狀態...":"⏳ Checking login..."}</div>`}else if(!fbUser){loginBtn=`<div style="margin-top:12px;text-align:center"><button onclick="fbLogin()" class="auth-signin" style="background:var(--surface);border:1px solid var(--line-strong);padding:10px 20px;border-radius:8px;font-size:12px;font-weight:600;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,.1)"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:18px;height:18px">${lang==="zh"?"Google 登入恢復設定":"Login Google untuk restore"}</button></div>`}
     return wS(lang==="zh"?"今天上什麼班？":"Shift hari ini?","1/2",`<div class="opts ${allSh.length>=4?'c2':'c2'}">${shiftBtns}${offBtn}</div>${loginBtn}`);
   }
   if(S.wT==="o"&&!S.wN){const sh=[...new Set(c.filter(x=>x!=="休"))];return wS(lang==="zh"?"休假後接什麼班？":"Shift setelah libur?","1/2",`<div class="opts ${sh.length===3?'c3':'c2'}">${sh.map(s=>`<button class="opt-btn" data-a="wn" data-v="${s}"><img class="oi" src="${SI[s]}">→${sf(s)}</button>`).join("")}</div>`);}
@@ -2606,7 +2616,7 @@ function rMod(){
   const hasCust=ev.includes("custom");const custTxt=NOTES[ek(y,m,d)]||"";
   let custP="";if(hasCust){custP=`<div class="al-pick" style="border-color:var(--pri)"><label>📝 ${lang==="zh"?"備註內容":"Isi catatan"}</label><input type="text" id="custIn" value="${esc(custTxt)}" placeholder="${lang==="zh"?"輸入備註...":"Tulis catatan..."}" maxlength="50" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:4px" oninput="NOTES['${ek(y,m,d)}']=this.value;sNotes()"></div>`}
   const hasTy=ev.includes("typhoon");const dayTy=TYD[ek(y,m,d)]||0;
-  let tyP="";if(hasTy){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayTy?' selected':''}>${h} ${t("hr")}</option>`}tyP=`<div class="al-pick" style="border-color:#0288d1;background:rgba(2,136,209,.05)"><label style="color:#01579b">🌀 ${lang==="zh"?"颱風假時數":"Jam Libur Topan"}</label><select id="tySel" data-a="tyh" style="margin-top:4px">${opts}</select><div style="font-size:10px;color:var(--tx3);margin-top:4px;line-height:1.4">${lang==="zh"?"依公告自行記錄天災假時數；目前依薪資條規則不扣正常薪資，也不自動扣加班。其他未出勤時段可用「新增請假」記錄並自動換算。":"Sesuai pengumuman: seharian=12h, sore=6h, dll."}</div></div>`}
+  let tyP="";if(hasTy){let opts="";for(let h=0.5;h<=12;h+=0.5){opts+=`<option value="${h}"${h===dayTy?' selected':''}>${h} ${t("hr")}</option>`}tyP=`<div class="al-pick" style="border-color:#0288d1;background:rgba(2,136,209,.05)"><label style="color:var(--brand)">🌀 ${lang==="zh"?"颱風假時數":"Jam Libur Topan"}</label><select id="tySel" data-a="tyh" style="margin-top:4px">${opts}</select><div style="font-size:10px;color:var(--tx3);margin-top:4px;line-height:1.4">${lang==="zh"?"依公告自行記錄天災假時數；目前依薪資條規則不扣正常薪資，也不自動扣加班。其他未出勤時段可用「新增請假」記錄並自動換算。":"Sesuai pengumuman: seharian=12h, sore=6h, dll."}</div></div>`}
   return`<div class="modal-bg" data-a="close"><div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="day-dialog-title" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="modal-title" id="day-dialog-title">${ds}</div>${uiDaySheetNavigationHtml()}${uiDaySheetDateControlHtml(y,m,d)}
   <div class="modal-shift" style="background:${bg[s]||'var(--pri-l)'}"><img src="${SI[s]}" style="width:28px;height:28px;border-radius:8px"><div class="modal-shift-name">${sf(s)}</div></div>${calendarDaySummaryHtml(y,m,d)}${shiftAdjHtml(y,m,d)}${(()=>{try{return modalLeaveHtml(y,m,d)}catch(e){return'<div style="color:red;font-size:11px">Leave error: '+e.message+'</div>'}})()}${adminEvModalHtml(y,m,d)}<div class="modal-divider"></div><div class="modal-section" id="day-event-section">${t("mark")}</div><div class="ev-list">${evR}</div>${alP}${tyP}${custP}${S.showLunar?lunarModalBlock(y,m,d):""}
   <button class="modal-done" data-a="close">${t("done")}</button></div></div>`}
@@ -2622,13 +2632,13 @@ function shiftAdjHtml(y,m,d){
   const opts=[["早",isZh?"早班":"Pagi"],["中",isZh?"中班":"Siang"],["晚",isZh?"晚班":"Malam"],["休",isZh?"休假":"Libur"]];
   const btns=opts.map(([v,label])=>{
     const on=cur===v;
-    return`<button onclick="doShiftAdj('${key}','${v}')" style="flex:1;padding:8px 4px;border-radius:6px;border:1.5px solid ${on?'var(--pri)':'#ddd'};background:${on?'var(--pri)':'var(--card)'};color:${on?'#fff':'var(--tx)'};font-size:12px;font-weight:${on?'700':'500'};cursor:pointer">${label}</button>`;
+    return`<button type="button" aria-pressed="${on}" onclick="doShiftAdj('${key}','${v}')" style="flex:1;padding:8px 4px;border-radius:6px;border:1.5px solid ${on?'var(--pri)':'#ddd'};background:${on?'var(--pri)':'var(--card)'};color:${on?'var(--on-brand)':'var(--tx)'};font-size:12px;font-weight:${on?'700':'500'};cursor:pointer">${label}</button>`;
   }).join("");
   const origLabel={"早":isZh?"早班":"Pagi","中":isZh?"中班":"Siang","晚":isZh?"晚班":"Malam","休":isZh?"休假":"Libur"}[orig]||orig;
   return`<div class="al-pick" id="day-shift-section" style="border-color:#f57c00;background:rgba(245,124,0,.05)">
-    <label style="color:#e65100">🔄 ${isZh?"調班（特殊狀況改這天班別）":"Ubah Shift Hari Ini"}</label>
+    <label style="color:var(--amber)">🔄 ${isZh?"調班（特殊狀況改這天班別）":"Ubah Shift Hari Ini"}</label>
     <div style="display:flex;gap:4px;margin-top:6px">${btns}</div>
-    ${isOv?`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px"><span style="font-size:10px;color:var(--tx3)">${isZh?"原班表為「"+origLabel+"」":"Asli: "+origLabel}</span><button onclick="doShiftAdj('${key}','')" style="background:var(--tx3);color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:10px;cursor:pointer">${isZh?"↩ 還原原班":"↩ Reset"}</button></div>`:`<div style="font-size:10px;color:var(--tx3);margin-top:6px">${isZh?"點上方按鈕即可把這天改成其他班別，只影響這一天。會自動重算工時與薪資。":"Klik untuk ubah shift hari ini saja."}</div>`}
+    ${isOv?`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px"><span style="font-size:10px;color:var(--tx3)">${isZh?"原班表為「"+origLabel+"」":"Asli: "+origLabel}</span><button onclick="doShiftAdj('${key}','')" class="control-secondary" style="background:var(--surface-3);color:var(--ink);border:none;padding:4px 10px;border-radius:4px;font-size:10px;cursor:pointer">${isZh?"↩ 還原原班":"↩ Reset"}</button></div>`:`<div style="font-size:10px;color:var(--tx3);margin-top:6px">${isZh?"點上方按鈕即可把這天改成其他班別，只影響這一天。會自動重算工時與薪資。":"Klik untuk ubah shift hari ini saja."}</div>`}
   </div>`;
 }
 // 執行調班：覆寫某天班別並重新渲染
@@ -2668,8 +2678,8 @@ function modalLeaveHtml(y,m,d){
     myLeaves.forEach(l=>{
       const lt=getLT(l.leaveType),ltName=lt?(lang==="zh"?lt.name:lt.nameId):l.leaveType;
       const reasonRow=l.reason?`<div style="font-size:11px;color:var(--tx2);padding:3px 8px 0;font-style:italic">💬 ${esc(l.reason)}</div>`:"";
-      const legacy=!hasPreciseLeaveTime(l)?`<div style="font-size:9px;color:#e65100;padding:0 8px 4px">⚠️ ${lang==="zh"?"舊紀錄沒有起訖時間；薪資暫沿用舊推算。建議取消後重登。":"Data lama tanpa waktu; masukkan ulang untuk akurat."}</div>`:"";
-      html+=`<div style="background:var(--card);border-radius:6px;margin-bottom:3px;border-left:3px solid ${lt?lt.color:'#999'};padding-bottom:${l.reason||legacy?'4px':'0'}"><div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;gap:8px"><span style="font-size:12px;font-weight:600">${esc(leaveRecordLabel(l))}<br><small style="color:var(--tx2);font-weight:500">🕒 ${esc(formatLeaveRange(l,date))}</small></span><button onclick="removeLeave('${date}','${l.leaveType}','${l.docId||''}')" style="background:var(--red);color:#fff;border:none;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer">${lang==="zh"?"取消":"Batal"}</button></div>${reasonRow}${legacy}</div>`;
+      const legacy=!hasPreciseLeaveTime(l)?`<div style="font-size:9px;color:var(--amber);padding:0 8px 4px">⚠️ ${lang==="zh"?"舊紀錄沒有起訖時間；薪資暫沿用舊推算。建議取消後重登。":"Data lama tanpa waktu; masukkan ulang untuk akurat."}</div>`:"";
+      html+=`<div style="background:var(--card);border-radius:6px;margin-bottom:3px;border-left:3px solid ${lt?lt.color:'#999'};padding-bottom:${l.reason||legacy?'4px':'0'}"><div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;gap:8px"><span style="font-size:12px;font-weight:600">${esc(leaveRecordLabel(l))}<br><small style="color:var(--tx2);font-weight:500">🕒 ${esc(formatLeaveRange(l,date))}</small></span><button onclick="removeLeave('${date}','${l.leaveType}','${l.docId||''}')" style="background:var(--red);color:var(--on-danger);border:none;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer">${lang==="zh"?"取消":"Batal"}</button></div>${reasonRow}${legacy}</div>`;
     });
     html+=`</div>`;
   }
@@ -2693,7 +2703,7 @@ function modalLeaveHtml(y,m,d){
   }else if(fbUser&&!rule.isWork)html+=`<div style="margin:8px 0;padding:9px;background:var(--green-l);border-radius:7px;font-size:11px;color:var(--green)">${lang==="zh"?"此日為休假日，沒有正常工時，不建立請假紀錄。":"Hari libur, tidak perlu cuti."}</div>`;
   if(isAdmin()){
     const people=uniqueCount(leaves);
-    html+=`<div class="admin-leave-edit"><label>👑 ${lang==="zh"?"管理員：手動設定請假人數":"Admin: Set jumlah cuti"}</label><div style="margin-top:4px;display:flex;align-items:center;gap:4px"><input type="number" id="adminLeaveN" min="0" value="${people}" placeholder="0"><button onclick="adminSetLeave('${date}')" style="background:var(--pri);color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer">${lang==="zh"?"確認":"OK"}</button></div></div>`;
+    html+=`<div class="admin-leave-edit"><label>👑 ${lang==="zh"?"管理員：手動設定請假人數":"Admin: Set jumlah cuti"}</label><div style="margin-top:4px;display:flex;align-items:center;gap:4px"><input type="number" aria-label="${lang==="zh"?'當日請假人數':'Jumlah cuti hari ini'}" id="adminLeaveN" min="0" value="${people}" placeholder="0"><button class="control-primary" onclick="adminSetLeave('${date}')" style="background:var(--pri);color:var(--on-brand);border:none;padding:5px 12px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer">${lang==="zh"?"確認":"OK"}</button></div></div>`;
   }
   return html;
 }
@@ -2825,7 +2835,7 @@ function wxDetailHtml(){
     const code=wxData.hCode?wxData.hCode[i]:0;
     rows+=`<div class="cell">${String(h).padStart(2,"0")}:00</div><div class="cell">${WXI[code]||""} ${tmp}°</div><div class="cell wx-pop-cell">${prec}</div><div class="cell">${wind}</div><div class="cell">${hum}</div>`;
   }
-  const dayTabs=wxData.days.map((d,i)=>{const dt=new Date(d.date);return`<button onclick="wxDetailDay=${i};render();event.stopPropagation()" style="padding:4px 8px;border:none;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;${i===wxDetailDay?'background:var(--pri);color:#fff':'background:#eee;color:var(--tx2)'}">${i===0?(isZh?'今天':'Hari ini'):t('wk')[dt.getDay()]}</button>`}).join("");
+  const dayTabs=wxData.days.map((d,i)=>{const dt=new Date(d.date+'T00:00:00');return`<button type="button" class="detail-day-tab${i===wxDetailDay?' active':''}" aria-pressed="${i===wxDetailDay}" aria-label="${esc(d.date)}" onclick="wxDetailDay=${i};render();event.stopPropagation()">${i===0?(isZh?'今天':'Hari ini'):t('wk')[dt.getDay()]}<small>${dt.getMonth()+1}/${dt.getDate()}</small></button>`}).join("");
   const hasCwa=Array.isArray(wxData.hPopSource)&&wxData.hPopSource.some((v,i)=>v==='cwa'&&String(wxData.hTime[i]||'').startsWith(today));
   const sourceNote=hasCwa
     ?(isZh?`降雨機率採中央氣象署鄉鎮預報原始${windowH?windowH+' 小時':'區間'}值；雨量站只顯示實況，不會改寫預報。`:`Rain probability uses original CWA interval values; station observations never overwrite the forecast.`)
@@ -2835,7 +2845,7 @@ function wxDetailHtml(){
   return`<div class="wx-detail" onclick="closeWxDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">${isZh?'⛅ 逐時天氣與降雨區間':'⛅ Hourly weather & rain intervals'}</div>
     <div class="wx-source-panel"><div><b>${isZh?'位置':'Location'}：</b>${esc(place||'GPS')}</div><div><b>${isZh?'資料更新':'Updated'}：</b>${esc(updated)}</div><div class="wx-source-note">${sourceNote}</div></div>
     ${rainObsHtml()}
-    <div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div class="wx-detail-grid"><div class="hdr">${isZh?'時間':'Jam'}</div><div class="hdr">${isZh?'天氣':'Cuaca'}</div><div class="hdr">${isZh?'降雨區間':'Hujan'}</div><div class="hdr">${isZh?'陣風':'Gust'}</div><div class="hdr">${isZh?'濕度':'Humid'}</div>${rows}</div><button class="modal-done" onclick="closeWxDetail()" style="margin-top:12px">${t('done')}</button></div></div>`;
+    <div class="detail-day-tabs" role="group" aria-label="${lang==="zh"?'選擇日期':'Pilih tanggal'}">${dayTabs}</div><div class="wx-detail-grid"><div class="hdr">${isZh?'時間':'Jam'}</div><div class="hdr">${isZh?'天氣':'Cuaca'}</div><div class="hdr">${isZh?'降雨區間':'Hujan'}</div><div class="hdr">${isZh?'陣風':'Gust'}</div><div class="hdr">${isZh?'濕度':'Humid'}</div>${rows}</div><button class="modal-done" onclick="closeWxDetail()" style="margin-top:12px">${t('done')}</button></div></div>`;
 }
 
 function tideDetailHtml(){
@@ -2850,8 +2860,8 @@ function tideDetailHtml(){
     const isHi=item.type==="滿潮";
     return`<div class="cell" style="font-weight:600">${item.time.slice(11,16)}</div><div class="cell" style="color:${isHi?"var(--red)":"#1565c0"};font-weight:700">${isHi?"▲ "+(lang==="zh"?"滿潮":"Pasang"):"▼ "+(lang==="zh"?"乾潮":"Surut")}</div><div class="cell" style="font-size:14px;font-weight:700">${item.height} cm</div>`;
   }).join("");
-  const dayTabs=dates.map((d,i)=>{const dt=new Date(d);return`<button onclick="tideDetailDay='${d}';render();event.stopPropagation()" style="padding:4px 8px;border:none;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;${d===selDate?'background:var(--pri);color:#fff':'background:#eee;color:var(--tx2)'}">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dt.getDay()]}</button>`}).join("");
-  return`<div class="wx-detail" onclick="closeTideDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">🌊 ${tideData.station} ${lang==="zh"?"潮汐詳情":"Detail Pasang Surut"}</div><div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px">${dayTabs}</div><div style="display:grid;grid-template-columns:70px 1fr 80px;gap:2px;font-size:12px"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"潮汐":"Pasut"}</div><div class="hdr">${lang==="zh"?"潮位(cm)":"Tinggi(cm)"}</div>${rows}</div><div style="margin-top:10px;font-size:9px;color:var(--tx3);text-align:center">${lang==="zh"?"資料來源：中央氣象署 · 潮位：相對臺灣高程系統(cm)":"Sumber: CWA Taiwan"}</div><button class="modal-done" onclick="closeTideDetail()" style="margin-top:8px">${t("done")}</button></div></div>`}
+  const dayTabs=dates.map((d,i)=>{const dt=new Date(d+'T00:00:00');return`<button type="button" class="detail-day-tab${d===selDate?' active':''}" aria-pressed="${d===selDate}" aria-label="${esc(d)}" onclick="tideDetailDay='${d}';render();event.stopPropagation()">${i===0?(lang==="zh"?"今天":"Hari ini"):wk[dt.getDay()]}<small>${dt.getMonth()+1}/${dt.getDate()}</small></button>`}).join("");
+  return`<div class="wx-detail" onclick="closeTideDetail()"><div class="wx-detail-sheet" onclick="event.stopPropagation()"><div class="wx-detail-title">🌊 ${tideData.station} ${lang==="zh"?"潮汐詳情":"Detail Pasang Surut"}</div><div class="detail-day-tabs" role="group" aria-label="${lang==="zh"?'選擇日期':'Pilih tanggal'}">${dayTabs}</div><div style="display:grid;grid-template-columns:70px 1fr 80px;gap:2px;font-size:12px"><div class="hdr">${lang==="zh"?"時間":"Jam"}</div><div class="hdr">${lang==="zh"?"潮汐":"Pasut"}</div><div class="hdr">${lang==="zh"?"潮位(cm)":"Tinggi(cm)"}</div>${rows}</div><div style="margin-top:10px;font-size:9px;color:var(--tx3);text-align:center">${lang==="zh"?"資料來源：中央氣象署 · 潮位：相對臺灣高程系統(cm)":"Sumber: CWA Taiwan"}</div><button class="modal-done" onclick="closeTideDetail()" style="margin-top:8px">${t("done")}</button></div></div>`}
 
 function rHelp(){
   const steps=t("h");
@@ -2880,14 +2890,14 @@ function rHelp(){
   <div class="help-section">
     <div class="help-sec-title">${isZh?"💳 薪資計算說明":"💳 Perhitungan Gaji"}</div>
     <div class="help-step" style="background:rgba(21,101,194,.05);border-left:3px solid #1565c0">
-      <div class="help-num" style="background:#1565c0">$</div>
+      <div class="help-num" style="background:var(--brand)">$</div>
       <div class="help-txt">
         <h3>${isZh?"薪資計算週期":"Periode Perhitungan"}</h3>
         <p>${isZh?"每月預設計薪區間為上月 26 日至當月 25 日（例如 3 月為 2/26～3/25）。公司某月結算日若有變動，可在「薪資」設定中的「本月計薪區間」單獨調整，起日與迄日都會計入。":"Periode default adalah tanggal 26 bulan lalu sampai tanggal 25 bulan ini. Jika tanggal perusahaan berubah pada bulan tertentu, atur masing-masing di pengaturan gaji; tanggal awal dan akhir ikut dihitung."}</p>
       </div>
     </div>
     <div class="help-step" style="background:rgba(21,101,194,.05);border-left:3px solid #1565c0">
-      <div class="help-num" style="background:#1565c0">💰</div>
+      <div class="help-num" style="background:var(--brand)">💰</div>
       <div class="help-txt">
         <h3>${isZh?"發薪日與獎金日":"Gaji & Bonus"}</h3>
         <p>${isZh?"每月 5 日發放薪資，每月 20 日發放績效獎金。遇國定假日或週末則提前至前一個工作日。日曆上以 💰 和 🏆 標示實際發放日。":"Gaji tanggal 5, bonus tanggal 20. Jika jatuh di hari libur/weekend, dimajukan ke hari kerja sebelumnya. Ditandai 💰 dan 🏆."}</p>
@@ -2897,14 +2907,14 @@ function rHelp(){
   <div class="help-section">
     <div class="help-sec-title">${isZh?"📋 功能說明":"📋 Panduan Fitur"}</div>`;
   const stepsHtml=steps.map((s,i)=>{const[title,desc]=s.split("|");return`<div class="help-step"><div class="help-num">${i+1}</div><div class="help-txt"><h3>${title}</h3><p>${desc}</p></div></div>`}).join("");
-  return`<div class="modal-bg" data-a="closeH"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="help-header"><div class="help-header-icon"><img src="${IMG.icon}" style="width:40px;height:40px;border-radius:10px"></div><div><div class="modal-title" style="text-align:left;font-size:18px">${isZh?"我的班表 使用說明":"My Shift Panduan"}</div><div style="font-size:11px;color:var(--tx3);margin-top:2px">${isZh?"華新麗華 輪班管理系統":"Sistem Manajemen Shift"}</div></div></div><div style="height:16px"></div>
+  return`<div class="modal-bg" data-a="closeH"><div class="modal-sheet help-sheet" role="dialog" aria-modal="true" aria-label="${isZh?'使用說明':'Panduan'}" onclick="event.stopPropagation()"><div class="modal-handle"></div><div class="help-header"><div class="help-header-icon"><img src="${IMG.icon}" style="width:40px;height:40px;border-radius:10px"></div><div><div class="modal-title" style="text-align:left;font-size:18px">${isZh?"我的班表 使用說明":"My Shift Panduan"}</div><div style="font-size:11px;color:var(--tx3);margin-top:2px">${isZh?"華新麗華 輪班管理系統":"Sistem Manajemen Shift"}</div></div></div><div style="height:16px"></div>
   ${colorLegend}${stepsHtml}</div>
-  <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee">
-    <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:700;color:var(--tx)">🏭 ${isZh?"切換單位":"Ganti Unit"}</label><div style="display:flex;gap:6px;margin-top:6px"><select id="unitChg"${unitConfigAvailable()?'':' disabled'} style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;font-weight:600"><option value="">${isZh?"-- 無 --":"-- None --"}</option>${isAdmin()?`<option value="__all"${S.unit==="__all"?" selected":""}>${isZh?"全部單位":"Semua Unit"}</option>`:""}
-${getUnits().map(u=>`<option value="${esc(u)}"${S.unit===u?' selected':''}>${esc(u)}</option>`).join('')}</select><button data-a="chUnit"${unitConfigAvailable()?'':' disabled'} style="padding:8px 14px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">${isZh?"確認":"OK"}</button></div>${unitConfigStatusHtml()}</div>
+  <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+    <div style="margin-bottom:12px"><label for="unitHelpChg" style="font-size:12px;font-weight:700;color:var(--tx)">🏭 ${isZh?"切換單位":"Ganti Unit"}</label><div style="display:flex;gap:6px;margin-top:6px"><select id="unitHelpChg"${unitConfigAvailable()?'':' disabled'} style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;font-weight:600"><option value="">${isZh?"-- 無 --":"-- None --"}</option>${isAdmin()?`<option value="__all"${S.unit==="__all"?" selected":""}>${isZh?"全部單位":"Semua Unit"}</option>`:""}
+${getUnits().map(u=>`<option value="${esc(u)}"${S.unit===u?' selected':''}>${esc(u)}</option>`).join('')}</select><button class="control-primary" data-a="chUnit" data-target="unitHelpChg"${unitConfigAvailable()?'':' disabled'} style="padding:8px 14px;background:var(--pri);color:var(--on-brand);border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">${isZh?"確認":"OK"}</button></div>${unitConfigStatusHtml('unitHelpConfigHint')}</div>
     <button class="modal-done" data-a="closeH">${t("done")}</button>
     
-    <button class="modal-done" data-a="reset" style="background:var(--red);margin-top:6px">${isZh?"⚠️ 重新設定班表":"⚠️ Reset Jadwal"}</button>
+    <button class="modal-done" data-a="reset" style="background:var(--red);color:var(--on-danger);margin-top:6px">${isZh?"⚠️ 重新設定班表":"⚠️ Reset Jadwal"}</button>
   </div></div></div>`}
 
 function rW(sh,day){const c=cyc();for(let i=0;i<c.length;i++){if(c[i]!==sh)continue;let n=1;for(let j=i-1;j>=0;j--){if(c[j]===sh)n++;else break}if(n===day)return i}return 0}
@@ -3004,17 +3014,17 @@ let showAdmin=false;
 function adminPanelHtml(){
   if(!isAdmin()||!showAdmin)return"";
   const isZh=lang==="zh";
-  let unitsHtml=APP_CFG.units.map((u,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:var(--card);border-radius:6px"><span style="flex:1;font-size:12px">${esc(u)}</span><button onclick="adminDelUnit(${i})" style="background:var(--red);color:#fff;border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">✕</button></div>`).join("");
-  let ltHtml=APP_CFG.leaveTypes.map((lt,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:var(--card);border-radius:6px;border-left:3px solid ${lt.color}"><span style="flex:1;font-size:12px">${esc(isZh?lt.name:lt.nameId)} (${lt.step}h)</span><button onclick="adminDelLT(${i})" style="background:var(--red);color:#fff;border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">✕</button></div>`).join("");
-  return`<div class="modal-bg" onclick="showAdmin=false;render()"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div>
+  let unitsHtml=APP_CFG.units.map((u,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:var(--card);border-radius:6px"><span style="flex:1;font-size:12px">${esc(u)}</span><button aria-label="${esc((isZh?'刪除單位：':'Hapus unit: ')+u)}" onclick="adminDelUnit(${i})" style="background:var(--red);color:var(--on-danger);border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">✕</button></div>`).join("");
+  let ltHtml=APP_CFG.leaveTypes.map((lt,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:var(--card);border-radius:6px;border-left:3px solid ${lt.color}"><span style="flex:1;font-size:12px">${esc(isZh?lt.name:lt.nameId)} (${lt.step}h)</span><button aria-label="${esc((isZh?'刪除假別：':'Hapus jenis cuti: ')+lt.name)}" onclick="adminDelLT(${i})" style="background:var(--red);color:var(--on-danger);border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">✕</button></div>`).join("");
+  return`<div class="modal-bg" onclick="showAdmin=false;render()"><div class="modal-sheet help-sheet admin-settings-sheet" role="dialog" aria-modal="true" aria-label="${isZh?'管理員設定':'Pengaturan admin'}" onclick="event.stopPropagation()"><div class="modal-handle"></div>
     <div class="modal-title">⚙️ ${isZh?"管理員後台":"Admin Panel"}</div>
     <div style="margin:12px 0"><h3 style="font-size:13px;margin-bottom:6px">🏭 ${isZh?"單位管理":"Unit Management"}</h3>${unitsHtml}
-      <div style="display:flex;gap:4px;margin-top:6px"><input id="newUnit" placeholder="${isZh?"新增單位名稱":"Nama unit baru"}" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px"><button onclick="adminAddUnit()" style="background:var(--pri);color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">+</button></div>
+      <div style="display:flex;gap:4px;margin-top:6px"><input id="newUnit" placeholder="${isZh?"新增單位名稱":"Nama unit baru"}" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px"><button class="control-primary" aria-label="${isZh?'新增單位':'Tambah unit'}" onclick="adminAddUnit()" style="background:var(--pri);color:var(--on-brand);border:none;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">+</button></div>
     </div>
-    <div style="margin:12px 0;padding-top:12px;border-top:1px solid #eee"><h3 style="font-size:13px;margin-bottom:6px">📋 ${isZh?"假別管理":"Leave Type Management"}</h3>${ltHtml}
-      <div style="margin-top:8px;padding:8px;background:#f8f8f8;border-radius:8px">
+    <div style="margin:12px 0;padding-top:12px;border-top:1px solid var(--line)"><h3 style="font-size:13px;margin-bottom:6px">📋 ${isZh?"假別管理":"Leave Type Management"}</h3>${ltHtml}
+      <div style="margin-top:8px;padding:8px;background:var(--surface-2);border-radius:8px">
         <div style="display:flex;gap:4px;margin-bottom:4px"><input id="newLTName" placeholder="${isZh?"假別名稱(中)":"Nama cuti"}" style="flex:1;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:11px"><input id="newLTNameId" placeholder="${isZh?"印尼文名":"Nama ID"}" style="flex:1;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:11px"></div>
-        <div style="display:flex;gap:4px;align-items:center"><label style="font-size:10px;white-space:nowrap">${isZh?"計算單位":"Step"}:</label><select id="newLTStep" style="padding:5px;border:1px solid #ddd;border-radius:4px;font-size:11px"><option value="0.5">0.5h</option><option value="1" selected>1h</option></select><label style="font-size:10px;white-space:nowrap">${isZh?"顏色":"Color"}:</label><input id="newLTColor" type="color" value="#607d8b" style="width:30px;height:26px;border:none;cursor:pointer"><button onclick="adminAddLT()" style="background:var(--pri);color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer">+</button></div>
+        <div style="display:flex;gap:4px;align-items:center"><label style="font-size:10px;white-space:nowrap">${isZh?"計算單位":"Step"}:</label><select id="newLTStep" style="padding:5px;border:1px solid #ddd;border-radius:4px;font-size:11px"><option value="0.5">0.5h</option><option value="1" selected>1h</option></select><label style="font-size:10px;white-space:nowrap">${isZh?"顏色":"Color"}:</label><input id="newLTColor" type="color" value="#607d8b" style="width:30px;height:26px;border:none;cursor:pointer"><button class="control-primary" aria-label="${isZh?'新增假別':'Tambah jenis cuti'}" onclick="adminAddLT()" style="background:var(--pri);color:var(--on-brand);border:none;padding:5px 12px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer">+</button></div>
       </div>
     </div>
     <button onclick="showAdmin=false;render()" class="modal-done" style="margin-top:10px">${isZh?"完成":"Done"}</button>
@@ -3070,7 +3080,7 @@ function handle(e){
     case "prev":if(S.mo===1){S.yr--;S.mo=12}else S.mo--;loadLeaves();loadAdminEv();break;
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();break;
     case "today":S.yr=TY;S.mo=TM;UI_CAL_VIEW="month";UI_CAL_FILTER="all";loadLeaves();loadAdminEv();break;
-    case "chUnit":{if(S.lockedUnit){alert(lang==="zh"?"單位已被管理員鎖定，無法更改":"Unit dikunci oleh admin");break}const sel=document.getElementById("unitChg");if(sel&&changeSelectedUnit(sel.value))render()}break;
+    case "chUnit":{if(S.lockedUnit){alert(lang==="zh"?"單位已被管理員鎖定，無法更改":"Unit dikunci oleh admin");break}const sel=document.getElementById(e.currentTarget.dataset.target||"unitChg");if(sel&&changeSelectedUnit(sel.value))render()}break;
     case "reset":if(S.lockedRt){S.pos=null;S.step="wiz";S.wT=S.wS=S.wN=S.wD=null;break}S.step="type";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){fsEnqueue(()=>fbDb.collection("users").doc(fbUser.uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}),"reset").catch(()=>{})}break;
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
@@ -4764,10 +4774,10 @@ function userPrefsModalHtml(){
     const activeCount=evaluated.length;
     statusHtml=`<div style="padding:12px;background:var(--card);border:1px solid rgba(127,140,141,0.25);border-left:4px solid #3498db;border-radius:8px;margin-bottom:10px;font-size:11px;line-height:1.6;color:var(--tx)">
       <div style="font-weight:700;font-size:12px;margin-bottom:6px;color:var(--tx)">📊 ${isZh?'目前狀況':'Status'}</div>
-      <div style="color:var(--tx)">${isZh?'目前溫度':'Temp'}：<strong style="color:#ff6b35;font-size:14px">${curT}°C</strong>　${isZh?'預報降雨機率':'Forecast rain'}：<strong style="color:#3498db;font-size:14px">${curPrec}%</strong></div>
+      <div style="color:var(--tx)">${isZh?'目前溫度':'Temp'}：<strong style="color:var(--amber);font-size:14px">${curT}°C</strong>　${isZh?'預報降雨機率':'Forecast rain'}：<strong style="color:var(--brand);font-size:14px">${curPrec}%</strong></div>
       <div style="margin-top:2px;color:var(--tx3);font-size:9px">${_popSourceLabel(curPopSource,isZh)}｜${obsStatus}</div>
       <div style="margin-top:4px;color:var(--tx2);font-size:10px">${isZh?`🥵 高溫門檻 ${heatTh}°C ${heatDiff>0?'(再 '+heatDiff+'°C 觸發)':'✓ 已達標'}　🥶 低溫門檻 ${coldTh}°C ${coldDiff>0?'(再 '+coldDiff+'°C 觸發)':'✓ 已達標'}`:`Heat ${heatTh}°C, Cold ${coldTh}°C`}</div>
-      <div style="margin-top:6px;padding:5px 10px;background:${activeCount>0?'rgba(192,57,43,0.15)':'rgba(39,174,96,0.15)'};border-radius:5px;color:${activeCount>0?'#e74c3c':'#27ae60'};font-weight:700;font-size:11px;display:inline-block">${activeCount>0?(isZh?`🚨 ${activeCount} 個警報觸發中`:`${activeCount} active`):(isZh?'✅ 目前無警報':'No alerts')}</div>
+      <div style="margin-top:6px;padding:5px 10px;background:${activeCount>0?'rgba(192,57,43,0.15)':'rgba(39,174,96,0.15)'};border-radius:5px;color:${activeCount>0?'var(--red)':'var(--green)'};font-weight:700;font-size:11px;display:inline-block">${activeCount>0?(isZh?`🚨 ${activeCount} 個警報觸發中`:`${activeCount} active`):(isZh?'✅ 目前無警報':'No alerts')}</div>
       ${(()=>{
         if(!wxData)return'';
         const st=geoState.status;
@@ -4788,9 +4798,9 @@ function userPrefsModalHtml(){
   const permState=getNotifyPermission();
   const btnStyle='border:none;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:transform .15s';
   const testBtnHtml=permState==='granted'?`<div style="display:flex;gap:8px;margin-bottom:14px">
-    <button onclick="forceReloadWx()" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform=''" style="flex:1;background:linear-gradient(135deg,#16a085,#0d6b5e);${btnStyle}">🔄 ${isZh?'重新抓取':'Reload'}</button>
+    <button onclick="forceReloadWx()" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform=''" style="flex:1;background:linear-gradient(135deg,#126e5b,#0d5449);${btnStyle}">🔄 ${isZh?'重新抓取':'Reload'}</button>
     <button onclick="testNotification()" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform=''" style="flex:1;background:linear-gradient(135deg,#3949ab,#1a237e);${btnStyle}">🔔 ${isZh?'測試通知':'Test'}</button>
-  </div>`:`<button onclick="forceReloadWx()" style="background:linear-gradient(135deg,#16a085,#0d6b5e);${btnStyle};width:100%;margin-bottom:14px">🔄 ${isZh?'立即重新抓天氣':'Reload weather'}</button>`;
+  </div>`:`<button onclick="forceReloadWx()" style="background:linear-gradient(135deg,#126e5b,#0d5449);${btnStyle};width:100%;margin-bottom:14px">🔄 ${isZh?'立即重新抓天氣':'Reload weather'}</button>`;
 
   // ── 各警報項目（每項有自己的色彩主題）──
   const alertRows=_USR_ALERTS.map((a,idx)=>{
@@ -4825,7 +4835,7 @@ function userPrefsModalHtml(){
     {key:'animals',icon:'🦋',color:'#e67e22',titleZh:'動物動畫',titleId:'Animasi hewan',descZh:'緩緩飛行的蝴蝶與夜間螢火蟲',descId:'Kupu-kupu dan kunang-kunang malam'},
     {key:'seasonal',icon:'🍁',color:'#27ae60',titleZh:'季節動畫',titleId:'Animasi musim',descZh:'飄落花瓣、葉片翻轉、分層雲影',descId:'Kelopak, bunga, daun, embun beku, awan'},
     {key:'sound',icon:'🔊',color:'#8e44ad',titleZh:'環境音效',titleId:'Suara ambience',descZh:'實地錄製的雨、風、落葉、鳥鳴與蟲鳴',descId:'Suara hujan, angin, burung, serangga'}
-  ].map(item=>`<div style="padding:10px 12px;background:rgba(255,255,255,0.55);border-radius:8px;display:flex;align-items:center;gap:10px;justify-content:space-between">
+  ].map(item=>`<div style="padding:10px 12px;background:var(--surface-2);border-radius:8px;display:flex;align-items:center;gap:10px;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
         <div style="font-size:18px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:${item.color};color:#fff;border-radius:50%;flex-shrink:0">${item.icon}</div>
         <div style="min-width:0;flex:1">
@@ -4852,13 +4862,13 @@ function userPrefsModalHtml(){
   // ── 通知權限狀態 ──
   let permTip='';
   if(permState==='granted'){
-    permTip=`<div style="padding:10px 12px;background:rgba(39,174,96,0.15);border:1px solid rgba(39,174,96,0.4);border-radius:8px;font-size:11px;color:#27ae60;margin-bottom:10px;font-weight:600">✅ ${isZh?'系統通知已授權':'Notification allowed'}</div>`;
+    permTip=`<div style="padding:10px 12px;background:rgba(39,174,96,0.15);border:1px solid rgba(39,174,96,0.4);border-radius:8px;font-size:11px;color:var(--green);margin-bottom:10px;font-weight:600">✅ ${isZh?'系統通知已授權':'Notification allowed'}</div>`;
   }else if(permState==='denied'){
-    permTip=`<div style="padding:10px 12px;background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.4);border-radius:8px;font-size:11px;color:#e74c3c;margin-bottom:10px;font-weight:600;line-height:1.5">🚫 ${isZh?'通知被瀏覽器封鎖，請到手機系統設定開啟':'Notification blocked'}</div>`;
+    permTip=`<div style="padding:10px 12px;background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.4);border-radius:8px;font-size:11px;color:var(--red);margin-bottom:10px;font-weight:600;line-height:1.5">🚫 ${isZh?'通知被瀏覽器封鎖，請到手機系統設定開啟':'Notification blocked'}</div>`;
   }else if(permState==='unsupported'){
-    permTip=`<div style="padding:10px 12px;background:rgba(243,156,18,0.15);border:1px solid rgba(243,156,18,0.4);border-radius:8px;font-size:11px;color:#e67e22;margin-bottom:10px;font-weight:600;line-height:1.5">⚠ ${isZh?'此裝置不支援通知':'Device not supported'}</div>`;
+    permTip=`<div style="padding:10px 12px;background:rgba(243,156,18,0.15);border:1px solid rgba(243,156,18,0.4);border-radius:8px;font-size:11px;color:var(--amber);margin-bottom:10px;font-weight:600;line-height:1.5">⚠ ${isZh?'此裝置不支援通知':'Device not supported'}</div>`;
   }else{
-    permTip=`<div style="padding:10px 12px;background:rgba(52,152,219,0.15);border:1px solid rgba(52,152,219,0.4);border-radius:8px;font-size:11px;color:#3498db;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;line-height:1.4"><span>🔔 ${isZh?'尚未授權通知':'Tap to enable'}</span><button onclick="requestNotifyPermission()" style="background:#3498db;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">${isZh?'啟用':'Enable'}</button></div>`;
+    permTip=`<div style="padding:10px 12px;background:rgba(52,152,219,0.15);border:1px solid rgba(52,152,219,0.4);border-radius:8px;font-size:11px;color:var(--brand);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;line-height:1.4"><span>🔔 ${isZh?'尚未授權通知':'Tap to enable'}</span><button onclick="requestNotifyPermission()" style="background:var(--brand);color:var(--on-brand);border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">${isZh?'啟用':'Enable'}</button></div>`;
   }
 
   // ── 總開關（兩個並排）──
@@ -4871,7 +4881,7 @@ function userPrefsModalHtml(){
       <div style="display:flex;justify-content:flex-end">${_miniSwitch(up.wxMaster!==false&&adminWxOn,"setUserPref('wxMaster',!USER_PREFS.wxMaster)",!adminWxOn,'#fff',isZh?'警報橫幅':'Banner peringatan')}</div>
       ${!adminWxOn?`<div style="margin-top:4px;font-size:9px;font-weight:600;opacity:0.9">⚠ ${isZh?'管理員停用':'Admin off'}</div>`:''}
     </div>
-    <div style="padding:12px;background:linear-gradient(135deg,#2980b9,#1f5d8a);border-radius:8px;color:#fff;${!adminNotifyOn?'opacity:0.4':''}">
+    <div style="padding:12px;background:linear-gradient(135deg,#246f9f,#1f5d8a);border-radius:8px;color:#fff;${!adminNotifyOn?'opacity:0.4':''}">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
         <div style="font-size:18px">📱</div>
         <div style="font-size:11px;font-weight:700;line-height:1.2">${isZh?'手機通知':'Push'}</div>
@@ -4885,7 +4895,7 @@ function userPrefsModalHtml(){
   const sectionTitleStyle='font-size:11px;color:var(--tx2);margin:14px 4px 8px;font-weight:800;letter-spacing:.8px;display:flex;align-items:center;gap:6px';
 
   return `<div class="modal-bg" onclick="closeUserPrefs()">
-    <div class="modal-sheet help-sheet" onclick="event.stopPropagation()" style="max-width:480px">
+    <div class="modal-sheet help-sheet user-prefs-sheet" role="dialog" aria-modal="true" aria-label="${isZh?'個人設定':'Pengaturan'}" onclick="event.stopPropagation()" style="max-width:480px">
       <div class="modal-handle"></div>
       <div class="modal-title" style="margin-bottom:14px">⚙️ ${isZh?'個人設定':'Pengaturan'}</div>
       ${permTip}
@@ -4985,7 +4995,7 @@ function rainWarnHtml(){
   return`<div class="rain-warn fi" style="margin:4px 0;padding:8px 12px;background:${bg};border-left:4px solid ${bc};border-radius:6px;font-size:11px;font-weight:700;line-height:1.5;color:${tc}">${tip}</div>`
 }
 function wxHtml(){
-  if(wxErr)return`<div class="wx-card fi"><div class="wx-err" style="text-align:center;padding:12px">🌡️ ${lang==="zh"?"天氣載入失敗":"Gagal muat cuaca"}<br><button data-a="wxR" style="margin-top:8px;padding:6px 16px;background:var(--pri);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">${lang==="zh"?"重新載入":"Muat Ulang"}</button></div></div>`;
+  if(wxErr)return`<div class="wx-card fi"><div class="wx-err" style="text-align:center;padding:12px">🌡️ ${lang==="zh"?"天氣載入失敗":"Gagal muat cuaca"}<br><button data-a="wxR" style="margin-top:8px;padding:6px 16px;background:var(--pri);color:var(--on-brand);border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">${lang==="zh"?"重新載入":"Muat Ulang"}</button></div></div>`;
   if(!wxData)return`<div class="wx-card fi"><div class="wx-loading">🌡️ ${lang==="zh"?"載入天氣中...":"Memuat cuaca..."}</div></div>`;
   const d=wxData,wk=t("wk"),desc=lang==="zh"?WXZ:WXD;
   const fc=d.days.map((f,i)=>{const dt=new Date(f.date),dw=dt.getDay();
@@ -5076,9 +5086,9 @@ function rStats(){
   const alPct=alTotal>0?Math.round(alUsedCalc/alTotal*100):0;
   const alRange=`${aly}/12/26 ~ ${aly+1}/12/25`;
   
-  const yearNav=`<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0"><button onclick="S.statsYr=${y-1};render()" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">◀</button><span style="font-size:16px;font-weight:900">${y}${isZh?" 年度統計":" Annual"}</span><button onclick="S.statsYr=${y+1};render()" style="width:28px;height:28px;border-radius:6px;background:#eee;border:none;font-size:13px;cursor:pointer">▶</button></div>`;
+  const yearNav=`<div class="period-nav stats-year-nav" role="group" aria-label="${isZh?'切換統計年度':'Pilih tahun statistik'}"><button type="button" class="period-step previous" onclick="S.statsYr=${y-1};render()" aria-label="${isZh?'上一年':'Tahun sebelumnya'}" title="${isZh?'上一年':'Tahun sebelumnya'}">${uiIcon('chevron',20)}</button><strong class="period-label" aria-live="polite">${y}${isZh?" 年度統計":" · Statistik"}</strong><button type="button" class="period-step" onclick="S.statsYr=${y+1};render()" aria-label="${isZh?'下一年':'Tahun berikutnya'}" title="${isZh?'下一年':'Tahun berikutnya'}">${uiIcon('chevron',20)}</button></div>`;
   
-  return`<div class="modal-bg" data-a="closeStats"><div class="modal-sheet help-sheet" onclick="event.stopPropagation()"><div class="modal-handle"></div>
+  return`<div class="modal-bg" data-a="closeStats"><div class="modal-sheet help-sheet stats-sheet" role="dialog" aria-modal="true" aria-label="${isZh?'年度統計':'Statistik tahunan'}" onclick="event.stopPropagation()"><div class="modal-handle"></div>
   ${yearNav}
   <div class="stat-summary">
     <div class="stat-sum-item"><div class="stat-sum-val">${totals.wd}</div><div class="stat-sum-lbl">${isZh?"出勤日":"Hari Kerja"}</div></div>
@@ -5086,10 +5096,10 @@ function rStats(){
     <div class="stat-sum-item"><div class="stat-sum-val ot-c">${totals.oH}h</div><div class="stat-sum-lbl">${isZh?"加班":"Lembur"}</div></div>
   </div>
   <div class="stat-shifts">
-    <div class="stat-shift-item" style="color:#004d56"><span class="stat-shift-dot" style="background:#d0eff5;border:1px solid #9dd8e6"></span>${isZh?"早班":"Pagi"} <b>${totals.e}</b></div>
-    <div class="stat-shift-item" style="color:#311b6b"><span class="stat-shift-dot" style="background:#ddd0ec;border:1px solid #c0a9dc"></span>${isZh?"晚班":"Malam"} <b>${totals.n}</b></div>
-    ${totals.m?`<div class="stat-shift-item" style="color:#7a4700"><span class="stat-shift-dot" style="background:#ffeecf;border:1px solid #ffd88a"></span>${isZh?"中班":"Siang"} <b>${totals.m}</b></div>`:""}
-    <div class="stat-shift-item" style="color:#999"><span class="stat-shift-dot" style="background:#f5f5f5;border:1px solid #e8e8e8"></span>${isZh?"休假":"Libur"} <b>${totals.o}</b></div>
+    <div class="stat-shift-item" style="color:var(--early)"><span class="stat-shift-dot" style="background:#d0eff5;border:1px solid #9dd8e6"></span>${isZh?"早班":"Pagi"} <b>${totals.e}</b></div>
+    <div class="stat-shift-item" style="color:var(--night)"><span class="stat-shift-dot" style="background:#ddd0ec;border:1px solid #c0a9dc"></span>${isZh?"晚班":"Malam"} <b>${totals.n}</b></div>
+    ${totals.m?`<div class="stat-shift-item" style="color:var(--mid)"><span class="stat-shift-dot" style="background:#ffeecf;border:1px solid #ffd88a"></span>${isZh?"中班":"Siang"} <b>${totals.m}</b></div>`:""}
+    <div class="stat-shift-item" style="color:var(--off)"><span class="stat-shift-dot" style="background:#f5f5f5;border:1px solid #e8e8e8"></span>${isZh?"休假":"Libur"} <b>${totals.o}</b></div>
   </div>
   <div style="margin:14px 0 6px;font-size:13px;font-weight:800">${isZh?"📊 每月工時":"📊 Monthly Hours"}</div>
   <div class="stat-chart">${barChart}</div>

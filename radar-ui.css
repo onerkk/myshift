@@ -46,3 +46,18 @@ body[data-cloud-source="jma"] .leaflet-cloudsat-pane{filter:grayscale(1) contras
 
 /* Keep an exit available while location, map or network loading is blocked. */
 .overlay-back{display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:20px;border:1px solid #799382;border-radius:13px;color:#e5efcf;background:#142d23;text-decoration:none;font-size:14px}
+
+/* v328: touch targets stay usable even on compact, short displays. */
+.backchip,.fab{min-width:44px;min-height:44px}
+.play,.step{min-height:44px;height:44px}
+.cloud-tools button,.cardtoggle{min-height:44px;font-size:12px;line-height:1.4}
+.cloud-tools button{white-space:normal;padding:7px 4px}
+.cloud-tools button[aria-pressed=false]{opacity:1;color:#e3ebdb;border-color:#809474;background:#17341f}
+.cloud-summary-copy strong{font-size:13px;line-height:1.5}
+.cloud-summary-copy small{font-size:11px;line-height:1.6}
+.loc{font-size:12px;line-height:1.5;flex-wrap:wrap}
+.coords{font-size:11px;overflow-wrap:anywhere}
+.track,input[type=range]{height:44px}.rail{top:21px}.nowmark{top:19px}
+.topcard{max-height:calc(100dvh - var(--ctrl-height) - 24px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+#cardBody{max-height:max(60px,calc(100dvh - var(--ctrl-height) - 330px))}
+@media(max-width:380px){.cloud-tools button{font-size:11px}.cloud-summary-copy strong{font-size:12px}.cloud-summary-copy small{font-size:10px}}

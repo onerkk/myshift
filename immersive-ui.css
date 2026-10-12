@@ -1,9 +1,9 @@
 /* v320 · Horizon. Ceramic surfaces, machined instruments, warm edge light. */
 :root{
  --bg:#e8eeeb;--surface:#fcfdfb;--surface-2:#f0f4ef;--surface-3:#e0e9e2;
- --ink:#15352f;--ink-2:#526d63;--ink-3:#657d72;--brand:#146c57;--brand-dark:#0b493b;--brand-soft:#e0f0e7;
+ --ink:#15352f;--ink-2:#526d63;--ink-3:#526b5e;--brand:#146c57;--brand-dark:#0b493b;--brand-soft:#e0f0e7;
  --line:#d3e0d6;--line-strong:#b8cbbf;--amber:#886024;--amber-soft:#f8edda;
- --early:#186950;--early-soft:#e3f0e8;--night:#635087;--night-soft:#eeeaf6;--mid:#8b5f22;--mid-soft:#fbf0dd;--off:#5d7166;--off-soft:#ebf0eb;
+ --early:#186950;--early-soft:#e3f0e8;--night:#635087;--night-soft:#eeeaf6;--mid:#8b5f22;--mid-soft:#fbf0dd;--off:#526b5e;--off-soft:#ebf0eb;
  --raised:inset 0 1px 0 #fff,inset 0 -1px 0 #bdcdb947,0 3px 0 #becfbe75,0 7px 12px -7px #193b2f50,0 20px 37px -25px #183e396b;
  --button-shadow:inset 0 1px 1px #fff,inset 0 -1px 1px #aac0b755,0 3px 0 #bfd0c4,0 8px 13px -7px #193b2f44;
  --inset:inset 0 2px 4px #1c493316,inset 0 -1px 0 #ffffffd9;
@@ -95,7 +95,7 @@ html.ui-still .ui-enter>*{animation:none;transform:none;opacity:1}html.ui-still 
 .page-returnbar>button>.ui-icon,.sheet-returnbar>button>.ui-icon{transform:rotate(180deg)}.return-destination{margin-left:auto;min-width:0;font-size:.72rem;line-height:1.5;color:var(--ink-2);overflow-wrap:anywhere;text-align:right}
 .sheet-returnbar{margin:0 0 14px;padding:6px 0 10px;z-index:8;background:var(--surface-2);border-radius:10px 10px 0 0}.sheet-returnbar>button{flex:none}.app-shell:has(.page-returnbar) .app-header{padding-top:18px}
 .day-sheet-nav{top:calc(var(--sheet-return-height,60px) + 2px);z-index:7}.modal-sheet .modal-section,.modal-sheet .leave-entry{scroll-margin-top:135px}.app-main{padding-bottom:calc(max(128px,var(--nav-clearance,128px)) + env(safe-area-inset-bottom))}
-.wx-detail-sheet>div:has(>button[onclick*="DetailDay"]){scrollbar-width:thin;padding-bottom:6px}.wx-detail-sheet button[onclick*="DetailDay"]{min-height:44px;min-width:44px;background:var(--surface-2)!important;color:var(--ink)!important;border:1px solid var(--line)!important}.wx-detail-sheet button[onclick*="DetailDay"][style*="var(--pri)"]{background:var(--brand-soft)!important;color:var(--brand-dark)!important;border-color:var(--brand)!important}
+
 @media(max-width:370px){.hero-leave-overview{gap:6px;padding:9px 10px}.hero-leave-overview>span:first-child{font-size:.66rem}.hero-leave-overview>em{font-size:.57rem}.week-leave-count{gap:3px;font-size:.52rem}.week-leave-count b{font-size:.65rem}.page-returnbar{padding-left:12px;padding-right:12px}.calendar-today-anchor .today-anchor-leave{font-size:.6rem}}
 
 /* v323: adjacent dates keep a readable, quiet relief instead of empty slots. */
@@ -110,3 +110,103 @@ html.ui-still .ui-enter>*{animation:none;transform:none;opacity:1}html.ui-still 
 .calendar-v314 .day.adjacent-month:not(.today) .num,.calendar-v314 .day.adjacent-month:not(.today) .shift-code{color:var(--ink-2)}
 .calendar-v314 .day-month-label{display:block;width:100%;min-height:18px;padding:2px 0;border:1px solid var(--line);border-radius:5px;background:var(--surface-2);color:var(--ink-2);font-size:.58rem;font-weight:750;line-height:1.3;text-align:center;letter-spacing:0;overflow-wrap:anywhere}
 .calendar-v314 .day.today .day-month-label{color:var(--today-ink);background:#073a2bdd;border-color:var(--today-divider)}
+
+/* v328: paired control colours and shared, responsive period navigation.
+   Content keys retain their accent; text never depends on an arbitrary key colour. */
+:root{--control-border:#63816e;--control-focus:#146c57}
+html[data-theme="dark"]{--control-border:#799b83;--control-focus:#dfc68b}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.period-nav{display:grid;grid-template-columns:44px minmax(0,1fr) 44px 44px;gap:8px;align-items:center;min-width:0}
+.period-step,.control-primary,.control-secondary{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:44px;min-height:44px;padding:9px 12px;border:1px solid var(--control-border);border-radius:13px;font-weight:750;line-height:1.4;box-shadow:var(--button-shadow)}
+.period-step{width:44px;height:44px;padding:0;background:linear-gradient(145deg,var(--surface-3),var(--surface-2));color:var(--brand)}
+.period-step>.ui-icon{stroke-width:2.4}
+.period-refresh{background:var(--brand-soft);color:var(--brand)}
+.period-label{min-width:0;text-align:center;font-size:.9rem;line-height:1.5;overflow-wrap:anywhere;color:var(--ink)}
+.period-step:active:not(:disabled),.control-primary:active:not(:disabled),.control-secondary:active:not(:disabled){box-shadow:var(--inset)}
+.control-primary{background:var(--brand);color:var(--on-brand)}
+.control-secondary{background:var(--surface-3);color:var(--ink)}
+.period-refresh.is-loading>.ui-icon{animation:spin 1.1s linear infinite}
+.stats-year-nav{grid-template-columns:44px minmax(0,1fr) 44px;margin:8px 0 18px}
+.stats-year-nav .period-label{font-size:1.03rem}
+.leaves-overview-header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:4px 0 18px;flex-wrap:wrap}
+.leaves-overview-header h2{font-size:1.08rem;line-height:1.5;min-width:0;overflow-wrap:anywhere}
+.leaves-overview-header .period-nav{flex:1 1 285px;max-width:350px}
+.leaves-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:18px}
+.leaves-summary-card{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:15px 7px;border:1px solid var(--line-strong);border-radius:15px;box-shadow:var(--raised);background:linear-gradient(145deg,var(--surface),var(--brand-soft));color:var(--ink);text-align:center}
+.leaves-summary-card:nth-child(2){background:linear-gradient(145deg,var(--surface),var(--early-soft))}
+.leaves-summary-card:nth-child(3){background:linear-gradient(145deg,var(--surface),var(--night-soft))}
+.leaves-summary-card strong{max-width:100%;font-size:1.65rem;line-height:1.25;overflow-wrap:anywhere;color:var(--brand)}
+.leaves-summary-card:nth-child(2) strong{color:var(--early)}
+.leaves-summary-card:nth-child(3) strong{color:var(--night)}
+.leaves-summary-card span{font-size:.77rem;color:var(--ink-2);line-height:1.5;overflow-wrap:anywhere}
+.leaves-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.leaves-filters label{display:flex;flex-direction:column;gap:5px;min-width:0}
+.leaves-filters label>span{font-size:.78rem;font-weight:650;color:var(--ink-2)}
+.leaves-filters select{width:100%;min-width:0;min-height:46px}
+.leaves-search{display:flex;align-items:center;gap:8px;margin:0 0 17px;color:var(--brand)}
+.leaves-search>.ui-icon{flex:none}
+.leaves-search input{width:100%;min-width:0;min-height:46px}
+.leaves-empty{padding:25px 12px;text-align:center;color:var(--ink-2);font-size:.86rem;line-height:1.7}
+.leaves-load-error{padding:17px;border:1px solid var(--red);background:var(--red-l);color:var(--ink);border-radius:14px;text-align:center;line-height:1.7}
+.leaves-load-error button{margin-top:12px}
+.leave-date-group{margin:0 0 18px;min-width:0}
+.leave-date-head{display:flex;align-items:center;flex-wrap:wrap;gap:5px 12px;padding:10px 12px;background:var(--surface-3);color:var(--ink);border:1px solid var(--line-strong);border-radius:12px;margin-bottom:8px;font-size:.9rem;line-height:1.5}
+.leave-date-head small{font-size:.77rem;font-weight:500;color:var(--ink-2)}
+.leave-date-head.is-today{background:var(--brand-soft);border-color:var(--brand);color:var(--brand)}
+.leave-date-head.is-future{background:var(--early-soft);border-color:var(--early)}
+.leave-record{min-width:0;margin-bottom:8px;padding:13px 12px;border:1px solid var(--line);border-left:4px solid var(--leave-accent,var(--line-strong));border-radius:12px;background:var(--surface-2);box-shadow:inset 0 1px 0 #ffffff0d}
+.leave-record-name{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 7px;line-height:1.6;overflow-wrap:anywhere}
+.leave-record-name strong{font-size:.96rem;color:var(--ink)}
+.leave-record-name>span{font-size:.79rem;color:var(--ink-2)}
+.leave-record-meta{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px 10px;margin-top:7px;font-size:.8rem;line-height:1.65;color:var(--ink-2);overflow-wrap:anywhere}
+.leave-record-meta>span{min-width:0;max-width:100%}
+.leave-type-label{border:1px solid var(--line-strong);border-radius:7px;padding:3px 7px;background:var(--surface-3);color:var(--ink);font-weight:650}
+.leave-submitted{color:var(--ink-3)}
+.leave-reason,.leaves-privacy-note{padding:10px 11px;background:var(--brand-soft);border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:9px;color:var(--ink-2);font-size:.79rem;line-height:1.75;overflow-wrap:anywhere}
+.leave-reason{margin-top:9px;color:var(--ink)}
+.leaves-privacy-note{margin-top:16px}
+.detail-day-tabs{display:flex;gap:7px;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 3px 10px;margin:6px -3px 8px;scrollbar-width:thin}
+.detail-day-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;flex:0 0 auto;min-width:54px;min-height:54px;padding:7px 10px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface-2);color:var(--ink-2);box-shadow:var(--button-shadow);font-size:.82rem;font-weight:650;line-height:1.4}
+.detail-day-tab small{font-size:.72rem;line-height:1.4}
+.detail-day-tab.active{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+.detail-day-tab:active{box-shadow:var(--inset)}
+.modal-sheet button:not(.day),.wx-detail-sheet button{min-width:44px}
+.modal-sheet input[type="color"]{width:44px;min-width:44px;min-height:44px;padding:4px}
+.modal-sheet .admin-leave-edit input{flex:1;min-width:0}
+.admin-settings-sheet input:not([type="color"]),.admin-settings-sheet select{min-width:0}
+.admin-settings-sheet input[style*="flex:1"]{width:0}
+.modal-sheet,.wx-detail-sheet{overflow-x:hidden;scrollbar-gutter:stable;scroll-padding-top:90px;scroll-padding-bottom:70px}
+.modal-sheet .modal-title,.wx-detail-title,.payroll-form-heading h2{overflow-wrap:anywhere}
+.modal-sheet .payroll-form-actions{z-index:9}
+.auth-signin{min-height:46px;box-shadow:var(--button-shadow)!important;color:var(--ink)}
+.icon-button,.icon-action,.mnav-btn,.wiz-back{min-width:44px;min-height:44px;border-color:var(--control-border)}
+.section-kicker button,.scene-heading>button,.hero-footer button,.segmented-language button,.day-sheet-nav .day-nav-close{min-height:44px}
+.day-date-stepper>button{flex-basis:44px;min-width:44px;min-height:44px}
+.modal-sheet input[type="date"],.modal-sheet input[type="time"]{color-scheme:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid var(--control-focus);outline-offset:3px}
+@media(hover:hover){.period-step:not(:disabled):hover,.control-secondary:not(:disabled):hover{border-color:var(--brand);background:var(--brand-soft)}}
+@media(max-width:480px){
+ .leaves-overview-header{display:block;margin-bottom:17px}
+ .leaves-overview-header h2{margin-bottom:12px}
+ .leaves-overview-header .period-nav{max-width:none;width:100%}
+ .leaves-summary{gap:7px}.leaves-summary-card{padding:13px 5px}
+ .stat-chart{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;height:170px;padding-top:29px;padding-bottom:10px}
+ .stat-bar-col{flex:1 0 30px}
+ .language-control{flex-wrap:wrap;gap:12px}
+ .payroll-form-actions{grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px}
+ .payroll-form-actions button{overflow-wrap:anywhere}
+ .modal-sheet,.wx-detail-sheet{scrollbar-gutter:auto}
+}
+@media(max-width:350px){
+ .leaves-filters{grid-template-columns:minmax(0,1fr)}
+ .period-nav{gap:6px}.period-label{font-size:.86rem}
+ .stats-year-nav .period-label{font-size:.95rem}
+ .leaves-summary-card strong{font-size:1.4rem}
+ .leaves-summary-card span{font-size:.73rem}
+}
+@media(prefers-reduced-motion:reduce){.period-refresh.is-loading>.ui-icon{animation:none}}
+/* Every independent action keeps its touch area after the legacy sheet rules. */
+.modal-sheet button:not(.day),.wx-detail-sheet button,.account-logout,.leave-calendar-link,.nature-controls button,.wx-live-status button,.wx-place-row button,.pay-period-editor-foot button{min-height:44px;min-width:44px}
+.nature-controls>.atmosphere-view .scene-heading>button,.scene-caption>button{min-height:44px;min-width:44px}
+.nature-volume input{min-height:44px}
+.calendar-rest-plan>button{min-width:44px;min-height:44px;display:grid;place-items:center;align-self:center;border:1px solid var(--control-border);border-radius:12px;background:var(--surface-2);color:var(--brand);box-shadow:var(--button-shadow)}
