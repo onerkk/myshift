@@ -226,7 +226,7 @@ test('release integrity includes every stylesheet, effect module and local offic
 });
 
 test('a complete upgrade reuses verified styles and activates only after all required downloads finish',async()=>{
-  const e=worker(),assets=shellEntries(),old=new Map([[origin+'styles.css?v=325-night-auto',new Response(fs.readFileSync(path.join(__dirname,'../styles.css')))]]);
+  const e=worker(),assets=shellEntries(),old=new Map([[origin+assets.find(a=>a.path.startsWith('studio-v308.css')).path,new Response(fs.readFileSync(path.join(__dirname,'../studio-v308.css')))]]);
   e.stores.set('myshift-v326-login-fast',old);const install=e.dispatch('install');
   await new Promise(r=>setImmediate(r));
   for(let n=0;e.network.length<assets.length-1&&n<100;n++)await new Promise(r=>setImmediate(r));
@@ -249,9 +249,9 @@ test('a missing or mismatched release cannot activate or remove the previous wor
 });
 
 test('activation preserves notification state, unrelated caches and the two recent release caches',async()=>{
-  const e=worker();for(const name of ['unrelated','wx-notify-state-v2','myshift-v323','myshift-v325','myshift-v326'])e.stores.set(name,new Map());
+  const e=worker();for(const name of ['unrelated','wx-notify-state-v2','myshift-admin-v6','myshift-v323','myshift-v325','myshift-v326'])e.stores.set(name,new Map());
   await e.dispatch('activate');assert.deepEqual(e.deleted,['myshift-v323']);assert.deepEqual(e.lifecycle,['claim']);
-  for(const name of ['unrelated','wx-notify-state-v2','myshift-v325','myshift-v326'])assert.ok(e.stores.has(name));
+  for(const name of ['unrelated','wx-notify-state-v2','myshift-admin-v6','myshift-v325','myshift-v326'])assert.ok(e.stores.has(name));
 });
 
 test('unversioned code refreshes in background and SDK URLs are cached without intercepting APIs',async()=>{
