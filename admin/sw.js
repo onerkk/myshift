@@ -1,7 +1,7 @@
-const CACHE_NAME='myshift-admin-v6-unified-leave';
+const CACHE_NAME='myshift-admin-v328-ui';
 self.addEventListener('install',e=>{e.waitUntil(self.skipWaiting())});
 self.addEventListener('activate',e=>{
-  e.waitUntil(caches.keys().then(n=>Promise.all(n.filter(x=>x!==CACHE_NAME).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))
+  e.waitUntil(caches.keys().then(n=>Promise.all(n.filter(x=>x.startsWith('myshift-admin-')&&x!==CACHE_NAME).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))
 });
 self.addEventListener('fetch',e=>{
   const u=new URL(e.request.url);u.search='';

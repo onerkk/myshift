@@ -43,6 +43,8 @@ let LEAVES_DATA=[];
 let leavesYM="";
 let leavesUnitFilter="";
 let leavesLoading=false;
+let leavesRequest=0;
+let leavesError=false;
 let leavesTypeFilter="";
 let leavesNameSearch="";
 
@@ -181,7 +183,7 @@ function tabsHtml(){
     {id:"appearance",label:"🎨 外觀"},
     {id:"wxAlerts",label:"🚨 天氣警報"}
   ];
-  return `<div class="tabs">${tabs.map(t=>`<button class="tab ${activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`).join("")}</div>`;
+  return `<div class="tabs" role="group" aria-label="管理功能">${tabs.map(t=>`<button type="button" aria-pressed="${activeTab===t.id}" class="tab ${activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`).join("")}</div>`;
 }
 
 function setTab(t){activeTab=t;expandedUserId=null;userSearch="";render();if(t==='leaves'&&!leavesYM){const now=new Date();leavesYM=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");loadLeavesData(leavesYM)}}
@@ -372,25 +374,30 @@ async function delLT(i){
 // TAB 4: 請假總覽（管理員可看到所有單位的請假紀錄含原因）
 // ═══════════════════════════════════════════════════════════════
 async function loadLeavesData(ym){
-  leavesLoading=true;
+  if(!isAdmin())return;
+  const request=++leavesRequest;
+  leavesLoading=true;leavesError=false;LEAVES_DATA=[];
   if(activeTab==='leaves')render();
   try{
     const snap=await fbDb.collection("leaves").where("ym","==",ym).get();
-    LEAVES_DATA=[];
+    if(request!==leavesRequest||ym!==leavesYM||!isAdmin())return;
+    const rows=[];
     snap.forEach(d=>{
       const v=d.data();
       if(v.uid&&v.uid.startsWith("admin_"))return;
-      LEAVES_DATA.push({docId:d.id,...v});
+      rows.push({docId:d.id,...v});
     });
-    LEAVES_DATA.sort((a,b)=>{
+    rows.sort((a,b)=>{
       const c=(a.date||"").localeCompare(b.date||"");
       if(c!==0)return c;
-      const ta=a.ts&&a.ts.seconds||0,tb=b.ts&&b.ts.seconds||0;
-      return ta-tb;
+      return (a.ts&&a.ts.seconds||0)-(b.ts&&b.ts.seconds||0);
     });
+    LEAVES_DATA=rows;
   }catch(e){
-    toast("載入請假失敗: "+e.message,"err");
+    if(request!==leavesRequest||ym!==leavesYM)return;
+    leavesError=true;toast("載入請假失敗，請重試。","err");
   }
+  if(request!==leavesRequest||ym!==leavesYM)return;
   leavesLoading=false;
   if(activeTab==='leaves')render();
 }
@@ -424,6 +431,7 @@ function _adminLeaveLabel(l){
 }
 
 function _renderLeavesList(container){
+  if(leavesLoading||leavesError)return;
   let filtered=LEAVES_DATA.slice();
   if(leavesUnitFilter)filtered=filtered.filter(l=>(l.unit||"")===leavesUnitFilter);
   if(leavesTypeFilter)filtered=filtered.filter(l=>(l.leaveType||"")===leavesTypeFilter);
@@ -439,7 +447,7 @@ function _renderLeavesList(container){
   const byDate={};
   filtered.forEach(l=>{const d=l.date||"";if(!byDate[d])byDate[d]=[];byDate[d].push(l)});
   const dates=Object.keys(byDate).sort();
-  const today=(new Date()).toISOString().slice(0,10);
+  const now=new Date(),today=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
   let html="";
   dates.forEach(d=>{
     const dayObj=new Date(d+"T00:00:00");
@@ -467,7 +475,7 @@ function _renderLeavesList(container){
         <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;flex-wrap:wrap">
           <div style="flex:1;min-width:0">
             <div style="font-size:14px;font-weight:700;color:#fff">${esc(l.name||"未知")} <span style="font-size:11px;font-weight:500;color:#aaa">${esc(l.unit||"無單位")}</span></div>
-            <div style="font-size:12px;color:#ccc;margin-top:2px"><span style="color:${esc(color)};font-weight:600">${esc(_adminLeaveLabel(l))}</span> · 🕒 ${esc(_adminLeaveRange(l))}${timeStr?' · <span style="color:#888">提交於 '+timeStr+'</span>':''}</div>
+            <div style="font-size:12px;color:#ccc;margin-top:2px"><span class="admin-leave-label">${esc(_adminLeaveLabel(l))}</span> · 🕒 ${esc(_adminLeaveRange(l))}${timeStr?' · <span style="color:#888">提交於 '+timeStr+'</span>':''}</div>
           </div>
         </div>
         ${reasonRow}
@@ -484,6 +492,7 @@ function leavesTabHtml(){
     leavesYM=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
     setTimeout(()=>loadLeavesData(leavesYM),0);
   }
+  const known=!leavesLoading&&!leavesError;
   const realCount=LEAVES_DATA.length;
   // 統計各假別、各單位人數
   const byType={},byUnit={};
@@ -498,35 +507,35 @@ function leavesTabHtml(){
   const monthLabel=`${y} 年 ${parseInt(m)} 月`;
   
   return `<div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+    <div class="admin-leaves-header">
       <h2 style="margin:0">📅 請假總覽</h2>
-      <div style="display:flex;align-items:center;gap:6px">
-        <button class="btn gray sm" onclick="changeLeavesMonth(-1)">◀</button>
+      <div class="admin-period-nav" role="group" aria-label="切換請假月份">
+        <button type="button" class="btn gray sm" aria-label="上個月" title="上個月" onclick="changeLeavesMonth(-1)">◀</button>
         <span style="font-size:14px;font-weight:700;min-width:96px;text-align:center">${monthLabel}</span>
-        <button class="btn gray sm" onclick="changeLeavesMonth(1)">▶</button>
-        <button class="btn sm" onclick="loadLeavesData(leavesYM)" title="重新載入" style="margin-left:4px">🔄</button>
+        <button type="button" class="btn gray sm" aria-label="下個月" title="下個月" onclick="changeLeavesMonth(1)">▶</button>
+        <button type="button" class="btn sm" aria-label="重新載入請假紀錄" onclick="loadLeavesData(leavesYM)" title="重新載入" ${leavesLoading?'disabled':''}>🔄</button>
       </div>
     </div>
     
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
       <div style="background:#1565c0;padding:10px;border-radius:6px;text-align:center;color:#fff">
-        <div style="font-size:20px;font-weight:900">${realCount}</div><div style="font-size:10px;opacity:0.9">總筆數</div>
+        <div style="font-size:20px;font-weight:900">${known?realCount:'—'}</div><div style="font-size:10px;opacity:0.9">總筆數</div>
       </div>
       <div style="background:#2e7d32;padding:10px;border-radius:6px;text-align:center;color:#fff">
-        <div style="font-size:20px;font-weight:900">${totalHrs}h</div><div style="font-size:10px;opacity:0.9">總時數</div>
+        <div style="font-size:20px;font-weight:900">${known?totalHrs+'h':'—'}</div><div style="font-size:10px;opacity:0.9">總時數</div>
       </div>
       <div style="background:#6a1b9a;padding:10px;border-radius:6px;text-align:center;color:#fff">
-        <div style="font-size:20px;font-weight:900">${reasonCount}</div><div style="font-size:10px;opacity:0.9">有填原因</div>
+        <div style="font-size:20px;font-weight:900">${known?reasonCount:'—'}</div><div style="font-size:10px;opacity:0.9">有填原因</div>
       </div>
     </div>
     
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-      <select class="inp" onchange="setLeavesUnitFilter(this.value)">${unitOpts}</select>
-      <select class="inp" onchange="setLeavesTypeFilter(this.value)">${typeOpts}</select>
+      <select class="inp" aria-label="篩選單位" onchange="setLeavesUnitFilter(this.value)">${unitOpts}</select>
+      <select class="inp" aria-label="篩選假別" onchange="setLeavesTypeFilter(this.value)">${typeOpts}</select>
     </div>
-    <input class="inp" placeholder="🔍 搜尋姓名或原因..." value="${esc(leavesNameSearch)}" oninput="setLeavesNameSearch(this.value)" style="margin-bottom:12px">
+    <input class="inp" type="search" aria-label="搜尋姓名或原因" placeholder="🔍 搜尋姓名或原因..." value="${esc(leavesNameSearch)}" oninput="setLeavesNameSearch(this.value)" style="margin-bottom:12px">
     
-    <div id="leavesListBody">${leavesLoading?'<div class="empty">載入中...</div>':(LEAVES_DATA.length?'':'<div class="empty">本月尚無請假紀錄</div>')}</div>
+    <div id="leavesListBody" aria-busy="${leavesLoading}">${leavesLoading?'<div class="empty">載入中...</div>':leavesError?'<div class="empty" role="alert">請假資料載入失敗。<br><button class="btn" onclick="loadLeavesData(leavesYM)">重新載入</button></div>':(LEAVES_DATA.length?'':'<div class="empty">本月尚無請假紀錄</div>')}</div>
     
     <div style="color:#666;font-size:10px;margin-top:14px;line-height:1.6;padding:8px;background:rgba(33,150,243,0.08);border-radius:6px;border-left:3px solid #2196f3">
       🔒 此頁面僅管理員可見。員工只能看到當天請假人數（無姓名無原因）。<br>
@@ -639,9 +648,10 @@ function _wxNotifyKey(id){return 'notify'+id.charAt(0).toUpperCase()+id.slice(1)
 function _wxA(){if(!CFG.wxAlerts)CFG.wxAlerts=Object.assign({},WX_ALERTS_DEFAULTS);return CFG.wxAlerts}
 
 function _wxSwitchHtml(checked,onclickStr){
-  const bg=checked?'#27ae60':'#7a8a99';
-  const left=checked?'24px':'3px';
-  return `<span onclick="${onclickStr}" style="display:inline-block;position:relative;width:48px;height:26px;background:${bg};border-radius:13px;cursor:pointer;transition:.2s;flex-shrink:0"><span style="position:absolute;width:20px;height:20px;left:${left};top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span></span>`;
+  const label=onclickStr.match(/(?:wxToggle|wxToggleNotify)\('([^']+)'/);
+  const names={master:'警報總開關',notifyEnabled:'通知總開關',earthquake:'地震',typhoon:'颱風',storm:'雷雨',heavyRain:'豪大雨',rain:'降雨',strongWind:'強風',heat:'高溫',cold:'低溫',fog:'濃霧'};
+  const name=label?(names[label[1]]||label[1])+(onclickStr.startsWith('wxToggleNotify(')?'通知':'橫幅'):({wxToggleMaster:'警報總開關',wxToggleNotifyMaster:'通知總開關',wxToggleNoticeOverride:'警報公告覆蓋',wxToggleQuietCritical:'重大警報略過靜音'})[onclickStr.split('(')[0]]||'切換設定';
+  return `<button type="button" class="admin-switch" role="switch" aria-checked="${!!checked}" aria-label="${esc(name)}" onclick="${onclickStr}"><span class="admin-switch-track${checked?' on':''}" aria-hidden="true"><i></i></span></button>`;
 }
 
 function wxAlertsTabHtml(){
@@ -1072,7 +1082,7 @@ function bind(){
     }catch(e){}
   }
   // 請假總覽 tab：渲染列表內容
-  if(activeTab==='leaves'&&!leavesLoading){
+  if(activeTab==='leaves'&&!leavesLoading&&!leavesError){
     const list=$("leavesListBody");
     if(list&&LEAVES_DATA.length)_renderLeavesList(list);
   }
