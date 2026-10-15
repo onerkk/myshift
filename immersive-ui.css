@@ -207,6 +207,17 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 @media(prefers-reduced-motion:reduce){.period-refresh.is-loading>.ui-icon{animation:none}}
 /* Every independent action keeps its touch area after the legacy sheet rules. */
 .modal-sheet button:not(.day),.wx-detail-sheet button,.account-logout,.leave-calendar-link,.nature-controls button,.wx-live-status button,.wx-place-row button,.pay-period-editor-foot button{min-height:44px;min-width:44px}
+
+/* v329: account actions stay readable on narrow phones in both themes. */
+.account-card{flex-wrap:wrap}
+.account-card .account-copy{flex:1;min-width:0}
+.account-card .account-copy small{color:#dce8d3;overflow-wrap:anywhere}
+.account-actions{display:flex;flex:0 0 100%;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:4px}
+.account-actions button{min-height:44px;min-width:64px;padding:10px 14px;border-radius:12px;font:inherit;font-size:.8rem;line-height:1.4;cursor:pointer}
+.account-actions .account-switch{flex:1;color:#193825;background:linear-gradient(145deg,#e4f1d9,#bfd7aa);border:1px solid #e4f1d9;box-shadow:inset 0 1px 0 #fff8,0 3px 0 #112b1966;font-weight:700}
+.account-actions .account-logout{color:#f0f5e9;background:#163423;border:1px solid #a8c397}
+.account-actions button:disabled{opacity:.65;cursor:wait}
+.account-actions button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .nature-controls>.atmosphere-view .scene-heading>button,.scene-caption>button{min-height:44px;min-width:44px}
 .nature-volume input{min-height:44px}
 .calendar-rest-plan>button{min-width:44px;min-height:44px;display:grid;place-items:center;align-self:center;border:1px solid var(--control-border);border-radius:12px;background:var(--surface-2);color:var(--brand);box-shadow:var(--button-shadow)}

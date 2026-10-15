@@ -359,7 +359,8 @@ function _handleFatalFsError(){
 let _cloudSaveTimer=null;
 function _scheduleCloudSave(){
   if(_cloudSaveTimer)clearTimeout(_cloudSaveTimer);
-  _cloudSaveTimer=setTimeout(()=>{_cloudSaveTimer=null;cloudSave()},800);
+  const uid=fbUser&&fbUser.uid;
+  _cloudSaveTimer=setTimeout(()=>{_cloudSaveTimer=null;if(uid&&fbUser&&fbUser.uid===uid)cloudSave().catch(e=>console.log("cloudSave err",e))},800);
 }
 
 let _authInitUid="",_authInitRequest=0,_cloudLoadRequest=0;
@@ -427,8 +428,57 @@ function syncALYearLeaves(){
     if(changed){sAL();render()}
   }).catch(e=>console.log("syncALYear err",e));
 }
+// Keep the existing offline cache, but give every signed-in account its own
+// snapshot. An account without cloud data must never inherit another roster.
+let _accountDataOwner=null;
+try{_accountDataOwner=localStorage.getItem("sb_account_uid")}catch(e){}
+const _accountSnapshots=new Map();
+function _accountData(){
+  return {config:{rt:S.rt,pos:S.pos,ep:true,unit:S.unit||"",lockedUnit:S.lockedUnit||"",lockedRt:S.lockedRt||""},
+    ev:EVS,al:AL,ald:ALD,tyd:TYD,otd:OTD,alReset:AL_RESET_TS,notes:NOTES,shiftov:SHIFT_OV,sal:SAL};
+}
+function _rememberAccountData(uid){
+  if(!uid)return;
+  const raw=JSON.stringify(_accountData());
+  _accountSnapshots.set(uid,raw);
+  try{localStorage.setItem("sb_account_data:"+uid,raw)}catch(e){}
+}
+function _selectAccountData(uid){
+  const previous=fbUser&&fbUser.uid||_accountDataOwner;
+  if(previous===uid||previous===null&&!uid)return;
+  if(_cloudSaveTimer){clearTimeout(_cloudSaveTimer);_cloudSaveTimer=null}
+  if(previous)_rememberAccountData(previous);
+  let saved=null;
+  if(uid){try{saved=JSON.parse(_accountSnapshots.get(uid)||localStorage.getItem("sb_account_data:"+uid)||"null")}catch(e){}}
+  // Adopt the pre-update offline data on the first login only. Once ownership
+  // is known, a different uid starts with its own snapshot or clean defaults.
+  if(previous!==null||saved){
+    const data=saved&&typeof saved==='object'?saved:{},cfg=data.config||{};
+    S.rt=cfg.rt||"4on2off";S.pos=cfg.pos??null;S.unit=cfg.unit||"";
+    S.lockedUnit=cfg.lockedUnit||"";S.lockedRt=cfg.lockedRt||"";
+    S.step=S.pos===null?"type":"cal";
+    S.wT=S.wS=S.wD=S.wN=S.modal=null;
+    S.showH=S.showStats=S.showSal=S.showLeavesOv=S.showShare=false;
+    EVS=data.ev||{};AL=data.al||{};ALD=data.ald||{};TYD=data.tyd||{};OTD=data.otd||{};
+    AL_RESET_TS=data.alReset||{};NOTES=data.notes||{};SHIFT_OV=data.shiftov||{};
+    SAL=JSON.parse(JSON.stringify(Object.assign({},SAL_DEFAULT,data.sal||{})));
+    if(typeof showAdmin!=="undefined")showAdmin=false;
+    if(typeof LEAVES_OV_DATA!=="undefined"){LEAVES_OV_DATA=[];leavesOvRequest++;leavesOvLoading=false;leavesOvError=false;leavesOvSearch="";leavesOvUnitF="";leavesOvTypeF=""}
+    if(typeof _lastOverlayKind!=="undefined")_lastOverlayKind="";
+  }
+  const data=_accountData(),keys={sb_c:data.config,sb_ev:data.ev,sb_al2:data.al,sb_ald:data.ald,
+    sb_tyd:data.tyd,sb_otd:data.otd,sb_al_reset:data.alReset,sb_notes:data.notes,sb_shiftov:data.shiftov,sb_sal:data.sal};
+  for(const [key,value] of Object.entries(keys)){
+    const raw=JSON.stringify(value);
+    try{localStorage.setItem(key,raw)}catch(e){}
+    if(key!=="sb_sal"&&key!=="sb_al_reset")try{sCk(key,raw,3650)}catch(e){}
+  }
+  _accountDataOwner=uid;
+  try{localStorage.setItem("sb_account_uid",uid)}catch(e){}
+}
 function _acceptAuthUser(u){
   const changed=(fbUser&&fbUser.uid||"")!==(u&&u.uid||"");
+  _selectAccountData(u&&u.uid||"");
   if(SAL.referenceOwnerUid&&(!u||u.uid!==SAL.referenceOwnerUid)){SAL=Object.assign({},SAL_DEFAULT,{monthly:{}});try{localStorage.removeItem("sb_sal")}catch(e){}}
   fbUser=u;fbAuthReady=true;
   if(changed){
@@ -543,20 +593,47 @@ function cloudLoad(){
     render();
   });
 }
-let fbLoginPending=false;
-function fbLogin(){const p=new firebase.auth.GoogleAuthProvider();
-  fbLoginPending=true;render();
-  fbAuth.signInWithPopup(p).then(r=>{
-    fbLoginPending=false;
-    if(r&&r.user)_acceptAuthUser(r.user);
-  }).catch(e=>{
-    fbLoginPending=false;render();
-    if(e.code==='auth/popup-blocked'){
-      fbAuth.signInWithRedirect(p);
-    }
-  });
+let fbLoginPending=false,fbLogoutPending=false;
+function _showAuthError(error){
+  const code=error&&error.code||"";
+  if(code==='auth/popup-closed-by-user'||code==='auth/cancelled-popup-request')return;
+  const offline=code==='auth/network-request-failed';
+  alert(lang==='zh'?(offline?'網路連線失敗，請確認連線後再試。':'帳號操作未完成，請稍後再試。'):(offline?'Koneksi gagal. Periksa jaringan lalu coba lagi.':'Operasi akun gagal. Coba lagi nanti.'));
 }
-function fbLogout(){return fbAuth.signOut()}
+async function fbLogin(){
+  if(fbLoginPending||fbLogoutPending)return;
+  fbLoginPending=true;render();
+  try{
+    const p=new firebase.auth.GoogleAuthProvider();
+    p.setCustomParameters({prompt:'select_account'});
+    fbAuth.languageCode=lang==='zh'?'zh-TW':'id';
+    if(fbUser){
+      _rememberAccountData(fbUser.uid);
+      if(_cloudSaveTimer){clearTimeout(_cloudSaveTimer);_cloudSaveTimer=null;cloudSave().catch(e=>console.log("cloudSave err",e))}
+    }
+    // Open inside the click handler; do not await signOut or a cloud write.
+    // A cancelled chooser leaves the original Firebase session intact.
+    try{
+      const r=await fbAuth.signInWithPopup(p);
+      if(r&&r.user)_acceptAuthUser(r.user);
+    }catch(e){
+      if(e&&e.code==='auth/popup-blocked')await fbAuth.signInWithRedirect(p);
+      else throw e;
+    }
+  }catch(e){_showAuthError(e)}
+  finally{fbLoginPending=false;render()}
+}
+function fbSwitchAccount(){return fbLogin()}
+async function fbLogout(){
+  if(fbLoginPending||fbLogoutPending)return;
+  fbLogoutPending=true;render();
+  try{
+    if(_cloudSaveTimer){clearTimeout(_cloudSaveTimer);_cloudSaveTimer=null;cloudSave().catch(e=>console.log("cloudSave err",e))}
+    await fbAuth.signOut();_acceptAuthUser(null);
+  }
+  catch(e){_showAuthError(e)}
+  finally{fbLogoutPending=false;render()}
+}
 let leavesCache={};
 let payrollLeaveState={uid:"",unit:"",loading:false,error:false,months:[]};
 let payrollLeaveRequest=0;
@@ -638,10 +715,12 @@ function addLeave(date,leaveTypeId,hours,reason,detail){
     if(reason)payload.reason=reason;
     await fbDb.collection("leaves").doc(docId).set(payload);
   },"addLeave").then(()=>{
+    if(!fbUser||fbUser.uid!==entry.uid)return;
     // 寫入成功才退役此日舊加班覆寫；失敗時仍保留原本的薪資資料。
     if(entry.schemaVersion>=3&&Object.prototype.hasOwnProperty.call(OTD,date)){delete OTD[date];sOTD()}
     return loadLeaves();
   }).catch(e=>{
+    if(!fbUser||fbUser.uid!==entry.uid)return;
     if(!/INTERNAL ASSERTION/i.test(e&&e.message||"")){
       if(leavesCache[date]){
         leavesCache[date]=leavesCache[date].filter(l=>l.docId!==docId);
@@ -657,6 +736,7 @@ function _isAnnualLT(id){const lt=getLT(id);return id==="annual"||(lt&&(lt.name=
 function _isSickLT(id){const lt=getLT(id)||{};const txt=String((id||"")+" "+(lt.name||"")+" "+(lt.nameId||"")).toLowerCase();return txt.includes("sick")||txt.includes("病假")||txt.includes("sakit")}
 function removeLeave(date,leaveTypeId,docId){
   if(!fbUser)return Promise.resolve();
+  const uid=fbUser.uid;
   let backup=null,backupALD=null,targetId=docId||"";
   if(leavesCache[date]){
     backup=leavesCache[date].slice();
@@ -674,14 +754,15 @@ function removeLeave(date,leaveTypeId,docId){
   return fsEnqueue(async()=>{
     if(targetId){await fbDb.collection("leaves").doc(targetId).delete()}
     else if(leaveTypeId){
-      const legacyId=fbUser.uid+"_"+date+"_"+leaveTypeId;
+      const legacyId=uid+"_"+date+"_"+leaveTypeId;
       await fbDb.collection("leaves").doc(legacyId).delete();
     }else{
-      const snap=await fbDb.collection("leaves").where("uid","==",fbUser.uid).where("date","==",date).get();
+      const snap=await fbDb.collection("leaves").where("uid","==",uid).where("date","==",date).get();
       const refs=[];snap.forEach(d=>refs.push(d.ref));
       for(const ref of refs){await ref.delete();await new Promise(r=>setTimeout(r,30))}
     }
-  },"removeLeave").then(()=>loadLeaves()).catch(e=>{
+  },"removeLeave").then(()=>{if(fbUser&&fbUser.uid===uid)return loadLeaves()}).catch(e=>{
+    if(!fbUser||fbUser.uid!==uid)return;
     if(!/INTERNAL ASSERTION/i.test(e&&e.message||"")){
       if(backup)leavesCache[date]=backup;
       if(backupALD&&Object.keys(backupALD).length)Object.assign(ALD,backupALD);else delete ALD[date];
@@ -1657,7 +1738,7 @@ function cloudLoadSal(d){
       normalizeSal();
       try{localStorage.setItem("sb_sal",JSON.stringify(SAL))}catch(e){}
       // 薪資資料結構或公司核定值完成遷移後，立即回寫自己的雲端，避免換機後反覆套用舊資料。
-      if(before!==JSON.stringify(SAL)&&fbUser)setTimeout(()=>sSAL(),0);
+      if(before!==JSON.stringify(SAL)&&fbUser){const uid=fbUser.uid;setTimeout(()=>{if(fbUser&&fbUser.uid===uid)sSAL()},0)}
     }
   }catch(e){console.log("cloudLoadSal err",e)}
 }
@@ -2655,7 +2736,8 @@ function fbBarHtml(){
   const zh=lang==='zh';
   if(!fbUser)return `<section class="account-card signed-out"><span class="account-avatar">${uiIcon('user',23)}</span><span class="account-copy"><strong>${zh?'讓班表隨你同步':'Sinkronkan jadwal Anda'}</strong><small>${zh?'登入以備份班表與請假資料':'Login untuk mencadangkan jadwal dan cuti'}</small></span><button class="account-login" onclick="fbLogin()" id="loginBtn" ${fbLoginPending?'disabled':''}>${fbLoginPending?(zh?'登入中…':'Memuat…'):(zh?'Google 登入':'Login Google')}</button></section>`;
   const name=fbUser.displayName||fbUser.email||'',pic=fbUser.photoURL?`<img src="${esc(fbUser.photoURL)}" alt="" referrerpolicy="no-referrer">`:uiIcon('user',23);
-  return `<section class="account-card"><span class="account-avatar">${pic}</span><span class="account-copy"><strong>${esc(name)}</strong><small>${S.unit?esc(S.unit==='__all'?(zh?'全部單位':'Semua unit'):S.unit):(zh?'尚未選擇單位':'Unit belum dipilih')}</small></span><button class="account-logout" onclick="fbLogout()">${zh?'登出':'Keluar'}</button></section>`;
+  const busy=fbLoginPending||fbLogoutPending;
+  return `<section class="account-card" aria-busy="${busy}"><span class="account-avatar">${pic}</span><span class="account-copy"><strong>${esc(name)}</strong>${fbUser.displayName&&fbUser.email?`<small class="account-email">${esc(fbUser.email)}</small>`:''}<small>${S.unit?esc(S.unit==='__all'?(zh?'全部單位':'Semua unit'):S.unit):(zh?'尚未選擇單位':'Unit belum dipilih')}</small></span><span class="account-actions"><button type="button" class="account-switch" onclick="fbSwitchAccount()" ${busy?'disabled':''}>${fbLoginPending?(zh?'正在切換…':'Mengganti…'):(zh?'切換其他帳號':'Ganti akun')}</button><button type="button" class="account-logout" onclick="fbLogout()" ${busy?'disabled':''}>${fbLogoutPending?(zh?'登出中…':'Keluar…'):(zh?'登出':'Keluar')}</button></span></section>`;
 }
 function modalLeaveHtml(y,m,d){
   const date=ek(y,m,d),leaves=calendarScopedLeaves(date),myLeaves=myLeave(date),rule=getShiftWorkRule(y,m,d);
@@ -3081,7 +3163,7 @@ function handle(e){
     case "next":if(S.mo===12){S.yr++;S.mo=1}else S.mo++;loadLeaves();loadAdminEv();break;
     case "today":S.yr=TY;S.mo=TM;UI_CAL_VIEW="month";UI_CAL_FILTER="all";loadLeaves();loadAdminEv();break;
     case "chUnit":{if(S.lockedUnit){alert(lang==="zh"?"單位已被管理員鎖定，無法更改":"Unit dikunci oleh admin");break}const sel=document.getElementById(e.currentTarget.dataset.target||"unitChg");if(sel&&changeSelectedUnit(sel.value))render()}break;
-    case "reset":if(S.lockedRt){S.pos=null;S.step="wiz";S.wT=S.wS=S.wN=S.wD=null;break}S.step="type";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){fsEnqueue(()=>fbDb.collection("users").doc(fbUser.uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}),"reset").catch(()=>{})}break;
+    case "reset":if(S.lockedRt){S.pos=null;S.step="wiz";S.wT=S.wS=S.wN=S.wD=null;break}S.step="type";S.rt="4on2off";S.pos=null;S.wT=S.wS=S.wN=S.wD=null;try{localStorage.removeItem("sb_c")}catch(e){}sCk("sb_c","",0);if(fbUser){const uid=fbUser.uid;fsEnqueue(()=>fbDb.collection("users").doc(uid).update({rt:firebase.firestore.FieldValue.delete(),pos:firebase.firestore.FieldValue.delete(),ep:firebase.firestore.FieldValue.delete()}),"reset").catch(()=>{})}break;
     case "open":S.modal={y:S.yr,m:S.mo,d:+el.dataset.d};break;
     case "close":S.modal=null;break;
     case "lunar":S.showLunar=!S.showLunar;try{localStorage.setItem("sb_lunar",S.showLunar?"1":"0")}catch(e){}if(S.showLunar&&typeof loadYiji==="function")loadYiji();break;
@@ -5568,7 +5650,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiAtmosphereSceneHtml()}${uiShiftWeatherHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v327</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v329</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${uiQuickToolsHtml()}${uiDayFocusHtml()}${uiAtmosphereSceneHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${uiShiftWeatherHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }
