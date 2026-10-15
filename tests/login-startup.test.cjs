@@ -13,13 +13,13 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve()};
 
 function authEnv(){
-  const reads=[],writes=[],renders=[],documents=[],config=deferred(),reference=deferred();
+  const reads=[],writes=[],renders=[],documents=[],config=deferred(),reference=deferred(),storage=new Map();
   const c={Promise,console:{log(){}},setTimeout,clearTimeout,Date,
     fbUser:null,fbAuthReady:false,_authInitUid:'',_authInitRequest:0,_cloudLoadRequest:0,_cloudLoading:false,_loading:false,
     _fsQueue:[],_fsRunning:false,payrollLeaveRequest:0,leavesCache:{},payrollLeaveState:{},payrollReferenceRequest:0,payrollReferenceState:'idle',
     SAL:{},SAL_DEFAULT:{},S:{step:'type',rt:'4on2off',pos:null,unit:''},R:{'4on2off':{}},
-    EVS:{},AL:{},ALD:{},TYD:{},OTD:{},NOTES:{},SHIFT_OV:{},lang:'zh',
-    localStorage:{setItem(){},removeItem(){}},sCk(){},cloudLoadSal(){},_handleFatalFsError(){throw Error('fatal')},
+    EVS:{},AL:{},ALD:{},TYD:{},OTD:{},AL_RESET_TS:{},NOTES:{},SHIFT_OV:{},lang:'zh',_cloudSaveTimer:null,
+    localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},sCk(){},cloudLoadSal(){},_handleFatalFsError(){throw Error('fatal')},
     loads:{config:0,leaves:0,events:0,reference:0,locate:0},
     render(){renders.push({loading:c._cloudLoading,pos:c.S.pos})},
     loadAppConfig(){c.loads.config++;return config.promise},
@@ -36,12 +36,127 @@ function authEnv(){
   vm.createContext(c);
   vm.runInContext(slice('function fsEnqueue(', 'let _fatalShown='),c);
   vm.runInContext(slice('function _doAuthInit(', '// 登入後自動定位'),c);
-  vm.runInContext(slice('function _acceptAuthUser(', 'fbAuth.onAuthStateChanged'),c);
+  vm.runInContext(slice('let _accountDataOwner=', 'fbAuth.onAuthStateChanged'),c);
   vm.runInContext(slice('function cloudSave(', 'let fbLoginPending='),c);
-  return{c,reads,writes,renders,documents,config,reference};
+  return{c,reads,writes,renders,documents,config,reference,storage};
 }
 const user=uid=>({uid,displayName:'Synthetic test',email:'test@example.invalid'});
 const snapshot=data=>({exists:!!data,data:()=>data});
+
+function chooserEnv(){
+  const e=authEnv(),popup=deferred(),redirect=deferred(),calls=[],alerts=[];
+  e.c.alert=message=>alerts.push(message);
+  e.c.firebase.auth={GoogleAuthProvider:class{setCustomParameters(value){this.parameters=value}}};
+  e.c.fbAuth={signInWithPopup(provider){calls.push({kind:'popup',provider});return popup.promise},
+    signInWithRedirect(provider){calls.push({kind:'redirect',provider});return redirect.promise},
+    signOut(){calls.push({kind:'logout'});return Promise.resolve()}};
+  vm.runInContext(slice('let fbLoginPending=', 'let leavesCache='),e.c);
+  const run=source=>vm.runInContext(source,e.c);
+  return{...e,popup,redirect,calls,alerts,run};
+}
+
+test('switch opens a Google chooser immediately, blocks duplicate clicks and keeps the current session on cancel',async()=>{
+  const e=chooserEnv();e.c.fbUser=user('A');e.c.S.pos=3;e.c.EVS={private:'A'};
+  const operation=e.c.fbSwitchAccount();
+  assert.equal(e.calls.length,1);assert.equal(e.calls[0].kind,'popup');
+  assert.equal(e.calls[0].provider.parameters.prompt,'select_account');assert.equal(e.c.fbAuth.languageCode,'zh-TW');
+  assert.equal(e.run('fbLoginPending'),true);await e.c.fbSwitchAccount();await e.c.fbLogout();assert.equal(e.calls.length,1);
+  e.popup.reject({code:'auth/popup-closed-by-user'});await operation;
+  assert.equal(e.c.fbUser.uid,'A');assert.equal(e.c.S.pos,3);assert.equal(e.c.EVS.private,'A');
+  assert.equal(e.run('fbLoginPending'),false);assert.equal(e.alerts.length,0);
+});
+
+test('blocked popups use the same account chooser on redirect and handle redirect rejection',async()=>{
+  const e=chooserEnv();e.c.fbUser=user('A');e.c.lang='id';
+  const operation=e.c.fbSwitchAccount();e.popup.reject({code:'auth/popup-blocked'});await flush();
+  assert.equal(e.calls[1].kind,'redirect');assert.equal(e.calls[1].provider,e.calls[0].provider);
+  assert.equal(e.calls[1].provider.parameters.prompt,'select_account');assert.equal(e.c.fbAuth.languageCode,'id');
+  assert.equal(e.run('fbLoginPending'),true);assert.equal(e.c.fbUser.uid,'A');
+  e.redirect.reject({code:'auth/network-request-failed'});await operation;
+  assert.equal(e.run('fbLoginPending'),false);assert.equal(e.alerts.length,1);assert.equal(e.c.fbUser.uid,'A');
+});
+
+test('switch success restores the selected uid and an empty cloud document cannot inherit personal data',async()=>{
+  const e=chooserEnv();e.c.fbUser=user('A');Object.assign(e.c.S,{pos:3,unit:'private-A',lockedUnit:'private-A',lockedRt:'private-rule'});
+  for(const key of ['EVS','AL','ALD','TYD','OTD','AL_RESET_TS','NOTES','SHIFT_OV','SAL'])e.c[key]={private:'A'};
+  const operation=e.c.fbSwitchAccount();e.popup.resolve({user:user('B')});await operation;await flush();
+  assert.equal(e.c.fbUser.uid,'B');assert.equal(e.c.S.pos,null);assert.equal(e.c.S.unit,'');assert.equal(e.c.S.lockedRt,'');
+  assert.equal(e.storage.get('sb_account_uid'),'B');
+  e.documents[0].resolve(snapshot(null));await flush();
+  for(const key of ['EVS','AL','ALD','TYD','OTD','AL_RESET_TS','NOTES','SHIFT_OV','SAL'])assert.equal(e.c[key].private,undefined,key);
+  assert.ok(e.storage.get('sb_account_data:A').includes('private-A'));
+  assert.equal(JSON.parse(e.storage.get('sb_sal')).private,undefined);
+});
+
+test('returning to an account recovers only its own offline snapshot, including fields absent from cloud',async()=>{
+  const e=authEnv();e.c._acceptAuthUser(user('A'));await flush();
+  e.documents[0].resolve(snapshot({rt:'4on2off',pos:3,unit:'unit-A'}));await flush();
+  e.c.NOTES={private:'A'};e.c.SAL={base:123,monthly:{}};
+  e.c._acceptAuthUser(user('B'));await flush();e.documents[1].resolve(snapshot({rt:'4on2off',pos:1,unit:'unit-B'}));await flush();
+  e.c.NOTES={private:'B'};e.c.SAL={base:456,monthly:{}};
+  e.c._acceptAuthUser(user('A'));await flush();
+  assert.equal(e.c.S.pos,3);assert.equal(e.c.S.unit,'unit-A');assert.equal(e.c.NOTES.private,'A');assert.equal(e.c.SAL.base,123);
+  e.documents[2].resolve(snapshot({rt:'4on2off',pos:4}));await flush();
+  assert.equal(e.c.S.pos,4);assert.equal(e.c.NOTES.private,'A');assert.equal(e.c.SAL.base,123);
+});
+
+test('reload with a different remembered owner clears the old cache before loading the new account',async()=>{
+  const e=authEnv();e.c.S.pos=3;e.c.NOTES={private:'A'};e.c.SAL={base:123};
+  vm.runInContext("_accountDataOwner='A'",e.c);e.c._acceptAuthUser(user('B'));await flush();
+  assert.equal(e.c.S.pos,null);assert.equal(e.c.NOTES.private,undefined);assert.equal(e.c.SAL.base,undefined);
+  assert.equal(e.storage.get('sb_account_uid'),'B');assert.ok(e.storage.get('sb_account_data:A'));
+});
+
+test('selecting the same account keeps its roster and does not start a second restore',async()=>{
+  const e=chooserEnv();e.c._acceptAuthUser(user('A'));await flush();
+  e.documents[0].resolve(snapshot({rt:'4on2off',pos:3}));await flush();e.c.NOTES={draft:'A'};
+  const operation=e.c.fbSwitchAccount();e.popup.resolve({user:user('A')});await operation;
+  assert.equal(e.reads.length,1);assert.equal(e.c.S.pos,3);assert.equal(e.c.NOTES.draft,'A');
+});
+
+test('pending saves capture their original uid before opening the chooser',async()=>{
+  const e=chooserEnv(),jobs=[],saved=[];e.c.fbUser=user('A');e.c.S.pos=3;
+  e.c.fsEnqueue=fn=>{jobs.push(fn);return Promise.resolve()};
+  e.c.fbDb={collection:()=>({doc:uid=>({set:async data=>saved.push({uid,data})})})};
+  e.c._cloudSaveTimer=setTimeout(()=>assert.fail('old debounce fired'),2000);
+  const operation=e.c.fbSwitchAccount();assert.equal(e.c._cloudSaveTimer,null);
+  e.c.fbUser=user('B');e.c.S.pos=9;await jobs[0]();assert.equal(saved[0].uid,'A');assert.equal(saved[0].data.pos,3);
+  e.popup.reject({code:'auth/popup-closed-by-user'});await operation;
+});
+
+test('account changes cancel the pending debounce and invalidate administrator detail reads',()=>{
+  const e=authEnv();e.c.fbUser=user('A');e.c.LEAVES_OV_DATA=[{reason:'private'}];e.c.leavesOvRequest=4;
+  Object.assign(e.c,{leavesOvLoading:true,leavesOvError:false,leavesOvSearch:'private',leavesOvUnitF:'A',leavesOvTypeF:'annual',showAdmin:true});
+  e.c._cloudSaveTimer=setTimeout(()=>assert.fail('old debounce fired'),2000);
+  e.c._acceptAuthUser(user('B'));
+  assert.equal(e.c._cloudSaveTimer,null);assert.equal(e.c.LEAVES_OV_DATA.length,0);assert.equal(e.c.leavesOvRequest,5);
+  assert.equal(e.c.leavesOvSearch,'');assert.equal(e.c.showAdmin,false);
+});
+
+test('sign-out clears personal data and a failed sign-out retains the current user',async()=>{
+  const e=chooserEnv();e.c.fbUser=user('A');e.c.NOTES={private:'A'};await e.c.fbLogout();
+  assert.equal(e.c.fbUser,null);assert.equal(e.c.NOTES.private,undefined);assert.equal(e.run('fbLogoutPending'),false);
+  e.c.fbUser=user('B');e.c.NOTES={private:'B'};e.c.fbAuth.signOut=()=>Promise.reject({code:'auth/network-request-failed'});
+  await e.c.fbLogout();assert.equal(e.c.fbUser.uid,'B');assert.equal(e.c.NOTES.private,'B');assert.equal(e.alerts.length,1);
+});
+
+test('account switching remains usable when local storage is unavailable',async()=>{
+  const e=chooserEnv();e.c.localStorage={getItem(){throw Error('blocked')},setItem(){throw Error('blocked')}};
+  e.c.fbUser=user('A');e.c.NOTES={private:'A'};
+  const operation=e.c.fbSwitchAccount();e.popup.resolve({user:user('B')});await operation;await flush();
+  assert.equal(e.c.fbUser.uid,'B');assert.equal(e.c.NOTES.private,undefined);
+  e.c._acceptAuthUser(user('A'));assert.equal(e.c.NOTES.private,'A');
+});
+
+test('account controls are bilingual, show an escaped email and disable both operations while busy',()=>{
+  const e=chooserEnv();e.c.fbUser={...user('A'),displayName:'<A>',email:'a<b@example.invalid'};
+  e.c.uiIcon=()=>'';e.c.esc=value=>String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  vm.runInContext(slice('function fbBarHtml(', 'function modalLeaveHtml('),e.c);
+  const html=e.c.fbBarHtml();assert.match(html,/切換其他帳號/);assert.match(html,/fbSwitchAccount\(\)/);assert.match(html,/fbLogout\(\)/);
+  assert.match(html,/a&lt;b@example.invalid/);assert.doesNotMatch(html,/<A>/);
+  e.run('fbLoginPending=true');const busy=e.c.fbBarHtml();assert.equal((busy.match(/ disabled/g)||[]).length,2);assert.match(busy,/正在切換/);
+  e.run('fbLoginPending=false');e.c.lang='id';assert.match(e.c.fbBarHtml(),/Ganti akun/);
+});
 
 test('pending login write, configuration and payroll do not delay the restored roster',async()=>{
   const e=authEnv();

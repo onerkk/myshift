@@ -50,6 +50,25 @@ function env(){
 }
 function record(type,start,end,extra={}){return {uid:'me',leaveType:type,hours:Math.max(0,Math.min(480,end)-Math.min(480,start))/60,startOffset:start,endOffset:end,shiftHours:12,shiftStartMinute:480,schemaVersion:3,...extra}}
 function near(a,b){assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`)}
+test('a delayed leave cancellation targets its original uid after switching accounts',async()=>{
+  const c=env(),jobs=[];c.fsEnqueue=fn=>new Promise((resolve,reject)=>jobs.push(()=>Promise.resolve().then(fn).then(resolve,reject)));
+  const operation=c.removeLeave('2026-09-10','annual');
+  c.fbUser={uid:'other'};await jobs[0]();await operation;
+  assert.equal(c.writes[0].id,'me_2026-09-10_annual');
+});
+test('a late leave failure cannot restore the previous account records or quota into the new account',async()=>{
+  const c=env(),jobs=[];c.fsEnqueue=fn=>new Promise((resolve,reject)=>jobs.push(()=>Promise.resolve().then(fn).then(resolve,reject)));
+  c.leavesCache['2026-09-10']=[record('annual',0,720,{docId:'old'})];c.ALD['2026-09-10']=8;
+  const operation=c.removeLeave('2026-09-10','annual','old');
+  c.fbUser={uid:'other'};c.leavesCache={};c.ALD={};c.failWrite=true;await jobs[0]();await operation;
+  assert.equal(Object.keys(c.leavesCache).length,0);assert.equal(Object.keys(c.ALD).length,0);assert.equal(c.alerts.length,0);
+});
+test('a late successful leave submission cannot change the selected account overtime',async()=>{
+  const c=env(),jobs=[];c.fsEnqueue=fn=>new Promise((resolve,reject)=>jobs.push(()=>Promise.resolve().then(fn).then(resolve,reject)));
+  const operation=c.addLeave('2026-09-10','annual',8,'',{startOffset:0,endOffset:720,shiftHours:12});
+  c.fbUser={uid:'other'};c.OTD={'2026-09-10':2};c.leavesCache={};await jobs[0]();await operation;
+  assert.equal(c.OTD['2026-09-10'],2);assert.equal(Object.keys(c.leavesCache).length,0);
+});
 const cases=[
   ['full annual','annual',0,720,8,0,0,24000],
   ['regular-only annual','annual',0,480,8,4,0,24600],

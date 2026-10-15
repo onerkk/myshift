@@ -22,7 +22,7 @@ function env(lang='zh'){
     S:{step:'cal',yr:2026,mo:9,rt:'4on2off',unit:'測試單位',showLunar:false,instH:true},UI_TAB:'today',UI_CAL_VIEW:'month',UI_CAL_FILTER:'all',adminEvState:{months:['2026-09'],loading:false,error:false},payrollLeaveState:{uid:'me',unit:'測試單位',months:['2026-09'],loading:false,error:false},PAY_VIEW:{y:2026,m:8},
     RN:{zh:{'4on2off':'四休二'},id:{'4on2off':'4 kerja 2 libur'}},SC:{早:'e',晚:'n',中:'m',休:'o'},
     EVS:{},NOTES:{},TYD:{},ALD:{},SHIFT_OV:{},DP:null,IMG:{icon:'./icons/icon-192x192.png'},
-    fbUser:null,fbLoginPending:false,admin:false,shift:'早',WxSfx:{isMuted:()=>true,getVolume:()=>.3},
+    fbUser:null,fbLoginPending:false,fbLogoutPending:false,admin:false,shift:'早',WxSfx:{isMuted:()=>true,getVolume:()=>.3},
     wxData:null,_wxLoading:false,_wxErrorCode:'',tideData:null,tideErr:true,tideCollapsed:false,
     WXZ:{0:'晴天',2:'局部多雲',3:'多雲',63:'中雨'},WXD:{0:'Cerah',2:'Berawan',3:'Mendung',63:'Hujan'},
     navigator:{onLine:true,userAgent:'test'},
