@@ -1,3 +1,11 @@
+# v333 全畫面沉浸特效
+
+手機在 https://onerkk.github.io/myshift/update.html 選 `myshift-v333-immersive-update.zip`，檢查後提交。這是 v330 起的累積包，亦適用 v331、v332。更新後更多頁底部應顯示 v333。
+
+全畫面天空與前景粒子，14 種情境與四季；新增颱風、冰雹、地震情境及錄音聲景。預覽 20 秒，可隨時結束。地震為手動示意，不是即時警報。首次需輕觸開啟聲音。詳見 UPDATE_v333.md。尚未代為部署。
+
+---
+
 # v332 清楚可讀的日夜 UI 與天氣重設計
 
 手機在 https://onerkk.github.io/myshift/update.html 選 `myshift-v332-ui-update.zip`，檢查後提交。這是 v330 起的累積更新；v331 也可使用。更新完成重開班表，更多頁底部應顯示 v332。

@@ -82,5 +82,41 @@
     "edits": "Excerpt 0–0.847s; loudness normalization; 15/25ms edge fades; MP3 128kbps. No synthesized replacement.",
     "durationSeconds": 0.888,
     "sha256": "b1f72855a48f10d6e6cb3aab1f974f02235b83508017fce6c71f6ebd67d46f9a"
+  },
+  {
+    "file": "hail.mp3",
+    "title": "HAIL .wav",
+    "author": "joly1",
+    "source": "https://freesound.org/people/joly1/sounds/81452/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "field recording",
+    "edits": "Excerpt 8–38s; loudness -22 LUFS, true peak -3dB; edge fades; 128kbps MP3.",
+    "durationSeconds": 30.024,
+    "sha256": "54de43ff9a2bc2d88e9ba768f1bb39714d446b266cdb025bbf8de6e9b7cca5bf"
+  },
+  {
+    "file": "quake.mp3",
+    "title": "Sounds For Earthquakes - Radiator Metal Rumbling.wav",
+    "author": "RutgerMuller",
+    "source": "https://freesound.org/people/RutgerMuller/sounds/51097/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "recorded object foley",
+    "edits": "Recorded radiator shaking; not an actual earthquake recording. Loudness -24 LUFS, true peak -4dB; edge fades; 128kbps MP3.",
+    "durationSeconds": 7.464,
+    "sha256": "8df8744959ff08f7d3050034a4268396dd28b90cea14f6ac5a58c51f66b4316f"
+  },
+  {
+    "file": "rumble.mp3",
+    "title": "Earthquake rumble",
+    "author": "betostado99",
+    "source": "https://freesound.org/people/betostado99/sounds/719551/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "DIY geophone recording; not identified as a particular earthquake event",
+    "edits": "Loudness -25 LUFS, true peak -4dB; edge fades; 128kbps MP3.",
+    "durationSeconds": 14.616,
+    "sha256": "82cbd550b8b7e7c453c1a498bd2a33399fe3b53b222ed06983163c6282f324b4"
   }
 ]

@@ -15,3 +15,12 @@
 來源核對日期：2026-09-24。詳細截取區段、長度與檔案 SHA-256 見同目錄 `sources.json`。
 
 環境錄音作為情境聲景，不代表錄音地點就是使用者所在地；太陽與雪花本身沒有音效，依情境使用現場鳥鳴或風聲。
+
+## v333 新增實錄素材（2026-10-19 查證）
+
+- **hail.mp3** — [HAIL .wav](https://freesound.org/people/joly1/sounds/81452/) · joly1 · CC0 1.0；冰雹敲擊屋頂窗的現場錄音。
+- **quake.mp3** — [Sounds For Earthquakes - Radiator Metal Rumbling.wav](https://freesound.org/people/RutgerMuller/sounds/51097/) · RutgerMuller · CC0 1.0；實際搖晃暖氣片的物件擬音，用於地震情境。**不是實際地震錄音，也不是即時警報。**
+
+颱風、豪雨等聲景使用雨、風與雷聲實錄素材混音，並非錄於使用者所在地。
+
+- **rumble.mp3** — [Earthquake rumble](https://freesound.org/people/betostado99/sounds/719551/) · betostado99 · CC0 1.0；作者說明為自製地震檢波器錄音。僅作情境低頻素材，不宣稱為特定地震事件。與物件擬音混合呈現震動聲景。

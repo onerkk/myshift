@@ -20,11 +20,11 @@ for(const width of [320,393])for(const theme of ['light','dark'])for(const langu
   await page.evaluate(({theme,language,code})=>{lang=language;UI_TAB='weather';MyShiftAppearance.set(theme);wxData.updatedAt=Date.now();wxData.sourceTime=Date.now();wxData.code=code;_wxCurrentView=()=>({code,sourceLabel:language==='zh'?'附近雨量實測 · 模式預報':'Rain observation · Model forecast',stationFresh:true,note:language==='zh'?'附近雨量站近1小時未測得降雨':'No rainfall observed in the past hour'});render()},{theme,language,code});
   await page.waitForTimeout(60);
   const data=await page.evaluate(()=>({w:innerWidth,s:document.documentElement.scrollWidth,colors:[...document.querySelectorAll('.weather-current>.weather-current-note,.weather-current-copy small,.weather-current-copy strong,.weather-current-copy em,.weather-current-copy strong>span,.weather-source b,.weather-source small')].map(e=>({text:e.textContent,color:getComputedStyle(e).color,size:parseFloat(getComputedStyle(e).fontSize),footer:!!e.closest('.weather-source')})),sun:document.querySelector('.weather-current-icon .sky-sculpture')?.className||document.querySelector('.weather-dashboard')?.outerHTML||document.querySelector('#app').textContent,foreground:getComputedStyle(document.querySelector('#wxfx')).display}));
-  assert(data.s<=data.w+1,`overflow ${width}/${theme}/${language}/${code}`);assert.equal(data.foreground,'none');assert.equal(data.sun.includes('sky-night'),hour===23,JSON.stringify({theme,code,hour,sun:data.sun}));
+  assert(data.s<=data.w+1,`overflow ${width}/${theme}/${language}/${code}`);assert.equal(data.foreground,'block');assert.equal(data.sun.includes('sky-night'),hour===23,JSON.stringify({theme,code,hour,sun:data.sun}));
   for(const e of data.colors){const hex=e.color.match(/[\d.]+/g).slice(0,3).map(v=>Math.round(+v).toString(16).padStart(2,'0')).join('');const ratio=contrast(hex,e.footer?'102c3e':'38657d');assert(ratio>=4.5,JSON.stringify({theme,code,ratio,...e}));assert(e.size>=11.3||e.text==='°C','minimum weather text size');}
   if(width===393&&language==='zh'&&process.env.UI_SCREENSHOT_DIR){fs.mkdirSync(process.env.UI_SCREENSHOT_DIR,{recursive:true});await page.locator('.weather-current').screenshot({path:require('node:path').join(process.env.UI_SCREENSHOT_DIR,`${theme}-${hour}-${code}.png`)});}
   checks++;
  }
 }
-assert.deepEqual(errors,[]);await browser.close();console.log(`PASS: ${checks} weather layouts; all weather text >=4.5:1 against brightest sky; day/night follows location, no overlays or JS errors`);
+assert.deepEqual(errors,[]);await browser.close();console.log(`PASS: ${checks} weather layouts; all weather text >=4.5:1 against brightest sky; day/night follows location, foreground enabled and zero JS errors`);
 })().catch(e=>{console.error(e);process.exit(1)});
