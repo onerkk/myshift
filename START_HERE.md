@@ -1,3 +1,5 @@
+> 最新版本：v334 氣象劇場。冰雹撞擊裂紋、寒流結霜與選單重排，詳見 [UPDATE_v334.md](UPDATE_v334.md)。
+
 # v333 全畫面沉浸特效
 
 手機在 https://onerkk.github.io/myshift/update.html 選 `myshift-v333-immersive-update.zip`，檢查後提交。這是 v330 起的累積包，亦適用 v331、v332。更新後更多頁底部應顯示 v333。
