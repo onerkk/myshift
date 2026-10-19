@@ -1,4 +1,4 @@
-v335-observatory
+v336-contrast
 本機修改完成，尚未部署。
-手機使用 update.html 上傳 myshift-v335-observatory-update.zip。
-詳見 UPDATE_v335.md。
+手機使用 update.html 上傳 myshift-v336-contrast-update.zip。
+詳見 UPDATE_v336.md。

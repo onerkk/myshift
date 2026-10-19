@@ -97,7 +97,7 @@
       };
       // Keep navigation and active forms clear. Ordinary card surfaces remain
       // available to clouds and rain, including the centres of large cards.
-      const fullSelector='.bottom-nav,.wk-row,.page-returnbar,.modal-sheet,.wx-detail-sheet,.nature-preview-hud,input,select,textarea';
+      const fullSelector='.bottom-nav,.wk-row,.calendar-month-grid,.calendar-view-switch,.screen-heading,.page-returnbar,.modal-sheet,.wx-detail-sheet,.nature-preview-hud,input,select,textarea';
       document.querySelectorAll(fullSelector).forEach(e=>protect(e.getBoundingClientRect(),true));
       document.querySelectorAll('.status-switch,.pref-switch,.header-actions,.brand-mark,.account-avatar').forEach(e=>protect(e.getBoundingClientRect()));
       for(const scope of document.querySelectorAll('#app,#mr')){

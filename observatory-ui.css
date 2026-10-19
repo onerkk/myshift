@@ -158,3 +158,33 @@ html .calendar-v314 .calendar-month-grid>.wk-row .wk-cell{font-size:.75rem;font-
 html .calendar-v314 .calendar-month-grid>.wk-row .wk-cell.we{color:var(--brand)}
 html .calendar-month-grid>.cal{padding-top:7px}
 html body.scene-theatre{overflow:hidden}
+
+/* v336: readable foreground/background pairs, independent of old theme rules. */
+html .page-returnbar{background:var(--surface);color:var(--ink)}
+html .page-returnbar .return-destination{color:var(--ink-2)}
+html[data-theme] .calendar-view-switch button[aria-pressed="true"],html[data-theme] .language-switch button.active,html[data-theme] .theme-tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);border-color:var(--line-strong);font-weight:700}
+html .today-hero{background-color:#102a3e}
+html .hero-time-labels span,html .hero-work-segments span{color:#d8e6ef}
+html .hero-leave-overview{background:#193d48;color:#f1f7fb}
+html .hero-leave-overview small{color:#d8e6ef}
+html .hero-leave-overview em{color:#ffedba}
+html .week-holiday{color:#80502e}
+html .calendar-v314 .day.today .num{background:#174e43;color:#fff;border-radius:5px;padding-inline:3px}
+html .calendar-v314 .calendar-breaks{background:#234b39}
+html .calendar-v314 .break-total{color:#fff0ba}
+html .calendar-v314 .break-length{background:#eedda8;color:#344022}
+html .calendar-rest-plan{background:var(--surface-2);color:var(--ink)}
+html .calendar-rest-plan small,html .calendar-rest-plan>span>span{color:var(--ink-2)}
+html .modal-done,html .salary-primary-action{background:linear-gradient(145deg,#326665,#214e5a);color:#fff}
+html input::placeholder,html textarea::placeholder{color:var(--ink-3);opacity:1}
+html .calendar-data-note,html .calendar-legend{font-size:.75rem}
+html .day-leave{font-size:.625rem}
+html .calendar-v314 .shift-code{font-size:.68rem}
+html .day-event,html .day-holiday{font-size:.65rem}
+html .today-hero .hero-phase,html .today-hero .hero-countdown>span,html .today-hero .hero-date-context{color:#e0ecf3}
+html .today-hero .hero-time-labels span{color:#e0ecf3}
+/* Headings must remain readable even when light UI overlays night weather. */
+html .screen-heading{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 16px;color:var(--ink);box-shadow:var(--button-shadow)}
+html .screen-heading h1{color:var(--ink)}
+html .screen-heading p{color:var(--ink-2)}
+html .app-version{background:var(--surface);color:var(--ink-2);border-radius:10px;padding:10px 14px}

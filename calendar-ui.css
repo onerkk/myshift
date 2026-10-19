@@ -28,7 +28,7 @@ body:has(.screen-calendar) #nature-sky,body:has(.screen-calendar) #wxfx{z-index:
 .calendar-view-switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border:1px solid var(--line);border-radius:13px;background:var(--surface-2);margin:0 2px}
 .calendar-view-switch button{display:flex;justify-content:center;align-items:center;gap:7px;padding:9px 3px;min-height:42px;border:1px solid transparent;border-radius:9px;color:var(--ink-2);font-weight:700;font-size:.8rem}
 .calendar-view-switch button[aria-pressed="true"]{background:var(--brand);color:var(--surface);border-color:var(--brand);box-shadow:0 2px 5px #0e342b22}
-html[data-theme="dark"] .calendar-view-switch button[aria-pressed="true"]{color:#102a21}
+html[data-theme="dark"] .calendar-view-switch button[aria-pressed="true"]{color:var(--ink);background:var(--surface);border-color:var(--line-strong)}
 .calendar-data-note{display:flex;align-items:center;justify-content:space-between;gap:7px;padding:10px 4px;color:var(--ink-2);font-size:.65rem;line-height:1.6;min-height:36px}
 .calendar-data-note button{flex:none;font-size:.75rem;text-decoration:underline;color:var(--brand);padding:6px 8px;min-height:36px}
 .calendar-v314 .wk-row{gap:4px;padding:10px 0;font-size:.7rem;border-color:var(--line)}

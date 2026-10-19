@@ -5669,7 +5669,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiAtmosphereSceneHtml()}${uiShiftWeatherHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v335</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v336</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${uiQuickToolsHtml()}${uiDayFocusHtml()}${uiAtmosphereSceneHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${uiShiftWeatherHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }
