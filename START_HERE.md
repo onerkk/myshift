@@ -1,3 +1,11 @@
+# v330 手機後台與更新中心
+
+首次只須上傳 `update.html` 到原專案 main 分支根目錄，再開啟 https://onerkk.github.io/myshift/update.html ，貼上具 Contents 寫入權限的 GitHub Token，選擇本次完整 ZIP，檢查後一鍵更新。
+
+GitHub 整合寫入回傳 403，本次未部署；本包為完整原始碼。260 項自動測試通過，未執行實機手機與瀏覽器視覺驗證。
+
+詳見 UPDATE_v330.md。以下為舊版紀錄。
+
 # v329 Google 帳號切換更新
 
 本 ZIP 只包含相對本次上傳 `myshift-main.zip` 有變更的檔案。

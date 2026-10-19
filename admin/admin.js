@@ -149,7 +149,7 @@ function render(){
     app.innerHTML=`<div class="login-box"><h1>⛔ 權限不足</h1><p>您的帳號（${esc(user.email)}）不是管理員</p><button class="btn gray" onclick="logout()">登出</button></div>`;
     return;
   }
-  app.innerHTML=headerHtml()+tabsHtml()+tabBodyHtml()+`<div class="footer">MyShift Admin v3</div>`;
+  app.innerHTML=headerHtml()+tabsHtml()+'<main id="adminContent">'+tabBodyHtml()+'</main>'+`<div class="footer">MyShift Admin v3</div>`;
   bind();
 }
 
@@ -168,7 +168,7 @@ function headerHtml(){
       <h1>⚙️ 班表管理後台 ${roleBadge}</h1>
       <div class="u">${esc(user.displayName||user.email)}</div>
     </div>
-    <button class="btn gray sm" onclick="logout()">登出</button>
+    <div class="header-actions"><a class="btn gray sm" href="../update/">網站更新</a><button class="btn gray sm" onclick="logout()">登出</button></div>
   </div>`;
 }
 
@@ -964,12 +964,18 @@ function usersTabHtml(){
   return `<div class="card">
     <h2>👥 使用者管理（共 ${USERS.length} 位）</h2>
     <div class="search-box">
-      <input class="inp" placeholder="搜尋姓名/email/單位..." value="${esc(userSearch)}" oninput="setUserSearch(this.value)">
+      <input class="inp" aria-label="搜尋姓名、Email 或單位" placeholder="搜尋姓名、Email 或單位" value="${esc(userSearch)}" oninput="setUserSearch(this.value)">
     </div>
-    ${list}
+    <div id="usersList" aria-live="polite">${list}</div>
   </div>`;
 }
-function setUserSearch(v){userSearch=v;const app=$("app");const c=app.querySelector(".card");if(c){/* 只更新列表 */render()}}
+function setUserSearch(v){
+  userSearch=v;
+  const q=v.trim().toLowerCase();
+  const rows=USERS.filter(u=>((u.displayName||"")+" "+(u.email||"")+" "+(u.lockedUnit||u.unit||"")).toLowerCase().includes(q));
+  const list=$("usersList");
+  if(list)list.innerHTML=rows.length?rows.map(userRowHtml).join(""):'<div class="empty">查無使用者</div>';
+}
 
 function userRowHtml(u){
   const name=u.displayName||u.email||u.id;
@@ -988,7 +994,7 @@ function userRowHtml(u){
     <div style="display:flex;align-items:center;gap:8px;width:100%">
       <div class="info">
         <div class="name">${esc(name)} ${badges}</div>
-        <div class="sub">${esc(u.email||"-")} · ${esc(unit)} · ${esc(rtName)}</div>
+        <div class="sub user-email">${esc(u.email||"-")}</div><div class="user-meta"><span>${esc(unit)}</span><span>${esc(rtName)}</span></div>
       </div>
       <button class="btn sm gray" onclick="toggleUser('${u.id}')">${expanded?'收起':'展開'}</button>
     </div>
@@ -1091,7 +1097,7 @@ function bind(){
 // ═══ 註冊 service worker (PWA) ═══
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('/myshift/admin/sw.js').catch(()=>{});
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
   });
 }
 
