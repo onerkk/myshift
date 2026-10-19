@@ -2,7 +2,7 @@
 const MyShiftNavigation=(()=>{
   const tabs=['today','calendar','pay','weather','more'];
   const session=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-  let entries=[],cursor=-1,nextId=0,restoring=false,pendingKey=null,pendingUi=null,navObserver=null,observedNav=null,lastDialogKey='';
+  let entries=[],cursor=-1,nextId=0,restoring=false,pendingKey=null,pendingUi=null,navObserver=null,observedNav=null,lastDialogKey='',returnBarObserver=null,observedReturnBar=null;
   function kind(){
     if(document.getElementById('wx-location-dialog'))return 'location';
     if(wxDetailShow)return 'wx';
@@ -109,6 +109,10 @@ const MyShiftNavigation=(()=>{
       if(!dialog.hasAttribute('aria-labelledby')&&!dialog.hasAttribute('aria-label'))dialog.setAttribute('aria-label',title(entries[cursor]?.route));
       const h=dialog.querySelector('.sheet-returnbar')?.getBoundingClientRect().height||48;dialog.style.setProperty('--sheet-return-height',h+'px');
     }
+    const returnBar=document.querySelector('.page-returnbar');
+    const measureReturn=()=>document.documentElement.style.setProperty('--page-return-height',Math.ceil(document.querySelector('.page-returnbar')?.getBoundingClientRect().height||0)+'px');
+    measureReturn();
+    if(returnBar!==observedReturnBar){returnBarObserver?.disconnect();observedReturnBar=returnBar;if(returnBar&&typeof ResizeObserver!=='undefined'){returnBarObserver=new ResizeObserver(measureReturn);returnBarObserver.observe(returnBar)}}
     const nav=document.querySelector('.bottom-nav');
     if(nav&&nav!==observedNav){
       navObserver?.disconnect();observedNav=nav;

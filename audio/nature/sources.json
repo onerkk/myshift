@@ -118,5 +118,17 @@
     "edits": "Loudness -25 LUFS, true peak -4dB; edge fades; 128kbps MP3.",
     "durationSeconds": 14.616,
     "sha256": "82cbd550b8b7e7c453c1a498bd2a33399fe3b53b222ed06983163c6282f324b4"
+  },
+  {
+    "file": "hail-impact.mp3",
+    "title": "HAIL .wav",
+    "author": "joly1",
+    "source": "https://freesound.org/people/joly1/sounds/81452/",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "recordingType": "field recording",
+    "edits": "Derived from hail.mp3 at 15.6943s; strongest recorded impact, 0.48s excerpt with fade out. Not glass-breaking recording.",
+    "durationSeconds": 0.48,
+    "sha256": "938584ddd0437d010ce25ece798b195191b1a1c9f719991a11e255c798457b08"
   }
 ]

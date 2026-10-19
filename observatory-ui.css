@@ -1,0 +1,160 @@
+/* Observatory 335. Quiet information planes, optical depth, consistent spacing. */
+:root{--surface:#f6f8f9;--surface-2:#edf2f4;--surface-3:#e1eaee;--ink:#152e3d;--ink-2:#425e6e;--ink-3:#506b7a;--line:#cad6dd;--line-strong:#9bafbd;--brand:#235e76;--brand-dark:#17465c;--brand-soft:#dfedf2;--panel-radius:20px;--raised:0 12px 30px -20px #102e4555,inset 0 1px 0 #fff;--button-shadow:0 2px 5px #193d4d14,inset 0 1px 0 #ffffffb3;--inset:inset 0 1px 3px #16344b0b;--plane:rgba(247,250,251,.96);--dock:rgba(246,250,252,.95)}
+html[data-theme=dark]{--surface:#152332;--surface-2:#10202e;--surface-3:#233645;--ink:#f0f5f8;--ink-2:#c0d0db;--ink-3:#adbfcd;--line:#354a5d;--line-strong:#516a7c;--brand:#aed7e6;--brand-dark:#d7ecf4;--brand-soft:#233c4e;--raised:0 16px 36px -20px #0009,inset 0 1px 0 #d4efff14;--button-shadow:0 2px 6px #0002,inset 0 1px 0 #d0eaff12;--inset:inset 0 1px 3px #0002;--plane:rgba(17,32,46,.96);--dock:rgba(17,32,46,.96)}
+html body{letter-spacing:.015em;-webkit-font-smoothing:antialiased}
+html body::before,html body::after{display:none!important}
+html #app{max-width:1060px;margin-inline:auto;background:transparent}
+html .app-shell{background:transparent}
+html .app-header{padding:calc(19px + env(safe-area-inset-top)) 22px 20px;background:var(--plane);border-radius:0;border-bottom:1px solid var(--line);box-shadow:none;backdrop-filter:blur(18px)}
+html .brand-mark{width:42px;height:42px;border-radius:13px;background:linear-gradient(150deg,#466d83,#183a53);box-shadow:inset 0 1px 0 #c5e9ff66,0 4px 10px #0e294d33;border:1px solid #7596a8;color:#fff}
+html .brand-copy strong{font-size:1.13rem;letter-spacing:.12em;font-weight:650;color:var(--ink)}
+html .brand-copy>span{font-size:.7rem;color:var(--ink-2);margin-top:4px}
+html .header-actions{gap:7px}
+html .header-actions button{border-radius:10px;box-shadow:none;background:var(--surface-2);border:1px solid var(--line);min-height:38px}
+html .app-main{padding:22px 18px 110px;gap:22px}
+html .screen-heading{margin-bottom:20px}
+html .screen-heading h1{font-size:1.9rem;font-weight:600;letter-spacing:.06em;line-height:1.3}
+html .screen-heading p{font-size:.78rem;line-height:1.75}
+/* One dominant object; surrounding information stays visually quiet. */
+html .today-hero{padding:23px 22px 0;border-radius:25px;border:1px solid #93afbf77;background:radial-gradient(ellipse at 100% 0,#5c889a88,transparent 60%),linear-gradient(145deg,#243f55,#102a3e 78%);color:#f7fafc;box-shadow:inset 0 1px 0 #e2f5ff70,0 18px 36px -16px #06213b80;overflow:hidden;transform:none!important}
+html .today-hero::before{background:linear-gradient(125deg,#c6e9ff0c,transparent 45%);border:0;inset:0;border-radius:inherit;box-shadow:none}
+html .today-hero::after{display:none}
+html .hero-topline{margin-bottom:20px}
+html .hero-shift-tag{padding:5px 10px;background:#d0eaff15;border:1px solid #c1ddeb40;border-radius:7px;font-size:.72rem;box-shadow:none;color:#eef6fb}
+html .hero-phase{font-size:.65rem;color:#c4d9e4}
+html .hero-main{gap:12px;align-items:center;margin:0 0 21px}
+html .hero-countdown>span{font-size:.77rem;color:#c6d9e5;letter-spacing:.04em}
+html .hero-countdown h1{font-size:clamp(2.3rem,9vw,3.5rem);font-weight:500;line-height:1.22;letter-spacing:-.05em;margin:10px 0 9px;color:#fff;text-shadow:none}
+html .hero-countdown h1 small{font-size:.74rem;font-weight:400;letter-spacing:0;color:#d5e4ee;margin-inline:4px}
+html .hero-date-context{font-size:.65rem;color:#bfd2df}
+html .shift-dial{width:108px;height:116px;flex:0 0 108px;transform:none}
+html .dial-halo,html .dial-shadow{display:none}
+html .dial-case{inset:1px;border:1px solid #9dbac566;border-radius:50%;padding:8px;background:linear-gradient(140deg,#a8bdca66,#0a263a 35%,#234458 65%,#a2beca44);box-shadow:inset 0 1px 0 #d7e9ee66,0 8px 16px #051a2b55}
+html .dial-ring{padding:2px;background:conic-gradient(#b8d7df calc(var(--progress)*1%),#74939e2b 0);box-shadow:none}
+html .dial-face{background:radial-gradient(ellipse at 35% 15%,#34596d,#142f44 75%);box-shadow:inset 0 1px 6px #01162699;border:0}
+html .dial-face>svg{width:16px;height:16px;color:#b8d7e5;margin-bottom:5px}
+html .dial-face b{font-size:1.6rem;font-weight:500;color:#f5f8fb}
+html .dial-face b small{font-size:.64rem}
+html .dial-face>span{font-size:6.8px;color:#c1d4df;letter-spacing:.03em}
+html .hero-timeline{margin-top:17px}
+html .hero-track{height:3px;border-radius:3px;box-shadow:none;background:#aac5d426}
+html .hero-track>span{background:linear-gradient(90deg,#789eaf,#d7e9ec);box-shadow:0 0 12px #d7e9ec30}
+html .hero-time-labels,html .hero-work-segments{font-size:.63rem;color:#c5d8e3}
+html .hero-footer{margin:19px -22px 0;padding:3px 22px;min-height:54px;background:#061d302e;border-top:1px solid #aec5d32b;font-size:.72rem}
+html .hero-footer button{font-size:.72rem;color:#eff7fc}
+html .hero-day-leave,html .today-hero .day-leave-count{box-shadow:none}
+/* Strip actions, not four competing floating boxes. */
+html .quick-launch{gap:0;padding:7px 0;background:var(--plane);border:1px solid var(--line);border-radius:17px;box-shadow:var(--raised);overflow:hidden}
+html .quick-launch>button{background:transparent;border:0;border-radius:0;box-shadow:none;min-height:77px;padding:9px 3px;gap:8px;border-right:1px solid var(--line)}
+html .quick-launch>button:last-child{border-right:0}
+html .quick-launch>button>span,html #app .quick-launch>button:first-child>span{width:28px;height:28px;border:0;border-radius:0;background:transparent;color:var(--brand);box-shadow:none}
+html .quick-launch>button b{font-size:.7rem;font-weight:600}
+html .section-kicker{margin-bottom:17px;align-items:center}
+html .section-kicker h2{font-size:1.02rem;font-weight:650;letter-spacing:.045em}
+html .section-kicker button{font-size:.73rem;min-height:36px}
+html .day-focus,html .week-overview,html .shift-weather,html .insight-row,html .salary-dashboard,html .weather-dashboard,html .settings-panel,html .theme-panel,html .quick-controls,html .feature-directory,html .nature-controls,html .leave-center{background:var(--plane);border:1px solid var(--line);border-radius:20px;box-shadow:var(--raised);padding:20px 18px}
+html .focus-grid,html .shift-weather-grid{gap:0;border-top:1px solid var(--line);padding-top:16px}
+html .focus-tile,html .shift-weather-point{background:transparent;border:0;box-shadow:none;border-radius:0;padding:0 15px;min-height:112px}
+html .focus-tile:first-child,html .shift-weather-point:first-child{padding-left:0;border-right:1px solid var(--line)}
+html .focus-tile:last-child,html .shift-weather-point:last-child{padding-right:0}
+html .focus-tile strong{font-size:1.5rem;font-weight:500;letter-spacing:-.03em;margin:8px 0}
+html .focus-tile small{font-size:.73rem;line-height:1.7}
+html .focus-icon{display:none}
+html .focus-footnote{border-top:1px solid var(--line);padding-top:12px;margin-top:13px;font-size:.7rem}
+html .schedule-day{border:0;border-right:1px solid var(--line);border-radius:0;background:transparent;box-shadow:none;min-height:125px;padding:7px 2px}
+html .schedule-day:last-child{border-right:0}
+html .schedule-date{font-size:1.4rem;font-weight:500}
+html .schedule-day.current{background:#234e65;border:0;border-radius:11px;box-shadow:0 6px 12px #163a5325;color:#fff}
+html .insight-row{min-height:145px}
+html .insight-icon{border:0;box-shadow:none;background:var(--brand-soft)}
+html .insight-row .insight-copy strong{font-size:1.65rem;font-weight:500}
+/* Navigation: a compact suspended glass dock with one active accent. */
+html .bottom-nav,html[data-theme=dark] .bottom-nav{bottom:calc(10px + env(safe-area-inset-bottom));width:calc(100% - 28px);max-width:740px;border:1px solid var(--line-strong);border-radius:22px;padding:7px 5px 6px;background:var(--dock);backdrop-filter:blur(24px);box-shadow:0 10px 30px #061a3540,inset 0 1px 0 #ffffff44;gap:2px}
+html .bottom-nav-item{min-height:56px;padding:3px 1px;gap:4px;font-size:.65rem;font-weight:550;letter-spacing:.025em;border:0;background:transparent;box-shadow:none;border-radius:15px;color:var(--ink-2)}
+html .bottom-nav-icon{width:33px;height:28px;border:0;border-radius:10px;background:transparent;box-shadow:none;transform:none}
+html .bottom-nav-icon svg{width:20px;height:20px}
+html .bottom-nav-item.active{background:var(--brand-soft);color:var(--ink)}
+html .bottom-nav-item.active .bottom-nav-icon,html[data-theme=dark] .bottom-nav-item.active .bottom-nav-icon{background:transparent;color:var(--brand);border:0;box-shadow:none;transform:none}
+html .bottom-nav-item.active::after{display:none}
+/* Calendar and finance retain useful density with quieter supporting frames. */
+html .calendar-v314{padding:20px 10px;background:var(--plane);border-radius:20px;border:1px solid var(--line);box-shadow:var(--raised)}
+html .calendar-v314 .cal{gap:6px 3px}
+html .calendar-v314 .day{border-radius:9px;box-shadow:none;border:1px solid color-mix(in srgb,var(--line) 65%,transparent);min-height:106px;background:var(--surface-2)}
+html .calendar-v314 .day.today{box-shadow:inset 0 0 0 1px var(--brand);border-color:var(--brand);min-height:106px}
+html .calendar-v314 .day .num{font-size:1.2rem;font-weight:550}
+html .calendar-toolbar,html .calendar-view-switch{box-shadow:none}
+html .calendar-highlight{box-shadow:none;border-radius:13px}
+html .salary-hero{border-radius:18px;background:radial-gradient(ellipse at 100% 0,#537c9066,transparent 65%),linear-gradient(145deg,#263f54,#102b40);box-shadow:inset 0 1px 0 #d9efff50,0 9px 20px -14px #09243899;border:1px solid #7798a9}
+html .salary-net{font-size:3.2rem;font-weight:450;letter-spacing:-.055em}
+html .salary-metrics{gap:0;padding:18px 0;border-block:1px solid var(--line)}
+html .salary-metrics>div{background:transparent;border:0;border-right:1px solid var(--line);box-shadow:none;border-radius:0}
+html .salary-metrics>div:last-child{border-right:0}
+html .salary-detail-list>div{padding-block:12px}
+html .salary-breakdown{border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent}
+html .weather-current,html[data-theme=dark] .weather-current{border-radius:20px;box-shadow:inset 0 1px 0 #d3ebff44,0 12px 20px -18px #12354d;border-color:#7592a7}
+html .forecast-day{border:0;border-right:1px solid var(--line);border-radius:0;background:transparent;box-shadow:none}
+html .forecast-day:last-child{border:0}
+html .forecast-strip{padding-block:14px;border-block:1px solid var(--line);gap:0}
+html .precip-visual{box-shadow:none;border-radius:14px;background:var(--surface-2)}
+html .settings-row,html .quick-control-card{box-shadow:none;border-radius:0;border:0;border-bottom:1px solid var(--line);background:transparent;padding:16px 0}
+html .settings-row:last-child,html .quick-control-card:last-child{border-bottom:0}
+html .settings-row-icon,html .quick-control-icon{box-shadow:none;border:0;border-radius:11px;background:var(--brand-soft)}
+html .theme-choices button{border-radius:11px;box-shadow:none}
+html .feature-grid{gap:0}
+html .feature-grid>button{border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent;padding:16px 10px}
+html .feature-grid>button:nth-child(odd){border-right:1px solid var(--line)}
+html .account-card,html[data-theme=dark] .account-card{background:linear-gradient(135deg,#365c72,#17364d);border-color:#718fa0;border-radius:20px;box-shadow:var(--raised)}
+/* Scene catalogue: wide scene posters give each weather family a distinct identity. */
+html .nature-controls{padding:20px 16px!important}
+html .nature-controls-head{padding-bottom:15px;gap:10px}
+html .nature-emblem{background:var(--brand-soft);box-shadow:none;border:0;border-radius:12px}
+html .nature-controls-head h3{font-size:1.04rem;letter-spacing:.04em}
+html .nature-live{display:none}
+html .nature-master{box-shadow:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding-inline:0;background:transparent}
+html .nature-previews{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
+html .nature-previews button{min-height:123px!important;align-items:flex-end!important;padding:14px 12px!important;border:1px solid #9cb5c866!important;box-shadow:inset 0 1px 0 #ffffff28,0 6px 14px #08213c20!important;background:linear-gradient(180deg,#0b27400a,#092037ed),url('./images/atmosphere/lagoon-day.webp') center 40%/cover!important;overflow:hidden;border-radius:15px!important;isolation:isolate}
+html .nature-previews button::before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(130deg,#5a8fba20,transparent);pointer-events:none}
+html .nature-previews button[data-effect=typhoon],html .nature-previews button[data-effect=storm],html .nature-previews button[data-effect=heavy],html .nature-previews button[data-effect=hail],html .nature-previews button[data-effect=rain]{background-image:linear-gradient(180deg,#0b274000,#071a2aee),url('./images/atmosphere/lagoon-storm.webp')!important}
+html .nature-previews button[data-effect=cold]::before,html .nature-previews button[data-effect=snow]::before{background:linear-gradient(135deg,#effaff99,#a5d7eb44,transparent 75%);box-shadow:inset 9px 9px 22px #e6faff44}
+html .nature-previews button[data-effect=fog]::before{background:linear-gradient(150deg,#eef8ffaa,#bdccd955,transparent)}
+html .nature-previews button[data-effect=heat]::before{background:linear-gradient(145deg,#ffcc7980,transparent 75%)}
+html .nature-previews .effect-tile-icon{position:absolute;top:12px;left:12px;width:27px!important;height:27px!important;background:#0b2a4655!important;color:#eff9ff!important;box-shadow:none!important;border:1px solid #e0f1ff40;border-radius:8px!important}
+html .nature-previews b{color:#fff!important;font-size:.9rem!important;font-weight:550;letter-spacing:.06em}
+html .nature-previews small{color:#d6e6f0!important;font-size:.62rem;line-height:1.6}
+html .nature-previews .effect-play{top:14px;right:13px;color:#e0edf5!important;font-size:.8rem}
+html .nature-previews button[aria-pressed=true]{outline:2px solid #a8d8ec;outline-offset:2px;transform:translateY(-1px)}
+/* Full-screen stage is optional; the same effects also run across the working UI. */
+html body.scene-theatre #app{visibility:hidden;pointer-events:none}
+html body.scene-theatre #wxfx{z-index:31}
+.theatre-caption{position:fixed;left:max(28px,calc((100vw - 780px)/2));right:28px;bottom:calc(60px + env(safe-area-inset-bottom));z-index:40;pointer-events:none;color:#f6fafc;text-shadow:0 2px 20px #071b2b99}
+.theatre-caption[hidden]{display:none}
+.theatre-caption::before{content:'';position:absolute;z-index:-1;inset:-60px -40px -80px;background:linear-gradient(transparent,#07192799 60%,#071927bf)}
+.theatre-caption>small{display:block;font:500 10px/1.7 sans-serif;letter-spacing:.22em;color:#d6e5ee}
+.theatre-caption>strong{display:block;font-size:3rem;font-weight:350;letter-spacing:.16em;margin:10px 0}
+.theatre-caption>p{font-size:.8rem;letter-spacing:.08em;color:#e0ebf1;margin:0 0 20px}
+.theatre-caption>span{font-size:.62rem;color:#c6d8e4;letter-spacing:.03em}
+html .nature-preview-hud{top:calc(env(safe-area-inset-top) + 12px);left:12px;right:12px;background:#0c243be6;border:1px solid #aac8dc4d!important;border-radius:14px!important;box-shadow:0 6px 26px #061a3b30!important;gap:8px;padding:8px 9px 8px 12px}
+html .nature-preview-hud>span{font-size:.66rem;line-height:1.5;flex:1}
+html .nature-preview-hud>button{font-size:.65rem;padding:6px 9px;min-height:38px;background:#dfedf4;color:#17364a;border-color:#e3f5ff;border-radius:9px}
+.theatre-toggle{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;cursor:pointer;min-width:45px;position:relative}
+.theatre-toggle input{position:absolute;opacity:0;width:100%;height:100%;cursor:pointer}
+.theatre-toggle i{display:block;width:24px;height:13px;border:1px solid #8ca9bd;border-radius:10px;background:#ffffff15}
+.theatre-toggle i::after{content:'';display:block;width:7px;height:7px;background:#d9e9f3;border-radius:50%;margin:2px;transition:translate .2s}
+.theatre-toggle input:checked+i::after{translate:10px 0}
+.theatre-toggle input:focus-visible+i{outline:2px solid white;outline-offset:3px}
+.theatre-toggle em{font-size:8px;font-style:normal;color:#d6e7f3;white-space:nowrap}
+@media(min-width:760px){html .app-main{padding:28px 30px 120px}html .nature-previews{grid-template-columns:repeat(4,minmax(0,1fr))!important}html .today-hero{padding-top:30px}html .hero-countdown h1{font-size:4rem}html .shift-dial{width:140px;height:146px;flex-basis:140px}html .dial-face b{font-size:2.2rem}}
+@media(max-width:350px){html .app-main{padding:16px 12px 100px}html .app-header{padding-inline:14px}html .today-hero{padding:19px 16px 0}html .hero-footer{margin-inline:-16px;padding-inline:16px}html .shift-dial{width:85px;height:92px;flex-basis:85px}html .hero-countdown h1{font-size:2.2rem}html .dial-face b{font-size:1.3rem}html .dial-face>span{font-size:5.7px}html .quick-launch>button b{font-size:.62rem}html .nature-previews button{padding:12px 9px!important}html .nature-previews small{font-size:.58rem}}
+@media(prefers-reduced-motion:reduce){.theatre-toggle i::after{transition:none}}
+html .hero-main{min-height:122px;margin-top:0;margin-bottom:17px}
+html .hero-topline{margin-bottom:13px}
+html .app-header{padding-top:calc(14px + env(safe-area-inset-top));padding-bottom:14px}
+html .hero-countdown .time-part{font-size:2.7rem;font-weight:500}
+@media(max-width:350px){html .hero-countdown .time-part{font-size:2.1rem}html .hero-main{min-height:110px}}
+/* Weekday labels stay under the measured return bar, and stop at the grid end. */
+html .calendar-month-grid{position:relative;min-width:0;overflow:visible}
+html .calendar-v314 .calendar-month-grid>.wk-row{position:sticky;top:var(--page-return-height,0px);z-index:34;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin:0;padding:12px 0;background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line);box-shadow:0 6px 10px -9px #0b294f99}
+html .calendar-v314 .calendar-month-grid>.wk-row .wk-cell{font-size:.75rem;font-weight:650;line-height:1.4;text-align:center;color:var(--ink)}
+html .calendar-v314 .calendar-month-grid>.wk-row .wk-cell.we{color:var(--brand)}
+html .calendar-month-grid>.cal{padding-top:7px}
+html body.scene-theatre{overflow:hidden}

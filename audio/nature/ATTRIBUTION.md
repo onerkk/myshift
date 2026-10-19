@@ -24,3 +24,6 @@
 颱風、豪雨等聲景使用雨、風與雷聲實錄素材混音，並非錄於使用者所在地。
 
 - **rumble.mp3** — [Earthquake rumble](https://freesound.org/people/betostado99/sounds/719551/) · betostado99 · CC0 1.0；作者說明為自製地震檢波器錄音。僅作情境低頻素材，不宣稱為特定地震事件。與物件擬音混合呈現震動聲景。
+
+## v335 hail-impact.mp3
+Derived from the existing CC0 hail.mp3 (joly1, Freesound 81452), excerpt at 15.6943s for 0.48s with fade out. A recorded hail impact accent synchronized to the visual strike, not a glass-breaking recording.

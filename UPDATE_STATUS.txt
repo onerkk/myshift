@@ -1,4 +1,4 @@
-v334-theatre
-已完成本機修改與驗證，尚未部署至正式網站。
-請用 update.html 上傳 myshift-v334-theatre-update.zip。
-詳見 UPDATE_v334.md。
+v335-observatory
+本機修改完成，尚未部署。
+手機使用 update.html 上傳 myshift-v335-observatory-update.zip。
+詳見 UPDATE_v335.md。

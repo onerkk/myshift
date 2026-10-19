@@ -2,7 +2,7 @@
    Asset provenance and edits: audio/nature/ATTRIBUTION.md. */
 (function(root){
   'use strict';
-  const files={rain:'rain.mp3',wind:'wind.mp3',leaves:'leaves.mp3',birds:'birds.mp3',crickets:'crickets.mp3',thunder:'thunder.mp3',click:'click.mp3',hail:'hail.mp3',quake:'quake.mp3',rumble:'rumble.mp3'};
+  const files={rain:'rain.mp3',wind:'wind.mp3',leaves:'leaves.mp3',birds:'birds.mp3',crickets:'crickets.mp3',thunder:'thunder.mp3',click:'click.mp3',hail:'hail.mp3',iceImpact:'hail-impact.mp3',quake:'quake.mp3',rumble:'rumble.mp3'};
   root.NatureAudio={create:function(){
     let context=null,master=null,buttonBus=null,scene={season:null,wind:0},buttonVolume=.45,mode='none',muted=true,unlocked=false,revision=0,lastThunder=-Infinity,lastClick=-Infinity,status='muted',volume=.3;
     const cache=new Map(),decoded=new Set(),loops=new Map(),oneshots=new Set(),tails=new Set();
@@ -85,7 +85,8 @@
       load(key).then(buffer=>{if(ticket!==revision||muted||!permitted()||document.hidden||key==='click'&&performance.now()-requested>200)return;const node=context.createBufferSource(),gain=context.createGain();node.buffer=buffer;gain.gain.value=amount;node.connect(gain);gain.connect(key==='click'?buttonBus:master);if(key==='click')node.playbackRate.value=1+(Math.random()-.5)*.035;oneshots.add(node);node.onended=()=>{oneshots.delete(node);node.disconnect();gain.disconnect()};node.start()}).catch(()=>announce('error'));
     }
     function triggerThunder(){const now=performance.now();if(now-lastThunder<25000||!['storm','typhoon'].includes(mode))return;lastThunder=now;oneShot('thunder',.45)}
-    function setMode(value){if(value!==mode){revision++;lastThunder=-Infinity;for(const node of oneshots){try{node.stop()}catch(e){}}oneshots.clear()}mode=value;refresh()}
+    function triggerIceImpact(){if(mode==='hail'&&decoded.has('iceImpact'))oneShot('iceImpact',.7)}
+    function setMode(value){if(value==='hail'&&context)load('iceImpact').catch(()=>{});if(value!==mode){revision++;lastThunder=-Infinity;for(const node of oneshots){try{node.stop()}catch(e){}}oneshots.clear()}mode=value;refresh()}
     function setVolume(v){volume=Math.max(0,Math.min(1,Number(v)||0));try{localStorage.setItem('nature_volume',String(volume))}catch(e){}refresh()}
     function forceSilence(){stopAll();if(master)master.gain.value=0;announce('paused')}
     document.addEventListener('visibilitychange',()=>{if(document.hidden){stopAll();if(master)master.gain.value=0;if(context&&context.state==='running')context.suspend().catch(()=>{});announce('paused')}else if(context&&unlocked&&!muted&&permitted()){context.resume().then(refresh).catch(()=>announce('waiting'))}else refresh()});
@@ -93,7 +94,7 @@
     document.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)&&!muted){initAudio();refresh()}});
     document.addEventListener('change',e=>{if(e.target.matches('select,input[type="checkbox"],input[type="radio"]'))oneShot('click',.45)},{passive:true});
     document.addEventListener('click',e=>{if(muted||!e.target.closest('button:not(:disabled),[role="button"],summary')||e.target.closest('[data-a="sfx"]'))return;const now=performance.now();if(now-lastClick<90)return;lastClick=now;oneShot('click',.55)},{passive:true});
-    return{initAudio,toggle,setMode,isMuted:()=>muted||!permitted(),triggerThunder,refresh,setVolume,getVolume:()=>volume,getStatus:()=>status,
+    return{initAudio,toggle,setMode,isMuted:()=>muted||!permitted(),triggerThunder,triggerIceImpact,refresh,setVolume,getVolume:()=>volume,getStatus:()=>status,
       setScene(value){scene=Object.assign({},scene,value);refresh()},setButtonVolume(value){buttonVolume=Math.max(0,Math.min(1,Number(value)||0));try{localStorage.setItem('nature_button_volume',String(buttonVolume))}catch(e){}if(buttonBus)buttonBus.gain.setTargetAtTime(buttonVolume,context.currentTime,.05)},getButtonVolume:()=>buttonVolume,setSeasonSnd:refresh,stopSeasonSnd:forceSilence,_forceSilence:forceSilence,
       _debug:()=>({mode,muted,unlocked,status,volume,buttonVolume,scene,context:context&&context.state,loops:[...loops.keys()],voices:[...loops.values()].reduce((n,v)=>n+v.nodes.size,oneshots.size),cache:[...cache.keys()],decoded:[...decoded],loopVoices:Object.fromEntries([...loops].map(([key,v])=>[key,v.nodes.size]))})};
   }};
