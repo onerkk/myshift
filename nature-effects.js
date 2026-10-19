@@ -1,5 +1,5 @@
 /* v319 layered atmosphere, physical wind response and seasonal scene.
-   Foreground clouds and leaves intentionally pass over content; only text is protected.
+   Weather motion is confined to atmospheric windows; application data stays unobstructed.
     Existing photographic assets; time-based motion.
    No weather API, account data, or pay state is written by this module. */
 (function(root){
@@ -222,7 +222,10 @@
       if(time-lastLightUpdate>1||lastLightUpdate<0){lastLightUpdate=time;document.documentElement.style.setProperty('--sun-x',Math.round(clamp((hour-5)/14,0,1)*70+15)+'%')}
       document.body.dataset.atmosphere=m;
       drawSky(m,hour,dark);
+      // No foreground animation crosses application data. Weather stays inside scene windows.
+      // Advance particles here so rain and seasonal motion remain alive within those windows.
       if(!reduced.matches){drawLeaves(dt,season,m);drawRain(dt,m,dark);drawSnow(dt,m);drawAnimals(m,hour)}
+      ctx.clearRect(0,0,w,h);
       // Protect text on both front planes, never entire content cards.
       if(layoutDirty||time-rectTick>.5||rectTick<0)collectQuiet();
       for(const c of [bg,ctx]){c.save();c.globalCompositeOperation='destination-out';c.drawImage(mask,0,0,w,h);c.restore()}

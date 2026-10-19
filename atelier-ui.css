@@ -88,3 +88,43 @@ html[data-theme=dark] .quick-launch>button>span{background:linear-gradient(145de
 .sky-night .sky-sun::after,.sky-clear.sky-night .sky-sun::after{content:"";position:absolute;inset:auto;width:89%;height:90%;right:-20%;top:-16%;border:0;border-radius:50%;background:#294957;box-shadow:inset 1px -1px 3px #12314666}
 .sky-overcast .sky-sun,.sky-fog .sky-sun,.sky-snow .sky-sun,.sky-unknown .sky-sun{display:none}.sky-overcast .sky-cloud{transform:translateY(-5px);filter:brightness(.93)}.sky-unknown .sky-cloud{opacity:.65}.sky-fog .sky-cloud{opacity:.7;filter:blur(1px)}.sky-fog::after{content:"";position:absolute;left:18%;right:17%;bottom:25%;height:4px;border-radius:4px;background:#a9bfc5;box-shadow:7px 9px 0 #c5d5d8,-5px 18px 0 #95acb6}
 .sky-snow .sky-drops{display:block!important}.sky-snow .sky-drops b{width:5px;height:5px;background:#eef7f5;border:1px solid #c5d8dd;border-radius:50%;transform:none;box-shadow:0 1px 3px #597e9980;animation:none}
+
+/* v332: opaque information planes, restrained elevation, atmospheric weather. */
+:root{--bg:#e9eef0;--surface:#ffffff;--surface-2:#f3f6f7;--surface-3:#e5ecee;--ink:#172e3b;--ink-2:#425d6b;--ink-3:#4c6571;--line:#cdd9de;--line-strong:#a6bbc5;--brand:#205e70;--brand-dark:#164452;--brand-soft:#e1edf0;--panel-radius:23px;--raised:inset 0 1px 0 #fff,0 2px 0 #bdcbd2,0 12px 24px -16px #183c565c;--button-shadow:inset 0 1px 0 #fff,0 2px 0 #b5c7cf,0 6px 12px -10px #21435988}
+html[data-theme=dark]{--bg:#0b1722;--surface:#1b2c3c;--surface-2:#142535;--surface-3:#283d4e;--ink:#f1f6fa;--ink-2:#c4d4e0;--ink-3:#b7cad8;--line:#3a5367;--line-strong:#5d7b91;--brand:#a4d5e7;--brand-dark:#d7edf5;--brand-soft:#284756;--raised:inset 0 1px 0 #deefff1f,0 2px 0 #06111c,0 12px 26px -16px #000b;--button-shadow:inset 0 1px 0 #deefff29,0 2px 0 #06111c,0 6px 12px -10px #000c}
+body{background:radial-gradient(ellipse at 90% 0,#e0edf3,transparent 40rem),var(--bg);font-family:"Noto Sans TC","Noto Sans CJK TC",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+html[data-theme=dark] body{background:radial-gradient(ellipse at 90% 0,#19374b70,transparent 40rem),var(--bg)}
+body::after{opacity:.06}#wxfx,body:has(.screen-calendar) #wxfx{display:none!important}#nature-sky{opacity:.18!important}
+.app-header{padding-top:calc(22px + env(safe-area-inset-top));padding-bottom:24px}.brand-copy strong{font-size:1.2rem}.brand-copy>span{font-size:.78rem}.brand-mark{border-radius:14px}
+.screen-heading h1{font-size:1.8rem}.screen-heading p{font-size:.85rem}.section-kicker h2{font-size:1.06rem}.section-kicker button{font-size:.8rem}
+.day-focus,.week-overview,.shift-weather,.salary-dashboard,.weather-dashboard,.tide-panel,.leave-summary,.settings-panel,.feature-directory{background:var(--surface);color:var(--ink)}
+.focus-tile,.shift-weather-point{background:var(--surface-2);box-shadow:inset 0 1px 3px #17394b0a}.focus-tile small,.shift-point-top,.shift-weather-context,.focus-footnote{font-size:.78rem;line-height:1.7}.focus-tile>span:not(.focus-icon){font-size:.75rem}.quick-launch>button b{font-size:.78rem}
+.insight-copy small,.insight-meta,.period-caption,.calendar-data-note,.salary-reconcile-note{font-size:.75rem;line-height:1.75}.insight-row{background:var(--surface);box-shadow:var(--raised)}
+/* This component owns every foreground color; no inherited legacy white on ivory. */
+html .weather-current,html[data-theme=dark] .weather-current{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:16px 8px;align-items:center;position:relative;isolation:isolate;padding:24px 20px 0;border-radius:21px;border:1px solid #6e91a6;background:radial-gradient(ellipse at 100% 0,#38657d80,transparent 64%),#153447;color:#f5f9fc;box-shadow:inset 0 1px 0 #c8e9fa55,inset 0 -2px 0 #061d2d,0 3px 0 #9eb3be,0 18px 26px -22px #12354d;overflow:hidden;text-align:left;transform:none}
+.weather-current::before{display:none}
+html .weather-current .weather-current-copy{position:relative;z-index:1;min-width:0;color:#f5f9fc}
+html .weather-current .weather-current-copy>small{font-size:.75rem;line-height:1.7;color:#d2e3ef;font-weight:500}
+html .weather-current .weather-current-copy strong{display:block;margin:8px 0 5px;font-size:4.4rem;line-height:1.1;letter-spacing:-.065em;color:#ffffff;font-weight:600;font-variant-numeric:tabular-nums;text-shadow:none}
+html .weather-current .weather-current-copy strong>span{font-size:1.25rem;line-height:1.5;letter-spacing:0;vertical-align:top;margin:8px 0 0 6px;color:#e6f0f7;font-weight:500}
+html .weather-current .weather-current-copy em{font-size:1rem;line-height:1.7;display:block;color:#f5f9fc;font-weight:600;letter-spacing:.02em}
+html .weather-current .weather-current-copy .weather-current-note{font-size:.75rem!important;line-height:1.8;margin-top:8px;color:#d2e3ef;font-weight:400}
+html .weather-current .weather-current-icon{position:relative;width:112px;height:144px;background:none;box-shadow:none;border:0;transform:none;align-self:center;overflow:visible}
+html .sky-sculpture{width:128px;height:128px;perspective:none;filter:none;animation:none;display:block}
+html .weather-current-icon .sky-sculpture{width:140px;height:150px;margin-left:-14px}
+.weather-object{width:100%;height:100%;display:block;overflow:visible;filter:none}
+html .weather-current .weather-source{position:relative;grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px 12px;justify-content:space-between;margin:3px -20px 0;padding:13px 20px 16px;border-top:1px solid #82a4b53b;background:#102c3e;color:#d2e3ef;line-height:1.7}
+html .weather-current .weather-source b{font-size:.71rem;line-height:1.7;max-width:100%;color:#d2e3ef;font-weight:500;overflow-wrap:anywhere}
+html .weather-current .weather-source small{font-size:.71rem;line-height:1.7;color:#d2e3ef;text-align:left}.weather-source small br{display:none}
+html .insight-icon.weather .sky-sculpture{width:64px;height:64px}.forecast-heading{margin-top:24px}.forecast-heading h3{font-size:1rem}.forecast-heading>span{font-size:.75rem;color:var(--ink-2)}
+html .wx-live-status,html .wx-place-row{font-size:.8rem;line-height:1.8;color:var(--ink-2)}.wx-live-status button,.wx-place-row button{font-size:.8rem;min-height:44px;color:var(--brand)}
+html .wx-source-credit{font-size:.74rem;line-height:1.8;color:var(--ink-2)}.wx-source-credit a{color:var(--brand)}.forecast-day>span{font-size:.67rem}.forecast-day>small{font-size:.72rem}.rain-station-meta,.rain-station-title small,.rain-metrics small{font-size:.75rem;line-height:1.7}
+.atmosphere-view{border-radius:23px}.scene-heading>span,.scene-heading>button{background:#102e43;color:#edf6fc;border-color:#8eafc46b;backdrop-filter:none;font-size:.75rem}.scene-caption{background:linear-gradient(0deg,#0d283cfb,#0d283ce6 65%,transparent);padding-top:45px}.scene-caption small{font-size:.75rem;color:#d2e3ef}.scene-caption strong{font-size:1.55rem;color:#fff}.scene-micro>span{font-size:.7rem;color:#e1eff8;background:#193a50;border-color:#718fa75e}
+html[data-theme=dark] .scene-heading>span,html[data-theme=dark] .scene-heading>button{background:#102e43;color:#edf6fc}.screen-weather .atmosphere-view{height:300px}
+/* Typography remains opaque during page transitions. */
+.ui-enter>*{animation:none!important}.ui-enter{opacity:1!important}.bottom-nav{border-radius:23px;box-shadow:inset 0 1px 0 #fff8,0 3px 0 var(--line-strong),0 12px 28px -12px #15354a55}.bottom-nav-item{font-size:.76rem}.bottom-nav-icon{border-radius:12px}
+html .salary-dashboard-head,html .salary-dashboard-head h2,html .period-navigation,html .salary-metrics strong{color:var(--ink)}
+html .salary-metrics span{color:var(--ink-2);font-size:.75rem}.salary-hero p{font-size:.78rem;color:#d9e7ee}.salary-hero>span{font-size:.8rem;color:#e5eef2}.salary-net{color:#fff}.theme-choices button{min-height:44px;font-size:.8rem}.settings-panel h3,.feature-directory h3{color:var(--ink)}
+@media(max-width:375px){html .weather-current{grid-template-columns:minmax(0,1fr) 86px;padding:20px 14px 0;gap:14px 3px}html .weather-current .weather-current-icon{width:86px;height:120px}html .weather-current-icon .sky-sculpture{width:112px;height:126px;margin-left:-14px}html .weather-current .weather-current-copy strong{font-size:3.65rem}html .weather-current .weather-source{margin-left:-14px;margin-right:-14px;padding-left:14px;padding-right:14px}.forecast-day>span{font-size:.6rem}.forecast-day>small{font-size:.67rem}.focus-tile small,.focus-footnote{font-size:.73rem}.brand-copy strong{font-size:1.04rem}}
+
+html .weather-current>.weather-current-note{grid-column:1/-1;color:#d2e3ef;font-size:.75rem!important;line-height:1.8;text-align:left;display:block;margin-top:-5px;position:relative;z-index:1}

@@ -1,3 +1,11 @@
+# v332 清楚可讀的日夜 UI 與天氣重設計
+
+手機在 https://onerkk.github.io/myshift/update.html 選 `myshift-v332-ui-update.zip`，檢查後提交。這是 v330 起的累積更新；v331 也可使用。更新完成重開班表，更多頁底部應顯示 v332。
+
+修正天氣白字融入淺底、重做發光日輪與雲層、移除跨越資訊的裝飾、調整全站字級與層次。詳細內容及驗證限制見 UPDATE_v332.md。尚未代為部署。
+
+---
+
 # v331 UI 與更新修正
 
 使用 https://onerkk.github.io/myshift/update.html 選本次更新 ZIP，檢查後一鍵套用。主站與後台已整合日夜立體介面；詳見 UPDATE_v331.md。
