@@ -161,6 +161,7 @@ function loginHtml(){
   </div>`;
 }
 
+function toggleAdminAppearance(){const value=document.documentElement.dataset.theme==='light'?'dark':'light';document.documentElement.dataset.theme=value;try{localStorage.setItem('_appearance',value)}catch(e){}render();}
 function headerHtml(){
   const roleBadge=isSuper()?'<span class="badge su">超級管理員</span>':'<span class="badge ad">管理員</span>';
   return `<div class="hd">
@@ -168,7 +169,7 @@ function headerHtml(){
       <h1>⚙️ 班表管理後台 ${roleBadge}</h1>
       <div class="u">${esc(user.displayName||user.email)}</div>
     </div>
-    <div class="header-actions"><a class="btn gray sm" href="../update/">網站更新</a><button class="btn gray sm" onclick="logout()">登出</button></div>
+    <div class="header-actions"><button class="btn gray sm" type="button" onclick="toggleAdminAppearance()">${document.documentElement.dataset.theme==='light'?'夜間外觀':'日間外觀'}</button><a class="btn gray sm" href="../update/">網站更新</a><button class="btn gray sm" onclick="logout()">登出</button></div>
   </div>`;
 }
 

@@ -1,3 +1,13 @@
+# v331 UI 與更新修正
+
+使用 https://onerkk.github.io/myshift/update.html 選本次更新 ZIP，檢查後一鍵套用。主站與後台已整合日夜立體介面；詳見 UPDATE_v331.md。
+
+之前的 signal timed out 為部署查詢逾時，當時 GitHub 部署已成功。新版會自動重試、交叉查詢並保留提交紀錄，無需因查詢逾時重傳 ZIP。更新後重新開啟班表及更新頁。
+
+269 項自動測試與 174 組瀏覽器版面檢查通過。本包尚未代為部署，未進行實體手機驗證。
+
+---
+
 # v330 手機後台與更新中心
 
 首次只須上傳 `update.html` 到原專案 main 分支根目錄，再開啟 https://onerkk.github.io/myshift/update.html ，貼上具 Contents 寫入權限的 GitHub Token，選擇本次完整 ZIP，檢查後一鍵更新。

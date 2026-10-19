@@ -33,8 +33,8 @@ function target(){
 }
 function lock(value){busy=value;for(const id of ['connect','inspect','publish','token','zip','owner','repo','branch','clear','retryDeploy'])$(id).disabled=value;}
 function invalidate(){inspection++;plan=null;$('review').hidden=true;$('files').replaceChildren();}
-async function api(t,path,options={}){
- const res=await fetch(`https://api.github.com/repos/${encodeURIComponent(t.owner)}/${encodeURIComponent(t.repo)}${path}`,{...options,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+$('token').value.trim(),'X-GitHub-Api-Version':'2022-11-28',...(options.body?{'Content-Type':'application/json'}:{})},cache:'no-store',signal:AbortSignal.timeout(45000)});
+async function api(t,path,options={},timeoutMs=45000){
+ const res=await fetch(`https://api.github.com/repos/${encodeURIComponent(t.owner)}/${encodeURIComponent(t.repo)}${path}`,{...options,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+$('token').value.trim(),'X-GitHub-Api-Version':'2022-11-28',...(options.body?{'Content-Type':'application/json'}:{})},cache:'no-store',signal:AbortSignal.timeout(timeoutMs)});
  if(!res.ok){let msg='';try{msg=(await res.json()).message||''}catch{}
  throw Error(`GitHub ${res.status}：${res.status===401?'授權碼無效或過期':res.status===403?'權限不足、分支受保護或 API 額度限制':res.status===404?'找不到儲存庫、分支，或授權碼沒有存取權':res.status===409||res.status===422?'版本衝突，請重新檢查更新包':msg||'連線失敗'}`);}
  return res.status===204?null:res.json();
@@ -93,28 +93,41 @@ async function publish(){
  const created=await post(p.t,'/git/trees',{base_tree:p.tree,tree});
  const commit=await post(p.t,'/git/commits',{message:'手機更新班表 '+new Date().toISOString(),tree:created.sha,parents:[p.base]});
  await api(p.t,'/git/refs/heads/'+encodeURIComponent(p.t.branch),{method:'PATCH',body:JSON.stringify({sha:commit.sha,force:false})});
- submitted=true;deployed={t:p.t,sha:commit.sha};plan=null;$('publish').hidden=true;step('stepCommit','done');link('查看這次更新紀錄',`https://github.com/${p.t.owner}/${p.t.repo}/commit/${commit.sha}`);
+ submitted=true;deployed={t:p.t,sha:commit.sha};rememberDeployment();plan=null;$('publish').hidden=true;step('stepCommit','done');link('查看這次更新紀錄',`https://github.com/${p.t.owner}/${p.t.repo}/commit/${commit.sha}`);
  await checkDeployment();
  }catch(e){status((submitted?'更新已提交；部署確認失敗：':'尚未完成網站更新：')+e.message,true);if(!submitted){invalidate();step('stepCommit','');}else $('retryDeploy').hidden=false;}finally{lock(false);}
 }
+function transientDeploymentError(e){return /timed out|timeout|network|fetch|abort|signal|GitHub 5\d\d|GitHub 429/i.test(e?.message||'');}
+function rememberDeployment(){try{localStorage.setItem('myshift_deploy_receipt',JSON.stringify(deployed))}catch(e){}}
+function deploymentDone(message){step('stepDeploy','done');status(message);$('retryDeploy').hidden=true;link('開啟更新後的班表',new URL('?updated='+deployed.sha,siteHome).href);}
 async function checkDeployment(){
  if(!deployed)return;const {t,sha}=deployed;step('stepDeploy','active');$('retryDeploy').hidden=true;
- status('更新已提交，等待 GitHub Pages 部署。部署成功前不代表網站已更新。');
- const pause=()=>new Promise(r=>setTimeout(r,5000));
- for(let i=0;i<24;i++){
-  try{const builds=await api(t,'/pages/builds?per_page=10'),build=builds.find(x=>x.commit===sha);
-   if(build?.status==='built'){step('stepDeploy','done');status('GitHub Pages 已完成這次部署。請重新開啟班表；已安裝的 App 可能需要關閉再開啟。');link('開啟更新後的班表',new URL('?updated='+sha,siteHome).href);return;}
-   if(build?.status==='errored')throw Error('Pages 部署失敗，請查看 GitHub 部署紀錄。');
-  }catch(e){if(!/GitHub (403|404)/.test(e.message))throw e;}
-  try{const runs=await api(t,'/actions/runs?head_sha='+sha+'&per_page=20');const pages=runs.workflow_runs.filter(r=>/pages/i.test(r.name||r.path||''));
-   const failed=pages.find(r=>r.status==='completed'&&r.conclusion!=='success');
-   if(failed){link('查看部署錯誤',failed.html_url);throw Error('Pages 工作流程未成功：'+failed.conclusion);}
-   if(pages.some(r=>r.status==='completed'&&r.conclusion==='success')){step('stepDeploy','done');status('GitHub Pages 工作流程已完成。請重新開啟班表。');link('開啟更新後的班表',new URL('?updated='+sha,siteHome).href);return;}
-  }catch(e){if(!/GitHub (403|404)/.test(e.message))throw e;}
-  await pause();
+ status('更新已提交，等待 GitHub Pages 部署。請保持頁面開啟；查詢逾時會自動重試。');
+ const pause=()=>new Promise(r=>setTimeout(r,5000)),started=Date.now();let lastIssue='';
+ for(let i=0;i<18&&Date.now()-started<120000;i++){
+  // Actions is queried first: Pages builds may be slow or unavailable on Actions deployments.
+  try{
+   const runs=await api(t,'/actions/runs?head_sha='+sha+'&per_page=20',{},8000),pages=(runs.workflow_runs||[]).filter(r=>/pages/i.test(r.name||r.path||''));
+   if(pages.some(r=>r.status==='completed'&&r.conclusion==='success')){deploymentDone('GitHub Pages 已部署成功。請關閉再重新開啟班表，以載入新版。');return;}
+   const failed=pages.find(r=>r.status==='completed'&&!['success','cancelled','skipped','neutral'].includes(r.conclusion));
+   if(failed){link('查看部署錯誤',failed.html_url);throw Error('Pages 工作流程回報未成功：'+failed.conclusion);}
+  }catch(e){if(transientDeploymentError(e)||/GitHub (403|404)/.test(e.message))lastIssue=e.message;else throw e;}
+  try{
+   const builds=await api(t,'/pages/builds?per_page=10',{},8000),build=Array.isArray(builds)?builds.find(x=>x.commit===sha):null;
+   if(build?.status==='built'){deploymentDone('GitHub Pages 已部署成功。請關閉再重新開啟班表，以載入新版。');return;}
+   if(build?.status==='errored')throw Error('GitHub Pages 明確回報部署失敗，請查看部署紀錄。');
+  }catch(e){if(transientDeploymentError(e)||/GitHub (403|404)/.test(e.message))lastIssue=e.message;else throw e;}
+  status(lastIssue?'更新已提交；部署查詢暫時未回應，正在自動重試。\n不必重新上傳 ZIP。':'更新已提交，GitHub Pages 正在排隊或部署。\n完成後會自動顯示結果。');await pause();
  }
- step('stepDeploy','');status('更新已提交，但尚未確認部署成功。可能仍在排隊或缺少部署查詢權限，請稍後重新檢查。');$('retryDeploy').hidden=false;link('查看 GitHub Actions',`https://github.com/${t.owner}/${t.repo}/actions`);
+ step('stepDeploy','');status('更新已提交，尚未確認部署結果。查詢可能受網路或權限影響，這不代表更新失敗。\n可按「重新檢查部署」，不必重新上傳 ZIP。');$('retryDeploy').hidden=false;link('查看 GitHub Actions',`https://github.com/${t.owner}/${t.repo}/actions`);
 }
+try{
+ const saved=JSON.parse(localStorage.getItem('myshift_deploy_receipt')||'null');
+ if(saved?.t&&/^[a-f0-9]{40}$/.test(saved.sha)&&/^[\w-]+$/.test(saved.t.owner)&&/^[\w.-]+$/.test(saved.t.repo)){
+  deployed=saved;step('stepCommit','done');status('已保留上次更新紀錄。填入授權碼後，可重新檢查部署，不必再次上傳 ZIP。');$('retryDeploy').hidden=false;link('查看上次更新紀錄',`https://github.com/${saved.t.owner}/${saved.t.repo}/commit/${saved.sha}`);
+ }
+}catch(e){}
+
 $('inspect').addEventListener('click',inspect);$('publish').addEventListener('click',publish);
 $('clear').addEventListener('click',()=>{$('token').value='';invalidate();status('已清除授權碼。');});
 for(const id of ['token','owner','repo','branch','zip'])$(id).addEventListener('input',invalidate);
