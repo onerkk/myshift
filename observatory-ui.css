@@ -112,9 +112,9 @@ html .nature-controls-head h3{font-size:1.04rem;letter-spacing:.04em}
 html .nature-live{display:none}
 html .nature-master{box-shadow:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding-inline:0;background:transparent}
 html .nature-previews{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
-html .nature-previews button{min-height:123px!important;align-items:flex-end!important;padding:14px 12px!important;border:1px solid #9cb5c866!important;box-shadow:inset 0 1px 0 #ffffff28,0 6px 14px #08213c20!important;background:linear-gradient(180deg,#0b27400a,#092037ed),url('./images/atmosphere/lagoon-day.webp') center 40%/cover!important;overflow:hidden;border-radius:15px!important;isolation:isolate}
+html .nature-previews button{min-height:123px!important;align-items:flex-end!important;padding:14px 12px!important;border:1px solid #9cb5c866!important;box-shadow:inset 0 1px 0 #ffffff28,0 6px 14px #08213c20!important;background:linear-gradient(180deg,#0b27400a,#092037ed),url('https://upload.wikimedia.org/wikipedia/commons/a/af/Cirrus_Clouds1.jpg') center 40%/cover!important;overflow:hidden;border-radius:15px!important;isolation:isolate}
 html .nature-previews button::before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(130deg,#5a8fba20,transparent);pointer-events:none}
-html .nature-previews button[data-effect=typhoon],html .nature-previews button[data-effect=storm],html .nature-previews button[data-effect=heavy],html .nature-previews button[data-effect=hail],html .nature-previews button[data-effect=rain]{background-image:linear-gradient(180deg,#0b274000,#071a2aee),url('./images/atmosphere/lagoon-storm.webp')!important}
+html .nature-previews button[data-effect=typhoon],html .nature-previews button[data-effect=storm],html .nature-previews button[data-effect=heavy],html .nature-previews button[data-effect=hail],html .nature-previews button[data-effect=rain]{background-image:linear-gradient(180deg,#0b274000,#071a2aee),url('https://upload.wikimedia.org/wikipedia/commons/6/6e/Cumulus_clouds_-_NOAA.jpg')!important}
 html .nature-previews button[data-effect=cold]::before,html .nature-previews button[data-effect=snow]::before{background:linear-gradient(135deg,#effaff99,#a5d7eb44,transparent 75%);box-shadow:inset 9px 9px 22px #e6faff44}
 html .nature-previews button[data-effect=fog]::before{background:linear-gradient(150deg,#eef8ffaa,#bdccd955,transparent)}
 html .nature-previews button[data-effect=heat]::before{background:linear-gradient(145deg,#ffcc7980,transparent 75%)}
@@ -268,8 +268,8 @@ html .nature-controls-head h3{font-size:19px}
 html .nature-previews button{min-height:144px!important}
 html .nature-previews b{font-size:16px!important;font-weight:650}
 html .nature-previews small{font-size:12px;line-height:1.55;color:#e3edf4!important}
-html .nature-previews button[data-effect=snow]{background-image:linear-gradient(180deg,#0b274000,#071a2af5),url('./images/atmosphere/lagoon-winter.webp')!important}
-html .nature-previews button[data-effect=cold]{background-image:linear-gradient(180deg,#0b274000,#071a2af5),url('./images/atmosphere/frost-glass.webp'),url('./images/atmosphere/lagoon-night.webp')!important}
+html .nature-previews button[data-effect=snow]{background-image:linear-gradient(180deg,#0b274000,#071a2af5),url('https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/Reeds_%2831919808003%29.jpg/1280px-Reeds_%2831919808003%29.jpg')!important}
+html .nature-previews button[data-effect=cold]{background-image:linear-gradient(180deg,#0b274000,#071a2af5),url('./images/atmosphere/frost-glass.webp'),url('https://upload.wikimedia.org/wikipedia/commons/a/af/Cirrus_Clouds1.jpg')!important}
 html .nature-preview-hud>span{font-size:12px}
 html .nature-preview-hud>button{font-size:12px;min-height:44px}
 html .theatre-toggle em{font-size:10px}
@@ -283,4 +283,7 @@ html .scene-lighting{font:500 12px system-ui;min-height:44px;max-width:90px;back
 body[data-atmosphere=earthquake] #nature-sky{transform:translate(var(--quake-x,0px),var(--quake-y,0px)) scale(1.02)}
 @media(prefers-reduced-motion:reduce){body[data-atmosphere=earthquake] #nature-sky{transform:none}}
 
-html .nature-previews button[data-effect=cloud],html .nature-previews button[data-effect=drizzle],html .nature-previews button[data-effect=fog]{background-image:linear-gradient(180deg,#0b274000,#071a2af5),url('./images/atmosphere/lagoon-overcast.webp')!important}
+html .nature-previews button[data-effect=cloud],html .nature-previews button[data-effect=drizzle],html .nature-previews button[data-effect=fog]{background-image:linear-gradient(180deg,#0b274000,#071a2af5),url('https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/Stratocumulus_Cloud_in_Milton%2C_Florida.jpg/1280px-Stratocumulus_Cloud_in_Milton%2C_Florida.jpg')!important}
+
+/* v338 observation provenance is always readable. */
+.nature-observation-state{padding:14px 16px;border:1px solid var(--border,#829aa7);border-radius:14px;background:var(--card,#fff);color:var(--tx,#243e48);font-size:13px;line-height:1.7;margin:14px 0}

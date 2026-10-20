@@ -149,7 +149,7 @@ function render(){
     app.innerHTML=`<div class="login-box"><h1>⛔ 權限不足</h1><p>您的帳號（${esc(user.email)}）不是管理員</p><button class="btn gray" onclick="logout()">登出</button></div>`;
     return;
   }
-  app.innerHTML=headerHtml()+tabsHtml()+'<main id="adminContent">'+tabBodyHtml()+'</main>'+`<div class="footer">MyShift Admin · v337</div>`;
+  app.innerHTML=headerHtml()+tabsHtml()+'<main id="adminContent">'+tabBodyHtml()+'</main>'+`<div class="footer">MyShift Admin · v338</div>`;
   bind();
 }
 

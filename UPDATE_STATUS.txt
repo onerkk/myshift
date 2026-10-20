@@ -1,4 +1,2 @@
-v337-studio
-修改與本機驗證完成後供手機套用；尚未部署。
-手機使用 update.html 上傳 myshift-v337-studio-update.zip。
-詳見 UPDATE_v337.md。
+v338-observed PREVIEW
+未部署；288 項 Node 測試通過。完整天氣實測 Worker 串接、攝影檔下載與瀏覽器合成驗收未完成。詳見 UPDATE_v338.md。

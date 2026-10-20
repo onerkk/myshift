@@ -2560,7 +2560,7 @@ function effectDescription(v,zh){
 }
 function natureControlsHtml(){
   const zh=lang==='zh',quality=WxFx.getQuality(),volume=Math.round(WxSfx.getVolume()*100),buttonVolume=Math.round(WxSfx.getButtonVolume()*100),master=isFxMasterEnabled(),adminEnabled=isFxAdminEnabled(),enabled=master&&adminEnabled;
-  return `<section class="nature-controls"><div class="nature-controls-head"><span class="nature-emblem" aria-hidden="true">${studioIcon('sun',22)}</span><div><h3>${zh?'全畫面沉浸光景':'Suasana layar penuh'}</h3><p>${zh?'前後景光影、氣象粒子與錄音聲景':'Cahaya, partikel & lanskap rekaman'}</p></div><span class="nature-live">${zh?'情境播放':'Suasana'}</span></div><button class="nature-master" onclick="setUserPref('visualFx',!isFxMasterEnabled())" role="switch" aria-checked="${enabled}" ${adminEnabled?'':'disabled'}><span><b>${zh?'沉浸光景':'Suasana imersif'}</b><small>${!adminEnabled?(zh?'管理員已停用':'Dinonaktifkan admin'):enabled?(zh?'光影隨天氣與季節流動':'Cahaya mengikuti cuaca dan musim'):(zh?'已關閉，輕觸恢復':'Dimatikan; ketuk untuk aktif')}</small></span><span class="status-switch${enabled?' on':''}" aria-hidden="true"><i></i></span></button>${uiAtmosphereSceneHtml()}<div class="nature-level" role="group" aria-label="${zh?'動畫密度':'Kepadatan animasi'}">${[['subtle','輕柔','Lembut'],['balanced','自然','Alami'],['rich','沉浸','Imersif']].map(([v,z,id])=>`<button onclick="WxFx.setQuality('${v}');render()" aria-pressed="${quality===v}" class="${quality===v?'active':''}">${zh?z:id}</button>`).join('')}</div><label class="nature-volume"><span>${zh?'環境音量':'Volume'}</span><input type="range" min="0" max="100" value="${volume}" aria-label="${zh?'環境音量':'Volume ambience'}" oninput="WxSfx.setVolume(this.value/100);this.nextElementSibling.value=this.value+'%'"/><output>${volume}%</output></label><label class="nature-volume"><span>${zh?'按鍵音量':'Volume tombol'}</span><input type="range" min="0" max="100" value="${buttonVolume}" aria-label="${zh?'按鍵音量':'Volume tombol'}" oninput="WxSfx.setButtonVolume(this.value/100);this.nextElementSibling.value=this.value+'%'"/><output>${buttonVolume}%</output></label><small class="nature-audio-status">${WxSfx.isMuted()?(zh?'已靜音，開啟上方聲音開關即可聆聽':'Aktifkan suara di atas untuk mendengar'):(zh?'自然錄音與情境擬音依模式切換':'Rekaman mengikuti cuaca dan waktu')}</small><div class="nature-previews"><span>${zh?'氣象劇場 · 全畫面 20 秒':'Pratinjau layar penuh 20 dtk'}</span>${[['clear','晴空','Cerah'],['cloud','雲層','Awan'],['fog','濃霧','Kabut'],['drizzle','細雨','Gerimis'],['rain','降雨','Hujan'],['heavy','豪雨','Hujan lebat'],['wind','強風','Angin'],['storm','雷雨','Badai'],['typhoon','颱風','Topan'],['hail','冰雹','Hujan es'],['snow','飄雪','Salju'],['cold','寒流','Dingin'],['heat','熱浪','Panas'],['earthquake','地震情境','Simulasi gempa']].map(([v,z,id])=>`<button data-effect="${v}" aria-pressed="false" onclick="previewNature('${v}',this)" ${enabled&&isFxEnabled('weather')?'':'disabled'}><span class="effect-tile-icon">${studioIcon(({clear:'sun',cloud:'cloud',rain:'rain',wind:'wind',storm:'storm',drizzle:'rain',heavy:'rain',typhoon:'typhoon',hail:'hail',snow:'snow',fog:'fog',heat:'sun',cold:'snow',earthquake:'quake'})[v],22)}</span><span class="effect-copy"><b>${zh?z:id}</b><small>${effectDescription(v,zh)}</small></span><span class="effect-play" aria-hidden="true">↗</span></button>`).join('')}</div><div class="nature-seasons" aria-label="${zh?'四季預覽':'Pratinjau musim'}">${[['spring','春','Semi'],['summer','夏','Panas'],['autumn','秋','Gugur'],['winter','冬','Dingin']].map(([v,z,id])=>`<button onclick="previewNatureSeason('${v}',this)" ${enabled?'':'disabled'}>${zh?z:id}</button>`).join('')}</div><div class="nature-visibility-controls" role="group" aria-label="${zh?'光景分類開關':'Sakelar suasana'}">${[['weather','天氣','Cuaca'],['seasonal','四季','Musim'],['animals','生態','Satwa']].map(([key,z,id])=>`<button onclick="setUserPref('fxDetail.${key}',!isFxEnabled('${key}'))" aria-pressed="${isFxEnabled(key)}" ${enabled?'':'disabled'}><i></i>${zh?z:id}</button>`).join('')}</div><p class="nature-preview-state" role="status"></p><a href="./audio/nature/ATTRIBUTION.md" target="_blank" rel="noopener">${zh?'錄音來源與授權':'Sumber & lisensi rekaman'} ↗</a></section>`;
+  return `<section class="nature-controls"><div class="nature-controls-head"><span class="nature-emblem" aria-hidden="true">${studioIcon('sun',22)}</span><div><h3>${zh?'全畫面沉浸光景':'Suasana layar penuh'}</h3><p>${zh?'前後景光影、氣象粒子與錄音聲景':'Cahaya, partikel & lanskap rekaman'}</p></div><span class="nature-live">${zh?'情境播放':'Suasana'}</span></div><button class="nature-master" onclick="setUserPref('visualFx',!isFxMasterEnabled())" role="switch" aria-checked="${enabled}" ${adminEnabled?'':'disabled'}><span><b>${zh?'沉浸光景':'Suasana imersif'}</b><small>${!adminEnabled?(zh?'管理員已停用':'Dinonaktifkan admin'):enabled?(zh?'光影隨天氣與季節流動':'Cahaya mengikuti cuaca dan musim'):(zh?'已關閉，輕觸恢復':'Dimatikan; ketuk untuk aktif')}</small></span><span class="status-switch${enabled?' on':''}" aria-hidden="true"><i></i></span></button>${uiAtmosphereSceneHtml()}<div class="nature-level" role="group" aria-label="${zh?'動畫密度':'Kepadatan animasi'}">${[['subtle','輕柔','Lembut'],['balanced','自然','Alami'],['rich','沉浸','Imersif']].map(([v,z,id])=>`<button onclick="WxFx.setQuality('${v}');render()" aria-pressed="${quality===v}" class="${quality===v?'active':''}">${zh?z:id}</button>`).join('')}</div><label class="nature-volume"><span>${zh?'環境音量':'Volume'}</span><input type="range" min="0" max="100" value="${volume}" aria-label="${zh?'環境音量':'Volume ambience'}" oninput="WxSfx.setVolume(this.value/100);this.nextElementSibling.value=this.value+'%'"/><output>${volume}%</output></label><label class="nature-volume"><span>${zh?'按鍵音量':'Volume tombol'}</span><input type="range" min="0" max="100" value="${buttonVolume}" aria-label="${zh?'按鍵音量':'Volume tombol'}" oninput="WxSfx.setButtonVolume(this.value/100);this.nextElementSibling.value=this.value+'%'"/><output>${buttonVolume}%</output></label><small class="nature-audio-status">${WxSfx.isMuted()?(zh?'已靜音，開啟上方聲音開關即可聆聽':'Aktifkan suara di atas untuk mendengar'):(zh?'自然錄音與情境擬音依模式切換':'Rekaman mengikuti cuaca dan waktu')}</small><div class="nature-previews"><span>${zh?'氣象劇場 · 全畫面 20 秒':'Pratinjau layar penuh 20 dtk'}</span>${[['clear','晴空','Cerah'],['cloud','雲層','Awan'],['fog','濃霧','Kabut'],['drizzle','細雨','Gerimis'],['rain','降雨','Hujan'],['heavy','豪雨','Hujan lebat'],['wind','強風','Angin'],['storm','雷雨','Badai'],['typhoon','颱風','Topan'],['hail','冰雹','Hujan es'],['snow','飄雪','Salju'],['cold','寒流','Dingin'],['heat','熱浪','Panas'],['earthquake','地震情境','Simulasi gempa']].map(([v,z,id])=>`<button data-effect="${v}" aria-pressed="false" onclick="previewNature('${v}',this)" ${enabled&&isFxEnabled('weather')?'':'disabled'}><span class="effect-tile-icon">${studioIcon(({clear:'sun',cloud:'cloud',rain:'rain',wind:'wind',storm:'storm',drizzle:'rain',heavy:'rain',typhoon:'typhoon',hail:'hail',snow:'snow',fog:'fog',heat:'sun',cold:'snow',earthquake:'quake'})[v],22)}</span><span class="effect-copy"><b>${zh?z:id}</b><small>${effectDescription(v,zh)}</small></span><span class="effect-play" aria-hidden="true">↗</span></button>`).join('')}</div><div class="nature-seasons" aria-label="${zh?'四季預覽':'Pratinjau musim'}">${[['spring','春','Semi'],['summer','夏','Panas'],['autumn','秋','Gugur'],['winter','冬','Dingin']].map(([v,z,id])=>`<button onclick="previewNatureSeason('${v}',this)" ${enabled?'':'disabled'}>${zh?z:id}</button>`).join('')}</div><div class="nature-visibility-controls" role="group" aria-label="${zh?'光景分類開關':'Sakelar suasana'}">${[['weather','天氣','Cuaca'],['seasonal','四季','Musim'],['animals','生態','Satwa']].map(([key,z,id])=>`<button onclick="setUserPref('fxDetail.${key}',!isFxEnabled('${key}'))" aria-pressed="${isFxEnabled(key)}" ${enabled?'':'disabled'}><i></i>${zh?z:id}</button>`).join('')}</div><button type="button" onclick="NaturePhotos.retry()">${zh?'重新載入攝影素材':'Muat ulang foto'}</button><p class="nature-observation-state" data-nature-evidence role="status"></p><p class="nature-preview-state" role="status"></p><a href="./images/atmosphere/PHOTOGRAPHS.md" target="_blank" rel="noopener">${zh?'攝影素材來源與限制':'Photo sources & limits'} ↗</a><a href="./audio/nature/ATTRIBUTION.md" target="_blank" rel="noopener">${zh?'錄音來源與授權':'Sumber & lisensi rekaman'} ↗</a></section>`;
 }
 function previewNature(mode,button){
   WxFx.preview(mode);experiencePreviewLabel(button,lang==='zh'?(mode==='earthquake'?'地震情境示意，非即時警報；20 秒後恢復，可隨時結束。':'全畫面情境示意，20 秒後恢復實際資料對應的情境。'):'Simulasi layar penuh; bukan peringatan langsung. Kembali setelah 20 detik.');
@@ -3615,58 +3615,19 @@ try{window._applyCwaPop=_applyCwaPop}catch(e){}
 // 前景動畫只代表目前狀態；未來降雨機率與警報不能把尚未下雨的現在畫成雨天。
 function _syncWeatherFx(){
   try{
-    const fx=window.WxFx;
-    if(!fx||typeof fx.update!=='function')return;
-    if(!wxData||_wxStale()){fx.update(null,0,0,0);return}
-
-    const view=_wxCurrentView(wxData),hi=view.hourIndex,stationDry=view.stationDry,stationWet=view.stationWet;
-    const rainCodes=[51,53,55,56,61,63,65,66,67,80,81,82,95,96,99];
-    let curPrec=0,curWind=0,actualRain=Math.max(0,Number(wxData.currentPrecip)||0);
-    let code=view.code===null||view.code===undefined?NaN:Number(view.code);
-    if(hi>=0){
-      curPrec=Number(wxData.hPrec&&wxData.hPrec[hi])||0;
-      curWind=Number(wxData.hWind&&wxData.hWind[hi])||0;
-      actualRain=Math.max(actualRain,Number(wxData.hRain&&wxData.hRain[hi])||0);
-    }
-    if(!Number.isFinite(code))code=null;
-
-    // 同時看目前與下一小時，避免 04:59/05:00 邊界剛好抓不到正在發生的降雨。
-    let nearPrec=curPrec,nearRain=actualRain;
-    if(hi>=0){
-      for(let i=hi;i<Math.min(hi+2,(wxData.hTime||[]).length);i++){
-        nearPrec=Math.max(nearPrec,Number(wxData.hPrec&&wxData.hPrec[i])||0);
-        nearRain=Math.max(nearRain,Number(wxData.hRain&&wxData.hRain[i])||0);
-      }
-    }
-
-    let obsRain=0;
-    try{
-      const m=(typeof _rainObsMeta==='function')?_rainObsMeta():null;
-      if(m&&m.local&&m.r10!==null){obsRain=Number(m.r10)||0;}
-    }catch(e){}
-    // 本地測站近 10 分鐘明確回報 0mm 時，不能用模型的前一小時雨量或未來機率覆蓋實測。
-    if(stationDry){actualRain=0;obsRain=0;curPrec=0;nearRain=0;nearPrec=0;}
-
-    const codeSaysRain=rainCodes.includes(code);
-    const rainNow=stationDry?false:(stationWet||codeSaysRain||actualRain>0.05||obsRain>0);
-    const rainNear=stationDry?false:(rainNow||nearRain>0.05||nearPrec>=60);
-
-    // 附近雨量站未明確回報乾燥時，可信警報與短時資料才可補足目前天氣狀態。
-    let ids=new Set();
-    try{
-      if(typeof evaluateWxAlerts==='function')ids=new Set(evaluateWxAlerts().map(a=>a&&a.id).filter(Boolean));
-    }catch(e){}
-    if(!stationDry){
-      if(ids.has('storm')&&rainNow&&![96,99].includes(code)) code=95;
-      else if(ids.has('heavyRain')&&rainNow) code=65;
-      else if(rainNow&&!rainCodes.includes(code)) code=61;
-    }
-
-    // 即時或目前小時已有降雨證據時，多雲/晴天碼不得把雨特效關掉。
-    if(rainNow&&!rainCodes.includes(code)){
-      code=(actualRain>=4||obsRain>=4||nearRain>=4||nearPrec>=85)?65:61;
-    }
-    fx.update(code,Number(wxData.temp)||0,Math.max(curPrec,rainNow?40:0),curWind,{typhoon:ids.has('typhoon')&&curWind>=62&&!stationDry,cloud:stationDry?(hi>=0?wxData.hCloud?.[hi]:wxData.currentCloud):(wxData.currentCloud??wxData.hCloud?.[hi]),rain:stationDry?0:Math.max(actualRain,obsRain*6),lat:wxData.lat,lon:wxData.lon,sourceTime:wxData.sourceTime});
+    const fx=window.WxFx;if(!fx||typeof fx.update!=='function')return;
+    if(!wxData||_wxStale()){fx.update(null,null,0,0,{context:{mode:'none',reason:'stale',expiresAt:0}});return}
+    const bound=typhoonData&&Number.isFinite(typhoonData._clientLat)&&Number.isFinite(typhoonData._clientLon)&&Math.abs(typhoonData._clientLat-wxData.lat)<.0001&&Math.abs(typhoonData._clientLon-wxData.lon)<.0001;
+    const gauge=bound?_rainObsMeta():null;
+    // CWA rain gauges cannot establish cloud type, thunder or hail. A future
+    // worker may return an explicitly observed weather record in this schema.
+    const observed=bound&&typhoonData.weatherObservation;
+    let typhoon=null;try{const a=evaluateTyphoonCWA(APP_CFG.wxAlerts||{},true);if(a&&a.official&&a.notifyEligible&&typhoonData.landAlert&&_typhoonAreaMatch(typhoonData)){const at=Number(typhoonData._clientFetchedAt);typhoon={official:true,local:true,time:at,expires:at+600000}}}catch(_){}
+    const context=NatureContext.resolve({lat:wxData.lat,lon:wxData.lon,typhoon,
+      observation:observed&&{...observed,kind:observed.kind},
+      rainObservation:gauge&&{kind:'observation',time:gauge.obsMs,distanceKm:gauge.distanceKm,rain10:gauge.r10}
+    });
+    fx.update(context.code,context.temp,0,context.wind,{...context,context,cloud:context.cloud,rain:context.rain,lat:wxData.lat,lon:wxData.lon});
   }catch(e){console.log('sync weather fx err',e)}
 }
 try{window._syncWeatherFx=_syncWeatherFx}catch(e){}
@@ -3785,10 +3746,11 @@ function _getCwaWorkerUrl(){
 
 let _cwaLoadPromise=null;
 let _lastCwaFetchAt=0,_lastCwaAttemptAt=0,_cwaRetryAt=0,_cwaFailures=0;
-function _stampCwaPayload(data,receivedAt){
+function _stampCwaPayload(data,receivedAt,coords){
   if(!data||typeof data!=='object')return data;
   data._clientFetchedAt=Number(receivedAt)||Date.now();
   data._clientSource='cwa-data-worker';
+  if(coords){data._clientLat=Number(coords.lat);data._clientLon=Number(coords.lon)}
   return data;
 }
 function _alertCoords(){
@@ -3817,7 +3779,7 @@ async function loadCwaData(arg){
     try{
       const c=JSON.parse(localStorage.getItem('_cwaCache'));
       if(c&&c.key===cwaKey&&c.ts&&(Date.now()-c.ts)<90*1000&&c.d){
-        _stampCwaPayload(c.d,c.ts);typhoonData=c.d;earthquakeData=c.d;_syncWeatherFx();render();
+        _stampCwaPayload(c.d,c.ts,coords);typhoonData=c.d;earthquakeData=c.d;_syncWeatherFx();render();
       }
     }catch(e){}
   }
@@ -3832,7 +3794,7 @@ async function loadCwaData(arg){
       const currentCoords=_alertCoords();
       if(revision!==_wxRevision||!currentCoords||_geoDistKm(coords.lat,coords.lon,currentCoords.lat,currentCoords.lon)>2)return null;
       _cwaFailures=0;_cwaRetryAt=0;
-      const fetchedAt=Date.now();_lastCwaFetchAt=fetchedAt;_stampCwaPayload(data,fetchedAt);
+      const fetchedAt=Date.now();_lastCwaFetchAt=fetchedAt;_stampCwaPayload(data,fetchedAt,coords);
       data._gpsQuery={lat:coords.lat,lon:coords.lon,place:place||null,ts:fetchedAt};
       typhoonData=data;earthquakeData=data;typhoonErr=false;earthquakeErr=false;
       try{localStorage.setItem('_cwaCache',JSON.stringify({ts:fetchedAt,key:cwaKey,place:place||null,d:data}))}catch(e){}
@@ -5669,7 +5631,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiAtmosphereSceneHtml()}${uiShiftWeatherHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v337</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v338</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${uiQuickToolsHtml()}${uiDayFocusHtml()}${uiAtmosphereSceneHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${uiShiftWeatherHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }

@@ -49,7 +49,7 @@
     }
     function desired(){
       if(mode==='none')return {};
-      const weather=allowed('weather'),animal=allowed('animals'),seasonal=allowed('seasonal'),night=typeof scene.night==='boolean'?scene.night:new Date().getHours()<5||new Date().getHours()>=19;
+      const weather=allowed('weather'),animal=allowed('animals')&&scene.animalsEligible!==false,seasonal=allowed('seasonal'),night=typeof scene.night==='boolean'?scene.night:new Date().getHours()<5||new Date().getHours()>=19;
       if(weather&&mode==='earthquake')return {quake:.22,rumble:.4};
       if(weather&&mode==='hail')return {hail:.57,wind:.12};
       if(weather&&mode==='typhoon')return {rain:.6,wind:.6};
