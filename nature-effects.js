@@ -1,4 +1,4 @@
-/* v341 atmosphere engine.
+/* v342 (stage 1: sky via sky-gl.js) / v341 atmosphere engine.
    Observed/modelled weather, solar geometry and season drive one scene:
    background plate (behind the app) + foreground particles (in front, text masked).
    Everything is local, offline-safe, sprite based; no per-frame gradient or filter
@@ -152,6 +152,7 @@
     function init(){
       if(canvas)return;
       sky=document.createElement('canvas');sky.id='nature-sky';sky.setAttribute('aria-hidden','true');document.body.appendChild(sky);bg=sky.getContext('2d',{alpha:true});
+      if(root.SkyGL)try{root.SkyGL.init()}catch(e){}
       canvas=document.createElement('canvas');canvas.id='wxfx';canvas.setAttribute('aria-hidden','true');document.body.appendChild(canvas);ctx=canvas.getContext('2d');
       mask=document.createElement('canvas');maskCtx=mask.getContext('2d');
       starsA=starField(7);starsB=starField(91);
@@ -181,6 +182,7 @@
       if(!canvas)return;w=innerWidth;h=innerHeight;const d=capDpr();dprFx=d.fx;dprSky=d.sky;
       canvas.width=Math.round(w*dprFx);canvas.height=Math.round(h*dprFx);canvas.style.width=w+'px';canvas.style.height=h+'px';ctx.setTransform(dprFx,0,0,dprFx,0,0);
       sky.width=Math.round(w*dprSky);sky.height=Math.round(h*dprSky);sky.style.width=w+'px';sky.style.height=h+'px';bg.setTransform(dprSky,0,0,dprSky,0,0);
+      if(root.SkyGL&&root.SkyGL.ok)root.SkyGL.resize(w,h,effLevel());
       mask.width=Math.ceil(w*maskScale);mask.height=Math.ceil(h*maskScale);gradeKey='';raysCanvas=null;layoutDirty=true;readViews();if(!raf)draw(0);
     }
 
@@ -214,6 +216,14 @@
       const state=preview?{...raw,mode:m,season,temp:m==='cold'?5:m==='heat'?37:m==='snow'?-1:26,wind:['wind','typhoon'].includes(m)?80:8,cloud:['clear','heat'].includes(m)?12:['cloud','fog'].includes(m)?88:100}:{...raw,mode:m,season};
       return root.NatureContext?root.NatureContext.ecology(state,night):{plant:'reeds',animals:[],wet:false,cloudType:'unknown'};
     }
+    // Sun elevation the sky should show: real solar geometry, or an equivalent when a preview
+    // forces day/night or no location is known.
+    function sceneElevation(phase,hour){
+      if(solar&&!(preview&&sceneLighting!=='auto'))return solar.elevation;
+      if(phase==='night')return -18;if(phase==='dusk')return -2;if(phase==='golden')return 8;
+      const t=clamp((hour-6)/12,0,1);return Math.max(12,Math.sin(t*Math.PI)*62);
+    }
+    function fallbackAzimuth(hour){return clamp((hour-6)/12,0,1)*180+90}
     function lightPhase(hour){
       if(preview&&sceneLighting!=='auto')return sceneLighting==='night'?'night':'day';
       if(solar)return solar.elevation< -6?'night':solar.elevation<0?'dusk':solar.elevation<12?'golden':'day';
@@ -521,7 +531,7 @@
       if(!ctx)return;
       const on=['weather','animals','seasonal'].some(allowed);
       if(preview&&(!on||!seasonPreview&&!allowed('weather'))){stopPreview();return}
-      canvas.style.display=on?'':'none';sky.style.display=on?'':'none';
+      canvas.style.display=on?'':'none';sky.style.display=on?'':'none';if(root.SkyGL&&root.SkyGL.ok)root.SkyGL.show(on);
       if(!on){ctx.clearRect(0,0,w,h);bg.clearRect(0,0,w,h);for(const v of views)labelScene(v,'none',seasonName());return}
       const m=activeMode(),d=new Date(),hour=d.getHours()+d.getMinutes()/60,name=seasonName();
       solar=solarPosition(d.getTime(),details.lat,details.lon);
@@ -539,10 +549,12 @@
       // background plane
       bg.setTransform(dprSky,0,0,dprSky,0,0);bg.clearRect(0,0,w,h);
       const weather=allowed('weather');
-      drawPlates(weather?m:'none',phase,name,dt);
-      drawGrade(weather?m:'none',phase,name);
-      if(weather){drawCelestial(m,phase,hour,cloudBlend,dt);drawClouds(m,phase,cloudBlend,dt);drawFogBanks(m,phase,hum);drawLightning(m,phase)}
-      else drawCelestial('clear',phase,hour,.15,dt);
+      // v342: procedural WebGL sky (sun, twilight, stars, moon, lit clouds, ridges) when available;
+      // the v341 plate + sprite path stays as the fallback for devices without WebGL.
+      const glSky=root.SkyGL&&root.SkyGL.ok&&root.SkyGL.render({time,elevation:sceneElevation(phase,hour),azimuth:solar?solar.azimuth:fallbackAzimuth(hour),hourAngle:solar?solar.hourAngle:(hour-12)*Math.PI/12,moonPhase:moonPhase(Date.now()),cover:weather?cloudBlend:.15,wind:weather?gust*3.6:8,mode:weather?m:'clear',season:name,tilt,level:effLevel(),fog:weather&&m!=='fog'&&known(hum)&&hum>=92&&!rainModes.includes(m)?.25:0});
+      if(!glSky){drawPlates(weather?m:'none',phase,name,dt);drawGrade(weather?m:'none',phase,name)}
+      if(weather){if(!glSky){drawCelestial(m,phase,hour,cloudBlend,dt);drawClouds(m,phase,cloudBlend,dt)}drawFogBanks(m,phase,hum);drawLightning(m,phase)}
+      else if(!glSky)drawCelestial('clear',phase,hour,.15,dt);
       // Everything outside the window is painted on the background plane, behind the glass panes,
       // so the panes' backdrop blur gives real depth and nothing sits on top of text.
       onBackground(()=>{drawBotany(m,name,phase);if(!reduced.matches){drawSeasonDrift(dt,m,name,phase);drawRain(dt,m,phase);drawSnow(dt,m,phase);drawHail(dt,m,phase);drawAnimals(m,name,phase,dt)}});
@@ -624,10 +636,10 @@
     }
     function paintScene(v,m,phase){
       if(v.rect.bottom<0||v.rect.top>h)return;const c=v.c,W=v.w,H=v.h;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,W,H);
-      const im=plate(plateKey);if(im){c.drawImage(im,...coverRect(im,W,H))}else{c.fillStyle=phase==='night'?'#0f2238':'#7aa3bf';c.fillRect(0,0,W,H)}
+      const g=root.SkyGL&&root.SkyGL.ok&&root.SkyGL.canvas();if(g){try{c.drawImage(g,0,0,W,H);return}catch(e){}}const im=plate(plateKey);if(im){c.drawImage(im,...coverRect(im,W,H))}else{c.fillStyle=phase==='night'?'#0f2238':'#7aa3bf';c.fillRect(0,0,W,H)}
     }
 
     return{update,stopPreview,previewModes:()=>previewModes.slice(),previewSeason,getSeason:seasonName,getMode:activeMode,refresh:resume,setQuality,getQuality:()=>level,preview:previewMode,_forceSilence(){if(root.WxSfx)root.WxSfx._forceSilence()},
-      _debug:()=>({mode,active:activeMode(),frames:frameCount,running:!!raf,quality:level,effectiveQuality:effLevel(),frameMs:Math.round(budget.ema*10)/10,frameInterval:Math.round(realFrame.ema),tilt:{x:tilt.x,y:tilt.y},cloud:weatherState.cloud,intensity:weatherState.intensity,solar,reduced:reduced.matches,sceneLighting,plateCacheSize:plates.size,spriteCount:sprites.size,canvasCount:document.querySelectorAll('#wxfx').length,protectedRects:quiet.length,views:views.length,season:seasonName(),plate:plateKey,evidence:details.context||null,gust,preview:!!preview,dpr:{fx:dprFx,sky:dprSky}})};
+      _debug:()=>({mode,active:activeMode(),frames:frameCount,running:!!raf,quality:level,effectiveQuality:effLevel(),frameMs:Math.round(budget.ema*10)/10,frameInterval:Math.round(realFrame.ema),tilt:{x:tilt.x,y:tilt.y},cloud:weatherState.cloud,intensity:weatherState.intensity,solar,reduced:reduced.matches,sceneLighting,plateCacheSize:plates.size,spriteCount:sprites.size,canvasCount:document.querySelectorAll('#wxfx').length,protectedRects:quiet.length,views:views.length,season:seasonName(),plate:plateKey,skyGL:root.SkyGL?root.SkyGL._debug():null,evidence:details.context||null,gust,preview:!!preview,dpr:{fx:dprFx,sky:dprSky}})};
   }};
 })(window);

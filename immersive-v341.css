@@ -45,6 +45,9 @@ body[data-atmosphere=storm],body[data-atmosphere=typhoon],body[data-atmosphere=h
 html{background:#6f8ea2}html[data-theme=dark]{background:#08141f}
 html body{background:transparent!important}
 #nature-sky{z-index:0!important}
+/* v342 stage 1: procedural WebGL sky sits directly under the 2D sky plane. */
+html body #nature-sky-gl,html body:has(.screen-calendar) #nature-sky-gl{position:fixed;inset:0;z-index:0;display:block;pointer-events:none;contain:strict;opacity:1!important}
+@media(prefers-reduced-motion:reduce){html body #nature-sky-gl{opacity:1!important}}
 #app{position:relative;z-index:1}
 .app-shell{background:transparent!important}
 
