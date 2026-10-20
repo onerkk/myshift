@@ -49,6 +49,8 @@ html body{background:transparent!important}
 html body #nature-sky-gl,html body:has(.screen-calendar) #nature-sky-gl{position:fixed;inset:0;z-index:0;display:block;pointer-events:none;contain:strict;opacity:1!important}
 @media(prefers-reduced-motion:reduce){html body #nature-sky-gl{opacity:1!important}}
 /* v342 stage 2: refracting drops on the front glass, under #wxfx (bolt sprites, butterflies) and above the app. */
+/* v343: live window inside the 全畫面光景 card, under its gradient and text. */
+.atmosphere-view{position:relative;isolation:isolate}.atmosphere-view .scene-canvas{display:block!important;position:absolute;inset:0;width:100%;height:100%;z-index:-1;border-radius:inherit;pointer-events:none}
 html body #nature-glass-gl,html body:has(.screen-calendar) #nature-glass-gl{position:fixed;inset:0;z-index:31;pointer-events:none;contain:strict;opacity:1!important}
 @media(prefers-reduced-motion:reduce){html body #nature-glass-gl{display:none!important}}
 #app{position:relative;z-index:1}

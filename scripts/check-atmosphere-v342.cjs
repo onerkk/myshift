@@ -30,7 +30,7 @@ const skySigs=new Set();
 for(const mode of await page.evaluate(()=>WxFx.previewModes())){
   await page.evaluate(m=>WxFx.preview(m),mode);await page.waitForTimeout(700);
   dbg=await page.evaluate(()=>WxFx._debug());assert.equal(dbg.active,mode);assert.equal(dbg.running,true);
-  assert.equal(await page.locator('.nature-preview-hud').isVisible(),true);assert.equal(await page.evaluate(()=>document.querySelector('#app').inert),true);
+  await page.locator('.nature-preview-hud').waitFor({state:'visible',timeout:4000});assert.equal(await page.locator('.nature-preview-hud').isVisible(),true);assert.equal(await page.evaluate(()=>document.querySelector('#app').inert),true);
   // v342: in rain the drops live on the GL glass plane (#nature-glass-gl); count its coverage too, right after a synchronous redraw.
   const ink=await page.evaluate(()=>{WxFx.refresh();const c=document.querySelector('#wxfx'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=64)if(d[i]>8)n++;const g=SkyGL&&SkyGL.glassActive&&SkyGL.glassActive()?SkyGL.glassCanvas():null;if(g){const gl=g.getContext('webgl'),px=new Uint8Array(g.width*g.height*4);gl.readPixels(0,0,g.width,g.height,gl.RGBA,gl.UNSIGNED_BYTE,px);for(let i=3;i<px.length;i+=64)if(px[i]>8)n++}return n});
   if(['drizzle','rain','heavy','storm','typhoon','hail','cold','heat','fog'].includes(mode))assert(ink>20,mode+' draws on the glass');

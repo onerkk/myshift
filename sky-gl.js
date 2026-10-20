@@ -1,4 +1,4 @@
-/* v342 stage 1+2 — procedural WebGL sky, rain, lightning and refracting glass drops.
+/* v343 — procedural WebGL sky (back plane) and front plane: rain, refracting drops, lightning, fog, heat shimmer.
    Replaces the five static plates, cloud sprites, sun/moon/star sprites of the v341 background.
    The sky is computed per pixel from the real solar elevation/azimuth, cloud cover, wind and
    weather family; clouds are FBM noise lit by the sun so they drift, thicken and darken instead
@@ -11,17 +11,15 @@
 (function(root){
   'use strict';
   const VERT='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
-  const FRAG=`
-precision mediump float;
-uniform vec2 uRes;uniform float uTime;uniform vec3 uSun;uniform float uEl;
-uniform float uCover;uniform float uWind;uniform float uStorm;uniform float uWet;uniform float uFog;
-uniform float uMoonPhase;uniform vec3 uMoon;uniform vec3 uTint;uniform vec2 uTilt;uniform float uOct;uniform float uHeat;uniform float uCold;
-uniform float uRain;uniform float uSlant;uniform float uFlash;uniform float uBoltX;uniform float uSeed;
-float hash(vec2 p){p=fract(p*vec2(127.1,311.7));p+=dot(p,p+19.19);return fract(p.x*p.y);}
+  // noise + rain + bolt helpers shared by the front (glass) shader
+  const NOISE=`
+float hash(vec2 p){p=fract(p*.3183099+vec2(.71,.113));p*=17.;return fract(p.x*p.y*(p.x+p.y));}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
 float fbm(vec2 p,float oct){float v=0.,a=.5;mat2 m=mat2(1.6,1.2,-1.2,1.6);
  for(int i=0;i<5;i++){if(float(i)>=oct)break;v+=a*noise(p);p=m*p+vec2(17.3,9.1);a*=.5;}return v;}
+`;
+  const FRONT_HELPERS=`
 // One sheet of rain: tall cells, a streak per cell, falling with slant. Returns coverage 0..1.
 float rainSheet(vec2 uv,float scale,float speed,float t,float seed){
  vec2 p=uv*vec2(scale,scale*.18);p.x+=p.y*uSlant*.6;p.y+=t*speed;
@@ -41,6 +39,22 @@ vec2 bolt(vec2 uv,float asp){
  float bd=abs(uv.x-bp)*asp;float bspan=smoothstep(by-.2,by-.14,y)*smoothstep(by+.01,by-.01,y);
  core+=exp(-bd*300.)*bspan*.7;glow+=exp(-bd*18.)*bspan*.2;
  return vec2(core,glow)*uFlash;}
+`;
+  const FRAG=`
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 uRes;uniform float uTime;uniform vec3 uSun;uniform float uEl;
+uniform float uCover;uniform float uWind;uniform float uStorm;uniform float uWet;uniform float uFog;
+uniform float uMoonPhase;uniform vec3 uMoon;uniform vec3 uTint;uniform vec2 uTilt;uniform float uOct;uniform float uHeat;uniform float uCold;
+uniform float uRain;uniform float uSlant;uniform float uFlash;uniform float uBoltX;uniform float uSeed;
+float hash(vec2 p){p=fract(p*.3183099+vec2(.71,.113));p*=17.;return fract(p.x*p.y*(p.x+p.y));}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+ return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p,float oct){float v=0.,a=.5;mat2 m=mat2(1.6,1.2,-1.2,1.6);
+ for(int i=0;i<5;i++){if(float(i)>=oct)break;v+=a*noise(p);p=m*p+vec2(17.3,9.1);a*=.5;}return v;}
 float star(vec3 rd,float t){vec2 q=rd.xz/(rd.y+.25)*42.;vec2 c=floor(q),f=fract(q)-.5;float h=hash(c);
  if(h<.93)return 0.;vec2 o=vec2(hash(c+1.7),hash(c+3.1))-.5;float d=length(f-o*.7);
  float tw=.6+.4*sin(t*(1.+h*3.)+h*40.);return smoothstep(.07,.0,d)*tw*(.2+.8*(h-.93)*14.);}
@@ -133,19 +147,8 @@ void main(){
   col=mix(col,ridgeNear,smoothstep(.0,-.004,rd.y-r2));
   col=mix(col,hor*mix(.3,1.,day),smoothstep(-.2,.0,rd.y)*.35);
  }
- // rain outside the glass: three sheets, far ones dimmer, plus a haze veil toward the horizon
- if(uRain>0.){
-  float t=uTime;vec2 ruv=vec2(uv.x*asp,uv.y);
-  float r=rainSheet(ruv,60.,2.4,t,1.)*.55+rainSheet(ruv,34.,1.7,t,2.)*.75+rainSheet(ruv,18.,1.2,t,3.);
-  // typhoon: soft drifting rain bands instead of hard-edged sheets
-  float bands=abs(uSlant)>1.?smoothstep(.45,.75,fbm(vec2(uv.x*1.6+uv.y*uSlant*.5-t*.9,uv.y*.6+t*.15),3.))*.35*uRain:0.;
-  r*=uRain;vec3 rainCol=mix(vec3(.3,.34,.4),vec3(.82,.86,.9),day);
-  col=mix(col,mix(vec3(.12,.14,.17),vec3(.7,.74,.78),day),bands);
-  col=mix(col,rainCol+uFlash*.5,clamp(r,0.,1.)*.6);
-  col=mix(col,mix(vec3(.08,.1,.12),vec3(.62,.67,.72),day),uRain*.22*(.3+.7*horizon));
- }
- vec2 b=bolt(uv,asp);float inCloud=rd.y>.005?smoothstep(.0,.6,cl):0.;
- col+=vec3(.92,.95,1.)*b.x*(1.-inCloud*.6)*1.4+vec3(.6,.7,1.)*b.y;
+ // distant rain only dims and greys the scene here; the streaks, bands and bolt are on the front plane
+ if(uRain>0.)col=mix(col,mix(vec3(.08,.1,.12),vec3(.62,.67,.72),day),uRain*.22*(.3+.7*horizon));
  // fog, season tint, dither
  vec3 fogCol=mix(vec3(.08,.1,.13),vec3(.82,.85,.88),day);
  col=mix(col,fogCol,uFog*(.55+.45*horizon));
@@ -154,20 +157,25 @@ void main(){
  gl_FragColor=vec4(col,1.);
 }`;
   const GLASS=`
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 uniform vec2 uRes;uniform float uTime;uniform sampler2D uSky;uniform sampler2D uMask;uniform float uRain;uniform float uSlant;uniform float uLayers;uniform float uFlash;
-float hash(vec2 p){p=fract(p*vec2(127.1,311.7));p+=dot(p,p+19.19);return fract(p.x*p.y);}
+uniform float uBoltX;uniform float uSeed;uniform float uDay;uniform float uFog;uniform float uHeat;
+`+NOISE+FRONT_HELPERS+`
 float sat(float x){return clamp(x,0.,1.);}
 // One layer of drops. Tall narrow cells, at most one sliding drop per cell with a beaded trail above it.
 // Returns (lens offset.xy, coverage).
 vec3 drops(vec2 uv,float t,float scale,float seed){
  float colId=floor(uv.x*scale*2.6);float sp=.6+.8*hash(vec2(colId,seed));
- vec2 st=uv*vec2(scale*2.6,scale);st.y+=t*.28*sp;
+ vec2 st=uv*vec2(scale*2.6,scale);st.y+=t*.55*sp;
  vec2 id=floor(st);float n=hash(id+seed);
  if(n<.42)return vec3(0.);
  vec2 f=fract(st)-.5;
  float x=(n-.5)*.55;
- float ti=t*1.4*sp+n*6.2832;float y=sin(ti+sin(ti+sin(ti)*.5))*.36;
+ float ti=t*1.1*sp+n*6.2832;float y=sin(ti+sin(ti+sin(ti)*.5))*.22;
  vec2 p=vec2(f.x-x,f.y-y);
  float k=5.6;                                   // physical cell height / width
  vec2 q=vec2(p.x,p.y*k*.8);float d=length(q);
@@ -187,20 +195,47 @@ void main(){
  vec2 guv=vec2(uv.x+uv.y*uSlant*.18,uv.y);
  float t=uTime;
  float dens=.4+.6*uRain;
- vec3 a=drops(guv,t,2.4*dens+1.2,1.);
- vec3 b=uLayers>1.5?drops(guv+.31,t*1.25,4.2*dens+1.5,2.):vec3(0.);
- vec3 c=uLayers>2.5?drops(guv+.67,t*.85,6.5*dens+2.,3.):vec3(0.);
+ vec3 a=uRain>0.?drops(guv,t,2.4*dens+1.2,1.):vec3(0.);
+ vec3 b=uRain>0.&&uLayers>1.5?drops(guv+.31,t*1.25,4.2*dens+1.5,2.):vec3(0.);
+ vec3 c=uRain>0.&&uLayers>2.5?drops(guv+.67,t*.85,6.5*dens+2.,3.):vec3(0.);
  float m=sat(a.z+b.z*.9+c.z*.75);
  vec2 off=(a.xy+b.xy*.6+c.xy*.4)*.03;
- if(m<.01){gl_FragColor=vec4(0.);return;}
- // refracted, slightly shrunken and inverted patch of the scene behind the glass
- vec3 bg=texture2D(uSky,clamp(uv-off*vec2(1.,-1.)*1.2,.001,.999)).rgb;
- bg=bg*1.08+.03;
- float edge=smoothstep(.0,.4,length(off))*.3;
- vec3 col=bg+edge;
- // specular from upper left plus lightning flash
- col+=vec3(1.)*pow(sat(1.-length(off*vec2(1.,-1.)*28.+vec2(-.45,.35))),8.)*.6+uFlash*.25;
- float alpha=m*(.55+.45*uRain);
+ vec3 col=vec3(0.);float alpha=0.;
+ // 1. heat shimmer: a wavering copy of the scene low in the frame (hot air rising off the ground)
+ if(uHeat>0.){
+  float band=smoothstep(.0,.35,uv.y)*smoothstep(.62,.3,uv.y);
+  vec2 wob=vec2(sin(uv.y*60.+t*5.+sin(uv.x*22.+t*3.)*.8),cos(uv.x*48.-t*4.))*.006*band;
+  vec3 sh=texture2D(uSky,clamp(uv+wob,.001,.999)).rgb;
+  float sa=band*.55*uHeat;col+=sh*sa;alpha+=sa;
+ }
+ // 2. rain streaks + typhoon bands, in front of the app
+ if(uRain>0.){
+  vec2 ruv=vec2(uv.x*asp,uv.y);
+  float r=rainSheet(ruv,60.,2.4,t,1.)*.55+rainSheet(ruv,34.,1.7,t,2.)*.75+rainSheet(ruv,18.,1.2,t,3.);
+  r=sat(r*uRain);
+  float bands=abs(uSlant)>1.?smoothstep(.45,.75,fbm(vec2(uv.x*1.6+uv.y*uSlant*.5-t*.9,uv.y*.6+t*.15),3.))*.35*uRain:0.;
+  vec3 rainCol=mix(vec3(.55,.6,.68),vec3(.9,.93,.96),uDay)+uFlash*.5;
+  float ra=r*.7;col=col*(1.-ra)+rainCol*ra;alpha=alpha*(1.-ra)+ra;
+  vec3 bandCol=mix(vec3(.3,.34,.38),vec3(.8,.84,.88),uDay);col=col*(1.-bands)+bandCol*bands;alpha=alpha*(1.-bands)+bands;
+ }
+ // 3. drops on the glass: refracted, slightly shrunken and inverted patch of the scene behind
+ if(uRain>0.&&m>.01){
+  vec3 bg=texture2D(uSky,clamp(uv-off*vec2(1.,-1.)*1.2,.001,.999)).rgb;
+  // a drop is never darker than a faint grey lens: ambient fill, bright rim, upper-left highlight
+  float rim=smoothstep(.45,1.,length(off)/.03);
+  vec3 dc=mix(bg,vec3(.55,.62,.72),.22)*1.05+rim*.28+vec3(1.)*pow(sat(1.-length(off*vec2(1.,-1.)*28.+vec2(-.45,.35))),8.)*.7+uFlash*.25;
+  float da=m*(.55+.45*uRain);col=col*(1.-da)+dc*da;alpha=alpha*(1.-da)+da;
+ }
+ // 4. fog: drifting mist banks between the viewer and the scene
+ if(uFog>0.){
+  float mist=fbm(vec2(uv.x*2.2+t*.05,uv.y*3.-t*.02),4.)*.6+fbm(vec2(uv.x*5.+t*.09,uv.y*7.),3.)*.4;
+  float fa=smoothstep(.38,.72,mist)*uFog*(.4+.5*(1.-uv.y));
+  vec3 fc=mix(vec3(.1,.12,.15),vec3(.86,.89,.92),uDay);col=col*(1.-fa)+fc*fa;alpha=alpha*(1.-fa)+fa;
+ }
+ // 5. lightning bolt in front of everything
+ vec2 bl=bolt(uv,asp);
+ col+=vec3(.92,.95,1.)*bl.x*1.4+vec3(.6,.7,1.)*bl.y;alpha=sat(alpha+bl.x+bl.y*.6);
+ if(alpha<.003){gl_FragColor=vec4(0.);return;}
  float cover=texture2D(uMask,uv).a;
  alpha*=(1.-cover);
  gl_FragColor=vec4(col*alpha,alpha);
@@ -229,7 +264,7 @@ void main(){
       const fx=document.getElementById('wxfx');if(fx)document.body.insertBefore(gcanvas,fx);else document.body.appendChild(gcanvas);
       ggl=gcanvas.getContext('webgl',{alpha:true,antialias:false,depth:false,stencil:false,premultipliedAlpha:true,powerPreference:'low-power'});
       if(!ggl)throw Error('no webgl (glass)');
-      const r=program(ggl,GLASS,['uRes','uTime','uSky','uMask','uRain','uSlant','uLayers','uFlash']);gprog=r.p;GU=r.u;
+      const r=program(ggl,GLASS,['uRes','uTime','uSky','uMask','uRain','uSlant','uLayers','uFlash','uBoltX','uSeed','uDay','uFog','uHeat']);gprog=r.p;GU=r.u;
       gtexSky=texture(ggl,0);gtexMask=texture(ggl,1);ggl.uniform1i(GU.uSky,0);ggl.uniform1i(GU.uMask,1);
       ggl.enable(ggl.BLEND);ggl.blendFunc(ggl.ONE,ggl.ONE_MINUS_SRC_ALPHA);ggl.pixelStorei(ggl.UNPACK_FLIP_Y_WEBGL,true);
       gcanvas.addEventListener('webglcontextlost',e=>{e.preventDefault();glassOn=false;gfailed=true;gcanvas.style.display='none'},false);
@@ -287,14 +322,16 @@ void main(){
   }
   // Drops on the front glass, refracting the sky frame just rendered. Off (and hidden) when dry.
   function renderGlass(s,rain,slant){
-    const want=rain>0&&!!ggl&&!gfailed&&s.glass!==false;
+    const flash=Math.max(0,Math.min(1,s.flash||0)),fog=s.mode==='fog'?.75:Math.max(0,Math.min(.35,s.fog||0)),heat=s.heat?1:0;
+    const want=(rain>0||flash>0||fog>0||heat>0)&&!!ggl&&!gfailed&&s.glass!==false;
     if(want!==glassOn){glassOn=want;if(gcanvas)gcanvas.style.display=want?'':'none'}
     if(!want)return;
     ggl.activeTexture(ggl.TEXTURE0);ggl.bindTexture(ggl.TEXTURE_2D,gtexSky);ggl.texImage2D(ggl.TEXTURE_2D,0,ggl.RGB,ggl.RGB,ggl.UNSIGNED_BYTE,canvas);
     ggl.activeTexture(ggl.TEXTURE1);ggl.bindTexture(ggl.TEXTURE_2D,gtexMask);
     if(maskDirty){maskDirty=false;if(maskSrc)ggl.texImage2D(ggl.TEXTURE_2D,0,ggl.RGBA,ggl.RGBA,ggl.UNSIGNED_BYTE,maskSrc);else ggl.texImage2D(ggl.TEXTURE_2D,0,ggl.RGBA,1,1,0,ggl.RGBA,ggl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]))}
     ggl.uniform2f(GU.uRes,gcanvas.width,gcanvas.height);ggl.uniform1f(GU.uTime,s.time||0);ggl.uniform1f(GU.uRain,rain);ggl.uniform1f(GU.uSlant,slant);
-    ggl.uniform1f(GU.uLayers,s.level==='subtle'?1:s.level==='balanced'?2:3);ggl.uniform1f(GU.uFlash,Math.max(0,Math.min(1,s.flash||0)));
+    ggl.uniform1f(GU.uLayers,s.level==='subtle'?1:s.level==='balanced'?2:3);ggl.uniform1f(GU.uFlash,flash);
+    ggl.uniform1f(GU.uBoltX,s.boltX==null?.5:s.boltX);ggl.uniform1f(GU.uSeed,(s.boltSeed||0)+1);ggl.uniform1f(GU.uDay,Math.max(0,Math.min(1,(s.elevation+8)/20)));ggl.uniform1f(GU.uFog,fog);ggl.uniform1f(GU.uHeat,heat);
     ggl.clearColor(0,0,0,0);ggl.clear(ggl.COLOR_BUFFER_BIT);ggl.drawArrays(ggl.TRIANGLES,0,3);
   }
   const api={ok:false,init,resize,render,show,setMask,glassActive:()=>glassOn,canvas:()=>canvas,glassCanvas:()=>gcanvas,_debug:()=>({ok:api.ok,lost,failed,scale,size:canvas?[canvas.width,canvas.height]:null,glass:{on:glassOn,failed:gfailed,size:gcanvas?[gcanvas.width,gcanvas.height]:null}})};

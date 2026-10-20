@@ -1,4 +1,4 @@
-/* v342 (stage 1: sky via sky-gl.js) / v341 atmosphere engine.
+/* v343 (stage 3: Taiwan ecology via nature-taiwan.js, all effects on the front plane) / v342 sky-gl / v341 atmosphere engine.
    Observed/modelled weather, solar geometry and season drive one scene:
    background plate (behind the app) + foreground particles (in front, text masked).
    Everything is local, offline-safe, sprite based; no per-frame gradient or filter
@@ -82,7 +82,7 @@
     let code=null,temp=0,wind=0,mode='none',preview=null,previewUntil=0,quiet=[],layoutDirty=true,scrollDirty=true,maskTick=-1,maskScale=.25;
     let signatureMode='',signatureStart=0,theatre=true,sceneCaption=null,returnFocus=null,hud=null,previewStarted=0,hudTimer=0,sceneLighting='auto';
     let previewTimer=0,previewToken=0,seasonPreview=null,thunderTimer=0,lastIceStrike=-1;
-    let gust=0,cloudBlend=.3,lightning=0,boltIndex=0,boltX=.5,nextLightning=25,interactionWind=0,lastLightUpdate=-1,failures=0;
+    let viewTick=-1,gust=0,cloudBlend=.3,lightning=0,boltIndex=0,boltX=.5,nextLightning=25,interactionWind=0,lastLightUpdate=-1,failures=0;
     const tilt={x:0,y:0,tx:0,ty:0};let pill=null,chromeTick=-10,realFrame={ema:33,slow:0};
     let plateKey='',plateFrom='',plateFade=1,gradeKey='',gradeCanvas=null,budget={ema:12,low:0,high:0},sessionLevel='';
     const previewModes=['clear','cloud','drizzle','rain','heavy','storm','typhoon','hail','snow','wind','fog','heat','cold','earthquake'];
@@ -100,6 +100,7 @@
     const activeMode=()=>preview&&performance.now()<previewUntil?preview:details.context&&(!details.context.expiresAt||Date.now()>details.context.expiresAt)?'none':mode;
     const rainMode=()=>rainModes.includes(activeMode());
 
+    const tw=key=>root.TaiwanFlora?root.TaiwanFlora.sprite(key):null; // v343 Taiwan ecology sprites (procedural)
     // ---- asset loading ----
     function sprite(key){
       if(!SPRITES[key])return null;let e=sprites.get(key);if(e)return e.ready?e.cv:null;
@@ -199,7 +200,7 @@
         const range=document.createRange();let node;
         while((node=walker.nextNode())){range.selectNodeContents(node);for(const rect of range.getClientRects())push(rect,false)}
       }
-      stickyEls=[...document.querySelectorAll(stickySelector)];layoutDirty=false;
+      stickyEls=[...document.querySelectorAll(stickySelector)];layoutDirty=false;readViews();
     }
     function buildMask(){
       const sy=scrollY||0,sx=scrollX||0,m=maskScale,c=maskCtx;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,mask.width,mask.height);c.fillStyle='#000';quiet=[];
@@ -376,35 +377,45 @@
     }
     // Season particles: spring petals and autumn leaves drift even in calm air; winter dry leaves and
     // generic debris need measured wind. Spin and sway follow gust strength.
+    // v343: Taiwan lowland seasons. Spring 油桐/木棉, summer 鳳凰木, autumn 欒樹/芒草, winter 落羽松 + north-east monsoon.
     function drawSeasonDrift(dt,m,season,phase){
       if(!allowed('seasonal')||reduced.matches)return;
-      const windy=['wind','typhoon'].includes(m),calmDrift=season==='spring'||season==='autumn';
-      const speedW=preview?(windy?60:8):Math.max(0,Number(details.context?.wind)||0);
-      if(!calmDrift&&speedW<8&&!windy)return;
-      const l=effLevel(),base=season==='spring'?(l==='subtle'?6:l==='balanced'?12:18):season==='autumn'?(l==='subtle'?5:l==='balanced'?9:14):(l==='subtle'?3:6);
-      const count=Math.min(petals.length,windy?base+10:base),dir=windDir()||1,f=dprFx,g=Math.min(1,speedW/40);
-      const kinds=season==='spring'?['blossom-',6]:season==='autumn'?['maple-',4]:['debris-',2];
+      const windy=['wind','typhoon'].includes(m),speedW=preview?(windy?60:m==='cold'?26:8):Math.max(0,Number(details.context?.wind)||0);
+      const monsoon=season==='winter'&&(m==='cold'||speedW>=20||windy);
+      const calmDrift=season==='spring'||season==='autumn'||season==='summer';
+      if(!calmDrift&&speedW<8&&!windy&&!monsoon)return;
+      const l=effLevel(),q=l==='subtle'?.35:l==='balanced'?.65:1;
+      const base=Math.round((season==='spring'?18:season==='summer'?9:season==='autumn'?16:monsoon?14:5)*q);
+      const count=Math.min(petals.length,windy?base+10:base),dir=windDir()||1,f=dprFx,g=Math.min(1,speedW/40),wet=rainMode();
       for(let i=0;i<count;i++){
-        const p=petals[i],cv=sprite(kinds[0]+(p.kind%kinds[1]));
-        const fall=season==='spring'?.028:season==='autumn'?.04:.06,sway=Math.sin(time*p.swing+p.phase);
-        p.y+=dt*(fall+.03*g)*(.5+p.z);p.x+=dt*(sway*.03+dir*(.01+g*.11)*(.4+p.z));p.rot+=dt*(p.spin*(1+g*3));
-        if(p.y>1.08){p.y=rand(-.3,-.05);p.x=Math.random()}if(p.x>1.1)p.x=-.1;if(p.x<-.1)p.x=1.1;
-        if(!cv)continue;const x=p.x*w,y=p.y*h,s=(season==='spring'?10:season==='autumn'?15:14)*(.6+p.z*.7),c=Math.cos(p.rot),sn=Math.sin(p.rot),tumble=.45+.55*Math.abs(Math.cos(time*1.3+p.phase));
-        ctx.globalAlpha=(phase==='night'?.4:.7)*vignette(x,y);ctx.setTransform(c*f*tumble,sn*f*tumble,-sn*f,c*f,x*f,y*f);ctx.drawImage(cv,-s,-s*cv.height/cv.width,s*2,s*2*cv.height/cv.width);
+        const p=petals[i];let key,size,fall,spin=1,heavy=false,float=false;
+        if(season==='spring'){if(p.kind<4){key='tung';size=9}else{key='kapok';size=14;heavy=true}}
+        else if(season==='summer'){key='flame-petal';size=9}
+        else if(season==='autumn'){if(p.kind<3){key='rain-tree-flower';size=6}else if(p.kind<5){key='rain-tree-capsule';size=9;heavy=true}else{key='fluff';size=6;float=true}}
+        else{if(p.kind<4||monsoon&&p.kind<5){key='cypress-needle';size=9}else{key='dry-leaf';size=11}}
+        const cv=tw(key);
+        fall=(heavy?.07:float?.012:.03)*(wet?1.5:1);
+        const sway=float?Math.sin(time*p.swing*.6+p.phase)*2:Math.sin(time*p.swing+p.phase);
+        const gust=monsoon?.18+g*.2:g*.11;
+        p.y+=dt*(fall+(float?-.004*(1-g):.03*g))*(.5+p.z);p.x+=dt*(sway*.03*(heavy?.4:1)+dir*(.01+gust)*(.4+p.z));p.rot+=dt*(p.spin*spin*(1+g*3)*(heavy?.5:1));
+        if(p.y>1.08){p.y=rand(-.3,-.05);p.x=Math.random()}if(p.y<-.3)p.y=1.05;if(p.x>1.1)p.x=-.1;if(p.x<-.1)p.x=1.1;
+        if(!cv)continue;const x=p.x*w,y=p.y*h,sz=size*(.6+p.z*.7),c=Math.cos(p.rot),sn=Math.sin(p.rot),tumble=heavy?.75+.25*Math.abs(Math.cos(time+p.phase)):.45+.55*Math.abs(Math.cos(time*1.3+p.phase));
+        ctx.globalAlpha=(phase==='night'?.45:.85)*vignette(x,y);ctx.setTransform(c*f*tumble,sn*f*tumble,-sn*f,c*f,x*f,y*f);ctx.drawImage(cv,-sz,-sz*cv.height/cv.width,sz*2,sz*2*cv.height/cv.width);
       }ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
-      if(windy){for(let i=0;i<9;i++){const x=((time*(60+i*9)+i*87)%(w+90))-45,y=(i*127+time*(14+i*3))%h;ctx.fillStyle=phase==='night'?'rgba(156,167,155,.4)':'rgba(96,104,84,.5)';ctx.beginPath();ctx.ellipse(x,y,3+i%3*2,1.4+i%2,.3,0,TAU);ctx.fill()}}
+      // wind made visible: faint streaks when it blows hard (typhoon, strong wind, NE monsoon)
+      if(windy||monsoon){const n=monsoon?7:9,night=phase==='night';ctx.lineWidth=1;for(let i=0;i<n;i++){const x=((time*(260+i*40)+i*131)%(w+260))-130,y=(i*97+Math.sin(time*.7+i)*12)%h,len=70+i%3*40;ctx.strokeStyle=night?`rgba(190,205,215,${.12+i%2*.06})`:`rgba(255,255,255,${.18+i%2*.08})`;ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+len*.5*dir,y-4,x+len*dir,y+2);ctx.stroke()}}
     }
     // Rooted foreground botany on both lower sides; sway follows measured wind only.
     function drawBotany(m,season,phase){
       if(!allowed('seasonal'))return;
       const speed=preview?(['wind','typhoon'].includes(m)?70:8):Math.max(0,Number(details.context?.wind)||0),dir=windDir()||1,night=phase==='night',f=dprFx;
-      const bottom=h-96,sw=Math.min(.6,speed*.014),set=season==='spring'?[['pear',60],['flower-1',46],['flower-0',40]]:season==='summer'?[['pleaf-0',88],['pear',62],['flower-3',44]]:season==='autumn'?[['acer',70],['maple-1',52],['maple-2',44]]:[['debris-2',80],['pleaf-1',64],['debris-1',34]];
+      const bottom=h-96,sw=Math.min(.6,speed*.014),set=season==='spring'?[['tung-branch',150]]:season==='summer'?[['flame-branch',160]]:season==='autumn'?[['miscanthus',70],['rain-tree-branch',130]]:[['cypress-branch',150]];
       for(let side=0;side<2;side++)for(let i=0;i<set.length;i++){
-        const [key,size]=set[i],cv=sprite(key);if(!cv)continue;
-        const rootX=side?w+6:-6,rootY=bottom-i*48,motion=reduced.matches?0:Math.sin(time*(.6+speed*.02)+i*1.1+side*2)*sw;
-        const rot=(side?1:-1)*(-.55+i*.12)+motion+dir*Math.min(.3,speed*.006),c=Math.cos(rot),s=Math.sin(rot),sx=side?-1:1;
+        const [key,size]=set[i],cv=tw(key)||sprite(key);if(!cv)continue;
+        const rootX=side?w+6:-6,rootY=bottom-i*30+(key==='miscanthus'?70:0),motion=reduced.matches?0:Math.sin(time*(.6+speed*.02)+i*1.1+side*2)*sw;
+        const rot=(side?1:-1)*(key==='miscanthus'?.05:-.1+i*.1)+motion+dir*Math.min(.3,speed*.006),c=Math.cos(rot),s=Math.sin(rot),sx=side?-1:1;
         ctx.globalAlpha=(night?.4:.86)*(season==='winter'?.75:1);ctx.setTransform(c*f*sx,s*f,-s*f*sx,c*f,rootX*f,rootY*f);
-        ctx.drawImage(cv,0,-size*.5,size*1.3,size*1.3*cv.height/cv.width);
+        ctx.drawImage(cv,key==='miscanthus'?-size*.4:0,key==='miscanthus'?-size*1.6*cv.height/cv.width:-size*1.3*cv.height/cv.width,size*1.3,size*1.3*cv.height/cv.width);
       }
       ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
       // Summer evenings and rain: a tree frog on a lily pad, bottom left, above the navigation.
@@ -444,15 +455,15 @@
     }
     // Two out-of-focus near leaves/petals cross the lens now and then (pre-blurred once).
     function drawNearBokeh(dt,m,season,phase){
-      if(!allowed('seasonal')||reduced.matches||effLevel()==='subtle'||!['spring','autumn'].includes(season)||rainMode())return;
-      const key=season==='spring'?'blossom-1':'maple-0',cv=blurred(key);if(!cv)return;const f=dprFx;
+      if(!allowed('seasonal')||reduced.matches||effLevel()==='subtle'||rainMode())return;
+      const key=season==='spring'?'tung':season==='summer'?'flame-petal':season==='autumn'?'rain-tree-capsule':'cypress-spray',cv=blurred(key);if(!cv)return;const f=dprFx;
       for(let i=0;i<2;i++){
-        const cycle=(time*.035+i*.5)%1;if(cycle>.42)continue;const k=cycle/.42,x=(i?w*1.1-k*w*1.3:-w*.1+k*w*1.3),y=h*(.18+i*.42)+Math.sin(k*Math.PI*2+i)*40,size=season==='spring'?70:110,rot=k*4+i;
+        const cycle=(time*.035+i*.5)%1;if(cycle>.42)continue;const k=cycle/.42,x=(i?w*1.1-k*w*1.3:-w*.1+k*w*1.3),y=h*(.18+i*.42)+Math.sin(k*Math.PI*2+i)*40,size=season==='winter'?90:season==='autumn'?60:70,rot=k*4+i;
         ctx.globalAlpha=(phase==='night'?.35:.6)*Math.sin(k*Math.PI);const c=Math.cos(rot),sn=Math.sin(rot);ctx.setTransform(c*f,sn*f,-sn*f,c*f,x*f,y*f);ctx.drawImage(cv,-size/2,-size/2,size,size);
       }
       ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
     }
-    function blurred(key){let cv=tints.get('blur|'+key);if(cv)return cv;const src=sprite(key);if(!src)return null;cv=document.createElement('canvas');cv.width=src.width+24;cv.height=src.height+24;const c=cv.getContext('2d');try{c.filter='blur(6px)'}catch(_){}c.drawImage(src,12,12);tints.set('blur|'+key,cv);return cv}
+    function blurred(key){let cv=tints.get('blur|'+key);if(cv)return cv;const src=tw(key)||sprite(key);if(!src)return null;cv=document.createElement('canvas');cv.width=src.width+24;cv.height=src.height+24;const c=cv.getContext('2d');try{c.filter='blur(6px)'}catch(_){}c.drawImage(src,12,12);tints.set('blur|'+key,cv);return cv}
     function drawLightning(m,phase){
       if(lightning<=0)return;const pulse=lightning*(.7+.3*Math.sin(lightning*19)**2);
       bg.globalCompositeOperation='screen';bg.fillStyle=`rgba(190,210,240,${pulse*.28})`;bg.fillRect(0,0,w,h);bg.globalCompositeOperation='source-over';
@@ -552,22 +563,22 @@
       const weather=allowed('weather');
       // v342: procedural WebGL sky (sun, twilight, stars, moon, lit clouds, ridges) when available;
       // the v341 plate + sprite path stays as the fallback for devices without WebGL.
-      const glSky=root.SkyGL&&root.SkyGL.ok&&root.SkyGL.render({time,elevation:sceneElevation(phase,hour),azimuth:solar?solar.azimuth:fallbackAzimuth(hour),hourAngle:solar?solar.hourAngle:(hour-12)*Math.PI/12,moonPhase:moonPhase(Date.now()),cover:weather?cloudBlend:.15,wind:weather?gust*3.6:8,mode:weather?m:'clear',season:name,tilt,level:effLevel(),rain:weather&&rainModes.includes(m)?rainIntensity(m):0,slant:windDir()*clamp(gust/34+(m==='typhoon'?Math.sin(time*1.4)*.22:0),.03,m==='typhoon'?1.6:.9),flash:weather?lightning:0,boltX,boltSeed:boltIndex,glass:!reduced.matches&&allowed('weather'),fog:weather&&m!=='fog'&&known(hum)&&hum>=92&&!rainModes.includes(m)?.25:0});
+      const glSky=root.SkyGL&&root.SkyGL.ok&&root.SkyGL.render({time,elevation:sceneElevation(phase,hour),azimuth:solar?solar.azimuth:fallbackAzimuth(hour),hourAngle:solar?solar.hourAngle:(hour-12)*Math.PI/12,moonPhase:moonPhase(Date.now()),cover:weather?cloudBlend:.15,wind:weather?gust*3.6:8,mode:weather?m:'clear',season:name,tilt,level:effLevel(),rain:weather&&rainModes.includes(m)?rainIntensity(m):0,slant:windDir()*clamp(gust/34+(m==='typhoon'?Math.sin(time*1.4)*.22:0),.03,m==='typhoon'?1.6:.9),flash:weather?lightning:0,boltX,boltSeed:boltIndex,glass:!reduced.matches&&allowed('weather'),heat:weather&&m==='heat'?1:0,fog:weather&&m!=='fog'&&known(hum)&&hum>=92&&!rainModes.includes(m)?.25:0});
       if(!glSky){drawPlates(weather?m:'none',phase,name,dt);drawGrade(weather?m:'none',phase,name)}
-      if(weather){if(!glSky){drawCelestial(m,phase,hour,cloudBlend,dt);drawClouds(m,phase,cloudBlend,dt)}drawFogBanks(m,phase,hum);if(!glSky)drawLightning(m,phase)}
+      if(weather){if(!glSky){drawCelestial(m,phase,hour,cloudBlend,dt);drawClouds(m,phase,cloudBlend,dt)}if(!glSky){drawFogBanks(m,phase,hum);drawLightning(m,phase)}}
       else if(!glSky)drawCelestial('clear',phase,hour,.15,dt);
-      // Everything outside the window is painted on the background plane, behind the glass panes,
-      // so the panes' backdrop blur gives real depth and nothing sits on top of text.
-      onBackground(()=>{drawBotany(m,name,phase);if(!reduced.matches){drawSeasonDrift(dt,m,name,phase);drawRain(dt,m,phase);drawSnow(dt,m,phase);drawHail(dt,m,phase);drawAnimals(m,name,phase,dt)}});
-      // foreground plane: only what is on or near the glass
+      // v343: every effect is painted on the front plane (above the app) so it is actually seen;
+      // the text-protection mask cuts it away wherever there is copy, panels or controls.
       ctx.setTransform(dprFx,0,0,dprFx,0,0);ctx.clearRect(0,0,w,h);
+      drawBotany(m,name,phase);
+      if(!reduced.matches){drawSeasonDrift(dt,m,name,phase);drawRain(dt,m,phase);drawSnow(dt,m,phase);drawHail(dt,m,phase);drawAnimals(m,name,phase,dt)}
       drawSignature(weather?m:'none',phase,name);
       if(!reduced.matches){drawBeads(dt,m);drawButterflies(m,name,phase);drawNearBokeh(dt,m,name,phase)}
       if(lightning>.35&&!glSky){const cv=sprite('bolt-'+boltIndex);if(cv){const bh=h*.55,bw=bh*cv.width/cv.height;ctx.globalAlpha=Math.min(1,(lightning-.35)*2.5)*.95;ctx.drawImage(cv,w*boltX-bw/2,h*.02,bw,bh);ctx.globalAlpha=1}}
       updateHud();
       if(layoutDirty&&(time-maskTick>.3||maskTick<0)){scanLayout();buildMask()}else if(scrollDirty&&time-maskTick>.12)buildMask();
       if(!document.body.classList.contains('scene-theatre')){ctx.globalCompositeOperation='destination-out';ctx.drawImage(mask,0,0,w,h);ctx.globalCompositeOperation='source-over'}
-      for(const v of views){paintScene(v,m,phase);labelScene(v,m,name)}
+      if(time-viewTick>.25||viewTick<0){viewTick=time;for(const v of views){v.rect=v.cv.getBoundingClientRect();paintScene(v,m,phase)}}for(const v of views)labelScene(v,m,name);
     }
     // Sliding glass pill under the active dock item.
     function syncDock(){
@@ -621,6 +632,8 @@
     // Optional in-card scene canvases (hidden by current CSS); kept lightweight.
     function readViews(){
       views=[];
+      // v343: the card's .scene-canvas is shown again (immersive-v341.css) and painted with a crop of the live
+      // scene at its screen position a few times a second; without it the card only showed the blurred panel behind it.
       document.querySelectorAll('.scene-canvas').forEach(cv=>{
         const r=cv.getBoundingClientRect();if(r.width<1||r.height<1)return;
         const cw=Math.round(r.width),ch=Math.round(r.height);
@@ -637,7 +650,9 @@
     }
     function paintScene(v,m,phase){
       if(v.rect.bottom<0||v.rect.top>h)return;const c=v.c,W=v.w,H=v.h;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,W,H);
-      const g=root.SkyGL&&root.SkyGL.ok&&root.SkyGL.canvas();if(g){try{c.drawImage(g,0,0,W,H);return}catch(e){}}const im=plate(plateKey);if(im){c.drawImage(im,...coverRect(im,W,H))}else{c.fillStyle=phase==='night'?'#0f2238':'#7aa3bf';c.fillRect(0,0,W,H)}
+      const g=root.SkyGL&&root.SkyGL.ok&&root.SkyGL.canvas();
+      if(g){try{const r=v.rect,kx=g.width/w,ky=g.height/h;c.drawImage(g,r.left*kx,r.top*ky,r.width*kx,r.height*ky,0,0,W,H);c.drawImage(sky,r.left*dprSky,r.top*dprSky,r.width*dprSky,r.height*dprSky,0,0,W,H);return}catch(e){}}
+      const im=plate(plateKey);if(im){c.drawImage(im,...coverRect(im,W,H))}else{c.fillStyle=phase==='night'?'#0f2238':'#7aa3bf';c.fillRect(0,0,W,H)}
     }
 
     return{update,stopPreview,previewModes:()=>previewModes.slice(),previewSeason,getSeason:seasonName,getMode:activeMode,refresh:resume,setQuality,getQuality:()=>level,preview:previewMode,_forceSilence(){if(root.WxSfx)root.WxSfx._forceSilence()},
