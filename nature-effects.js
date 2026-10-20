@@ -40,7 +40,14 @@
     const intensity=['drizzle','rain','heavy','storm','hail'].includes(mode)?clamp(rain===null?({drizzle:.16,rain:.32,heavy:.75,storm:.9,hail:.75}[mode]??.32):.12+Math.sqrt(rain/15),.12,1):0;
     return {cloud,intensity,rain,mode};
   }
-  root.NatureEffects={classify,solarPosition,visualState,create:function(){
+  function actorPose(kind,index,t,W,H,wind=0){
+    const bird=kind==='bird',period=bird?31+index*7:43+index*11;
+    const progress=((t+index*13)%period)/period,travel=bird?progress:progress+.055*Math.sin(t*.8+index);
+    const x=travel*(W+100)-50,y=H*(bird?.17+index*.13:.30+index*.16)+Math.sin(t*(bird?.35:.65)+index)*(bird?16:31);
+    const fold=bird?.38+.62*Math.abs(Math.sin(t*5.2+index)):.16+.84*Math.abs(Math.sin(t*9.4+index));
+    return {x,y,fold,bank:Math.sin(t*.55+index)*(bird?.10:.3),size:bird?32+index*6:30+index*9};
+  }
+  root.NatureEffects={classify,solarPosition,visualState,actorPose,create:function(){
     let canvas,sky,ctx,bg,mask,maskCtx,maskSource,maskSourceCtx,w=0,h=0,raf=0,last=0,time=0,frameCount=0,accum=0;
     let details={},weatherState=visualState(null),solar=null;
     let code=null,temp=0,wind=0,mode='none',preview=null,previewUntil=0,quiet=[],rectTick=-1,layoutDirty=true;
@@ -61,12 +68,11 @@
       if(root.NaturePhotos)root.NaturePhotos.onChange(()=>{plateCache.clear();if(ctx)draw(0)});
       for(const key of ['frost-glass','glass-impact']){const im=new Image();im.src='./images/atmosphere/'+key+'.webp';images[key]=im}
       scenePlate=document.createElement('canvas');
+      for(const key of ['butterfly','martin','pear-leaf','maple-leaf']){const im=new Image();im.onload=()=>{if(ctx)draw(0)};im.src='./images/nature-photo/'+key+'.png';images['photo-'+key]=im}
+
       document.addEventListener('keydown',e=>{if(e.key==='Escape'&&preview)stopPreview()});
       mask=document.createElement('canvas');maskCtx=mask.getContext('2d');
       maskSource=document.createElement('canvas');maskSourceCtx=maskSource.getContext('2d');
-      for(const [key,dir,prefix,count] of [['leaf','maple','maple',4],['cloud','cloud','cloud',3],['butterfly','butterfly','monarch',6],['petal','blossom','blossom',3]]){
-        images[key]=Array.from({length:count},(_,i)=>{const image=new Image();image.onload=()=>{if(reduced.matches)draw(0)};image.src='./images/fx/'+dir+'/'+prefix+'-'+String(i+1).padStart(2,'0')+'.png';return image});
-      }
       for(let i=0;i<16;i++)leaves.push({x:Math.random(),y:Math.random(),z:rand(.2,1),vx:rand(3,14),phase:rand(0,6.28),rot:rand(0,6.28),image:i%4});
       for(let i=0;i<420;i++)rain.push({x:Math.random(),y:Math.random(),z:rand(.15,1)});
       for(let i=0;i<24;i++)stars.push({x:Math.random(),y:Math.random()*.55,r:rand(.35,1.1),phase:rand(0,6.28)});
@@ -154,23 +160,6 @@
         glow(bg,w*1.15,h*.62,w*.65,'183,207,209',m==='fog'?.2:.08);
       }
     }
-    function drawLeaves(dt,season,m){
-      if(!document.body.classList.contains('scene-theatre')&&!seasonPreview&&m!=='wind')return;
-      if(document.body.classList.contains('scene-theatre')&&!seasonPreview&&m!=='wind')return;
-      if(!allowed('seasonal')||rainMode()||['snow','cold','fog','heat','hail','earthquake','none'].includes(m))return;
-      if(season!==2&&season!==0&&m!=='wind')return;
-      const count=level==='subtle'?2:level==='rich'?5:3;
-      for(let i=0;i<count;i++){
-        const p=leaves[i],target=6+gust*(1.1+p.z*.7);
-        p.vx+=(target-p.vx)*Math.min(1,dt*1.5);p.x+=dt*p.vx/w;p.y+=dt*(7+17*p.z)/h;
-        p.phase+=dt*(.6+p.z*.35);p.rot+=dt*(.25+gust*.018)*(i%2?-1:1);
-        if(p.y>1.08){p.y=-.08;p.x=Math.random();p.phase=rand(0,6.28)}if(p.x>1.12)p.x=-.12;
-        const x=p.x*w+Math.sin(p.phase)*(13+18*p.z),y=p.y*h,size=(season===0?14:20)+(level==='rich'?23:18)*p.z,flip=Math.cos(p.phase*.72);
-        ctx.save();ctx.translate(x,y);ctx.rotate(p.rot+Math.sin(p.phase)*.32);ctx.scale(Math.sign(flip)*Math.max(.16,Math.abs(flip)),.85+.15*Math.sin(p.phase));
-        ctx.shadowColor='rgba(20,46,31,.16)';ctx.shadowBlur=3+4*p.z;ctx.shadowOffsetY=3+p.z*2;
-        imageDraw(ctx,images[season===0?'petal':'leaf'][i%(season===0?3:4)],-size/2,-size/2,size,size,(.7+.24*p.z)*vignetteAlpha(x,y));ctx.restore();
-      }
-    }
     function rainDirection(){const v=details.windDirection;return preview?1:v===null||v===undefined?0:Math.sin((Number(v)+180)*Math.PI/180)}
     function drawRain(dt,m,dark){
       if(!allowed('weather')||!rainMode())return;
@@ -211,8 +200,60 @@
       for(let i=0;i<count;i++){const p=rain[i];p.y=(p.y+dt*(10+25*p.z)/h)%1;const x=p.x*w+Math.sin(time*.4+i)*18,y=p.y*h;ctx.fillStyle=`rgba(220,234,240,${.15+.3*vignetteAlpha(x,y)})`;ctx.beginPath();ctx.arc(x,y,.7+p.z*2,0,Math.PI*2);ctx.fill()}
     }
     function drawAnimals(m,hour){
-      // Wildlife comes from actual photographs in the environmental plane.
-      // Do not animate a still photograph as a fabricated flying specimen.
+      if(!allowed('animals'))return;
+      const eco=sceneContext(m,seasonName(),sceneIsNight(hour<5||hour>=19));
+      if(!eco.animals.length)return;
+      const night=sceneIsNight(false);
+      for(const kind of ['bird','butterfly']){
+        const im=images[kind==='bird'?'photo-martin':'photo-butterfly'];if(!im?.complete||!im.naturalWidth)continue;
+        const count=level==='subtle'?1:2;
+        for(let i=0;i<count;i++){
+          const pose=actorPose(kind,i,time,w,h,wind),iw=im.naturalWidth,ih=im.naturalHeight;
+          ctx.save();ctx.translate(pose.x,pose.y);ctx.rotate(pose.bank);ctx.globalAlpha=night?.5:.9;ctx.scale(pose.size/iw,pose.size/iw);
+          if(kind==='butterfly'){
+            // Two photographed wings hinge independently at the thorax.
+            const hinge=iw*.5;
+            ctx.save();ctx.scale(pose.fold,1);ctx.drawImage(im,0,0,hinge,ih,-hinge,-ih*.45,hinge,ih);ctx.restore();
+            ctx.save();ctx.scale(Math.min(1,pose.fold*1.08),1);ctx.drawImage(im,hinge,0,iw-hinge,ih,0,-ih*.45,iw-hinge,ih);ctx.restore();
+            ctx.drawImage(im,iw*.477,ih*.36,iw*.046,ih*.28,-iw*.023,-ih*.09,iw*.046,ih*.28);
+          }else{
+            // Wings flap around the photographed body; gliding intervals are
+            // separate from the flight path, so this is not a moving postcard.
+            const glide=Math.sin(time*.43+i)>.65,fold=glide?.92:pose.fold;
+            ctx.save();ctx.scale(1,fold);ctx.drawImage(im,0,0,iw,ih*.48,-iw*.5,-ih*.48,iw,ih*.48);ctx.restore();
+            ctx.save();ctx.scale(1,fold);ctx.drawImage(im,0,ih*.59,iw,ih*.41,-iw*.5,ih*.11,iw,ih*.41);ctx.restore();
+            ctx.drawImage(im,0,ih*.48,iw,ih*.11,-iw*.5,0,iw,ih*.11);
+          }
+          ctx.restore();
+        }
+      }
+    }
+    function drawBotany(m,night){
+      if(!allowed('seasonal'))return;
+      const s=seasonName(),photo=images[s==='autumn'?'photo-maple-leaf':'photo-pear-leaf'];
+      if(!photo?.complete||!photo.naturalWidth)return;
+      const fresh=preview||details.context&&Date.now()<=details.context.expiresAt;
+      const speed=fresh?Math.max(0,preview?wind||8:Number(details.context?.wind)||0):0;
+      const direction=fresh&&details.context?.windDirection!=null?Math.sin((details.context.windDirection+180)*Math.PI/180):1;
+      const n=level==='subtle'?2:s==='winter'?2:s==='summer'?5:4;
+      for(let side=0;side<2;side++)for(let i=0;i<n;i++){
+        const rootX=side?w+4:-4,rootY=h-30-i*54,size=38+i*4;
+        const motion=reduced.matches?0:Math.sin(time*(.55+speed*.018)+i*1.1+side)*Math.min(.5,speed*.017);
+        ctx.save();ctx.strokeStyle=night?'#54655799':'#59634399';ctx.lineWidth=1.3;
+        ctx.beginPath();ctx.moveTo(side?w-8:8,h+12);ctx.quadraticCurveTo(side?w-25:25,rootY+35,rootX+(side?-1:1)*(15+motion*14),rootY+3);ctx.stroke();ctx.restore();
+        ctx.save();ctx.translate(rootX,rootY);ctx.scale(side?-1:1,1);ctx.rotate(-.50+i*.09+motion+direction*Math.min(.3,speed*.008));
+        ctx.globalAlpha=night?.40:.82;
+        // Real alpha-masked leaves, each rooted and moving independently.
+        ctx.drawImage(photo,0,-size*.56,size*1.25,size*photo.naturalHeight/photo.naturalWidth*1.25);ctx.restore();
+      }
+      // Detached photographed leaves require observed wind; winter has fewer.
+      if(speed<8||reduced.matches)return;
+      const count=s==='autumn'?5:s==='winter'?1:2;
+      for(let i=0;i<count;i++){
+        const cycle=(time*(.013+speed*.0007)+i*.27)%1,x=((i*.31+time*direction*speed*.0003)%1+1)%1*w,y=cycle*(h+90)-45;
+        ctx.save();ctx.translate(x,y);ctx.rotate(time*(.5+i*.12)+i);ctx.scale(.45+.55*Math.abs(Math.cos(time+i)),1);ctx.globalAlpha=night?.35:.7;
+        if(s==='autumn')ctx.drawImage(photo,180,450,554,457,-17,-14,34,28);else ctx.drawImage(photo,-17,-17,34,34*photo.naturalHeight/photo.naturalWidth);ctx.restore();
+      }
     }
     function sceneContext(m,season,night){
       const raw=details.context||{mode:m,temp:null,wind:null,cloud:null,lat:details.lat,lon:details.lon};
@@ -221,28 +262,36 @@
     }
     function paintPhotographs(c,W,H,m,season,night){
       if(!root.NaturePhotos)return;
-      const eco=sceneContext(allowed('weather')?m:'none',season,night),wild=allowed('animals')?eco.animals:[];
-      // Stable local-solar-hour variation, no rapidly cycling slideshow.
-      const hour=Math.floor((Date.now()/3600000+(Number(details.lon)||0)/15)%24);
-      const natural=wild.length&&hour%3===1?wild[hour%wild.length]:allowed('seasonal')?eco.plant:null;
-      const key=eco.wet?'rain':natural||eco.cloudType;
-      const im=root.NaturePhotos.image(key);if(!im)return;
-      const cacheKey=['photo',key,W,H,night].join(':');let plate=plateCache.get(cacheKey);
-      if(!plate){plate=document.createElement('canvas');plate.width=Math.ceil(W);plate.height=Math.ceil(H);const pc=plate.getContext('2d'),scale=Math.max(W/im.naturalWidth,H/im.naturalHeight);pc.filter=night?'brightness(.25) saturate(.45)':'none';pc.drawImage(im,(W-im.naturalWidth*scale)/2,(H-im.naturalHeight*scale)/2,im.naturalWidth*scale,im.naturalHeight*scale);if(plateCache.size>10)plateCache.clear();plateCache.set(cacheKey,plate)}
-      c.save();const drift=reduced.matches?0:Math.sin(time*.035)*W*.008;c.drawImage(plate,drift-W*.015,-H*.015,W*1.03,H*1.03);c.restore();
-      // Real sky photographic textures blend into the top depth plane.
-      // Cloud genus is illustrative unless a station supplies cloud observations.
-      const skyKey=['storm','typhoon','hail'].includes(m)?'cumulus':eco.cloudType;
-      const skyPhoto=allowed('weather')&&m!=='none'?root.NaturePhotos.image(skyKey):null;
-      if(skyPhoto&&natural){
-        const k=['sky-photo',skyKey,W,H,night].join(':');let layer=plateCache.get(k);
-        if(!layer){layer=document.createElement('canvas');layer.width=W;layer.height=H;const p=layer.getContext('2d'),height=H*.64,sc=Math.max(W/skyPhoto.naturalWidth,height/skyPhoto.naturalHeight);p.filter=night?'brightness(.3) saturate(.5)':'none';p.drawImage(skyPhoto,(W-skyPhoto.naturalWidth*sc)/2,0,skyPhoto.naturalWidth*sc,skyPhoto.naturalHeight*sc);p.filter='none';p.globalCompositeOperation='destination-in';const mask=p.createLinearGradient(0,0,0,height);mask.addColorStop(0,'#000');mask.addColorStop(.45,'#000');mask.addColorStop(1,'transparent');p.fillStyle=mask;p.fillRect(0,0,W,height);if(plateCache.size>10)plateCache.clear();plateCache.set(k,layer)}c.drawImage(layer,0,0);
+      const eco=sceneContext(allowed('weather')?m:'none',season,night);
+      // Separate photographic planes. Wildlife close-ups never become landscapes.
+      // These are animated photographs, not live footage of the selected location.
+      function plane(key,top,height,alpha,foreground=false){
+        const im=root.NaturePhotos.image(key);if(!im)return;
+        const cacheKey=['plane340',key,W,height,night,foreground].join(':');let plate=plateCache.get(cacheKey);
+        if(!plate){
+          plate=document.createElement('canvas');plate.width=Math.ceil(W*1.08);plate.height=Math.ceil(height);
+          const pc=plate.getContext('2d'),scale=Math.max(plate.width/im.naturalWidth,height/im.naturalHeight);
+          pc.filter=night?'brightness(.22) saturate(.45)':'saturate(.8)';
+          pc.drawImage(im,(plate.width-im.naturalWidth*scale)/2,(height-im.naturalHeight*scale)/2,im.naturalWidth*scale,im.naturalHeight*scale);
+          pc.filter='none';pc.globalCompositeOperation='destination-in';const mask=pc.createLinearGradient(0,0,0,height);
+          if(foreground){mask.addColorStop(0,'transparent');mask.addColorStop(.34,'#000');mask.addColorStop(1,'#000')}
+          else{mask.addColorStop(0,'#000');mask.addColorStop(.6,'#000');mask.addColorStop(1,'transparent')}
+          pc.fillStyle=mask;pc.fillRect(0,0,plate.width,height);
+          if(plateCache.size>10)plateCache.clear();plateCache.set(cacheKey,plate);
+        }
+        c.save();c.globalAlpha=alpha;
+        const motion=reduced.matches?0:1;
+        const dx=Math.sin(time*.045)*W*.025*motion;c.drawImage(plate,-W*.04+dx,top);
+        c.restore();
       }
+      const skyKey=['storm','typhoon','hail'].includes(m)?'cumulus':eco.cloudType;
+      if(allowed('weather')&&m!=='none'&&skyKey!=='unknown')plane(skyKey,0,H*.84,night?.65:.9,false);
+
     }
     function evidenceLabel(){
       if(preview)return '手動預覽 · 非當地實況';
       const state=details.context;
-      if(!state||activeMode()==='none')return state?.reason==='measured-dry'&&Date.now()<=state.expiresAt?'近站未測得降雨 · 其他現象資料不足':'等待有效的當地實測 · 天氣特效暫停';
+      if(!state||activeMode()==='none')return state?.reason==='measured-dry'&&Date.now()<=state.expiresAt?'日夜與季節光景運作中 · 近站無雨；其他天氣待確認':'日夜與季節光景運作中 · 等待有效當地天氣實測';
       const date=new Date(state.sourceTime);return '近站實測 '+date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+' · 生態為季節示意';
     }
     function updateHud(){
@@ -402,7 +451,8 @@
       drawImmersive(dt,m,dark);
       drawSignature(m,sceneIsNight(hour<5||hour>=19));
       updateHud();
-      if(!reduced.matches){if(preview)drawLeaves(dt,season,m);drawRain(dt,m,dark);drawSnow(dt,m);drawAnimals(m,hour)}
+      drawBotany(m,sceneIsNight(hour<5||hour>=19));
+      if(!reduced.matches){drawRain(dt,m,dark);drawSnow(dt,m);drawAnimals(m,hour)}
       // Protect text on both front planes, never entire content cards.
       if(layoutDirty||time-rectTick>.5||rectTick<0)collectQuiet();
       if(!document.body.classList.contains('scene-theatre'))for(const c of [ctx]){c.save();c.globalCompositeOperation='destination-out';c.drawImage(mask,0,0,w,h);c.restore()}
@@ -434,12 +484,6 @@
         views.push({cv,c:cv.getContext('2d'),w:r.width,h:r.height,dpr,rect:r});
       });
     }
-    function cloudTexture(c,index,x,y,size,alpha,soft=0){
-      const img=images.cloud[index],crop=[[6,186,499,140],[7,78,498,355],[6,78,503,353]][index];
-      if(!img||!img.complete||!img.naturalWidth)return;
-      c.save();c.globalAlpha=alpha;if(soft)c.filter=(c.filter==='none'?'':c.filter+' ')+'blur('+soft+'px)';
-      c.drawImage(img,...crop,x,y,size,size*crop[3]/crop[2]);c.restore();
-    }
     function labelScene(v,m,season){
       const parent=v.cv.closest('.atmosphere-view'),zh=document.documentElement.lang!=='id',active=preview&&performance.now()<previewUntil;
       const names={spring:['春季','Musim semi'],summer:['夏季','Musim panas'],autumn:['秋季','Musim gugur'],winter:['冬季','Musim dingin']},modes={clear:['晴空','Cerah'],cloud:['雲層','Awan'],rain:['雨幕','Hujan'],heavy:['大雨','Hujan lebat'],storm:['雷雨','Badai'],wind:['風葉','Angin'],snow:['降雪','Salju'],fog:['霧景','Kabut'],cold:['冷空氣','Dingin'],heat:['盛夏暖光','Cahaya hangat'],none:['光景','Suasana']};
@@ -453,7 +497,7 @@
       const weather=allowed('weather')&&m!=='none',wet=weather&&['drizzle','rain','heavy','storm','typhoon','hail'].includes(m),snow=weather&&m==='snow';
       const sun=solar,night=sceneIsNight(hour<5||hour>=19),twilight=sun?sun.elevation>=-6&&sun.elevation<9:hour>=5&&hour<7||hour>=17&&hour<19;
       const cloud=preview?(['cloud','drizzle','rain','heavy','storm','typhoon','hail','fog'].includes(m)?.9:.15):cloudBlend;
-      const colors=!weather?['#718692','#a0b5bc','#d7e0dd']:night?wet?['#101f36','#263e53','#526674']:['#0d213d','#28475e','#739098']:wet?['#465f78','#7d97a7','#c0cbcb']:twilight?['#657eaa','#ccada7','#f4d1a0']:['#4c8fb6','#98c8d8','#d6e1cf'];
+      const colors=!weather?(night?['#0b1827','#23384a','#475554']:twilight?['#687887','#b3aaa2','#d4c6af']:['#718692','#a0b5bc','#d7e0dd']):night?wet?['#101f36','#263e53','#526674']:['#0d213d','#28475e','#739098']:wet?['#465f78','#7d97a7','#c0cbcb']:twilight?['#657eaa','#ccada7','#f4d1a0']:['#4c8fb6','#98c8d8','#d6e1cf'];
       const g=c.createLinearGradient(0,0,W*.08,H);g.addColorStop(0,colors[0]);g.addColorStop(.57,colors[1]);g.addColorStop(1,colors[2]);c.fillStyle=g;c.fillRect(0,0,W,H);
       paintPhotographs(c,W,H,m,season,night);
       if(m==='fog')for(let i=0;i<3;i++)glow(c,W*(i*.55-.05)+Math.sin(time*.03+i)*W*.1,H*(.45+i*.12),W*.6,'215,226,229',night?.08:.24);
@@ -463,7 +507,6 @@
         for(let i=0;i<5;i++){const x=W*[.08,.91,.19,.82,.37][i],y=(time*(1+i*.5)+i*H*.18)%(H+20)-10,r=1.5+i%3*.7;glow(c,x-r*.3,y-r*.4,r*2,'235,251,255',.3);c.strokeStyle='#173c5666';c.lineWidth=.65;c.beginPath();c.ellipse(x,y,r,r*1.8,-tilt*.1,0,Math.PI*2);c.stroke();c.strokeStyle='#edffffab';c.beginPath();c.arc(x-.2,y-r*.3,r*.65,3.1,4.9);c.stroke()}
       }
       if(snow){c.fillStyle='#e6f1ef99';for(let i=0;i<28;i++){const p=rain[i];c.beginPath();c.arc(p.x*W+Math.sin(time*.3+i)*6,p.y*H,1+p.z,0,Math.PI*2);c.fill()}}
-      if(allowed('animals')&&weather&&night&&!wet&&season==='summer')for(let i=0;i<5;i++)glow(c,W*(.12+i*.17)+Math.sin(time*.3+i)*6,H*(.6+i%2*.06),3,'222,238,146',Math.max(0,Math.sin(time*.8+i))*.4);
       if(lightning>0){c.fillStyle='rgba(213,233,255,'+lightning*.09+')';c.fillRect(0,0,W,H)}
     }
     function previewSeason(value){

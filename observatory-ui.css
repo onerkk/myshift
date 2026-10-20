@@ -287,3 +287,33 @@ html .nature-previews button[data-effect=cloud],html .nature-previews button[dat
 
 /* v338 observation provenance is always readable. */
 .nature-observation-state{padding:14px 16px;border:1px solid var(--border,#829aa7);border-radius:14px;background:var(--card,#fff);color:var(--tx,#243e48);font-size:13px;line-height:1.7;margin:14px 0}
+
+/* v340 · An everyday control panel, with the theatre available on demand. */
+html .nature-controls{padding:22px 18px;overflow:hidden}
+html .nature-controls-head{align-items:flex-start;gap:12px}
+html .nature-controls-head h3{font-size:19px;line-height:1.4;letter-spacing:.025em}
+html .nature-controls-head p{font-size:12px;line-height:1.7;color:var(--ink-2)}
+html .nature-live{font-size:10px;white-space:nowrap;padding:4px 7px}
+html .nature-observation-state{font-size:13px;line-height:1.75;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:12px;padding:13px 15px;margin:16px 0}
+html .nature-adjustments,html .nature-theatre-menu{border-top:1px solid var(--line);margin-top:16px}
+html .nature-adjustments>summary,html .nature-theatre-menu>summary{cursor:pointer;min-height:56px;padding:16px 26px 16px 0;position:relative;font-size:15px;font-weight:650;color:var(--ink);list-style:none;line-height:1.5}
+html .nature-adjustments>summary::-webkit-details-marker,html .nature-theatre-menu>summary::-webkit-details-marker{display:none}
+html .nature-adjustments>summary::after,html .nature-theatre-menu>summary::after{content:'＋';position:absolute;right:2px;top:16px;font-size:18px;font-weight:400;color:var(--brand)}
+html .nature-adjustments[open]>summary::after,html .nature-theatre-menu[open]>summary::after{content:'−'}
+html .nature-adjustments>summary:focus-visible,html .nature-theatre-menu>summary:focus-visible{outline:3px solid var(--brand);outline-offset:3px;border-radius:5px}
+html .nature-theatre-menu>summary>small{display:block;font-size:12px;font-weight:400;color:var(--ink-2);margin-top:4px}
+html .nature-theatre-menu .nature-previews{margin:0 0 18px;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+html .nature-theatre-menu .nature-previews>span{font-size:12px;color:var(--ink-2)}
+html .nature-theatre-menu .nature-previews>button{min-height:110px!important;aspect-ratio:auto!important;padding:14px!important;border-radius:15px!important}
+html .nature-theatre-menu .nature-previews .effect-copy b{font-size:16px!important}
+html .nature-theatre-menu .nature-previews .effect-copy small{font-size:11px!important;line-height:1.65}
+html .nature-theatre-menu .effect-tile-icon{width:29px;height:29px}
+html .nature-seasons{gap:8px;margin-top:18px}
+html .nature-seasons>button{min-height:44px;border-radius:10px;font-size:13px;padding:8px 4px}
+html .nature-visibility-controls{gap:8px;margin-top:16px}
+html .nature-visibility-controls>button{min-height:44px;font-size:13px;padding:8px 4px;border-radius:10px}
+html .nature-resource-links{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;border-top:1px solid var(--line);margin-top:18px;padding-top:14px}
+html .nature-resource-links>a{font-size:11px;line-height:1.6;color:var(--ink-2);text-underline-offset:4px;min-height:32px;display:inline-flex;align-items:center}
+html .nature-resource-links .nature-photo-retry{min-height:40px;border:1px solid var(--line);border-radius:9px;padding:8px 12px;background:var(--surface-2);color:var(--ink);font-size:12px;box-shadow:none}
+html .nature-preview-state:empty{display:none}
+@media(min-width:760px){html .nature-theatre-menu .nature-previews{grid-template-columns:repeat(3,minmax(0,1fr))!important}}

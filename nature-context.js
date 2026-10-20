@@ -44,7 +44,7 @@ function ecology(state,night,stamp=Date.now()){
  const s=state.season||season(stamp,state.lat,state.lon),warm=state.temp!==null&&state.temp>=18&&state.temp<=33,calm=state.wind!==null&&state.wind<18;
  const dry=['clear','cloud'].includes(state.mode),tropical=Math.abs(state.lat||0)<25;
  const plant=s==='summer'&&warm?'lotus':s==='spring'||tropical&&s==='winter'?'grass':'reeds';
- const animals=!night&&dry&&warm&&calm?['butterfly',...(s==='summer'?['dragonfly']:[]),'egret']:[];
+ const animals=!night&&dry&&warm&&calm?['butterfly','bird']:[];
  return {plant,animals,season:s,night,wet:['drizzle','rain','heavy','storm','typhoon'].includes(state.mode),cloudType:state.cloud===null?(state.mode==='clear'?'cirrus':state.mode==='cloud'?'stratocumulus':'unknown'):state.cloud<25?'cirrus':state.cloud<75?'cumulus':'stratocumulus',source:'seasonal-illustration'};
 }
 const api={resolve,season,ecology,fresh,normalizeObservation,weatherCode};root.NatureContext=api;if(typeof module==='object'&&module.exports)module.exports=api;

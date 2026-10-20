@@ -1,2 +1,2 @@
-v339-station PREVIEW
-實測 Worker 對接修正；296 項 Node 測試通過；未部署。攝影下載與瀏覽器視覺驗收仍未完成。
+v340-motion PREVIEW
+Independent photo actors implemented. 298 tests passed. Full mobile visual QA pending; not deployed.
