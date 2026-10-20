@@ -205,7 +205,7 @@
       const sy=scrollY||0,sx=scrollX||0,m=maskScale,c=maskCtx;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,mask.width,mask.height);c.fillStyle='#000';quiet=[];
       for(const r of pageRects){const top=r.t-sy,left=r.l-sx;if(top+r.h<0||top>h)continue;const pad=r.solid?5:4;c.fillRect((left-pad)*m,(top-pad)*m,(r.w+pad*2)*m,(r.h+pad*2)*m);quiet.push(r)}
       for(const el of stickyEls){const r=el.getBoundingClientRect();if(r.width<=0||r.height<=0||r.bottom<0||r.top>h)continue;c.fillRect((r.left-6)*m,(r.top-6)*m,(r.width+12)*m,(r.height+12)*m);quiet.push(r)}
-      scrollDirty=false;maskTick=time;
+      scrollDirty=false;maskTick=time;if(root.SkyGL&&root.SkyGL.ok)root.SkyGL.setMask(mask);
     }
 
     // ---- scene state helpers ----
@@ -323,7 +323,7 @@
     function vignette(x,y){return (.66+.34*clamp(Math.abs(x/w-.5)*2,0,1))*(y>h-120?.6:1)}
     function drawRain(dt,m,phase){
       if(!allowed('weather')||!rainMode())return;
-      const l=effLevel(),drizzle=m==='drizzle',intensity=rainIntensity(m),count=Math.round((l==='subtle'?70:l==='balanced'?170:280)*Math.max(.18,intensity));
+      const l=effLevel(),drizzle=m==='drizzle',intensity=rainIntensity(m),glRain=root.SkyGL&&root.SkyGL.ok,count=Math.round((l==='subtle'?70:l==='balanced'?170:280)*Math.max(.18,intensity)*(glRain?.55:1));
       const tilt=windDir()*clamp(gust/34+(m==='typhoon'?Math.sin(time*1.4)*.22:0),.03,m==='typhoon'?1.6:.9),angle=Math.atan(tilt),cos=Math.cos(angle),sin=Math.sin(angle),dark=phase==='night';
       const f=dprFx;
       for(let i=0;i<count;i++){
@@ -341,6 +341,7 @@
     // Beads live on the glass in front of the app; the rain field lives outside it.
     function drawBeads(dt,m){
       if(!allowed('weather')||!rainMode())return;
+      if(root.SkyGL&&root.SkyGL.glassActive&&root.SkyGL.glassActive())return; // v342: refracting drops live on the GL glass plane
       const l=effLevel(),drizzle=m==='drizzle',intensity=rainIntensity(m),tilt=windDir()*clamp(gust/34,.03,.9);
       const drop=sprite('drop'),nb=drizzle?6:l==='subtle'?4:intensity>.7?10:7;
       for(let i=0;i<nb;i++){
@@ -485,7 +486,7 @@
         for(let j=0;j<rows;j++){const y=h*.5+j*h*.023,dy=h*.024,offset=Math.sin(t*1.8+j*.7)*2.2*strength;c.globalAlpha=.34;c.drawImage(sky,0,y*d,sky.width,dy*d,offset,y,w,dy+1)}c.globalAlpha=1;
         if(m==='heat')glow(c,w*.8,h*.05,w,'255,153,57',.12);
       }
-      if(m==='typhoon'){const surge=Math.pow((Math.sin(t*1.25)+1)/2,3);c.fillStyle=`rgba(24,47,61,${.1+surge*.16})`;c.fillRect(0,0,w,h);for(let i=0;i<7;i++){const x=((t*(190+i*17)+i*163)%(w+650))-650,y=(i*139)%h;c.save();c.translate(x,y);c.rotate(-.24);c.fillStyle=`rgba(193,218,229,${.07+surge*.12})`;c.fillRect(0,20,650,45);c.restore()}}
+      if(m==='typhoon'){const surge=Math.pow((Math.sin(t*1.25)+1)/2,3);c.fillStyle=`rgba(24,47,61,${.1+surge*.16})`;c.fillRect(0,0,w,h);if(!(root.SkyGL&&root.SkyGL.ok))for(let i=0;i<7;i++){const x=((t*(190+i*17)+i*163)%(w+650))-650,y=(i*139)%h;c.save();c.translate(x,y);c.rotate(-.24);c.fillStyle=`rgba(193,218,229,${.07+surge*.12})`;c.fillRect(0,20,650,45);c.restore()}}
       if(m==='fog'){for(let i=0;i<4;i++){const x=Math.sin(t*.07+i*1.7)*w*.6+w*.5,y=h*(.15+i*.22);c.save();c.scale(1,.5);glow(c,x,y*2,w*.9,night?'153,185,206':'229,241,246',.22);c.restore()}}
       if(m==='earthquake'&&preview){
         const elapsed=(performance.now()-previewStarted)/1000,envelope=Math.min(1,elapsed/1.5)*Math.max(0,1-elapsed/20),amp=(effLevel()==='subtle'?1:effLevel()==='rich'?5.5:3.5)*envelope;
@@ -551,9 +552,9 @@
       const weather=allowed('weather');
       // v342: procedural WebGL sky (sun, twilight, stars, moon, lit clouds, ridges) when available;
       // the v341 plate + sprite path stays as the fallback for devices without WebGL.
-      const glSky=root.SkyGL&&root.SkyGL.ok&&root.SkyGL.render({time,elevation:sceneElevation(phase,hour),azimuth:solar?solar.azimuth:fallbackAzimuth(hour),hourAngle:solar?solar.hourAngle:(hour-12)*Math.PI/12,moonPhase:moonPhase(Date.now()),cover:weather?cloudBlend:.15,wind:weather?gust*3.6:8,mode:weather?m:'clear',season:name,tilt,level:effLevel(),fog:weather&&m!=='fog'&&known(hum)&&hum>=92&&!rainModes.includes(m)?.25:0});
+      const glSky=root.SkyGL&&root.SkyGL.ok&&root.SkyGL.render({time,elevation:sceneElevation(phase,hour),azimuth:solar?solar.azimuth:fallbackAzimuth(hour),hourAngle:solar?solar.hourAngle:(hour-12)*Math.PI/12,moonPhase:moonPhase(Date.now()),cover:weather?cloudBlend:.15,wind:weather?gust*3.6:8,mode:weather?m:'clear',season:name,tilt,level:effLevel(),rain:weather&&rainModes.includes(m)?rainIntensity(m):0,slant:windDir()*clamp(gust/34+(m==='typhoon'?Math.sin(time*1.4)*.22:0),.03,m==='typhoon'?1.6:.9),flash:weather?lightning:0,boltX,boltSeed:boltIndex,glass:!reduced.matches&&allowed('weather'),fog:weather&&m!=='fog'&&known(hum)&&hum>=92&&!rainModes.includes(m)?.25:0});
       if(!glSky){drawPlates(weather?m:'none',phase,name,dt);drawGrade(weather?m:'none',phase,name)}
-      if(weather){if(!glSky){drawCelestial(m,phase,hour,cloudBlend,dt);drawClouds(m,phase,cloudBlend,dt)}drawFogBanks(m,phase,hum);drawLightning(m,phase)}
+      if(weather){if(!glSky){drawCelestial(m,phase,hour,cloudBlend,dt);drawClouds(m,phase,cloudBlend,dt)}drawFogBanks(m,phase,hum);if(!glSky)drawLightning(m,phase)}
       else if(!glSky)drawCelestial('clear',phase,hour,.15,dt);
       // Everything outside the window is painted on the background plane, behind the glass panes,
       // so the panes' backdrop blur gives real depth and nothing sits on top of text.
@@ -562,7 +563,7 @@
       ctx.setTransform(dprFx,0,0,dprFx,0,0);ctx.clearRect(0,0,w,h);
       drawSignature(weather?m:'none',phase,name);
       if(!reduced.matches){drawBeads(dt,m);drawButterflies(m,name,phase);drawNearBokeh(dt,m,name,phase)}
-      if(lightning>.35){const cv=sprite('bolt-'+boltIndex);if(cv){const bh=h*.55,bw=bh*cv.width/cv.height;ctx.globalAlpha=Math.min(1,(lightning-.35)*2.5)*.95;ctx.drawImage(cv,w*boltX-bw/2,h*.02,bw,bh);ctx.globalAlpha=1}}
+      if(lightning>.35&&!glSky){const cv=sprite('bolt-'+boltIndex);if(cv){const bh=h*.55,bw=bh*cv.width/cv.height;ctx.globalAlpha=Math.min(1,(lightning-.35)*2.5)*.95;ctx.drawImage(cv,w*boltX-bw/2,h*.02,bw,bh);ctx.globalAlpha=1}}
       updateHud();
       if(layoutDirty&&(time-maskTick>.3||maskTick<0)){scanLayout();buildMask()}else if(scrollDirty&&time-maskTick>.12)buildMask();
       if(!document.body.classList.contains('scene-theatre')){ctx.globalCompositeOperation='destination-out';ctx.drawImage(mask,0,0,w,h);ctx.globalCompositeOperation='source-over'}

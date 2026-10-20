@@ -48,6 +48,9 @@ html body{background:transparent!important}
 /* v342 stage 1: procedural WebGL sky sits directly under the 2D sky plane. */
 html body #nature-sky-gl,html body:has(.screen-calendar) #nature-sky-gl{position:fixed;inset:0;z-index:0;display:block;pointer-events:none;contain:strict;opacity:1!important}
 @media(prefers-reduced-motion:reduce){html body #nature-sky-gl{opacity:1!important}}
+/* v342 stage 2: refracting drops on the front glass, under #wxfx (bolt sprites, butterflies) and above the app. */
+html body #nature-glass-gl,html body:has(.screen-calendar) #nature-glass-gl{position:fixed;inset:0;z-index:31;pointer-events:none;contain:strict;opacity:1!important}
+@media(prefers-reduced-motion:reduce){html body #nature-glass-gl{display:none!important}}
 #app{position:relative;z-index:1}
 .app-shell{background:transparent!important}
 

@@ -31,7 +31,8 @@ for(const mode of await page.evaluate(()=>WxFx.previewModes())){
   await page.evaluate(m=>WxFx.preview(m),mode);await page.waitForTimeout(700);
   dbg=await page.evaluate(()=>WxFx._debug());assert.equal(dbg.active,mode);assert.equal(dbg.running,true);
   assert.equal(await page.locator('.nature-preview-hud').isVisible(),true);assert.equal(await page.evaluate(()=>document.querySelector('#app').inert),true);
-  const ink=await page.evaluate(()=>{const c=document.querySelector('#wxfx'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=64)if(d[i]>8)n++;return n});
+  // v342: in rain the drops live on the GL glass plane (#nature-glass-gl); count its coverage too, right after a synchronous redraw.
+  const ink=await page.evaluate(()=>{WxFx.refresh();const c=document.querySelector('#wxfx'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=64)if(d[i]>8)n++;const g=SkyGL&&SkyGL.glassActive&&SkyGL.glassActive()?SkyGL.glassCanvas():null;if(g){const gl=g.getContext('webgl'),px=new Uint8Array(g.width*g.height*4);gl.readPixels(0,0,g.width,g.height,gl.RGBA,gl.UNSIGNED_BYTE,px);for(let i=3;i<px.length;i+=64)if(px[i]>8)n++}return n});
   if(['drizzle','rain','heavy','storm','typhoon','hail','cold','heat','fog'].includes(mode))assert(ink>20,mode+' draws on the glass');
   // v342: the sky lives on the WebGL plane; sample it right after a synchronous redraw (buffer is not preserved across frames).
   skySigs.add(await page.evaluate(()=>{WxFx.refresh();const g=SkyGL&&SkyGL.ok?SkyGL.canvas():null;let s='';if(g){const gl=g.getContext('webgl'),px=new Uint8Array(4);for(let i=1;i<8;i++)for(let j=1;j<8;j++){gl.readPixels(g.width*i/8|0,g.height*j/8|0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);s+=(px[0]>>4).toString(16)+(px[1]>>4).toString(16)+(px[2]>>4).toString(16)}}const c=document.querySelector('#nature-sky'),x=c.getContext('2d');for(let i=1;i<8;i++)for(let j=1;j<8;j++){const d=x.getImageData(c.width*i/8|0,c.height*j/8|0,1,1).data;s+=(d[0]>>4).toString(16)+(d[1]>>4).toString(16)+(d[2]>>4).toString(16)}return s}));
@@ -56,7 +57,7 @@ for(const theme of ['light','dark'])for(const tab of ['today','calendar','pay','
 // Dock pill sits under the active item.
 await page.evaluate(()=>{MyShiftAppearance.set('light');UI_TAB='weather';render()});await page.waitForTimeout(1600);
 // The pill follows the active tab on the engine's 0.5 s chrome tick; allow it a moment on slow (software GL) runs.
-let pill=null;for(let i=0;i<8&&!(pill!==null&&pill<3);i++){await page.waitForTimeout(300);pill=await page.evaluate(()=>{const p=document.querySelector('.dock-pill'),a=document.querySelector('.bottom-nav-item.active');if(!p||!a)return null;const pr=p.getBoundingClientRect(),ar=a.getBoundingClientRect();return Math.abs((pr.left+pr.width/2)-(ar.left+ar.width/2))})}assert(pill!==null&&pill<3,'dock pill aligned '+pill);checks++;
+let pill=null;for(let i=0;i<15&&!(pill!==null&&pill<3);i++){await page.waitForTimeout(400);pill=await page.evaluate(()=>{const p=document.querySelector('.dock-pill'),a=document.querySelector('.bottom-nav-item.active');if(!p||!a)return null;const pr=p.getBoundingClientRect(),ar=a.getBoundingClientRect();return Math.abs((pr.left+pr.width/2)-(ar.left+ar.width/2))})}assert(pill!==null&&pill<3,'dock pill aligned '+pill);checks++;
 // Frame cost stays bounded across screens and themes; the glass shell leaves text legible.
 for(const theme of ['light','dark'])for(const tab of ['today','calendar','pay','weather','more']){
   await page.evaluate(({theme,tab})=>{MyShiftAppearance.set(theme);UI_TAB=tab;render()},{theme,tab});await page.waitForTimeout(900);
@@ -71,6 +72,6 @@ for(const q of ['subtle','balanced','rich']){await page.evaluate(v=>WxFx.setQual
 assert.equal(await page.evaluate(()=>document.body.dataset.fxQuality),'rich');
 dbg=await page.evaluate(()=>WxFx._debug());assert(dbg.spriteCount<80,'sprite cache bounded');assert(dbg.plateCacheSize<=5);
 assert.deepEqual(errors,[]);
-console.log('atmosphere v341 verified: '+checks+' checks, frames '+dbg.frames+', last frame cost '+dbg.frameMs+' ms');
+console.log('atmosphere v342 verified: '+checks+' checks, frames '+dbg.frames+', last frame cost '+dbg.frameMs+' ms');
 await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
