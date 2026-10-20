@@ -1,4 +1,4 @@
-v336-contrast
-本機修改完成，尚未部署。
-手機使用 update.html 上傳 myshift-v336-contrast-update.zip。
-詳見 UPDATE_v336.md。
+v337-studio
+修改與本機驗證完成後供手機套用；尚未部署。
+手機使用 update.html 上傳 myshift-v337-studio-update.zip。
+詳見 UPDATE_v337.md。

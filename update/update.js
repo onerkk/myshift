@@ -114,3 +114,7 @@ for(const id of ['token','owner','repo','branch','zip'])$(id).addEventListener('
 $('connect').addEventListener('click',async()=>{if(busy)return;lock(true);try{const t=await resolve(target());await head(t);status(`連線成功：${t.owner}/${t.repo} · ${t.branch}。實際寫入權限在提交時由 GitHub 驗證。`);}catch(e){status(e.message,true);}finally{lock(false);}});
 $('retryDeploy').addEventListener('click',async()=>{if(busy)return;lock(true);try{await checkDeployment();}catch(e){status('更新已提交；'+e.message,true);$('retryDeploy').hidden=false;}finally{lock(false);}});
 window.addEventListener('beforeunload',e=>{if(busy){e.preventDefault();e.returnValue='';}});
+
+// Appearance is local only; authorization tokens never enter storage.
+const appearanceButton=document.getElementById('appearance');
+if(appearanceButton)appearanceButton.addEventListener('click',()=>{const next=document.documentElement.dataset.theme==='light'?'dark':'light';document.documentElement.dataset.theme=next;try{localStorage.setItem('_appearance',next)}catch(e){}});

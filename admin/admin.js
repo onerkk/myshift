@@ -149,7 +149,7 @@ function render(){
     app.innerHTML=`<div class="login-box"><h1>⛔ 權限不足</h1><p>您的帳號（${esc(user.email)}）不是管理員</p><button class="btn gray" onclick="logout()">登出</button></div>`;
     return;
   }
-  app.innerHTML=headerHtml()+tabsHtml()+'<main id="adminContent">'+tabBodyHtml()+'</main>'+`<div class="footer">MyShift Admin v3</div>`;
+  app.innerHTML=headerHtml()+tabsHtml()+'<main id="adminContent">'+tabBodyHtml()+'</main>'+`<div class="footer">MyShift Admin · v337</div>`;
   bind();
 }
 
@@ -166,7 +166,7 @@ function headerHtml(){
   const roleBadge=isSuper()?'<span class="badge su">超級管理員</span>':'<span class="badge ad">管理員</span>';
   return `<div class="hd">
     <div style="flex:1;min-width:0">
-      <h1>⚙️ 班表管理後台 ${roleBadge}</h1>
+      <span class="admin-eyebrow">MY SHIFT / WORKSPACE</span><h1>班表管理後台 ${roleBadge}</h1>
       <div class="u">${esc(user.displayName||user.email)}</div>
     </div>
     <div class="header-actions"><button class="btn gray sm" type="button" onclick="toggleAdminAppearance()">${document.documentElement.dataset.theme==='light'?'夜間外觀':'日間外觀'}</button><a class="btn gray sm" href="../update/">網站更新</a><button class="btn gray sm" onclick="logout()">登出</button></div>
@@ -175,16 +175,16 @@ function headerHtml(){
 
 function tabsHtml(){
   const tabs=[
-    {id:"units",label:"🏭 單位"},
-    {id:"rotations",label:"🔄 輪班規則"},
-    {id:"leaveTypes",label:"📋 假別"},
-    {id:"leaves",label:"📅 請假總覽"},
-    {id:"admins",label:"👑 管理員"},
-    {id:"users",label:"👥 使用者"},
-    {id:"appearance",label:"🎨 外觀"},
-    {id:"wxAlerts",label:"🚨 天氣警報"}
+    {id:"units",label:"單位"},
+    {id:"rotations",label:"輪班規則"},
+    {id:"leaveTypes",label:"假別"},
+    {id:"leaves",label:"請假總覽"},
+    {id:"admins",label:"管理員"},
+    {id:"users",label:"使用者"},
+    {id:"appearance",label:"外觀"},
+    {id:"wxAlerts",label:"天氣警報"}
   ];
-  return `<div class="tabs" role="group" aria-label="管理功能">${tabs.map(t=>`<button type="button" aria-pressed="${activeTab===t.id}" class="tab ${activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`).join("")}</div>`;
+  return `<div class="tabs" role="group" aria-label="管理功能"><label class="admin-mobile-label">管理功能<select aria-label="選擇管理功能" onchange="setTab(this.value)">${tabs.map(t=>`<option value="${t.id}" ${activeTab===t.id?'selected':''}>${t.label}</option>`).join('')}</select></label>${tabs.map(t=>`<button type="button" aria-pressed="${activeTab===t.id}" class="tab ${activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`).join("")}</div>`;
 }
 
 function setTab(t){activeTab=t;expandedUserId=null;userSearch="";render();if(t==='leaves'&&!leavesYM){const now=new Date();leavesYM=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");loadLeavesData(leavesYM)}}
@@ -214,7 +214,7 @@ function unitsTabHtml(){
     </div>`).join("")
     :'<div class="empty">尚無單位</div>';
   return `<div class="card">
-    <h2>🏭 單位管理（共 ${CFG.units.length} 個）</h2>
+    <h2>單位管理（共 ${CFG.units.length} 個）</h2>
     ${list}
     <div class="add-box">
       <label>新增單位</label>
@@ -263,7 +263,7 @@ function rotationsTabHtml(){
     </div>`).join("")
     :'<div class="empty">尚無輪班規則</div>';
   return `<div class="card">
-    <h2>🔄 輪班規則（共 ${CFG.rotations.length} 個）</h2>
+    <h2>輪班規則（共 ${CFG.rotations.length} 個）</h2>
     ${list}
     <div class="add-box">
       <label>新增輪班規則</label>
@@ -321,7 +321,7 @@ function leaveTypesTabHtml(){
     </div>`).join("")
     :'<div class="empty">尚無假別</div>';
   return `<div class="card">
-    <h2>📋 假別管理（共 ${CFG.leaveTypes.length} 個）</h2>
+    <h2>假別管理（共 ${CFG.leaveTypes.length} 個）</h2>
     ${list}
     <div class="add-box">
       <label>新增假別</label>
@@ -562,7 +562,7 @@ function adminsTabHtml(){
     </div>`).join("")
     :'<div class="empty">尚無額外管理員</div>';
   return `<div class="card">
-    <h2>👑 管理員權限（共 ${SUPER_ADMINS.length+CFG.admins.length} 位）</h2>
+    <h2>管理員權限（共 ${SUPER_ADMINS.length+CFG.admins.length} 位）</h2>
     ${superList}${normalList}
     ${isSuper()?`<div class="add-box">
       <label>新增管理員</label>
@@ -600,12 +600,12 @@ async function delAdmin(i){
 function appearanceTabHtml(){
   const on=CFG.visualFx&&CFG.visualFx.enabled!==false;
   return `<div class="card">
-    <h2>🎨 天氣動畫與音效</h2>
+    <h2>天氣動畫與音效</h2>
     <div style="color:#aaa;font-size:12px;line-height:1.6;margin-bottom:14px">
       一鍵控制全部使用者的前景特效，包含：<br>
-      • 天氣動畫（雨、雪、雲、太陽、星星、螢火蟲等）<br>
-      • 生態動畫（青蛙、蜻蜓、蝴蝶、荷葉、花瓣等）<br>
-      • 環境音效（雨聲、風聲、青蛙、蟲鳴、鳥叫）<br>
+      • 全畫面氣象光景、雨雪、霧與撞擊情境<br>
+      • 季節點綴（落葉、花瓣、蝴蝶與螢火蟲）<br>
+      • 錄音聲景（雨聲、風聲、蟲鳴、鳥叫與撞擊）<br>
       關閉後，所有使用者下次開 app（或重新同步雲端設定後）即停用，可省電與減輕效能負擔。
     </div>
     <div class="row" style="padding:12px">
@@ -749,20 +749,20 @@ function wxAlertsTabHtml(){
   const eqMaxAge=c.earthquakeMaxAgeMinutes!==undefined?c.earthquakeMaxAgeMinutes:120;
 
   return `<div class="card">
-    <h2>🚨 即時天氣警報</h2>
+    <h2>即時天氣警報</h2>
     <div style="color:#aaa;font-size:12px;line-height:1.6;margin-bottom:14px">
       偵測：颱風、雷雨、豪雨、強風、高/低溫、濃霧。<br>
       此處設定為「全局上限」，用戶端可進一步在自己 app 內關閉。
     </div>
 
-    <div class="row" style="padding:12px;background:linear-gradient(135deg,#0d6b5e,#0a4d44);border-radius:8px;margin-bottom:8px">
+    <div class="row admin-master" style="padding:12px;background:linear-gradient(135deg,#0d6b5e,#0a4d44);border-radius:8px;margin-bottom:8px">
       <div class="info">
         <div class="name" style="color:#fff">⚡ 警報系統總開關</div>
         <div class="sub" style="color:rgba(255,255,255,.85)">關閉後所有警報不顯示也不通知</div>
       </div>
       ${_wxSwitchHtml(masterOn,"wxToggleMaster()")}
     </div>
-    <div class="row" style="padding:12px;background:linear-gradient(135deg,#283593,#1a237e);border-radius:8px;margin-bottom:14px">
+    <div class="row admin-master" style="padding:12px;background:linear-gradient(135deg,#283593,#1a237e);border-radius:8px;margin-bottom:14px">
       <div class="info">
         <div class="name" style="color:#fff">🔔 系統通知總開關</div>
         <div class="sub" style="color:rgba(255,255,255,.85)">關閉後不會跳手機通知，但前台仍顯示警報橫幅</div>
@@ -876,7 +876,7 @@ function wxAlertsTabHtml(){
 
     <div style="margin-top:14px;padding:10px;background:#1a2533;border-radius:6px;font-size:11px;color:#aaa;line-height:1.6">
       💡 <strong style="color:#fff">提示</strong>：iOS 用戶必須先把 App「加入主畫面」並從主畫面開啟才能收到通知。<br>
-      🆓 <strong style="color:#fff">免費保證</strong>：所有 API 與服務皆免費（Open-Meteo / CWA / Cloudflare Worker 免費額度 / Firestore 既有額度）。
+      🆓 <strong style="color:#fff">服務額度</strong>：資料服務與雲端功能依各供應商方案及額度運作；超額可能受限或產生費用。
     </div>
     <button class="btn red" onclick="wxResetDefaults()" style="margin-top:14px">恢復預設</button>
   </div>`;
@@ -963,7 +963,7 @@ function usersTabHtml(){
     ?filtered.map(u=>userRowHtml(u)).join("")
     :'<div class="empty">查無使用者</div>';
   return `<div class="card">
-    <h2>👥 使用者管理（共 ${USERS.length} 位）</h2>
+    <h2>使用者管理（共 ${USERS.length} 位）</h2>
     <div class="search-box">
       <input class="inp" aria-label="搜尋姓名、Email 或單位" placeholder="搜尋姓名、Email 或單位" value="${esc(userSearch)}" oninput="setUserSearch(this.value)">
     </div>

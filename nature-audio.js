@@ -28,7 +28,7 @@
     function dispose(voice,fade=false){
       if(fade&&context&&context.state==='running'&&!document.hidden){voice.stopped=true;if(voice.timer)clearTimeout(voice.timer);for(const node of voice.nodes||[]){node.gain.gain.cancelScheduledValues(context.currentTime);node.gain.gain.setTargetAtTime(0,context.currentTime,.12)}const tail={voice,timer:0};tail.timer=setTimeout(()=>{tails.delete(tail);dispose(voice)},600);tails.add(tail);return;}
       if(voice.timer)clearTimeout(voice.timer);voice.stopped=true;
-      for(const node of voice.nodes||[]){try{node.source.stop();node.source.disconnect();node.gain.disconnect()}catch(e){}}if(voice.nodes)voice.nodes.clear();
+      for(const node of voice.nodes||[]){try{node.source.stop();node.source.disconnect();if(node.filter)node.filter.disconnect();node.gain.disconnect()}catch(e){}}if(voice.nodes)voice.nodes.clear();
     }
     function stopAll(){revision++;for(const tail of tails){clearTimeout(tail.timer);dispose(tail.voice)}tails.clear();for(const voice of loops.values())dispose(voice);loops.clear();for(const node of oneshots){try{node.stop()}catch(e){}}oneshots.clear();if(master&&context)master.gain.cancelScheduledValues(context.currentTime);}
     function loop(key,amount){
@@ -38,9 +38,9 @@
         const cross=Math.min(1.8,buffer.duration*.13),duration=buffer.duration;
         function schedule(start){
           if(voice.stopped)return;
-          const source=context.createBufferSource(),gain=context.createGain();source.buffer=buffer;source.connect(gain);gain.connect(master);
+          const source=context.createBufferSource(),gain=context.createGain();source.buffer=buffer;const filter=context.createBiquadFilter();filter.type=mode==='drizzle'?'highpass':'lowpass';filter.frequency.value=({drizzle:1100,cold:1800,fog:650,snow:1100,typhoon:5200,earthquake:650})[mode]||18000;filter.Q.value=.45;source.connect(filter);filter.connect(gain);gain.connect(master);
           gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(amount,start+cross);gain.gain.setValueAtTime(amount,start+duration-cross);gain.gain.linearRampToValueAtTime(0,start+duration);
-          const node={source,gain};voice.nodes.add(node);source.onended=()=>{voice.nodes.delete(node);source.disconnect();gain.disconnect()};source.start(start);
+          const node={source,gain,filter};voice.nodes.add(node);source.onended=()=>{voice.nodes.delete(node);source.disconnect();filter.disconnect();gain.disconnect()};source.start(start);
           const next=start+duration-cross;
           voice.timer=setTimeout(()=>schedule(Math.max(context.currentTime+.02,next)),Math.max(20,(next-context.currentTime-.15)*1000));
         }
@@ -49,7 +49,7 @@
     }
     function desired(){
       if(mode==='none')return {};
-      const weather=allowed('weather'),animal=allowed('animals'),seasonal=allowed('seasonal'),night=new Date().getHours()<5||new Date().getHours()>=19;
+      const weather=allowed('weather'),animal=allowed('animals'),seasonal=allowed('seasonal'),night=typeof scene.night==='boolean'?scene.night:new Date().getHours()<5||new Date().getHours()>=19;
       if(weather&&mode==='earthquake')return {quake:.22,rumble:.4};
       if(weather&&mode==='hail')return {hail:.57,wind:.12};
       if(weather&&mode==='typhoon')return {rain:.6,wind:.6};
@@ -78,14 +78,14 @@
       try{localStorage.setItem('sb_sfx',muted?'off':'on')}catch(e){}
       refresh();if(typeof root.render==='function')root.render();
     }
-    function oneShot(key,amount){
+    function oneShot(key,amount,pan=0){
       const requested=performance.now();
       if(muted||!permitted()||!context||context.state!=='running'||document.hidden)return;
       const ticket=revision;
-      load(key).then(buffer=>{if(ticket!==revision||muted||!permitted()||document.hidden||key==='click'&&performance.now()-requested>200)return;const node=context.createBufferSource(),gain=context.createGain();node.buffer=buffer;gain.gain.value=amount;node.connect(gain);gain.connect(key==='click'?buttonBus:master);if(key==='click')node.playbackRate.value=1+(Math.random()-.5)*.035;oneshots.add(node);node.onended=()=>{oneshots.delete(node);node.disconnect();gain.disconnect()};node.start()}).catch(()=>announce('error'));
+      load(key).then(buffer=>{if(ticket!==revision||muted||!permitted()||document.hidden||key==='click'&&performance.now()-requested>200)return;const node=context.createBufferSource(),gain=context.createGain();node.buffer=buffer;gain.gain.value=amount;node.connect(gain);const panner=context.createStereoPanner?context.createStereoPanner():null;if(panner){panner.pan.value=Math.max(-.8,Math.min(.8,pan));gain.connect(panner);panner.connect(key==='click'?buttonBus:master)}else gain.connect(key==='click'?buttonBus:master);if(key==='click')node.playbackRate.value=1+(Math.random()-.5)*.035;oneshots.add(node);node.onended=()=>{oneshots.delete(node);node.disconnect();gain.disconnect();if(panner)panner.disconnect()};node.start()}).catch(()=>announce('error'));
     }
-    function triggerThunder(){const now=performance.now();if(now-lastThunder<25000||!['storm','typhoon'].includes(mode))return;lastThunder=now;oneShot('thunder',.45)}
-    function triggerIceImpact(){if(mode==='hail'&&decoded.has('iceImpact'))oneShot('iceImpact',.7)}
+    function triggerThunder(){const now=performance.now();if(now-lastThunder<8000||!['storm','typhoon'].includes(mode))return;lastThunder=now;oneShot('thunder',.45)}
+    function triggerIceImpact(pan=0){if(mode==='hail'&&decoded.has('iceImpact'))oneShot('iceImpact',.7,pan)}
     function setMode(value){if(value==='hail'&&context)load('iceImpact').catch(()=>{});if(value!==mode){revision++;lastThunder=-Infinity;for(const node of oneshots){try{node.stop()}catch(e){}}oneshots.clear()}mode=value;refresh()}
     function setVolume(v){volume=Math.max(0,Math.min(1,Number(v)||0));try{localStorage.setItem('nature_volume',String(volume))}catch(e){}refresh()}
     function forceSilence(){stopAll();if(master)master.gain.value=0;announce('paused')}
