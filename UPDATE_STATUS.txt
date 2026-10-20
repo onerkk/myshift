@@ -1,2 +1,2 @@
-v338-observed PREVIEW
-未部署；288 項 Node 測試通過。完整天氣實測 Worker 串接、攝影檔下載與瀏覽器合成驗收未完成。詳見 UPDATE_v338.md。
+v339-station PREVIEW
+實測 Worker 對接修正；296 項 Node 測試通過；未部署。攝影下載與瀏覽器視覺驗收仍未完成。
