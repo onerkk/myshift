@@ -166,40 +166,47 @@ uniform vec2 uRes;uniform float uTime;uniform sampler2D uSky;uniform sampler2D u
 uniform float uBoltX;uniform float uSeed;uniform float uDay;uniform float uFog;uniform float uHeat;
 `+NOISE+FRONT_HELPERS+`
 float sat(float x){return clamp(x,0.,1.);}
-// One layer of drops. Tall narrow cells, at most one sliding drop per cell with a beaded trail above it.
-// Returns (lens offset.xy, coverage).
-vec3 drops(vec2 uv,float t,float scale,float seed){
- float colId=floor(uv.x*scale*2.6);float sp=.6+.8*hash(vec2(colId,seed));
- vec2 st=uv*vec2(scale*2.6,scale);st.y+=t*.55*sp;
- vec2 id=floor(st);float n=hash(id+seed);
- if(n<.42)return vec3(0.);
- vec2 f=fract(st)-.5;
- float x=(n-.5)*.55;
- float ti=t*1.1*sp+n*6.2832;float y=sin(ti+sin(ti+sin(ti)*.5))*.22;
- vec2 p=vec2(f.x-x,f.y-y);
- float k=5.6;                                   // physical cell height / width
- vec2 q=vec2(p.x,p.y*k*.8);float d=length(q);
- float r=.17+.08*hash(id+seed+2.);
- float main=smoothstep(r,r-.04,d);
- vec2 off=main>0.?q/r*main:vec2(0.);
- // beaded trail above the drop, narrowing with distance
- float up=sat(p.y*2.);float wdt=mix(.11,.03,up);
- float trailMask=smoothstep(wdt,wdt-.03,abs(p.x))*smoothstep(.02,.08,p.y)*step(p.y,.48);
- float by=fract(f.y*k*1.3)-.5;float bd=length(vec2(p.x*1.4,by*.5));
- float bead=smoothstep(.09,.05,bd)*trailMask*(.4+.6*hash(id+floor(f.y*k*1.3)));
- off+=vec2(p.x*1.4,by*.5)/.09*bead*.5;
- return vec3(off,sat(main+bead*.85));
+// Rain on the glass, after Martijn Steinrucken's "Heartfelt": one layer of fine static droplets that
+// bloom and fade, plus two layers of sliding drops with a stutter (gravity vs surface tension) that
+// leave a trail of small droplets. The coverage field's gradient gives each drop a lens normal.
+vec3 N13(float p){vec3 p3=fract(vec3(p)*vec3(.1031,.11369,.13787));p3+=dot(p3,p3.yzx+19.19);return fract(vec3((p3.x+p3.y)*p3.z,(p3.x+p3.z)*p3.y,(p3.y+p3.z)*p3.x));}
+float Saw(float b,float t){return smoothstep(0.,b,t)*smoothstep(1.,b,t);}
+vec2 DropLayer(vec2 uv,float t){
+ vec2 UV=uv;uv.y-=t*.75;
+ vec2 a=vec2(6.,1.);vec2 grid=a*2.;
+ vec2 id=floor(uv*grid);float colShift=N13(id.x).x;uv.y+=colShift;
+ id=floor(uv*grid);vec3 n=N13(id.x*35.2+id.y*2376.1);
+ vec2 st=fract(uv*grid)-vec2(.5,0.);
+ float x=n.x-.5;float y=UV.y*20.;float wiggle=sin(y+sin(y));
+ x+=wiggle*(.5-abs(x))*(n.z-.5);x*=.7;
+ float ti=fract(t+n.z);y=(Saw(.85,ti)-.5)*.9+.5;
+ vec2 p=vec2(x,y);float d=length((st-p)*a.yx);
+ float mainDrop=smoothstep(.4,.0,d);
+ float r=sqrt(smoothstep(1.,y,st.y));float cd=abs(st.x-x);
+ float trail=smoothstep(.23*r,.15*r*r,cd);float trailFront=smoothstep(-.02,.02,st.y-y);trail*=trailFront*r*r;
+ y=UV.y;float trail2=smoothstep(.2*r,.0,cd);
+ float droplets=max(0.,(sin(y*(1.-y)*120.)-st.y))*trail2*trailFront*n.z;
+ y=fract(y*10.)+(st.y-.5);float dd=length(st-vec2(x,y));droplets=smoothstep(.3,0.,dd);
+ float m=mainDrop+droplets*r*trailFront;
+ return vec2(m,trail);
 }
+float StaticDrops(vec2 uv,float t){
+ uv*=40.;vec2 id=floor(uv);uv=fract(uv)-.5;
+ vec3 n=N13(id.x*107.45+id.y*3543.654);vec2 p=(n.xy-.5)*.7;float d=length(uv-p);
+ float fade=Saw(.025,fract(t+n.z));return smoothstep(.3,0.,d)*fract(n.z*10.)*fade;}
+vec2 Drops(vec2 uv,float t,float l0,float l1,float l2){
+ float s=StaticDrops(uv,t)*l0;vec2 m1=DropLayer(uv,t)*l1;vec2 m2=DropLayer(uv*1.85,t)*l2;
+ float c=s+m1.x+m2.x;c=smoothstep(.3,1.,c);return vec2(c,max(m1.y*l0,m2.y*l1));}
 void main(){
  vec2 uv=gl_FragCoord.xy/uRes;float asp=uRes.x/uRes.y;
- vec2 guv=vec2(uv.x+uv.y*uSlant*.18,uv.y);
- float t=uTime;
- float dens=.4+.6*uRain;
- vec3 a=uRain>0.?drops(guv,t,2.4*dens+1.2,1.):vec3(0.);
- vec3 b=uRain>0.&&uLayers>1.5?drops(guv+.31,t*1.25,4.2*dens+1.5,2.):vec3(0.);
- vec3 c=uRain>0.&&uLayers>2.5?drops(guv+.67,t*.85,6.5*dens+2.,3.):vec3(0.);
- float m=sat(a.z+b.z*.9+c.z*.75);
- vec2 off=(a.xy+b.xy*.6+c.xy*.4)*.03;
+ float t=uTime*.2;
+ // drop field in a centred, aspect-correct space; wind slants the whole pane a little
+ vec2 duv=(gl_FragCoord.xy-.5*uRes)/uRes.y*1.3;duv.x+=duv.y*uSlant*.12;
+ float l0=smoothstep(-.5,1.,uRain)*2.,l1=smoothstep(.25,.75,uRain),l2=smoothstep(.0,.5,uRain);
+ vec2 c=uRain>0.?Drops(duv,t,l0,l1,l2):vec2(0.);
+ vec2 e=vec2(.0015,0.);
+ vec2 nrm=uRain>0.&&c.x>.001?vec2(Drops(duv+e,t,l0,l1,l2).x-c.x,Drops(duv+e.yx,t,l0,l1,l2).x-c.x):vec2(0.);
+ float m=c.x;vec2 off=nrm*1.2;
  vec3 col=vec3(0.);float alpha=0.;
  // 1. heat shimmer: a wavering copy of the scene low in the frame (hot air rising off the ground)
  if(uHeat>0.){
@@ -218,14 +225,15 @@ void main(){
   float ra=r*.7;col=col*(1.-ra)+rainCol*ra;alpha=alpha*(1.-ra)+ra;
   vec3 bandCol=mix(vec3(.3,.34,.38),vec3(.8,.84,.88),uDay);col=col*(1.-bands)+bandCol*bands;alpha=alpha*(1.-bands)+bands;
  }
- // 3. drops on the glass: refracted, slightly shrunken and inverted patch of the scene behind
+ // 3. drops on the glass: each one a small lens showing the scene behind, inverted and shrunk, with a
+ //    highlight on the sun side; trails wipe a thin film that slightly darkens the pane
  if(uRain>0.&&m>.01){
-  vec3 bg=texture2D(uSky,clamp(uv-off*vec2(1.,-1.)*1.2,.001,.999)).rgb;
-  // a drop is never darker than a faint grey lens: ambient fill, bright rim, upper-left highlight
-  float rim=smoothstep(.45,1.,length(off)/.03);
-  vec3 dc=mix(bg,vec3(.55,.62,.72),.22)*1.05+rim*.28+vec3(1.)*pow(sat(1.-length(off*vec2(1.,-1.)*28.+vec2(-.45,.35))),8.)*.7+uFlash*.25;
-  float da=m*(.55+.45*uRain);col=col*(1.-da)+dc*da;alpha=alpha*(1.-da)+da;
+  vec3 bg=texture2D(uSky,clamp(uv+off*vec2(1.,-1.),.001,.999)).rgb;
+  vec3 dc=mix(bg,vec3(.5,.58,.68),.14)*(1.+uDay*.1)+vec3(1.)*pow(sat(dot(normalize(vec3(nrm*8.,.6)),normalize(vec3(-.4,.5,.75)))),10.)*.55+uFlash*.25;
+  dc+=smoothstep(.0,.03,length(off))*.1;               // thin bright rim
+  float da=smoothstep(.05,.5,m)*(.7+.3*uRain);col=col*(1.-da)+dc*da;alpha=alpha*(1.-da)+da;
  }
+ if(uRain>0.&&c.y>.01){float ta=c.y*.18;col=col*(1.-ta)+vec3(.55,.6,.68)*ta;alpha=alpha*(1.-ta)+ta;}
  // 4. fog: drifting mist banks between the viewer and the scene
  if(uFog>0.){
   float mist=fbm(vec2(uv.x*2.2+t*.05,uv.y*3.-t*.02),4.)*.6+fbm(vec2(uv.x*5.+t*.09,uv.y*7.),3.)*.4;

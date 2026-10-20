@@ -1,0 +1,101 @@
+/* v345 daylight — the light theme rebuilt on the night theme's structure.
+   What makes night work is not "dark": it is contrast of materials. Big quiet panes, then a few DEEP
+   accent elements inside them (the weekday bar, the active segment, the "today" button), amber on navy,
+   tinted shift cells, and everything lit from one direction. The old light theme was white boxes on
+   white boxes. So, by day:
+   - panes: cool sky-frost glass (not ivory, not white), one gloss, one long navy shadow
+   - deep ink accents inside the panes, exactly where night has them, with amber/season highlights
+   - shift cells carry their colour (teal / violet / amber / sage) instead of fading into the pane
+   - the return bar is no longer a grey slab: transparent, with a glass button and a glass chip
+   Loaded after immersive-v341.css; every selector is scoped to html:not([data-theme=dark]). */
+html:not([data-theme=dark]){
+  --glass-rgb:247,251,254;--glass-a:.9;
+  --surface:rgba(247,251,254,.9);--surface-2:rgba(236,243,248,.92);--surface-3:rgba(224,233,240,.92);
+  --paper:linear-gradient(168deg,rgba(252,254,255,.95) 0%,rgba(241,247,251,.9) 48%,rgba(232,240,246,.92) 100%);
+  --plane:rgba(var(--glass-rgb),var(--glass-a));--dock:rgba(247,251,254,.92);
+  --ink:#14283a;--ink-2:#3f5467;--ink-3:#4a6072;--off:#43585e;--amber:#8c4e0e;
+  --deep:#172a3c;--deep-2:#24405a;--deep-ink:linear-gradient(165deg,#2a4660,#162a3c);--deep-edge:rgba(210,232,250,.3);
+  --line:rgba(20,40,58,.12);--line-strong:rgba(20,40,58,.26);
+  --edge:rgba(255,255,255,1);--edge-soft:rgba(255,255,255,.75);
+  --raised:inset 0 1px 0 var(--edge),inset 0 -1px 0 rgba(20,40,58,.06),0 0 0 1px var(--line),0 2px 4px rgba(20,40,58,.06),0 16px 30px -18px rgba(20,40,58,.4),0 40px 70px -40px rgba(8,28,48,.6);
+  --button-shadow:inset 0 1px 0 var(--edge),0 0 0 1px var(--line),0 1px 2px rgba(20,40,58,.1),0 8px 18px -12px rgba(20,40,58,.5);
+  --inset:inset 0 1px 2px rgba(20,40,58,.1);
+  --early:#146159;--early-soft:#d9efea;--night:#4f4680;--night-soft:#e7e1f6;--mid:#7d5218;--mid-soft:#f6e7cf;--off-soft:#e4ece6;
+}
+html:not([data-theme=dark]) body[data-season=spring]{--brand:#963660;--brand-dark:#6f2546;--brand-soft:rgba(244,196,216,.6);--accent-glow:rgba(236,140,180,.5);--gold:#c25a86}
+html:not([data-theme=dark]) body[data-season=summer]{--brand:#0c5f67;--brand-dark:#07444a;--brand-soft:rgba(168,230,222,.6);--accent-glow:rgba(60,200,186,.5);--gold:#1d8f98}
+html:not([data-theme=dark]) body[data-season=autumn]{--brand:#8c4411;--brand-dark:#63300a;--brand-soft:rgba(255,212,160,.62);--accent-glow:rgba(255,170,90,.52);--gold:#d08a3a}
+html:not([data-theme=dark]) body[data-season=winter]{--brand:#2b5c87;--brand-dark:#1b3f5f;--brand-soft:rgba(196,220,244,.64);--accent-glow:rgba(150,190,240,.5);--gold:#4f87b8}
+html:not([data-theme=dark]) body[data-light-phase=golden]{--glass-rgb:254,249,240;--surface:rgba(254,249,240,.9);--paper:linear-gradient(168deg,rgba(255,252,246,.95),rgba(251,243,230,.9) 50%,rgba(246,238,228,.92))}
+html:not([data-theme=dark]){background:#7f9db2}
+
+/* ---------- panes ---------- */
+html:not([data-theme=dark]) .app-main>section,html:not([data-theme=dark]) .app-main>.screen-heading,html:not([data-theme=dark]) .app-main>.today-insights>button,html:not([data-theme=dark]) .app-main>div.wx-alert-stack>*,html:not([data-theme=dark]) .app-main>button,html:not([data-theme=dark]) .al-bar,html:not([data-theme=dark]) .modal-sheet,html:not([data-theme=dark]) .wx-detail-sheet{
+  background:var(--paper)!important;border:1px solid var(--edge-soft)!important;box-shadow:var(--raised)!important;
+  backdrop-filter:blur(var(--blur)) saturate(1.5) brightness(1.04);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.5) brightness(1.04);
+}
+html:not([data-theme=dark]) .app-main>section::before,html:not([data-theme=dark]) .app-main>.screen-heading::before,html:not([data-theme=dark]) .app-main>.today-insights>button::before{
+  background:linear-gradient(160deg,rgba(255,255,255,.7),rgba(255,255,255,0) 40%),radial-gradient(80% 60% at 100% 100%,var(--brand-soft),transparent 70%);opacity:.6
+}
+html:not([data-theme=dark]) .screen-heading h1,html:not([data-theme=dark]) .screen-heading h2{color:var(--ink)!important;letter-spacing:.01em}
+html:not([data-theme=dark]) .screen-heading p,html:not([data-theme=dark]) .section-kicker small{color:var(--ink-2)!important}
+
+/* Deep cards keep night glass, restated so the paper rule above does not outrank them. */
+html:not([data-theme=dark]) .app-main>.today-hero,html:not([data-theme=dark]) .app-main>.account-card,html:not([data-theme=dark]) .salary-hero,html:not([data-theme=dark]) .calendar-breaks,html:not([data-theme=dark]) .weather-current,html:not([data-theme=dark]) .radar-action{
+  background:radial-gradient(120% 90% at 100% 0,rgba(120,170,196,.22),rgba(120,170,196,0) 60%),linear-gradient(155deg,var(--deep-2),var(--deep))!important;border:1px solid var(--deep-edge)!important;color:#f2f7fa!important;
+  box-shadow:inset 0 1px 0 rgba(220,240,255,.34),0 0 0 1px rgba(255,255,255,.4),0 20px 44px -22px rgba(2,12,24,.8)!important
+}
+html:not([data-theme=dark]) .app-main>.today-hero::before,html:not([data-theme=dark]) .app-main>.account-card::before{background:radial-gradient(70% 60% at 85% 10%,var(--accent-glow),transparent 70%)!important;opacity:.55}
+html:not([data-theme=dark]) body[data-light-phase=golden] .app-main>.today-hero{background:radial-gradient(120% 90% at 100% 0,rgba(255,170,100,.26),transparent 60%),linear-gradient(155deg,rgba(46,32,42,.9),rgba(20,16,30,.92))!important}
+html:not([data-theme=dark]) .app-main>.atmosphere-view,html:not([data-theme=dark]) .nature-controls>.atmosphere-view{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border:1px solid rgba(255,255,255,.5)!important}
+html:not([data-theme=dark]) .app-main>.atmosphere-view::before,html:not([data-theme=dark]) .nature-controls>.atmosphere-view::before{background:linear-gradient(180deg,rgba(2,12,22,.5) 0%,rgba(2,12,22,.12) 30%,rgba(2,12,22,.4) 48%,rgba(2,12,22,.86) 100%)!important;opacity:1}
+
+/* ---------- deep accents inside panes: where night has its navy pills ---------- */
+html:not([data-theme=dark]) .calendar-view-switch{background:rgba(20,40,58,.07)!important;border:1px solid var(--line)!important;box-shadow:inset 0 1px 2px rgba(20,40,58,.1)!important}
+html:not([data-theme=dark]) .calendar-view-switch>button{color:var(--ink-2)!important}
+html:not([data-theme=dark]) .calendar-view-switch>button.active,html:not([data-theme=dark]) .calendar-view-switch>button[aria-pressed=true]{background:var(--deep-ink)!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(220,240,255,.3),0 6px 16px -8px rgba(20,40,58,.7)!important;border-color:transparent!important}
+html:not([data-theme=dark]) .calendar-view-switch>button.active *,html:not([data-theme=dark]) .calendar-view-switch>button[aria-pressed=true] *{color:#fff!important}
+html:not([data-theme=dark]) body .wk-row,html:not([data-theme=dark]) body:has(.screen-calendar) .wk-row{background:var(--deep-ink)!important;color:#dfe9f2!important;border:1px solid rgba(220,240,255,.18)!important;border-radius:16px;box-shadow:inset 0 1px 0 rgba(220,240,255,.25),0 10px 24px -16px rgba(20,40,58,.7)!important;backdrop-filter:none!important}
+html:not([data-theme=dark]) .wk-row>*{color:#dfe9f2!important}
+html:not([data-theme=dark]) .wk-row>.weekend,html:not([data-theme=dark]) .wk-row>.sun,html:not([data-theme=dark]) .wk-row>.sat,html:not([data-theme=dark]) .wk-row>:first-child,html:not([data-theme=dark]) .wk-row>:last-child{color:#ffd8a8!important}
+html:not([data-theme=dark]) .section-kicker button,html:not([data-theme=dark]) .calendar-section-head button,html:not([data-theme=dark]) .pay-current-action{background:var(--deep-ink)!important;color:#ffd8a8!important;border:1px solid rgba(220,240,255,.18)!important;box-shadow:inset 0 1px 0 rgba(220,240,255,.28),0 10px 22px -12px rgba(20,40,58,.8)!important;font-weight:700}
+html:not([data-theme=dark]) .section-kicker button *,html:not([data-theme=dark]) .calendar-section-head button *,html:not([data-theme=dark]) .pay-current-action *{color:#ffd8a8!important}
+html:not([data-theme=dark]) .calendar-today-anchor{background:linear-gradient(180deg,#fff,rgba(236,243,248,.95))!important;border:1px solid rgba(255,255,255,.9)!important;box-shadow:var(--button-shadow)!important;color:var(--brand)!important;font-weight:700}
+html:not([data-theme=dark]) .icon-action,html:not([data-theme=dark]) .text-action,html:not([data-theme=dark]) .mnav>button,html:not([data-theme=dark]) .wx-empty-actions>button{background:linear-gradient(180deg,#fff,rgba(236,243,248,.95))!important;border:1px solid rgba(255,255,255,.9)!important;box-shadow:var(--button-shadow)!important;color:var(--brand)!important;font-weight:700}
+html:not([data-theme=dark]) .mnav>button{color:var(--ink)!important}
+html:not([data-theme=dark]) .quick-launch>button{border-color:transparent!important;color:var(--ink)!important}
+html:not([data-theme=dark]) .quick-launch>button>span{background:var(--deep-ink)!important;border:1px solid rgba(220,240,255,.18)!important;box-shadow:inset 0 1px 0 rgba(220,240,255,.28),0 10px 20px -12px rgba(20,40,58,.8)!important;color:#ffd8a8!important}
+html:not([data-theme=dark]) .theme-choices>button.active,html:not([data-theme=dark]) .theme-choices>button[aria-pressed=true],html:not([data-theme=dark]) .nature-level button.active,html:not([data-theme=dark]) .nature-level button[aria-pressed=true]{background:var(--deep-ink)!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(220,240,255,.3),0 8px 18px -10px rgba(20,40,58,.7)!important;border-color:transparent!important}
+html:not([data-theme=dark]) .theme-choices>button.active *,html:not([data-theme=dark]) .nature-level button.active *,html:not([data-theme=dark]) .theme-choices>button[aria-pressed=true] *,html:not([data-theme=dark]) .nature-level button[aria-pressed=true] *{color:#fff!important}
+html:not([data-theme=dark]) .theme-choices>button,html:not([data-theme=dark]) .nature-level button{color:var(--ink-2)}
+html:not([data-theme=dark]) .status-switch.on{background:linear-gradient(180deg,var(--brand),var(--brand-dark))!important}
+html:not([data-theme=dark]) input,html:not([data-theme=dark]) select,html:not([data-theme=dark]) textarea{background:rgba(255,255,255,.85)!important;border:1px solid var(--line-strong)!important;box-shadow:var(--inset)!important}
+
+/* ---------- calendar cells carry their shift colour ---------- */
+html:not([data-theme=dark]) .calendar-v314 .day{border:1px solid rgba(20,40,58,.1)!important;box-shadow:inset 0 1px 0 #fff,0 2px 0 rgba(20,40,58,.06)!important;background:linear-gradient(170deg,#fff,rgba(236,243,248,.9))}
+html:not([data-theme=dark]) .calendar-v314 .day.e{background:linear-gradient(170deg,#f3fbf9,#d6ede7)!important;border-color:rgba(20,97,89,.2)!important}
+html:not([data-theme=dark]) .calendar-v314 .day.n{background:linear-gradient(170deg,#f6f3fc,#e2dbf3)!important;border-color:rgba(79,70,128,.2)!important}
+html:not([data-theme=dark]) .calendar-v314 .day.m{background:linear-gradient(170deg,#fdf7ed,#f3e3c7)!important;border-color:rgba(125,82,24,.2)!important}
+html:not([data-theme=dark]) .calendar-v314 .day.o{background:linear-gradient(170deg,#f5f8f5,#e0e9e1)!important;border-color:rgba(67,88,94,.18)!important}
+html:not([data-theme=dark]) .calendar-v314 .day.today{box-shadow:inset 0 0 0 2px var(--brand),0 0 26px -6px var(--accent-glow)!important}
+html:not([data-theme=dark]) .calendar-v314 .day.adjacent-month{opacity:.72}
+
+/* ---------- bars ---------- */
+html:not([data-theme=dark]) .page-returnbar{background:linear-gradient(180deg,rgba(247,251,254,.6),rgba(247,251,254,0))!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+html:not([data-theme=dark]) .page-returnbar>button{background:linear-gradient(180deg,#fff,rgba(236,243,248,.95))!important;border:1px solid rgba(255,255,255,.9)!important;box-shadow:var(--button-shadow)!important;color:var(--brand)!important;font-weight:700;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+html:not([data-theme=dark]) .page-returnbar .return-destination{color:var(--ink)!important;background:var(--surface);border:1px solid rgba(255,255,255,.9);border-radius:999px;padding:6px 14px;box-shadow:var(--button-shadow);font-weight:700;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+html:not([data-theme=dark]) .brand-lockup,html:not([data-theme=dark]) .header-actions>.icon-button{background:var(--paper)!important;box-shadow:var(--button-shadow)!important}
+html:not([data-theme=dark]) .brand-mark{background:var(--deep-ink)!important;color:#ffd8a8!important;box-shadow:inset 0 1px 0 rgba(220,240,255,.3),0 8px 18px -10px rgba(20,40,58,.8)!important}
+html:not([data-theme=dark]) .brand-mark *{color:#ffd8a8!important}
+
+/* ---------- dock ---------- */
+html:not([data-theme=dark]) .bottom-nav,html:not([data-theme=dark]) body:has(.screen-calendar) .bottom-nav{background:linear-gradient(180deg,rgba(252,254,255,.95),rgba(236,243,248,.92))!important;border:1px solid rgba(255,255,255,.85)!important;box-shadow:inset 0 1px 0 #fff,0 0 0 1px var(--line),0 24px 48px -20px rgba(8,28,48,.6)!important}
+html:not([data-theme=dark]) .bottom-nav-item{color:var(--ink-2)!important}
+html:not([data-theme=dark]) .bottom-nav-item.active{color:var(--ink)!important}
+html:not([data-theme=dark]) .bottom-nav-item.active .bottom-nav-icon{color:var(--brand)!important}
+html:not([data-theme=dark]) .dock-pill{background:linear-gradient(165deg,var(--brand-soft),rgba(255,255,255,.95));box-shadow:inset 0 1px 0 #fff,0 0 0 1px var(--line-strong),0 10px 24px -12px var(--accent-glow),0 0 30px -8px var(--accent-glow)}
+html:not([data-theme=dark]) .nav-active-mark{background:var(--brand)!important}
+
+/* ---------- small type ---------- */
+html:not([data-theme=dark]) .commute-alert strong,html:not([data-theme=dark]) .commute-alert span{filter:saturate(1.05) brightness(.84)}
+html:not([data-theme=dark]) body[data-fx-quality=subtle]{--glass-a:.96;--surface:rgba(247,251,254,.96);--paper:rgba(247,251,254,.96)}
