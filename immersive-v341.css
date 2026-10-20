@@ -1,154 +1,169 @@
-/* v341 immersive shell: the live atmosphere is the page; panels are frosted glass.
-   Loaded last. Tokens react to theme, season, light phase and weather family.
-   Blur is applied only to top-level panels and the dock (never to calendar cells)
-   so phones keep a stable frame rate. */
+/* v341 immersive shell — the live atmosphere is the page, panels are glass.
+   Rules:
+   1. Surfaces come from tokens; opacity is high enough that text passes WCAG
+      over the darkest storm plate and the brightest noon plate (scripts/check-atmosphere-v341.cjs audits this).
+   2. Components that were designed dark keep light text and become "deep glass".
+   3. Blur only on top-level panes and fixed bars; never on calendar cells.          */
 :root{
-  --bg:transparent;
-  --glass:rgba(255,255,255,.66);--glass-2:rgba(255,255,255,.36);--glass-3:rgba(255,255,255,.22);
-  --glass-edge:rgba(255,255,255,.75);--glass-edge-2:rgba(255,255,255,.42);
-  --glass-ink-shadow:0 1px 0 rgba(255,255,255,.35);
-  --surface:var(--glass);--surface-2:var(--glass-2);--surface-3:var(--glass-3);
-  --plane:rgba(255,255,255,.6);--dock:rgba(255,255,255,.62);
-  --line:rgba(21,46,61,.14);--line-strong:rgba(21,46,61,.26);
-  --raised:inset 0 1px 0 var(--glass-edge),0 22px 44px -30px rgba(8,34,54,.55);
-  --button-shadow:inset 0 1px 0 var(--glass-edge),0 2px 6px -2px rgba(8,34,54,.25);
-  --inset:inset 0 1px 2px rgba(8,34,54,.08);
-  --blur:16px;--panel-radius:24px;
-  --accent:var(--brand);--accent-glow:rgba(32,94,112,.35);
+  --glass-rgb:250,252,253;--glass-a:.88;
+  --surface:rgba(var(--glass-rgb),var(--glass-a));--surface-2:rgba(236,243,246,.78);--surface-3:rgba(222,233,239,.82);
+  --plane:var(--surface);--dock:rgba(var(--glass-rgb),.86);
+  --line:rgba(24,52,70,.14);--line-strong:rgba(24,52,70,.28);
+  --edge:rgba(255,255,255,.95);--edge-soft:rgba(255,255,255,.5);
+  --raised:inset 0 1px 0 var(--edge),inset 0 0 0 1px rgba(255,255,255,.18),0 1px 2px rgba(8,30,48,.06),0 24px 48px -30px rgba(6,26,44,.62);
+  --button-shadow:inset 0 1px 0 var(--edge),0 1px 2px rgba(8,30,48,.12),0 6px 14px -10px rgba(8,30,48,.45);
+  --inset:inset 0 1px 2px rgba(8,30,48,.08);
+  --deep:rgba(12,30,46,.9);--deep-2:rgba(22,46,64,.9);--deep-edge:rgba(200,228,250,.26);
+  --accent:var(--brand);--accent-glow:rgba(32,94,112,.32);
+  --blur:18px;--panel-radius:24px;--ease-spring:cubic-bezier(.2,.9,.25,1.15);
 }
 html[data-theme=dark]{
-  --glass:rgba(13,26,40,.6);--glass-2:rgba(255,255,255,.07);--glass-3:rgba(255,255,255,.045);
-  --glass-edge:rgba(190,222,255,.22);--glass-edge-2:rgba(190,222,255,.12);
-  --glass-ink-shadow:0 1px 0 rgba(0,0,0,.35);
-  --plane:rgba(13,26,40,.58);--dock:rgba(10,22,36,.66);
-  --line:rgba(190,222,255,.12);--line-strong:rgba(190,222,255,.24);
-  --raised:inset 0 1px 0 var(--glass-edge),0 24px 50px -28px rgba(0,0,0,.85);
-  --button-shadow:inset 0 1px 0 var(--glass-edge),0 2px 8px -2px rgba(0,0,0,.5);
-  --inset:inset 0 1px 2px rgba(0,0,0,.25);
-  --accent-glow:rgba(164,213,231,.35);
+  --glass-rgb:13,26,40;--glass-a:.8;
+  --surface-2:rgba(34,54,72,.62);--surface-3:rgba(46,68,88,.66);
+  --dock:rgba(10,22,35,.84);
+  --line:rgba(190,222,255,.13);--line-strong:rgba(190,222,255,.26);
+  --edge:rgba(200,228,255,.2);--edge-soft:rgba(200,228,255,.1);
+  --raised:inset 0 1px 0 var(--edge),inset 0 0 0 1px rgba(200,228,255,.05),0 26px 52px -28px rgba(0,0,0,.9);
+  --button-shadow:inset 0 1px 0 var(--edge),0 2px 8px -2px rgba(0,0,0,.55);
+  --inset:inset 0 1px 2px rgba(0,0,0,.3);
+  --deep:rgba(6,16,28,.9);--deep-2:rgba(14,30,46,.9);
 }
-/* Season accents: a living colour the whole shell leans on. */
-body[data-season=spring]{--brand:#4f6f8a;--brand-dark:#37526a;--brand-soft:rgba(232,170,196,.26);--accent-glow:rgba(235,150,180,.38)}
-body[data-season=summer]{--brand:#1f6a70;--brand-dark:#154b50;--brand-soft:rgba(140,220,210,.28);--accent-glow:rgba(70,200,190,.4)}
-body[data-season=autumn]{--brand:#8a5120;--brand-dark:#5e3610;--brand-soft:rgba(255,196,128,.3);--accent-glow:rgba(255,170,80,.42)}
-body[data-season=winter]{--brand:#3f5c78;--brand-dark:#2a4056;--brand-soft:rgba(190,212,236,.32);--accent-glow:rgba(170,200,240,.4)}
-html[data-theme=dark] body[data-season=spring]{--brand:#f1bfd3;--brand-dark:#ffe4ef}
-html[data-theme=dark] body[data-season=summer]{--brand:#9fe3dc;--brand-dark:#d2fbf6}
-html[data-theme=dark] body[data-season=autumn]{--brand:#ffcf96;--brand-dark:#ffe8c8}
-html[data-theme=dark] body[data-season=winter]{--brand:#bcd6f2;--brand-dark:#e2eefc}
-/* Light phase tints the glass itself. */
-body[data-light-phase=golden]{--glass:rgba(255,240,222,.64);--glass-edge:rgba(255,246,230,.8);--plane:rgba(255,241,224,.6);--dock:rgba(255,239,220,.64)}
-html[data-theme=dark] body[data-light-phase=golden]{--glass:rgba(38,26,30,.58);--plane:rgba(38,26,30,.56);--dock:rgba(34,22,26,.64)}
-body[data-atmosphere=storm],body[data-atmosphere=typhoon],body[data-atmosphere=heavy],body[data-atmosphere=hail]{--glass:rgba(236,243,248,.72);--line:rgba(21,46,61,.18)}
-html[data-theme=dark] body[data-atmosphere=storm],html[data-theme=dark] body[data-atmosphere=typhoon],html[data-theme=dark] body[data-atmosphere=heavy]{--glass:rgba(8,16,26,.66)}
+/* Season accents (light / dark). */
+body[data-season=spring]{--brand:#8a3e62;--brand-dark:#62284a;--brand-soft:rgba(240,186,210,.42);--accent-glow:rgba(236,140,180,.42)}
+body[data-season=summer]{--brand:#16616a;--brand-dark:#0f474e;--brand-soft:rgba(140,222,212,.38);--accent-glow:rgba(60,200,186,.44)}
+body[data-season=autumn]{--brand:#8a4a14;--brand-dark:#64340b;--brand-soft:rgba(255,200,130,.42);--accent-glow:rgba(255,160,70,.46)}
+body[data-season=winter]{--brand:#2f5679;--brand-dark:#203e58;--brand-soft:rgba(186,212,240,.48);--accent-glow:rgba(150,190,240,.44)}
+html[data-theme=dark] body[data-season=spring]{--brand:#f6c3d8;--brand-dark:#ffe4ef;--brand-soft:rgba(236,140,180,.2)}
+html[data-theme=dark] body[data-season=summer]{--brand:#a3ece2;--brand-dark:#d2fbf6;--brand-soft:rgba(60,200,186,.18)}
+html[data-theme=dark] body[data-season=autumn]{--brand:#ffd29c;--brand-dark:#ffe8c8;--brand-soft:rgba(255,160,70,.18)}
+html[data-theme=dark] body[data-season=winter]{--brand:#c3dbf5;--brand-dark:#e2eefc;--brand-soft:rgba(150,190,240,.18)}
+/* Golden hour warms the glass; storms thicken it. */
+body[data-light-phase=golden]{--glass-rgb:253,248,241}
+html[data-theme=dark] body[data-light-phase=golden]{--glass-rgb:30,24,32}
+body[data-atmosphere=storm],body[data-atmosphere=typhoon],body[data-atmosphere=heavy],body[data-atmosphere=hail]{--glass-a:.88}
 
-html,body{background:#7b97ab}
-html[data-theme=dark],html[data-theme=dark] body{background:#0a1826}
-body{background:transparent!important}
+html{background:#6f8ea2}html[data-theme=dark]{background:#08141f}
+html body{background:transparent!important}
 #nature-sky{z-index:0!important}
-#app{position:relative;z-index:1;background:transparent}
-.app-shell{background:transparent}
+#app{position:relative;z-index:1}
+.app-shell{background:transparent!important}
 
-/* Header: floating, no slab. */
-.app-header{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none}
-.brand-mark{background:linear-gradient(145deg,var(--glass),var(--glass-2))!important;border:1px solid var(--glass-edge);box-shadow:var(--button-shadow);backdrop-filter:blur(10px)}
-.brand-copy strong,.brand-copy>span,.brand-eyebrow{text-shadow:var(--glass-ink-shadow)}
-.header-actions>.icon-button,.icon-action,.text-action{background:var(--glass)!important;border:1px solid var(--glass-edge)!important;box-shadow:var(--button-shadow)!important;backdrop-filter:blur(12px) saturate(1.3);-webkit-backdrop-filter:blur(12px) saturate(1.3)}
-.page-returnbar{background:var(--glass)!important;backdrop-filter:blur(var(--blur)) saturate(1.3);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.3);border-bottom:1px solid var(--glass-edge-2)!important;box-shadow:0 10px 30px -24px rgba(5,25,45,.6)!important}
-.page-returnbar>button{background:var(--glass-2)!important;border:1px solid var(--glass-edge-2)!important;box-shadow:var(--button-shadow)!important;border-radius:14px!important}
-
-/* Top-level panels: one frosted pane each. */
-.app-main>section,.app-main>.screen-heading,.app-main>.today-insights>button,.app-main>.calendar-shell,.app-main>.weather-dashboard,.app-main>.salary-dashboard,.app-main>.nature-controls,.app-main>.account-card,.app-main>.settings-panel,.app-main>.leave-center,.app-main>.quick-controls,.app-main>.feature-directory,.app-main>.theme-panel,.app-main>.month-summary-v300,.app-main>.calendar-holidays,.modal-sheet,.wx-detail-sheet{
-  background:var(--glass)!important;border:1px solid var(--glass-edge-2)!important;border-top-color:var(--glass-edge)!important;
-  box-shadow:var(--raised)!important;border-radius:var(--panel-radius)!important;
-  backdrop-filter:blur(var(--blur)) saturate(1.35);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.35);
-  position:relative;isolation:isolate;overflow:hidden;
-}
-.app-main>section::after,.app-main>.today-insights>button::after,.app-main>.screen-heading::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,.28),transparent 42%,transparent 70%,rgba(255,255,255,.08))}
-html[data-theme=dark] .app-main>section::after,html[data-theme=dark] .app-main>.today-insights>button::after,html[data-theme=dark] .app-main>.screen-heading::after{background:linear-gradient(135deg,rgba(190,222,255,.1),transparent 45%,transparent 75%,rgba(190,222,255,.04))}
-.app-main>.quick-launch{overflow:visible}
-.app-main>section>*{position:relative}
-
-/* Heroes keep their depth but let the sky bleed through. */
-.app-main>.today-hero,.app-main>.today-hero.shift-early,.app-main>.today-hero.shift-mid,.app-main>.today-hero.shift-night,.app-main>.today-hero.shift-off{background:radial-gradient(ellipse at 100% 0,rgba(96,148,170,.45),transparent 60%),linear-gradient(150deg,rgba(24,50,70,.78),rgba(10,30,48,.84) 85%)!important;border:1px solid rgba(190,222,255,.3)!important;box-shadow:inset 0 1px 0 rgba(220,242,255,.45),0 26px 50px -28px rgba(3,18,36,.9)!important;backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)}
-.salary-hero{background:radial-gradient(ellipse at 100% 0,rgba(83,124,144,.5),transparent 65%),linear-gradient(145deg,rgba(38,63,84,.82),rgba(16,43,64,.88))!important;border:1px solid rgba(190,222,255,.3)!important}
-body[data-light-phase=golden] .app-main>.today-hero{background:radial-gradient(ellipse at 100% 0,rgba(255,170,96,.35),transparent 60%),linear-gradient(150deg,rgba(60,42,52,.8),rgba(26,22,40,.86) 85%)!important}
-body[data-light-phase=night] .app-main>.today-hero{background:radial-gradient(ellipse at 100% 0,rgba(84,112,150,.38),transparent 60%),linear-gradient(150deg,rgba(10,22,40,.76),rgba(4,12,26,.84) 85%)!important}
-.hero-leave-overview,.hero-footer button{background:rgba(255,255,255,.1)!important;border:1px solid rgba(220,242,255,.22)!important;backdrop-filter:none}
-.shift-dial,.dial-face{box-shadow:0 0 0 1px rgba(220,242,255,.18),0 0 30px -6px var(--accent-glow)!important}
-
-/* Dock: a floating glass capsule with a luminous active pill. */
-.bottom-nav,body:has(.screen-calendar) .bottom-nav{background:var(--dock)!important;border:1px solid var(--glass-edge)!important;border-radius:26px!important;padding:7px!important;box-shadow:inset 0 1px 0 var(--glass-edge),0 18px 40px -18px rgba(3,18,36,.7)!important;backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5)}
-.bottom-nav-item{border-radius:19px!important;transition:background .25s,box-shadow .25s,transform .18s;color:var(--ink-2)!important}
-.bottom-nav-item:active{transform:scale(.94)}
-.bottom-nav-item.active,html[data-theme=dark] .bottom-nav-item.active{background:linear-gradient(160deg,var(--brand-soft),var(--glass-2))!important;border:1px solid var(--glass-edge)!important;color:var(--ink)!important;box-shadow:inset 0 1px 0 var(--glass-edge),0 0 0 1px rgba(255,255,255,.08),0 10px 24px -12px var(--accent-glow),0 0 26px -6px var(--accent-glow)!important}
-.bottom-nav-item.active .bottom-nav-icon{color:var(--brand)!important;filter:drop-shadow(0 0 6px var(--accent-glow))}
-.nav-active-mark{background:var(--brand)!important;box-shadow:0 0 8px var(--accent-glow)}
-
-/* Inner tiles and controls: lighter glass, no blur. */
-.focus-tile,.quick-control-card,.feature-grid>button,.schedule-day,.forecast-day,.insight-row,.month-summary-grid>*,.calendar-highlight,.theme-choices>button,.calendar-view-switch>button,.nature-level,.nature-previews button,.nature-seasons button,.nature-visibility-controls button,.settings-group,.history-month,.calendar-secondary>*,.calendar-holiday-list>*,.leave-center-head,.shift-weather-grid>*{background:var(--glass-2)!important;border-color:var(--glass-edge-2)!important;box-shadow:inset 0 1px 0 var(--glass-edge-2),var(--inset)!important}
-.feature-grid>button,.forecast-day,.quick-launch>button{background:transparent!important;box-shadow:none!important}
-.quick-launch{background:var(--glass)!important}
-.quick-launch>button:active,.feature-grid>button:active,.focus-tile:active{background:var(--glass-2)!important}
-.calendar-view-switch{background:var(--glass-3)!important;border:1px solid var(--glass-edge-2)!important;border-radius:16px!important}
-.calendar-view-switch>button{background:transparent!important;box-shadow:none!important;border-color:transparent!important}
-.calendar-view-switch>button.active,.calendar-view-switch>button[aria-pressed=true]{background:var(--glass)!important;box-shadow:var(--button-shadow)!important;border-color:var(--glass-edge)!important}
-.theme-choices>button.active,.theme-choices>button[aria-pressed=true],.nature-level button.active,.nature-visibility-controls button[aria-pressed=true]{background:linear-gradient(160deg,var(--brand-soft),var(--glass))!important;box-shadow:var(--button-shadow),0 0 18px -6px var(--accent-glow)!important;border-color:var(--glass-edge)!important}
-
-/* Calendar: translucent cells on the frosted month pane. */
-.wk-row{background:var(--glass)!important;backdrop-filter:blur(var(--blur)) saturate(1.3);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.3);border-top:1px solid var(--glass-edge)!important;border-bottom:1px solid var(--glass-edge-2)!important;box-shadow:0 10px 24px -20px rgba(3,18,36,.7)!important;border-radius:0 0 18px 18px}
-.calendar-v314 .day{background:var(--glass-2)!important;border:1px solid var(--glass-edge-2)!important;box-shadow:inset 0 1px 0 var(--glass-edge-2)!important;border-radius:14px!important}
-.calendar-v314 .day.today{background:linear-gradient(160deg,var(--brand-soft),var(--glass))!important;border:1px solid var(--glass-edge)!important;box-shadow:inset 0 1px 0 var(--glass-edge),0 0 0 1px var(--brand),0 0 22px -6px var(--accent-glow)!important}
-.calendar-v314 .day.selected{box-shadow:inset 0 0 0 2px var(--brand),0 0 22px -6px var(--accent-glow)!important}
-.mnav>button,.calendar-today-anchor{background:var(--glass-2)!important;border:1px solid var(--glass-edge-2)!important;box-shadow:var(--button-shadow)!important}
-
-/* Buttons everywhere: glass with a light crest and tactile press. */
-button,.account-login{transition:transform .15s,box-shadow .2s,background .2s}
-.app-main button:not(.bottom-nav-item):active,.app-header button:active{transform:translateY(1px) scale(.985)}
-.account-login,.pay-current-action,.wx-empty-actions>button,.leave-center-head button,.settings-group button:not(.danger),.calendar-section-head button,.section-kicker button,.scene-heading>button,.hero-footer button{background:linear-gradient(160deg,var(--glass),var(--glass-2))!important;border:1px solid var(--glass-edge)!important;color:var(--ink)!important;box-shadow:var(--button-shadow)!important;border-radius:14px!important;backdrop-filter:none}
-.account-login{background:linear-gradient(160deg,var(--brand-soft),var(--glass))!important;box-shadow:var(--button-shadow),0 0 24px -8px var(--accent-glow)!important;font-weight:700}
-.account-card .account-avatar{background:var(--glass-2)!important;border:1px solid var(--glass-edge)!important;box-shadow:var(--button-shadow)}
-input,select,textarea{background:var(--glass-2)!important;border:1px solid var(--glass-edge-2)!important;color:var(--ink)!important;border-radius:12px}
-input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
-.nature-master{background:linear-gradient(160deg,var(--glass),var(--glass-2))!important;border:1px solid var(--glass-edge)!important;box-shadow:var(--button-shadow)!important}
-.status-switch{background:var(--glass-3)!important;border:1px solid var(--glass-edge-2)!important}.status-switch.on{background:var(--brand)!important;box-shadow:0 0 14px -2px var(--accent-glow)!important}
-
-/* The atmosphere card becomes a clear window onto the live scene. */
-.app-main>.atmosphere-view,.nature-controls>.atmosphere-view{background:rgba(255,255,255,.08)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border:1px solid var(--glass-edge)!important;min-height:210px!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),inset 0 40px 60px -50px rgba(0,0,0,.35),var(--raised)!important}
-.atmosphere-view::before{display:block!important;content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(0,0,0,.18),transparent 30%,transparent 55%,rgba(0,0,0,.42));border:0;box-shadow:none;border-radius:inherit}
-.atmosphere-view .scene-heading{position:relative;z-index:3;color:#f3fafc!important}
-.atmosphere-view .scene-heading>span,.atmosphere-view .scene-heading>button{background:rgba(8,28,40,.48)!important;border:1px solid rgba(220,242,255,.35)!important;color:#f3fafc!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);text-shadow:0 1px 3px rgba(0,0,0,.4)}
-.atmosphere-view .scene-caption,html[data-theme=dark] .atmosphere-view .scene-caption{position:relative;z-index:3;background:linear-gradient(0deg,rgba(6,22,34,.62),rgba(6,22,34,.2) 60%,transparent)!important;color:#f6fbfd!important;text-shadow:0 1px 6px rgba(0,0,0,.55)}
-.atmosphere-view .scene-caption small,.atmosphere-view .scene-caption strong,.atmosphere-view .scene-caption>span,.atmosphere-view .scene-micro>span{color:#f6fbfd!important}
-.atmosphere-view .scene-micro>span{background:rgba(8,28,40,.42)!important;border-color:rgba(220,242,255,.3)!important}
-
-/* Type on glass. */
-.app-main h1,.app-main h2,.app-main h3,.screen-heading h1,.screen-heading h2{text-shadow:var(--glass-ink-shadow)}
-.section-kicker h2{letter-spacing:.03em}
-.app-version{opacity:.75;text-shadow:var(--glass-ink-shadow)}
-.wx-alert,.notify-cta{background:var(--glass)!important}
-
-/* Preview HUD and theatre captions share the glass language. */
-html .nature-preview-hud{background:rgba(10,30,46,.6)!important;border:1px solid rgba(190,222,255,.3)!important;backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);border-radius:18px!important}
-html .nature-preview-hud>button{background:rgba(255,255,255,.88)!important;border-radius:12px!important}
-
-/* Particles over glass: rain on the pane. */
-html body #wxfx,html body:has(.screen-calendar) #wxfx{opacity:1!important}
-@media(prefers-reduced-motion:reduce){html body #wxfx,html body:has(.screen-calendar) #wxfx{display:none!important}}
-
-/* Lower-end devices: drop the expensive blur, keep the look. */
-body[data-fx-quality=subtle] .app-main>section,body[data-fx-quality=subtle] .app-main>.screen-heading,body[data-fx-quality=subtle] .bottom-nav,body[data-fx-quality=subtle] .page-returnbar,body[data-fx-quality=subtle] .wk-row{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-body[data-fx-quality=subtle]{--glass:rgba(255,255,255,.84);--plane:rgba(255,255,255,.84);--dock:rgba(255,255,255,.88)}
-html[data-theme=dark] body[data-fx-quality=subtle]{--glass:rgba(13,26,40,.86);--plane:rgba(13,26,40,.86);--dock:rgba(10,22,36,.9)}
-
-/* Header lockup sits on its own small pane so the title reads over any sky. */
-.brand-lockup{background:var(--glass)!important;border:1px solid var(--glass-edge)!important;border-radius:20px!important;padding:5px 14px 5px 6px!important;box-shadow:var(--button-shadow)!important;backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3)}
-.brand-copy strong{color:var(--ink)!important}.brand-copy>span{color:var(--ink-2)!important}
+/* ---------- fixed chrome ---------- */
+.app-header{background:transparent!important;border:0!important;box-shadow:none!important}
+.brand-lockup{background:var(--surface)!important;border:1px solid var(--edge-soft)!important;border-radius:22px!important;padding:6px 16px 6px 6px!important;box-shadow:var(--raised)!important;backdrop-filter:blur(var(--blur)) saturate(1.4);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.4)}
+.brand-copy strong{color:var(--ink)!important}.brand-copy>span{color:var(--ink-2)!important}.brand-copy .brand-eyebrow{color:var(--brand)!important}
+.header-actions>.icon-button{background:var(--surface)!important;border:1px solid var(--edge-soft)!important;box-shadow:var(--button-shadow)!important;color:var(--brand)!important;backdrop-filter:blur(var(--blur)) saturate(1.4);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.4)}
+.page-returnbar{background:var(--surface)!important;border-bottom:1px solid var(--edge-soft)!important;box-shadow:0 12px 30px -24px rgba(4,20,36,.7)!important;backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5)}
+.page-returnbar>button{background:transparent!important;border:1px solid var(--line-strong)!important;box-shadow:none!important;border-radius:999px!important;color:var(--brand)!important;min-height:44px}
 .page-returnbar .return-destination{color:var(--ink-2)!important;font-weight:650}
-/* Account card: the dark slab becomes the same deep glass as the hero. */
-.account-card,html[data-theme=dark] .account-card{background:radial-gradient(ellipse at 100% 0,rgba(120,170,180,.35),transparent 65%),linear-gradient(135deg,rgba(40,74,92,.78),rgba(18,44,60,.84))!important;border:1px solid rgba(190,222,255,.3)!important;color:#f4f8f8!important;backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)}
-.account-card .account-copy strong,.account-card .account-copy small{color:#f4f8f8!important;text-shadow:0 1px 3px rgba(0,0,0,.35)}
-.account-card .account-login{color:#1d3f48!important;background:linear-gradient(160deg,rgba(255,255,255,.95),rgba(220,236,232,.9))!important}
-/* Atmosphere window: deeper bottom shade keeps the live readout legible. */
-.atmosphere-view::before{background:linear-gradient(180deg,rgba(0,0,0,.22),transparent 28%,transparent 48%,rgba(4,18,30,.62))}
-.atmosphere-view .scene-caption>button,.atmosphere-view .scene-caption b{color:#ffffff!important;text-shadow:0 1px 8px rgba(0,0,0,.6)}
+
+/* ---------- top-level panes ---------- */
+.app-main>section,.app-main>.screen-heading,.app-main>.today-insights>button,.app-main>div.wx-alert-stack>*,.app-main>button,.al-bar,.modal-sheet,.wx-detail-sheet{
+  background:var(--surface)!important;border:1px solid var(--edge-soft)!important;
+  box-shadow:var(--raised)!important;border-radius:var(--panel-radius)!important;
+  backdrop-filter:blur(var(--blur)) saturate(1.45);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.45);
+}
+.app-main>section,.app-main>.screen-heading,.app-main>.today-insights>button{position:relative;isolation:isolate}
+/* Specular sheen: a soft diagonal light on the pane, not a box. */
+.app-main>section::before,.app-main>.screen-heading::before,.app-main>.today-insights>button::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(160deg,rgba(255,255,255,.34),rgba(255,255,255,0) 38%)}
+html[data-theme=dark] .app-main>section::before,html[data-theme=dark] .app-main>.screen-heading::before,html[data-theme=dark] .app-main>.today-insights>button::before{background:linear-gradient(160deg,rgba(200,228,255,.09),rgba(200,228,255,0) 40%)}
+.app-main>.quick-launch{padding:8px 4px!important}
+.quick-launch>button{background:transparent!important;border-color:var(--line)!important;box-shadow:none!important}
+
+/* ---------- deep glass: components designed for light text ---------- */
+.app-main>.today-hero,.app-main>.account-card,.salary-hero,.calendar-breaks,.weather-current,.radar-action,html .calendar-breaks,html[data-theme=dark] .calendar-breaks{
+  background:radial-gradient(120% 90% at 100% 0,rgba(120,170,196,.22),rgba(120,170,196,0) 60%),linear-gradient(155deg,var(--deep-2),var(--deep))!important;
+  border:1px solid var(--deep-edge)!important;color:#f2f7fa!important;
+  box-shadow:inset 0 1px 0 rgba(220,240,255,.28),0 26px 52px -28px rgba(2,12,24,.9)!important;
+}
+.app-main>.today-hero,.app-main>.account-card{backdrop-filter:blur(var(--blur)) saturate(1.3);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.3)}
+.app-main>.today-hero::before,.app-main>.account-card::before{background:radial-gradient(70% 60% at 85% 10%,var(--accent-glow),transparent 70%)!important;opacity:.55}
+body[data-light-phase=golden] .app-main>.today-hero{background:radial-gradient(120% 90% at 100% 0,rgba(255,170,100,.26),transparent 60%),linear-gradient(155deg,rgba(46,32,42,.9),rgba(20,16,30,.92))!important}
+.calendar-breaks{border-radius:20px!important}
+.calendar-break-item{background:rgba(255,255,255,.07)!important;border:1px solid rgba(220,240,255,.16)!important;color:#f2f7fa!important}
+.calendar-breaks-head strong,.calendar-breaks-head small,.break-name,.break-dates strong,.break-dates i{color:#eef5f9!important}
+.calendar-breaks-head small,.break-name{color:#c9dbe6!important}
+.break-name{color:#d9e7ef!important}.break-total{color:#ffd99c!important}.break-total small{color:#d8e5ec!important}
+.break-length{background:linear-gradient(160deg,#ffe7b0,#f2cf84)!important;color:#3d2a08!important;box-shadow:inset 0 1px 0 #fff8,0 2px 6px -2px #0006!important}
+.radar-action{border-radius:18px!important}.radar-action small{color:#cfe0ea!important}
+.account-card .account-copy strong{color:#fff!important}.account-card .account-copy small{color:#d3e2ec!important}
+.account-card .account-login{background:linear-gradient(160deg,#fff,#e4eef2)!important;color:#183a4a!important;border:0!important;box-shadow:0 8px 20px -10px #000a,inset 0 1px 0 #fff!important;font-weight:700}
+.account-card .account-avatar{background:rgba(255,255,255,.12)!important;border:1px solid rgba(220,240,255,.3)!important;color:#fff!important;box-shadow:none!important}
+/* The dial is a round instrument; its wrapper is not. */
+.shift-dial{background:transparent!important;border:0!important;box-shadow:none!important;outline:0!important}
+.dial-face{box-shadow:inset 0 2px 10px rgba(0,10,20,.6),0 0 0 1px rgba(220,240,255,.16),0 0 34px -8px var(--accent-glow)!important}
+.hero-leave-overview{background:rgba(255,255,255,.07)!important;border:1px solid rgba(220,240,255,.18)!important}
+.hero-footer button{border-radius:14px!important;background:rgba(255,255,255,.1)!important;border:1px solid rgba(220,240,255,.24)!important;color:#f2f7fa!important;box-shadow:none!important}
+.hero-footer button svg{color:#f2f7fa}
+
+/* ---------- dock ---------- */
+.bottom-nav,body:has(.screen-calendar) .bottom-nav{background:var(--dock)!important;border:1px solid var(--edge-soft)!important;border-radius:28px!important;padding:7px!important;box-shadow:inset 0 1px 0 var(--edge),0 20px 44px -18px rgba(2,14,28,.75)!important;backdrop-filter:blur(26px) saturate(1.6);-webkit-backdrop-filter:blur(26px) saturate(1.6);isolation:isolate}
+.bottom-nav-item,html[data-theme=dark] .bottom-nav-item{position:relative;z-index:1;background:transparent!important;border:1px solid transparent!important;box-shadow:none!important;border-radius:21px!important;color:var(--ink-2)!important;transition:color .25s,transform .18s var(--ease-spring)}
+.bottom-nav-item:active{transform:scale(.92)}
+.bottom-nav-item.active,html[data-theme=dark] .bottom-nav-item.active{color:var(--ink)!important;background:transparent!important;border-color:transparent!important;box-shadow:none!important}
+.bottom-nav-item.active .bottom-nav-icon{color:var(--brand)!important;transform:translateY(-1px)}
+.bottom-nav-icon{transition:transform .3s var(--ease-spring)}
+.nav-active-mark{background:var(--brand)!important;box-shadow:0 0 10px var(--accent-glow)}
+/* Sliding glass pill (positioned by nature-effects); falls back to static highlight. */
+.dock-pill{position:absolute;z-index:0;top:7px;bottom:7px;left:0;width:0;border-radius:21px;pointer-events:none;background:linear-gradient(165deg,var(--brand-soft),rgba(255,255,255,.55));box-shadow:inset 0 1px 0 var(--edge),0 0 0 1px var(--line),0 10px 24px -12px var(--accent-glow),0 0 28px -8px var(--accent-glow);transition:transform .45s var(--ease-spring),width .45s var(--ease-spring);will-change:transform}
+html[data-theme=dark] .dock-pill{background:linear-gradient(165deg,var(--brand-soft),rgba(255,255,255,.06))}
+.bottom-nav:not(.has-pill) .bottom-nav-item.active{background:linear-gradient(165deg,var(--brand-soft),transparent)!important;box-shadow:inset 0 1px 0 var(--edge)!important}
+
+/* ---------- controls ---------- */
+.app-main button,.app-header button,.bottom-nav button{-webkit-tap-highlight-color:transparent}
+.app-main button:not(.bottom-nav-item):not(.day):active,.app-header button:active{transform:translateY(1px) scale(.97);transition:transform .08s}
+.app-main button{transition:transform .25s var(--ease-spring),box-shadow .2s,background-color .2s}
+/* Touch specular: a light that blooms where the finger lands (coordinates from nature-effects). */
+.fx-touch{position:relative;overflow:hidden}
+.fx-touch::after{content:"";position:absolute;left:var(--tx,50%);top:var(--ty,50%);width:220px;height:220px;margin:-110px 0 0 -110px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(255,255,255,.55),rgba(255,255,255,0) 60%);opacity:0;transform:scale(.3);animation:fx-bloom .55s ease-out}
+html[data-theme=dark] .fx-touch::after{background:radial-gradient(circle,rgba(190,225,255,.28),rgba(190,225,255,0) 60%)}
+@keyframes fx-bloom{0%{opacity:.9;transform:scale(.2)}100%{opacity:0;transform:scale(1.4)}}
+.icon-action,.text-action,.mnav>button,.calendar-today-anchor,.section-kicker button,.scene-heading>button,.calendar-section-head button,.pay-current-action,.wx-empty-actions>button{background:var(--surface-2)!important;border:1px solid var(--edge-soft)!important;box-shadow:var(--button-shadow)!important;color:var(--brand)!important}
+.calendar-view-switch{background:var(--surface-3)!important;border:1px solid var(--line)!important}
+.calendar-view-switch>button{background:transparent!important;box-shadow:none!important;border-color:transparent!important}
+.calendar-view-switch>button.active,.calendar-view-switch>button[aria-pressed=true]{background:var(--surface)!important;box-shadow:var(--button-shadow)!important;border-color:var(--edge-soft)!important;color:var(--ink)!important}
+.theme-choices>button.active,.theme-choices>button[aria-pressed=true],.nature-level button.active,.nature-level button[aria-pressed=true]{background:linear-gradient(165deg,var(--brand-soft),var(--surface))!important;box-shadow:var(--button-shadow),0 0 20px -8px var(--accent-glow)!important;border-color:var(--edge-soft)!important;color:var(--ink)!important}
+.status-switch.on{background:var(--brand)!important;box-shadow:0 0 14px -2px var(--accent-glow)!important}
+input,select,textarea{background:var(--surface-2)!important;color:var(--ink)!important}
+:focus-visible{outline:2px solid var(--brand)!important;outline-offset:2px}
+
+/* ---------- calendar ---------- */
+html body .wk-row,html body .calendar-v314 .wk-row,html body:has(.screen-calendar) .wk-row{background:var(--surface)!important;backdrop-filter:blur(var(--blur)) saturate(1.4);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.4);border-top:1px solid var(--edge-soft)!important;border-bottom:1px solid var(--line)!important;border-radius:16px;box-shadow:0 12px 24px -22px rgba(2,14,28,.8)!important}
+.calendar-v314 .day.today{box-shadow:inset 0 0 0 2px var(--brand),0 0 24px -6px var(--accent-glow)!important}
+
+/* ---------- live atmosphere window ---------- */
+.app-main>.atmosphere-view,.nature-controls>.atmosphere-view{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border:1px solid rgba(255,255,255,.38)!important;min-height:200px;overflow:hidden!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06),0 24px 48px -28px rgba(2,12,24,.8)!important}
+.app-main>.atmosphere-view::before,.nature-controls>.atmosphere-view::before{display:block!important;content:"";position:absolute;inset:0;z-index:0;pointer-events:none;border:0;border-radius:inherit;background:linear-gradient(180deg,rgba(2,12,22,.5) 0%,rgba(2,12,22,.12) 30%,rgba(2,12,22,.4) 48%,rgba(2,12,22,.86) 100%)!important;box-shadow:none!important}
+.atmosphere-view::after{display:none!important}
+.atmosphere-view .scene-heading,.atmosphere-view .scene-caption{position:relative;z-index:2;background:transparent!important;color:#f6fbfd!important;text-shadow:0 1px 3px rgba(0,0,0,.65),0 0 18px rgba(0,0,0,.35)}
+.app-main>.atmosphere-view,.nature-controls>.atmosphere-view{display:flex!important;flex-direction:column!important;height:auto!important;min-height:212px!important}
+.atmosphere-view .scene-caption{position:relative!important;inset:auto!important;margin-top:auto!important;padding:18px 18px 16px!important}
+.atmosphere-view .scene-heading{padding:14px 14px 0!important}
+.atmosphere-view .scene-caption *,.atmosphere-view .scene-heading *{color:#f6fbfd!important}
+.atmosphere-view .scene-heading>span,.atmosphere-view .scene-heading>button,.atmosphere-view .scene-micro>span{background:rgba(4,18,30,.58)!important;border:1px solid rgba(220,242,255,.32)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:none!important;text-shadow:none}
+
+/* ---------- theatre / HUD ---------- */
+html .nature-preview-hud{background:rgba(6,20,34,.7)!important;border:1px solid rgba(190,222,255,.3)!important;backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border-radius:20px!important}
+html .nature-preview-hud>button{background:#fff!important;color:#123044!important;border-radius:14px!important}
+html body #wxfx,html body:has(.screen-calendar) #wxfx{opacity:1!important}
+@media(prefers-reduced-motion:reduce){html body #wxfx{display:none!important}.dock-pill{transition:none}.fx-touch::after{animation:none}}
+
+/* ---------- performance fallback ---------- */
+body[data-fx-quality=subtle]{--glass-a:.95}
+body[data-fx-quality=subtle] .app-main>*,body[data-fx-quality=subtle] .bottom-nav,body[data-fx-quality=subtle] .page-returnbar,body[data-fx-quality=subtle] .wk-row,body[data-fx-quality=subtle] .brand-lockup,body[data-fx-quality=subtle] .header-actions>*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+
+/* ---------- theatre tiles: local plates only (the old remote Wikimedia originals were multi-megapixel) ---------- */
+html body .nature-previews button[data-effect]{background-color:#0d2233!important;background-size:cover!important;background-position:center 30%!important;color:#f4f9fb!important;border:1px solid rgba(220,240,255,.22)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 14px 28px -18px rgba(2,12,24,.9)!important;overflow:hidden}
+html body .nature-previews button[data-effect] *{color:#f4f9fb!important}
+html body .nature-previews button[data-effect] .effect-copy small{color:#d6e6ef!important}
+html body .nature-previews button[data-effect] .effect-tile-icon{background:rgba(255,255,255,.14)!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)!important;backdrop-filter:blur(6px)}
+html body .nature-previews button[data-effect=clear],html body .nature-previews button[data-effect=heat]{background-image:linear-gradient(180deg,rgba(4,16,28,.3),rgba(4,16,28,.86)),url('./images/atmosphere/lagoon-day.webp')!important}
+html body .nature-previews button[data-effect=cloud],html body .nature-previews button[data-effect=drizzle],html body .nature-previews button[data-effect=rain],html body .nature-previews button[data-effect=fog],html body .nature-previews button[data-effect=wind]{background-image:linear-gradient(180deg,rgba(4,16,28,.3),rgba(4,16,28,.86)),url('./images/atmosphere/lagoon-overcast.webp')!important}
+html body .nature-previews button[data-effect=heavy],html body .nature-previews button[data-effect=storm],html body .nature-previews button[data-effect=typhoon],html body .nature-previews button[data-effect=hail],html body .nature-previews button[data-effect=earthquake]{background-image:linear-gradient(180deg,rgba(4,16,28,.3),rgba(4,16,28,.86)),url('./images/atmosphere/lagoon-storm.webp')!important}
+html body .nature-previews button[data-effect=snow],html body .nature-previews button[data-effect=cold]{background-image:linear-gradient(180deg,rgba(4,16,28,.3),rgba(4,16,28,.86)),url('./images/atmosphere/lagoon-winter.webp')!important}
+html body .nature-previews button[data-effect]::before{opacity:.6}
+html body .nature-previews button[data-effect]:active{transform:scale(.96)}
+/* small contrast corrections found by the audit */
+html[data-theme=dark] .shift-weather-point.likely-rain{background:radial-gradient(ellipse at 100% 0,rgba(110,170,200,.16),transparent 80%),var(--surface-2)!important}
+.commute-alert strong,.commute-alert span{filter:saturate(1.1) brightness(.88)}
+html[data-theme=dark] .commute-alert strong,html[data-theme=dark] .commute-alert span{filter:none}

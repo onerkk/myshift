@@ -83,6 +83,7 @@
     let signatureMode='',signatureStart=0,theatre=true,sceneCaption=null,returnFocus=null,hud=null,previewStarted=0,hudTimer=0,sceneLighting='auto';
     let previewTimer=0,previewToken=0,seasonPreview=null,thunderTimer=0,lastIceStrike=-1;
     let gust=0,cloudBlend=.3,lightning=0,boltIndex=0,boltX=.5,nextLightning=25,interactionWind=0,lastLightUpdate=-1,failures=0;
+    const tilt={x:0,y:0,tx:0,ty:0};let pill=null,chromeTick=-10,realFrame={ema:33,slow:0};
     let plateKey='',plateFrom='',plateFade=1,gradeKey='',gradeCanvas=null,budget={ema:12,low:0,high:0},sessionLevel='';
     const previewModes=['clear','cloud','drizzle','rain','heavy','storm','typhoon','hail','snow','wind','fog','heat','cold','earthquake'];
     const labels={clear:['晴空','Cerah'],cloud:['雲層','Awan'],drizzle:['細雨','Gerimis'],rain:['降雨','Hujan'],heavy:['豪雨','Hujan lebat'],storm:['雷雨','Badai petir'],typhoon:['颱風','Topan'],hail:['冰雹','Hujan es'],snow:['飄雪','Salju'],wind:['強風','Angin kencang'],fog:['濃霧','Kabut'],heat:['熱浪','Panas'],cold:['寒流','Dingin'],earthquake:['地震情境','Simulasi gempa']};
@@ -169,7 +170,10 @@
       document.addEventListener('transitionend',dirty,{passive:true});document.addEventListener('animationend',dirty,{passive:true});
       if(document.fonts)document.fonts.addEventListener('loadingdone',dirty);
       document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTimeout(thunderTimer);lightning=0}resume()});reduced.addEventListener('change',resume);
-      document.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'&&e.target.closest&&e.target.closest('.atmosphere-view'))interactionWind=3},{passive:true});
+      document.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'){tilt.tx=clamp(e.clientX/w*2-1,-1,1);tilt.ty=clamp(e.clientY/h*2-1,-1,1);if(e.target.closest&&e.target.closest('.atmosphere-view'))interactionWind=3}},{passive:true});
+      addEventListener('deviceorientation',e=>{if(e.gamma==null)return;tilt.tx=clamp(e.gamma/30,-1,1);tilt.ty=clamp((e.beta-45)/30,-1,1)},{passive:true});
+      // Touch light: mark the pressed control and place the bloom under the finger.
+      document.addEventListener('pointerdown',e=>{const b=e.target.closest&&e.target.closest('#app button,#app [role=button],#app .day');if(!b||reduced.matches)return;const r=b.getBoundingClientRect();b.style.setProperty('--tx',(e.clientX-r.left)+'px');b.style.setProperty('--ty',(e.clientY-r.top)+'px');b.classList.remove('fx-touch');void b.offsetWidth;b.classList.add('fx-touch');setTimeout(()=>b.classList.remove('fx-touch'),600)},{passive:true});
       setInterval(()=>{syncSound();if(!raf)resume()},15000);resume();
     }
     function capDpr(){const d=devicePixelRatio||1,l=effLevel();return {fx:Math.min(d,l==='subtle'?1:l==='balanced'?1.25:1.5),sky:Math.min(d,1)}}
@@ -239,8 +243,9 @@
       plateFade=Math.min(1,plateFade+dt/2.4);
       const cur=plate(plateKey),prev=plateFrom?plate(plateFrom):null;
       if(!cur&&!prev){const g=bg.createLinearGradient(0,0,0,h);const c=phase==='night'?['#0b1a2c','#1b2f44']:want==='storm'?['#3f4e5c','#7f8c95']:want==='overcast'?['#8795a0','#c3ccd0']:['#5e97c3','#cfe0e4'];g.addColorStop(0,c[0]);g.addColorStop(1,c[1]);bg.fillStyle=g;bg.fillRect(0,0,w,h);return}
-      if(prev&&plateFade<1){bg.globalAlpha=1;bg.drawImage(prev,...coverRect(prev,w,h))}
-      if(cur){bg.globalAlpha=prev?plateFade:1;bg.drawImage(cur,...coverRect(cur,w,h));bg.globalAlpha=1}
+      const px=tilt.x*14,py=tilt.y*10,R=im=>{const r=coverRect(im,w+28,h+20);return [r[0]-14+px,r[1]-10+py,r[2],r[3]]};
+      if(prev&&plateFade<1){bg.globalAlpha=1;bg.drawImage(prev,...R(prev))}
+      if(cur){bg.globalAlpha=prev?plateFade:1;bg.drawImage(cur,...R(cur));bg.globalAlpha=1}
       else if(!prev){bg.fillStyle='#6d8da3';bg.fillRect(0,0,w,h)}
     }
     // Colour grading overlay cached per (season, phase, weather family); seasons differ strongly.
@@ -291,7 +296,7 @@
       for(let i=0;i<count;i++){
         const kind=cover>.75?i%2:cover>.35?(i%3):2,cv=tinted('cloud-'+kind,tint,tintA);if(!cv)continue;
         const depth=.35+(i%4)*.22,size=Math.min(w*(.55+depth*.75),760),aspect=cv.height/cv.width;
-        const x=(((i*.37+.11)*w+time*speed*depth*(1+i%3*.3))%(w+size*1.2))-size*.6,y=h*(.03+i*.085+(cover>.6?0:.02))+Math.sin(time*.05+i)*6;
+        const x=(((i*.37+.11)*w+time*speed*depth*(1+i%3*.3))%(w+size*1.2))-size*.6+tilt.x*22*depth,y=h*(.03+i*.085+(cover>.6?0:.02))+Math.sin(time*.05+i)*6+tilt.y*14*depth;
         let a=(cover<.2?cover*2:clamp(.35+cover*.7,0,1))*(.45+depth*.55);if(m==='fog')a*=.5;if(cover<.12&&kind!==2)continue;
         bg.globalAlpha=clamp(a,0,1);if(i%2){bg.save();bg.translate(x+size,y);bg.scale(-1,1);bg.drawImage(cv,0,0,size,size*aspect);bg.restore()}else bg.drawImage(cv,x,y,size,size*aspect);
       }bg.globalAlpha=1;
@@ -321,8 +326,13 @@
       ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
       // Splash rings on the lower band (near ground / sill).
       if(!drizzle){const n=l==='subtle'?4:intensity>.6?12:7;ctx.lineWidth=.8;for(let i=0;i<n;i++){const s=splashes[i];s.t+=dt*1.6;if(s.t>1){s.t=0;s.x=Math.random()}const x=s.x*w,y=h-18-i*3,k=s.t;ctx.strokeStyle=`rgba(224,243,250,${(1-k)*.5})`;ctx.beginPath();ctx.ellipse(x,y,2+k*16,.8+k*4,0,0,TAU);ctx.stroke();if(k<.4){ctx.fillStyle=`rgba(236,250,255,${(1-k*2.5)*.7})`;ctx.beginPath();ctx.arc(x+Math.sin(i)*3,y-k*18,1,0,TAU);ctx.fill()}}}
-      // Beads on the glass: refractive sprite sliding with a thin wet trail.
-      const drop=sprite('drop'),nb=drizzle?3:l==='subtle'?4:intensity>.7?10:7;
+      if(m==='heavy'||m==='typhoon'){ctx.fillStyle=`rgba(190,208,218,${.05+intensity*.07})`;ctx.fillRect(0,0,w,h)}
+    }
+    // Beads live on the glass in front of the app; the rain field lives outside it.
+    function drawBeads(dt,m){
+      if(!allowed('weather')||!rainMode())return;
+      const l=effLevel(),drizzle=m==='drizzle',intensity=rainIntensity(m),tilt=windDir()*clamp(gust/34,.03,.9);
+      const drop=sprite('drop'),nb=drizzle?6:l==='subtle'?4:intensity>.7?10:7;
       for(let i=0;i<nb;i++){
         const b=beads[i];b.y+=dt*(b.v*(.6+intensity))*(1+.4*Math.sin(time*2+b.wob));b.x+=dt*tilt*.004*b.r;if(b.y>1.08){b.y=rand(-.25,-.05);b.x=rand(.03,.97);b.r=rand(2.2,5.5)}
         const x=b.x*w+Math.sin(time*1.7+b.wob)*.6,y=b.y*h,r=b.r;
@@ -330,7 +340,6 @@
         if(drop){ctx.globalAlpha=.78;ctx.drawImage(drop,x-r*1.2,y-r*2.4,r*2.4,r*2.4*drop.height/drop.width)}
         else{ctx.fillStyle='rgba(220,236,244,.4)';ctx.beginPath();ctx.ellipse(x,y,r,r*1.5,0,0,TAU);ctx.fill()}
       }ctx.globalAlpha=1;
-      if(m==='heavy'||m==='typhoon'){ctx.fillStyle=`rgba(190,208,218,${.05+intensity*.07})`;ctx.fillRect(0,0,w,h)}
     }
     function drawSnow(dt,m,phase){
       if(m!=='snow'||!allowed('weather'))return;
@@ -370,7 +379,7 @@
         p.y+=dt*(fall+.03*g)*(.5+p.z);p.x+=dt*(sway*.03+dir*(.01+g*.11)*(.4+p.z));p.rot+=dt*(p.spin*(1+g*3));
         if(p.y>1.08){p.y=rand(-.3,-.05);p.x=Math.random()}if(p.x>1.1)p.x=-.1;if(p.x<-.1)p.x=1.1;
         if(!cv)continue;const x=p.x*w,y=p.y*h,s=(season==='spring'?10:season==='autumn'?15:14)*(.6+p.z*.7),c=Math.cos(p.rot),sn=Math.sin(p.rot),tumble=.45+.55*Math.abs(Math.cos(time*1.3+p.phase));
-        ctx.globalAlpha=(phase==='night'?.45:.88)*vignette(x,y);ctx.setTransform(c*f*tumble,sn*f*tumble,-sn*f,c*f,x*f,y*f);ctx.drawImage(cv,-s,-s*cv.height/cv.width,s*2,s*2*cv.height/cv.width);
+        ctx.globalAlpha=(phase==='night'?.4:.7)*vignette(x,y);ctx.setTransform(c*f*tumble,sn*f*tumble,-sn*f,c*f,x*f,y*f);ctx.drawImage(cv,-s,-s*cv.height/cv.width,s*2,s*2*cv.height/cv.width);
       }ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
       if(windy){for(let i=0;i<9;i++){const x=((time*(60+i*9)+i*87)%(w+90))-45,y=(i*127+time*(14+i*3))%h;ctx.fillStyle=phase==='night'?'rgba(156,167,155,.4)':'rgba(96,104,84,.5)';ctx.beginPath();ctx.ellipse(x,y,3+i%3*2,1.4+i%2,.3,0,TAU);ctx.fill()}}
     }
@@ -401,13 +410,6 @@
       }
       if(!eco.animals.length)return;
       const temp=sceneTemp(m);
-      // Butterflies: four photographed wing positions cycled (open→half→closed→side→back).
-      const species=season==='spring'?'swallowtail':season==='autumn'?'monarch':'purple',nb=l==='subtle'?1:2;
-      for(let i=0;i<nb;i++){
-        const pose=actorPose('butterfly',i,time,w,h,wind),frame=[0,1,2,3,2,1][Math.floor((time*9+i*2)%6)],cv=sprite(species+'-'+frame);if(!cv)continue;
-        const size=28+i*8,c=Math.cos(pose.bank),s=Math.sin(pose.bank),dir=Math.cos(time*.03+i)>0?1:-1;
-        ctx.globalAlpha=.92;ctx.setTransform(c*f*dir,s*f,-s*f*dir,c*f,pose.x*f,pose.y*f);ctx.drawImage(cv,-size/2,-size/2,size,size);
-      }
       // Dragonflies hover over water in warm summer afternoons.
       if(season==='summer'&&temp!==null&&temp>=26&&l!=='subtle'){for(let i=0;i<2;i++){const cv=sprite('dfly-'+(Math.floor(time*14+i)%3));if(!cv)continue;const x=w*(.3+i*.35)+Math.sin(time*(.8+i*.3))*w*.14+Math.sin(time*5+i)*2,y=h*(.52+i*.1)+Math.cos(time*.6+i)*22,dir=Math.cos(time*.8+i*.3)>0?1:-1;ctx.globalAlpha=.9;ctx.setTransform(f*dir,0,0,f,x*f,y*f);ctx.drawImage(cv,-26,-13,52,26)}}
       // Crag martin: photograph split into wings and body; glides between flapping bursts.
@@ -417,11 +419,33 @@
         ctx.save();ctx.scale(1,fold);ctx.drawImage(bird,0,0,iw,ih*.48,-iw*.5,-ih*.48,iw,ih*.48);ctx.restore();ctx.save();ctx.scale(1,fold);ctx.drawImage(bird,0,ih*.59,iw,ih*.41,-iw*.5,ih*.11,iw,ih*.41);ctx.restore();ctx.drawImage(bird,0,ih*.48,iw,ih*.11,-iw*.5,0,iw,ih*.11);ctx.restore()}}
       ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
     }
+    // Butterflies come close to the glass, so they are the only fauna in front of the app.
+    function drawButterflies(m,season,phase){
+      if(!allowed('animals')||reduced.matches)return;
+      const eco=sceneContext(m,season,phase==='night');if(!eco.animals.length)return;
+      const f=dprFx,l=effLevel(),species=season==='spring'?'swallowtail':season==='autumn'?'monarch':'purple',nb=l==='subtle'?1:2;
+      for(let i=0;i<nb;i++){
+        const pose=actorPose('butterfly',i,time,w,h,wind),frame=[0,1,2,3,2,1][Math.floor((time*9+i*2)%6)],cv=sprite(species+'-'+frame);if(!cv)continue;
+        const size=28+i*8,c=Math.cos(pose.bank),s=Math.sin(pose.bank),dir=Math.cos(time*.03+i)>0?1:-1;
+        ctx.globalAlpha=.92;ctx.setTransform(c*f*dir,s*f,-s*f*dir,c*f,pose.x*f,pose.y*f);ctx.drawImage(cv,-size/2,-size/2,size,size);
+      }
+      ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
+    }
+    // Two out-of-focus near leaves/petals cross the lens now and then (pre-blurred once).
+    function drawNearBokeh(dt,m,season,phase){
+      if(!allowed('seasonal')||reduced.matches||effLevel()==='subtle'||!['spring','autumn'].includes(season)||rainMode())return;
+      const key=season==='spring'?'blossom-1':'maple-0',cv=blurred(key);if(!cv)return;const f=dprFx;
+      for(let i=0;i<2;i++){
+        const cycle=(time*.035+i*.5)%1;if(cycle>.42)continue;const k=cycle/.42,x=(i?w*1.1-k*w*1.3:-w*.1+k*w*1.3),y=h*(.18+i*.42)+Math.sin(k*Math.PI*2+i)*40,size=season==='spring'?70:110,rot=k*4+i;
+        ctx.globalAlpha=(phase==='night'?.35:.6)*Math.sin(k*Math.PI);const c=Math.cos(rot),sn=Math.sin(rot);ctx.setTransform(c*f,sn*f,-sn*f,c*f,x*f,y*f);ctx.drawImage(cv,-size/2,-size/2,size,size);
+      }
+      ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
+    }
+    function blurred(key){let cv=tints.get('blur|'+key);if(cv)return cv;const src=sprite(key);if(!src)return null;cv=document.createElement('canvas');cv.width=src.width+24;cv.height=src.height+24;const c=cv.getContext('2d');try{c.filter='blur(6px)'}catch(_){}c.drawImage(src,12,12);tints.set('blur|'+key,cv);return cv}
     function drawLightning(m,phase){
       if(lightning<=0)return;const pulse=lightning*(.7+.3*Math.sin(lightning*19)**2);
       bg.globalCompositeOperation='screen';bg.fillStyle=`rgba(190,210,240,${pulse*.28})`;bg.fillRect(0,0,w,h);bg.globalCompositeOperation='source-over';
-      glow(ctx,w*boltX,h*.1,w*.8,'205,222,255',pulse*.3);
-      const cv=sprite('bolt-'+boltIndex);if(cv&&lightning>.35){const bh=h*.55,bw=bh*cv.width/cv.height;ctx.globalAlpha=Math.min(1,(lightning-.35)*2.5)*.95;ctx.drawImage(cv,w*boltX-bw/2,h*.02,bw,bh);ctx.globalAlpha=1}
+      glow(bg,w*boltX,h*.1,w*.8,'205,222,255',pulse*.3);
     }
     // Glass / optical signatures: hail cracks, frost growth, heat shimmer, fog breath.
     function drawSignature(m,phase,season){
@@ -507,6 +531,8 @@
       cloudBlend+=(cover-cloudBlend)*Math.min(1,Math.max(.02,dt*.45));
       lightning=Math.max(0,lightning-dt*1.6);
       if(!reduced.matches&&allowed('weather')&&['storm','typhoon'].includes(m)&&time>nextLightning){lightning=1;boltIndex=(boltIndex+1)%4;boltX=rand(.2,.8);nextLightning=time+rand(7,16);clearTimeout(thunderTimer);thunderTimer=setTimeout(()=>{if(['storm','typhoon'].includes(activeMode())&&!document.hidden&&allowed('weather')&&root.WxSfx)root.WxSfx.triggerThunder()},600+Math.random()*900)}
+      tilt.x+=(tilt.tx-tilt.x)*Math.min(1,dt*3);tilt.y+=(tilt.ty-tilt.y)*Math.min(1,dt*3);
+      if(time-chromeTick>.5||chromeTick<0){chromeTick=time;syncDock();syncChrome(phase,m)}
       document.body.dataset.season=name;document.body.dataset.lightPhase=phase==='dusk'?'golden':phase;document.body.dataset.atmosphere=m;document.body.dataset.fxQuality=effLevel();
       if(time-lastLightUpdate>1||lastLightUpdate<0){lastLightUpdate=time;document.documentElement.style.setProperty('--sun-x',Math.round(clamp((hour-5)/14,0,1)*70+15)+'%')}
       if(m!=='earthquake'){document.documentElement.style.setProperty('--quake-x','0px');document.documentElement.style.setProperty('--quake-y','0px')}
@@ -517,16 +543,34 @@
       drawGrade(weather?m:'none',phase,name);
       if(weather){drawCelestial(m,phase,hour,cloudBlend,dt);drawClouds(m,phase,cloudBlend,dt);drawFogBanks(m,phase,hum);drawLightning(m,phase)}
       else drawCelestial('clear',phase,hour,.15,dt);
-      // foreground plane
+      // Everything outside the window is painted on the background plane, behind the glass panes,
+      // so the panes' backdrop blur gives real depth and nothing sits on top of text.
+      onBackground(()=>{drawBotany(m,name,phase);if(!reduced.matches){drawSeasonDrift(dt,m,name,phase);drawRain(dt,m,phase);drawSnow(dt,m,phase);drawHail(dt,m,phase);drawAnimals(m,name,phase,dt)}});
+      // foreground plane: only what is on or near the glass
       ctx.setTransform(dprFx,0,0,dprFx,0,0);ctx.clearRect(0,0,w,h);
       drawSignature(weather?m:'none',phase,name);
-      drawBotany(m,name,phase);
-      if(!reduced.matches){drawSeasonDrift(dt,m,name,phase);drawRain(dt,m,phase);drawSnow(dt,m,phase);drawHail(dt,m,phase);drawAnimals(m,name,phase,dt)}
+      if(!reduced.matches){drawBeads(dt,m);drawButterflies(m,name,phase);drawNearBokeh(dt,m,name,phase)}
+      if(lightning>.35){const cv=sprite('bolt-'+boltIndex);if(cv){const bh=h*.55,bw=bh*cv.width/cv.height;ctx.globalAlpha=Math.min(1,(lightning-.35)*2.5)*.95;ctx.drawImage(cv,w*boltX-bw/2,h*.02,bw,bh);ctx.globalAlpha=1}}
       updateHud();
       if(layoutDirty&&(time-maskTick>.3||maskTick<0)){scanLayout();buildMask()}else if(scrollDirty&&time-maskTick>.12)buildMask();
       if(!document.body.classList.contains('scene-theatre')){ctx.globalCompositeOperation='destination-out';ctx.drawImage(mask,0,0,w,h);ctx.globalCompositeOperation='source-over'}
       for(const v of views){paintScene(v,m,phase);labelScene(v,m,name)}
     }
+    // Sliding glass pill under the active dock item.
+    function syncDock(){
+      const nav=document.querySelector('.bottom-nav');if(!nav)return;
+      if(!pill||!nav.contains(pill)){pill=document.createElement('span');pill.className='dock-pill';pill.setAttribute('aria-hidden','true');nav.prepend(pill);nav.classList.add('has-pill')}
+      const a=nav.querySelector('.bottom-nav-item.active');if(!a){pill.style.opacity='0';return}
+      const nr=nav.getBoundingClientRect(),ar=a.getBoundingClientRect(),x=ar.left-nr.left-1,wd=ar.width;
+      if(pill.dataset.x!==String(Math.round(x))||pill.dataset.w!==String(Math.round(wd))){pill.dataset.x=Math.round(x);pill.dataset.w=Math.round(wd);pill.style.width=wd+'px';pill.style.transform=`translateX(${x}px)`;pill.style.opacity='1'}
+    }
+    // Status-bar colour follows the sky so the phone chrome is part of the scene.
+    function syncChrome(phase,m){
+      const meta=document.querySelector('meta[name="theme-color"]');if(!meta)return;
+      const stormy=['storm','typhoon','hail','heavy'].includes(m),c=phase==='night'?'#0a1726':phase==='golden'||phase==='dusk'?'#5d5266':stormy?'#3c4a57':['rain','drizzle','fog','cloud'].includes(m)?'#7d8b96':'#6e9cc0';
+      document.documentElement.dataset.sceneChrome='1';if(meta.getAttribute('content')!==c)meta.setAttribute('content',c);
+    }
+    function onBackground(fn){const fc=ctx,fd=dprFx;ctx=bg;dprFx=dprSky;try{fn()}finally{ctx=fc;dprFx=fd;bg.setTransform(dprSky,0,0,dprSky,0,0);bg.globalAlpha=1}}
     // Adaptive budget: a slow phone drops to a lighter density for the session instead of freezing.
     function budgetFrame(ms){
       budget.ema+=(ms-budget.ema)*.08;const order=['subtle','balanced','rich'],idx=order.indexOf(effLevel());
@@ -536,6 +580,8 @@
     }
     function tick(now){
       raf=0;if(document.hidden||reduced.matches||!['weather','animals','seasonal'].some(allowed))return;
+      // Compositor cost (backdrop blur, GPU) is invisible to script timing; watch the real frame interval too.
+      if(last){const gap=now-last;if(gap<250){realFrame.ema+=(gap-realFrame.ema)*.05;if(realFrame.ema>48){if(++realFrame.slow>90){realFrame.slow=0;realFrame.ema=33;const order=['subtle','balanced','rich'],idx=order.indexOf(effLevel());if(idx>0){sessionLevel=order[idx-1];resize()}}}else realFrame.slow=Math.max(0,realFrame.slow-2)}}
       const elapsed=last?Math.min((now-last)/1000,.08):0;last=now;accum+=elapsed;
       const rate=effLevel()==='subtle'?24:30;
       if(accum>=1/rate){const t0=performance.now();time+=accum;try{draw(accum);failures=0}catch(e){if(failures++<3)console.log('nature fx frame error',e);if(failures>60){console.log('nature fx stopped after repeated errors');return}}budgetFrame(performance.now()-t0);accum=0;frameCount++}
@@ -582,6 +628,6 @@
     }
 
     return{update,stopPreview,previewModes:()=>previewModes.slice(),previewSeason,getSeason:seasonName,getMode:activeMode,refresh:resume,setQuality,getQuality:()=>level,preview:previewMode,_forceSilence(){if(root.WxSfx)root.WxSfx._forceSilence()},
-      _debug:()=>({mode,active:activeMode(),frames:frameCount,running:!!raf,quality:level,effectiveQuality:effLevel(),frameMs:Math.round(budget.ema*10)/10,cloud:weatherState.cloud,intensity:weatherState.intensity,solar,reduced:reduced.matches,sceneLighting,plateCacheSize:plates.size,spriteCount:sprites.size,canvasCount:document.querySelectorAll('#wxfx').length,protectedRects:quiet.length,views:views.length,season:seasonName(),plate:plateKey,evidence:details.context||null,gust,preview:!!preview,dpr:{fx:dprFx,sky:dprSky}})};
+      _debug:()=>({mode,active:activeMode(),frames:frameCount,running:!!raf,quality:level,effectiveQuality:effLevel(),frameMs:Math.round(budget.ema*10)/10,frameInterval:Math.round(realFrame.ema),tilt:{x:tilt.x,y:tilt.y},cloud:weatherState.cloud,intensity:weatherState.intensity,solar,reduced:reduced.matches,sceneLighting,plateCacheSize:plates.size,spriteCount:sprites.size,canvasCount:document.querySelectorAll('#wxfx').length,protectedRects:quiet.length,views:views.length,season:seasonName(),plate:plateKey,evidence:details.context||null,gust,preview:!!preview,dpr:{fx:dprFx,sky:dprSky}})};
   }};
 })(window);

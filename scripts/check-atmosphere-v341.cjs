@@ -11,6 +11,7 @@ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disab
 const context=await browser.newContext({timezoneId:'Asia/Taipei',viewport:{width:393,height:852},deviceScaleFactor:2,serviceWorkers:'block'});
 const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(/nature fx/.test(m.text()))errors.push(m.text())});
 await page.route('**/*',async r=>{const u=new URL(r.request().url());if(u.origin!=='http://127.0.0.1:8768')return r.abort();if(u.pathname.includes('/vendor/firebase/'))return r.fulfill({contentType:'text/javascript',body:`window.firebase={initializeApp(){},auth:Object.assign(()=>({setPersistence:()=>Promise.resolve(),onAuthStateChanged(cb){setTimeout(()=>cb(null),30)},getRedirectResult:()=>Promise.resolve(null)}),{Auth:{Persistence:{LOCAL:'local'}}}),firestore:Object.assign(()=>({collection:()=>({doc:()=>({get:async()=>({exists:false}),set:async()=>{}}),where(){return this},get:async()=>({forEach(){},docs:[],empty:true})})}),{FieldValue:{serverTimestamp:()=>0}})};`});return r.continue();});
+await page.addInitScript(fs.readFileSync(path.join(__dirname,'glass-contrast-audit.js'),'utf8'));
 await page.addInitScript(()=>{localStorage.setItem('sb_c',JSON.stringify({rt:'4on2off',pos:0,unit:'示範單位'}));localStorage.setItem('_appearance','auto');localStorage.setItem('_userPrefs',JSON.stringify({visualFx:true}));});
 await page.goto('http://127.0.0.1:8768/',{waitUntil:'networkidle'});await page.waitForTimeout(2000);
 const demo=code=>({code});
@@ -24,21 +25,36 @@ function NatureMode(c){return c===0?'clear':c===61?'rain':c===65?'heavy':c===95?
 // Stale weather falls back to light-only scene.
 await page.evaluate(()=>{wxData.updatedAt=Date.now()-5*3600000;wxData.sourceTime=wxData.updatedAt;_syncWeatherFx()});await page.waitForTimeout(100);dbg=await page.evaluate(()=>WxFx._debug());assert.equal(dbg.active,'none');checks++;
 await page.evaluate(()=>{wxData.updatedAt=Date.now();wxData.sourceTime=Date.now();wxData.code=2;wxData.hCode=wxData.hCode.map(()=>2);_syncWeatherFx()});
-// Every preview renders, shows the HUD, isolates the app and ends on its own.
+// Every preview renders, shows the HUD, isolates the app and ends on its own; each looks different.
+const skySigs=new Set();
 for(const mode of await page.evaluate(()=>WxFx.previewModes())){
   await page.evaluate(m=>WxFx.preview(m),mode);await page.waitForTimeout(700);
   dbg=await page.evaluate(()=>WxFx._debug());assert.equal(dbg.active,mode);assert.equal(dbg.running,true);
   assert.equal(await page.locator('.nature-preview-hud').isVisible(),true);assert.equal(await page.evaluate(()=>document.querySelector('#app').inert),true);
-  const ink=await page.evaluate(()=>{const c=document.querySelector('#wxfx'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=256)if(d[i]>8)n++;return n});
-  if(!['clear','cloud','earthquake'].includes(mode))assert(ink>20,mode+' draws foreground');
+  const ink=await page.evaluate(()=>{const c=document.querySelector('#wxfx'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=64)if(d[i]>8)n++;return n});
+  if(['drizzle','rain','heavy','storm','typhoon','hail','cold','heat','fog'].includes(mode))assert(ink>20,mode+' draws on the glass');
+  skySigs.add(await page.evaluate(()=>{const c=document.querySelector('#nature-sky'),x=c.getContext('2d');let s='';for(let i=1;i<8;i++)for(let j=1;j<8;j++){const d=x.getImageData(c.width*i/8|0,c.height*j/8|0,1,1).data;s+=(d[0]>>4).toString(16)+(d[1]>>4).toString(16)+(d[2]>>4).toString(16)}return s}));
   checks++;
 }
+assert(skySigs.size>=12,'distinct scenes '+skySigs.size);
 await page.evaluate(()=>WxFx.stopPreview());await page.waitForTimeout(100);dbg=await page.evaluate(()=>WxFx._debug());assert.equal(dbg.preview,false);assert.equal(dbg.active,'cloud');assert.equal(await page.evaluate(()=>document.querySelector('#app').inert),false);checks++;
 // Seasons change plates/accents and the shell reacts.
 for(const season of ['spring','summer','autumn','winter']){await page.evaluate(s=>WxFx.previewSeason(s),season);await page.waitForTimeout(400);assert.equal(await page.evaluate(()=>document.body.dataset.season),season);checks++}
 await page.evaluate(()=>WxFx.stopPreview());
+// Theme "auto" follows the sun at the weather location (Changhua, 18:23 in October is after dusk).
+await page.evaluate(()=>{wxData.lat=24.08;wxData.lon=120.54;MyShiftAppearance.set('auto')});
+const sunTheme=await page.evaluate(()=>{const sun=NatureEffects.solarPosition(Date.now(),24.08,120.54);return {dark:document.documentElement.dataset.theme==='dark',expect:sun.elevation< -3}});assert.equal(sunTheme.dark,sunTheme.expect);checks++;
+// Worst-case WCAG contrast over the darkest and brightest sky behind every glass pane, every screen, both themes.
+for(const theme of ['light','dark'])for(const tab of ['today','calendar','pay','weather','more']){
+  await page.evaluate(({theme,tab})=>{MyShiftAppearance.set(theme);UI_TAB=tab;render();document.querySelectorAll('#app details').forEach(d=>d.open=true)},{theme,tab});await page.waitForTimeout(250);
+  const fails=await page.evaluate(()=>__glassAudit([{r:6,g:14,b:26,a:1},{r:214,g:226,b:232,a:1}]));
+  assert.deepEqual(fails.map(f=>f.sel+' '+f.k),[],theme+' '+tab+' contrast');checks++;
+}
+// Dock pill sits under the active item.
+await page.evaluate(()=>{MyShiftAppearance.set('light');UI_TAB='weather';render()});await page.waitForTimeout(1600);
+const pill=await page.evaluate(()=>{const p=document.querySelector('.dock-pill'),a=document.querySelector('.bottom-nav-item.active');if(!p||!a)return null;const pr=p.getBoundingClientRect(),ar=a.getBoundingClientRect();return Math.abs((pr.left+pr.width/2)-(ar.left+ar.width/2))});assert(pill!==null&&pill<3,'dock pill aligned');checks++;
 // Frame cost stays bounded across screens and themes; the glass shell leaves text legible.
-for(const theme of ['light','dark'])for(const tab of ['today','calendar','salary','weather','more']){
+for(const theme of ['light','dark'])for(const tab of ['today','calendar','pay','weather','more']){
   await page.evaluate(({theme,tab})=>{MyShiftAppearance.set(theme);UI_TAB=tab;render()},{theme,tab});await page.waitForTimeout(900);
   dbg=await page.evaluate(()=>WxFx._debug());assert(dbg.running,'running on '+tab);assert(dbg.frameMs<40,'frame cost '+dbg.frameMs+' on '+tab);assert(dbg.protectedRects>5,'text mask on '+tab);
   const nav=await page.locator('.bottom-nav').evaluate(e=>getComputedStyle(e).backdropFilter);assert(/blur/.test(nav));
