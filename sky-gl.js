@@ -23,10 +23,10 @@ float fbm(vec2 p,float oct){float v=0.,a=.5;mat2 m=mat2(1.6,1.2,-1.2,1.6);
 // One sheet of rain: tall cells, a streak per cell, falling with slant. Returns coverage 0..1.
 float rainSheet(vec2 uv,float scale,float speed,float t,float seed){
  vec2 p=uv*vec2(scale,scale*.18);p.x+=p.y*uSlant*.6;p.y+=t*speed;
- vec2 c=floor(p),f=fract(p);float h=hash(c+seed);if(h<.7)return 0.;
+ vec2 c=floor(p),f=fract(p);float h=hash(c+seed);if(h<.62)return 0.;
  float x=mix(.2,.8,hash(c+seed+7.));float len=mix(.3,.9,hash(c+seed+3.));
- float d=abs(f.x-x)*scale*.05;float along=smoothstep(.0,.15,f.y)*smoothstep(len,len-.2,f.y);
- return smoothstep(.012,.0,d)*along*(.35+.65*(h-.7)*3.3);}
+ float d=abs(f.x-x)*scale*.05;float along=smoothstep(.0,.35,f.y)*smoothstep(len,len-.08,f.y);   // tail fades in, head is sharp
+ return smoothstep(.02,.0,d)*along*(.4+.6*(h-.62)*2.6);}
 // Procedural bolt in screen space; fades inside thick cloud. Returns core, glow in x,y.
 vec2 bolt(vec2 uv,float asp){
  if(uFlash<=0.)return vec2(0.);
@@ -172,7 +172,7 @@ float sat(float x){return clamp(x,0.,1.);}
 vec3 N13(float p){vec3 p3=fract(vec3(p)*vec3(.1031,.11369,.13787));p3+=dot(p3,p3.yzx+19.19);return fract(vec3((p3.x+p3.y)*p3.z,(p3.x+p3.z)*p3.y,(p3.y+p3.z)*p3.x));}
 float Saw(float b,float t){return smoothstep(0.,b,t)*smoothstep(1.,b,t);}
 vec2 DropLayer(vec2 uv,float t){
- vec2 UV=uv;uv.y-=t*.75;
+ vec2 UV=uv;uv.y+=t*.75;
  vec2 a=vec2(6.,1.);vec2 grid=a*2.;
  vec2 id=floor(uv*grid);float colShift=N13(id.x).x;uv.y+=colShift;
  id=floor(uv*grid);vec3 n=N13(id.x*35.2+id.y*2376.1);
@@ -191,7 +191,7 @@ vec2 DropLayer(vec2 uv,float t){
  return vec2(m,trail);
 }
 float StaticDrops(vec2 uv,float t){
- uv*=40.;vec2 id=floor(uv);uv=fract(uv)-.5;
+ uv*=70.;vec2 id=floor(uv);uv=fract(uv)-.5;
  vec3 n=N13(id.x*107.45+id.y*3543.654);vec2 p=(n.xy-.5)*.7;float d=length(uv-p);
  float fade=Saw(.025,fract(t+n.z));return smoothstep(.3,0.,d)*fract(n.z*10.)*fade;}
 vec2 Drops(vec2 uv,float t,float l0,float l1,float l2){
@@ -201,8 +201,9 @@ void main(){
  vec2 uv=gl_FragCoord.xy/uRes;float asp=uRes.x/uRes.y;
  float t=uTime*.2;
  // drop field in a centred, aspect-correct space; wind slants the whole pane a little
- vec2 duv=(gl_FragCoord.xy-.5*uRes)/uRes.y*1.3;duv.x+=duv.y*uSlant*.12;
- float l0=smoothstep(-.5,1.,uRain)*2.,l1=smoothstep(.25,.75,uRain),l2=smoothstep(.0,.5,uRain);
+ vec2 duv=(gl_FragCoord.xy-.5*uRes)/uRes.y*2.1;duv.x+=duv.y*uSlant*.12;
+ // mist for any rain; sliding drops only once it rains properly, and never a full curtain of them
+ float l0=smoothstep(-.3,1.,uRain)*1.2,l1=smoothstep(.55,1.,uRain)*.45,l2=smoothstep(.25,.8,uRain)*.6;
  vec2 c=uRain>0.?Drops(duv,t,l0,l1,l2):vec2(0.);
  vec2 e=vec2(.0015,0.);
  vec2 nrm=uRain>0.&&c.x>.001?vec2(Drops(duv+e,t,l0,l1,l2).x-c.x,Drops(duv+e.yx,t,l0,l1,l2).x-c.x):vec2(0.);
@@ -218,22 +219,23 @@ void main(){
  // 2. rain streaks + typhoon bands, in front of the app
  if(uRain>0.){
   vec2 ruv=vec2(uv.x*asp,uv.y);
-  float r=rainSheet(ruv,60.,2.4,t,1.)*.55+rainSheet(ruv,34.,1.7,t,2.)*.75+rainSheet(ruv,18.,1.2,t,3.);
-  r=sat(r*uRain);
+  float r=rainSheet(ruv,64.,2.6,t,1.)*.5+rainSheet(ruv,36.,1.9,t,2.)*.75+rainSheet(ruv,19.,1.3,t,3.);
+  r=sat(r*(.5+.7*uRain));
   float bands=abs(uSlant)>1.?smoothstep(.45,.75,fbm(vec2(uv.x*1.6+uv.y*uSlant*.5-t*.9,uv.y*.6+t*.15),3.))*.35*uRain:0.;
   vec3 rainCol=mix(vec3(.55,.6,.68),vec3(.9,.93,.96),uDay)+uFlash*.5;
-  float ra=r*.7;col=col*(1.-ra)+rainCol*ra;alpha=alpha*(1.-ra)+ra;
+  float ra=r*.85;col=col*(1.-ra)+rainCol*ra;alpha=alpha*(1.-ra)+ra;
   vec3 bandCol=mix(vec3(.3,.34,.38),vec3(.8,.84,.88),uDay);col=col*(1.-bands)+bandCol*bands;alpha=alpha*(1.-bands)+bands;
  }
  // 3. drops on the glass: each one a small lens showing the scene behind, inverted and shrunk, with a
  //    highlight on the sun side; trails wipe a thin film that slightly darkens the pane
  if(uRain>0.&&m>.01){
   vec3 bg=texture2D(uSky,clamp(uv+off*vec2(1.,-1.),.001,.999)).rgb;
-  vec3 dc=mix(bg,vec3(.5,.58,.68),.14)*(1.+uDay*.1)+vec3(1.)*pow(sat(dot(normalize(vec3(nrm*8.,.6)),normalize(vec3(-.4,.5,.75)))),10.)*.55+uFlash*.25;
-  dc+=smoothstep(.0,.03,length(off))*.1;               // thin bright rim
-  float da=smoothstep(.05,.5,m)*(.7+.3*uRain);col=col*(1.-da)+dc*da;alpha=alpha*(1.-da)+da;
+  // a drop is only the scene bent through it: no grey fill, a thin rim and one small highlight
+  vec3 dc=bg*(1.04+uDay*.08)+vec3(.9,.95,1.)*pow(sat(dot(normalize(vec3(nrm*10.,.5)),normalize(vec3(-.4,.55,.7)))),18.)*(.35+.25*uDay)+uFlash*.25;
+  dc+=smoothstep(.012,.03,length(off))*(.06+.08*uDay);
+  float da=smoothstep(.05,.5,m)*(.6+.3*uRain);col=col*(1.-da)+dc*da;alpha=alpha*(1.-da)+da;
  }
- if(uRain>0.&&c.y>.01){float ta=c.y*.18;col=col*(1.-ta)+vec3(.55,.6,.68)*ta;alpha=alpha*(1.-ta)+ta;}
+ if(uRain>0.&&c.y>.01){float ta=c.y*.08;col=col*(1.-ta)+vec3(.55,.6,.68)*ta;alpha=alpha*(1.-ta)+ta;}
  // 4. fog: drifting mist banks between the viewer and the scene
  if(uFog>0.){
   float mist=fbm(vec2(uv.x*2.2+t*.05,uv.y*3.-t*.02),4.)*.6+fbm(vec2(uv.x*5.+t*.09,uv.y*7.),3.)*.4;
