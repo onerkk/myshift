@@ -1,0 +1,87 @@
+/* ══════════════════════════════════════════════════════════════
+   refine-v349.css · 載入順序最後。統一月曆格、今日卡、薪資對照與細節層次。
+   設計原則：日期數字＝唯一視覺落點（大、輕）；班別與事項降一級；
+   「請假 0」不顯示；所有膠囊單行省略；今天格用金框＋深綠，不再堆三層。
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 月曆格：結構 ── */
+html .calendar-v314 .cal .day{display:flex;flex-direction:column;align-items:stretch;min-height:98px;padding:6px 4px 5px;gap:2px;border-radius:12px;
+  border:1px solid color-mix(in srgb,var(--line) 70%,transparent);
+  box-shadow:inset 0 1px 0 #ffffff26,0 1px 0 color-mix(in srgb,var(--ink) 8%,transparent);overflow:hidden}
+html .calendar-v314 .cal .day::before{content:"";position:absolute;inset:0 0 auto;height:3px;background:var(--cell-accent,transparent);opacity:.9}
+html .calendar-v314 .cal .day.e{--cell-accent:#4f9b76}html .calendar-v314 .cal .day.n{--cell-accent:#9b85c9}html .calendar-v314 .cal .day.m{--cell-accent:#d4a84a}html .calendar-v314 .cal .day.o{--cell-accent:transparent}
+html .calendar-v314 .cal .day.adjacent-month::before{opacity:.35}
+html .calendar-v314 .cal .day .day-top{display:flex;align-items:flex-start;justify-content:space-between;min-height:30px;padding:2px 0 0;gap:3px;flex-wrap:nowrap}
+html .calendar-v314 .cal .day .num{font-size:1.5rem;font-weight:300;line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+html .calendar-v314 .cal .day.weekend .num{color:var(--weekend-ink,#b25a63)}
+html[data-theme="dark"] .calendar-v314 .cal .day.weekend .num{color:#f0b6bc}
+html .calendar-v314 .cal .day .calendar-date-tag{flex:none;margin:1px 0 0;min-width:14px;height:14px;padding:0 3px;border-radius:5px;font-size:.52rem;line-height:14px;font-weight:700;letter-spacing:0}
+html .calendar-v314 .cal .day .day-month-label{position:static;order:-1;align-self:flex-start;margin:0;padding:0 4px;height:13px;line-height:13px;border-radius:4px;font-size:.5rem;opacity:.8;border:0;background:color-mix(in srgb,currentColor 12%,transparent)}
+html .calendar-v314 .cal .day .shift-code{font-size:.64rem;font-weight:700;line-height:1.3;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:clip;max-width:100%;padding:0}
+html .calendar-v314 .cal .day.o .shift-code{font-weight:600;opacity:.8}
+html .calendar-v314 .cal .day .day-event-stack{gap:3px;min-height:0;margin-top:1px}
+html .calendar-v314 .cal .day .day-event,html .calendar-v314 .cal .day .day-holiday{display:block;max-width:100%;padding:1px 3px 1px 4px;border-radius:5px;font-size:.57rem;line-height:1.3;white-space:normal;overflow-wrap:anywhere;text-align:left;border-left:2px solid currentColor;background:color-mix(in srgb,currentColor 11%,transparent)}
+html .calendar-v314 .cal .day .day-holiday{font-weight:700}
+html .calendar-v314 .cal .day .day-event-more{font-size:.58rem;font-weight:700;opacity:.8;padding:0 2px}
+html .calendar-v314 .cal .day .day-adjusted{font-size:.56rem;padding:1px 5px;border-radius:5px}
+/* 請假人數：只在 >0 或未取得時顯示，縮成右下角小字 */
+html .calendar-v314 .cal .day .day-leave{display:none}
+html .calendar-v314 .cal .day .day-leave.has-leave,html .calendar-v314 .cal .day .day-leave.unknown{display:flex;flex-wrap:nowrap;border:0;background:none;border-radius:0;min-height:0;justify-content:flex-end;align-items:center;gap:3px;margin-top:auto;padding:3px 0 0;border-top:1px dashed color-mix(in srgb,currentColor 22%,transparent);font-size:.6rem;letter-spacing:0;color:var(--ink-2)}
+html .calendar-v314 .cal .day .day-leave>span{display:none}html .calendar-v314 .cal .day .day-leave::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.8}
+html .calendar-v314 .cal .day .day-leave.has-leave{color:#9a6f1f}html[data-theme="dark"] .calendar-v314 .cal .day-leave.has-leave{color:#f0cf7e}
+html .calendar-v314 .cal .day .day-leave b{font-size:.78rem;font-weight:750;line-height:1}
+html .calendar-v314 .cal .day .day-leave.unknown b{font-weight:500;opacity:.6}
+/* 連假：底部細帶，不再佔一整行 */
+html .calendar-v314 .break-day-tag{position:absolute;inset:auto 0 0;min-height:0;height:14px;padding:0;display:flex;align-items:center;justify-content:center;gap:3px;font-size:.52rem;line-height:14px;font-weight:700;letter-spacing:0;color:#6a4d12;background:linear-gradient(90deg,#f3d68a,#e9c45f);border-radius:0}
+html[data-theme="dark"] .calendar-v314 .break-day-tag{color:#2f2410;background:linear-gradient(90deg,#d9b65c,#c39a3b)}
+html .calendar-v314 .cal .day.break-day{padding-bottom:18px}
+html .calendar-v314 .cal .day.break-start .break-day-tag{border-bottom-left-radius:12px}html .calendar-v314 .cal .day.break-end .break-day-tag{border-bottom-right-radius:12px}
+/* 今天：單一視覺語言 */
+html .calendar-v314 .cal .day.today{padding:7px 6px 6px;border:1.5px solid #e2cf8c;background:radial-gradient(ellipse at 100% 0,#cfe3b733,transparent 60%),linear-gradient(160deg,#3b7a5c,#1b4a39 70%);color:#f3f4e5;box-shadow:0 0 0 3px #e2cf8c2e,0 8px 18px -8px #0a2d2199}
+html .calendar-v314 .cal .day.today::before{background:#e2cf8c}
+html .calendar-v314 .cal .day.today .today-label{position:absolute;top:0;left:0;right:0;width:auto;min-height:0;height:15px;margin:0;padding:0;border-radius:0;background:#e9d58f;color:#2b3f2f;font-size:.54rem;line-height:15px;font-weight:800;letter-spacing:.08em;text-align:center;white-space:nowrap;overflow:hidden}
+html .calendar-v314 .cal .day.today{padding-top:18px}html .calendar-v314 .cal .day.today::before{display:none}
+html .calendar-v314 .cal .day.today .num{font-size:1.5rem;font-weight:400;color:#fbf6df;letter-spacing:-.04em}
+html .calendar-v314 .cal .day.today .shift-code,html .calendar-v314 .cal .day.today.e .shift-code,html .calendar-v314 .cal .day.today.n .shift-code,html .calendar-v314 .cal .day.today.m .shift-code,html .calendar-v314 .cal .day.today.o .shift-code{width:auto;padding:0;background:none;box-shadow:none;text-align:left;color:#dcebc8;font-weight:700}
+html .calendar-v314 .cal .day.today .day-event,html .calendar-v314 .cal .day.today .day-holiday{color:#f7eec4;background:#ffffff1c;border-left-color:#e9d58f}
+html .calendar-v314 .cal .day.today .day-leave,html .calendar-v314 .cal .day.today .day-leave.has-leave,html .calendar-v314 .cal .day.today .day-leave:not(.has-leave){color:#f3e2a0;border:0;border-top:1px dashed #e9d58f55;background:none;border-radius:0;min-height:0;padding:4px 0 0}html .calendar-v314 .cal .day.today .day-leave b{color:#fbf2c8}
+html .calendar-v314 .cal .day.today .calendar-date-tag{display:none}
+/* 前後月：退為線框 */
+html .calendar-v314 .cal .day.adjacent-month:not(.today){background:transparent;box-shadow:none;border-style:dashed}
+html .calendar-v314 .cal .day.adjacent-month:not(.today) .num{font-size:1.2rem;opacity:.55}
+html .calendar-v314 .cal .day.adjacent-month:not(.today) .day-leave{display:none}
+/* 週欄 */
+html .calendar-v314 .wk-row{padding:12px 0 8px}html .calendar-v314 .wk-cell{font-size:.66rem;letter-spacing:.14em;font-weight:700}
+html .calendar-v314 .cal{gap:5px 3px}
+@media(max-width:360px){html .calendar-v314 .cal{gap:4px 2px}html .calendar-v314 .cal .day{min-height:92px;padding:5px 3px 4px}html .calendar-v314 .cal .day .num{font-size:1.32rem}html .calendar-v314 .cal .day .day-event,html .calendar-v314 .cal .day .day-holiday{font-size:.54rem}}
+@media(min-width:600px){html .calendar-v314 .cal .day{min-height:132px}html .calendar-v314 .cal .day .num{font-size:1.9rem}html .calendar-v314 .cal .day .shift-code{font-size:.78rem}}
+
+/* ── 今天頁 · 天氣摘要列：來源與時間不再被 70px 寬欄位折成三行 ── */
+html .insight-row .insight-meta{display:block;max-width:none;text-align:left;font-size:.62rem;line-height:1.55;color:var(--ink-3);overflow-wrap:normal;word-break:keep-all}
+html .insight-row .insight-meta b{display:block;font-weight:600;color:var(--ink-2)}
+
+/* ── 薪資對照表：差額為 0 時不再印一排「$0」 ── */
+html .payroll-reconciliation th small:empty{display:none}
+html .payroll-reconciliation th small.payroll-difference{display:inline-block;margin-top:2px;padding:1px 6px;border-radius:6px;font-weight:700;background:color-mix(in srgb,var(--red,#c0392b) 12%,transparent);color:var(--red,#c0392b)}
+html .payroll-reconciliation tbody tr{min-height:0}
+html .payroll-reconciliation tbody th{padding-block:10px}html .payroll-reconciliation tbody td{padding-block:10px;font-variant-numeric:tabular-nums}
+
+/* ── 列表與卡片：統一分隔線與內距，移除空白高度 ── */
+html .more-section,html .settings-group{padding-block:14px}
+html .app-version{opacity:.7;letter-spacing:.14em}
+/* v349b · 修正：日期標籤改絕對定位不再被擠出格外；今天數字去掉底框 */
+html .calendar-v314 .cal .day .calendar-date-tag{position:absolute;top:5px;right:4px;margin:0}
+html .calendar-v314 .cal .day .day-top{padding-right:16px}
+html .calendar-v314 .cal .day.today .num,html .calendar-v314 .cal .day.today .day-top .num{background:none;padding:0;box-shadow:none;border:0;border-radius:0;display:inline}
+html .calendar-v314 .cal .day.today .day-top{padding-right:0;display:block}
+/* v349c · 日期標籤取消（週末＝玫瑰色數字；國定假日＝玫瑰色頂帶），避免與兩位數日期重疊 */
+html .calendar-v314 .cal .day .calendar-date-tag{display:none}
+html .calendar-v314 .cal .day .day-top{padding-right:0}
+html .calendar-v314 .cal .day.public-holiday::before{background:#d47f88;opacity:1}
+html .calendar-v314 .cal .day.public-holiday .num{color:#b25a63}html[data-theme="dark"] .calendar-v314 .cal .day.public-holiday .num{color:#f0b6bc}
+/* 日間模式的今天格：daylight-v345 用 !important 蓋掉底色，這裡同等覆寫 */
+html:not([data-theme=dark]) .calendar-v314 .cal .day.today{background:radial-gradient(ellipse at 100% 0,#cfe3b733,transparent 60%),linear-gradient(160deg,#3b7a5c,#1b4a39 70%)!important;border:1.5px solid #e2cf8c!important;color:#f3f4e5!important;box-shadow:0 0 0 3px #e2cf8c2e,0 8px 18px -8px #0a2d2199!important}
+html:not([data-theme=dark]) .calendar-v314 .cal .day.today .num{color:#fbf6df!important}
+html:not([data-theme=dark]) .calendar-v314 .cal .day.today .shift-code{color:#dcebc8!important}
+html:not([data-theme=dark]) .calendar-v314 .cal .day.today .day-event,html:not([data-theme=dark]) .calendar-v314 .cal .day.today .day-holiday{color:#f7eec4!important;background:#ffffff1c!important}
+html:not([data-theme=dark]) .calendar-v314 .cal .day.today .day-leave,html:not([data-theme=dark]) .calendar-v314 .cal .day.today .day-leave b{color:#f3e2a0!important}
