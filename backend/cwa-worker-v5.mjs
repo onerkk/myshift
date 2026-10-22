@@ -794,12 +794,88 @@ return Number.isFinite(time) && now - time >= -60_000 && now - time <= maxHours 
 });
 }
 
+
+// ─────────────────────────────────────────────────────────────
+// 行政院人事行政總處「天然災害停止上班及上課情形」(DGPA) 代抓與解析
+// 頁面為 HTML、無 CORS，由 worker 快取 5 分鐘後轉成 JSON。
+// 解析策略：以 <tr> 切列 → 去標籤取純文字 → 第一個縣市名為該列主體 →
+// 內容中的「今天／明天」+「停止上班」判定；「XX區…停止上班」視為部分地區。
+// ─────────────────────────────────────────────────────────────
+const DGPA_URL = 'https://www.dgpa.gov.tw/typh/daily/nds.html';
+const TW_COUNTIES = ['臺北市','新北市','桃園市','臺中市','臺南市','高雄市','基隆市','新竹市','新竹縣','苗栗縣','彰化縣','南投縣','雲林縣','嘉義市','嘉義縣','屏東縣','宜蘭縣','花蓮縣','臺東縣','澎湖縣','金門縣','連江縣'];
+function stripHtml(html) {
+return String(html || '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '')
+.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+.replace(/[ \t\u3000]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim();
+}
+function taiwanDateKey(offsetDays = 0) {
+const now = new Date(Date.now() + 8 * 3600 * 1000 + offsetDays * 86400000);
+return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+}
+// 「下午3時起停止上班」「中午12時起」「上午10時後」→ 小時（24h）；無時間 → null
+function parseSuspensionStartHour(text) {
+const m = String(text || '').match(/(上午|中午|下午|晚上|凌晨)?\s*(\d{1,2})\s*(?:時|:|：)\s*(\d{2})?\s*分?\s*(?:起|後|以後)?[^。；;]*?停止上班/);
+if (!m) return null;
+let h = Number(m[2]); const mm = Number(m[3] || 0);
+const p = m[1] || '';
+if ((p === '下午' || p === '晚上') && h < 12) h += 12;
+if (p === '中午' && h < 12) h = 12;
+if (p === '凌晨' && h === 12) h = 0;
+return h + mm / 60;
+}
+function classifySuspensionText(text, targetTown) {
+const t = String(text || '').replace(/\s+/g, '');
+if (!t || /尚未宣布|尚未公布|未發布/.test(t)) return { status: 'unknown', stopWork: false, stopClass: false, partial: false };
+const stopWork = /停止上班/.test(t), stopClass = /停止上課/.test(t);
+const normal = /照常上班/.test(t);
+// 「XX區…停止上班」且另有「照常」→ 部分地區；若鄉鎮名包含使用者鄉鎮則視為適用
+let partial = false, townMatched = false;
+if (stopWork && normal) {
+partial = true;
+const towns = (t.match(/[\u4e00-\u9fa5]{1,4}(?:區|鄉|鎮|市)(?=[、，,及與和]|停止|：|:|$)/g) || []).map(normalizeTwName);
+townMatched = !!targetTown && towns.some(x => x === normalizeTwName(targetTown) || x.replace(/[區鄉鎮市]$/, '') === String(targetTown).replace(/[區鄉鎮市]$/, ''));
+}
+const applies = stopWork && (!partial || townMatched);
+return { status: applies ? 'stop' : stopWork ? 'partial' : normal ? 'normal' : 'unknown', stopWork: applies, stopClass, partial, townMatched, fromHour: applies ? parseSuspensionStartHour(t) : null };
+}
+async function fetchWorkSuspension(targetCounty, targetTown) {
+const out = { ok: false, source: 'dgpa.gov.tw/typh/daily/nds.html', fetchedAt: nowIsoTaiwan(), county: targetCounty, town: targetTown || null, days: [], raw: [] };
+try {
+const response = await fetch(DGPA_URL, { headers: { 'User-Agent': 'myshift-cwa-worker/1.0', 'Accept-Language': 'zh-TW' }, cf: { cacheTtl: 300, cacheEverything: true } });
+if (!response.ok) { out.error = `dgpa http ${response.status}`; return out; }
+const html = await response.text();
+const rows = html.split(/<tr[\s>]/i).slice(1).map(r => stripHtml(r)).filter(Boolean);
+const county = normalizeTwName(targetCounty);
+const todayKey = taiwanDateKey(0), tomorrowKey = taiwanDateKey(1);
+const byDate = {};
+for (const row of rows) {
+const lines = row.split('\n').map(s => s.trim()).filter(Boolean);
+const joined = lines.join(' ');
+const hit = TW_COUNTIES.find(c => normalizeTwName(joined).includes(c));
+if (!hit || hit !== county) continue;
+out.raw.push(joined.slice(0, 200));
+// 同一列可能同時含今天與明天兩段；以「今天／明天」關鍵字切分
+const segs = joined.split(/(?=今天|明天|今日|明日)/).map(s => s.trim()).filter(s => /停止|照常|尚未/.test(s));
+for (const seg of segs) {
+const isTomorrow = /^(明天|明日)/.test(seg), key = isTomorrow ? tomorrowKey : todayKey;
+const c = classifySuspensionText(seg, targetTown);
+const prev = byDate[key];
+// 多列時保留「停班」優先於「照常」
+if (!prev || (c.stopWork && !prev.stopWork)) byDate[key] = { date: key, label: isTomorrow ? '明天' : '今天', text: seg.replace(/^(今天|明天|今日|明日)[:：]?/, '').trim(), ...c };
+}
+}
+out.days = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+out.ok = true;
+} catch (error) { out.error = String(error && error.message || error); }
+return out;
+}
+
 export default {
 async fetch(request, env) {
 const url = new URL(request.url);
 if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders() });
 if (url.pathname === '/health') {
-return jsonResponse({ ok: true, service: 'cwa-data', version: 'realtime-v5-2026-10-20', ts: nowIsoTaiwan() });
+return jsonResponse({ ok: true, service: 'cwa-data', version: 'realtime-v6-2026-10-22', ts: nowIsoTaiwan() });
 }
 
 const token = getToken(env, url);
@@ -812,7 +888,7 @@ const lon = cleanString(url.searchParams.get('lon'));
 const result = {
 ok: true,
 service: 'cwa-data-official',
-version: 'realtime-v5-2026-10-20',
+version: 'realtime-v6-2026-10-22',
 source: 'Central Weather Administration Open Data Platform',
 officialDatasets: Object.values(DATASETS),
 target: { county: targetCounty, town: targetTown, lat: lat || null, lon: lon || null },
@@ -832,6 +908,7 @@ earthquakeActive: false,
 earthquakes: [],
 rainObservation: null,
 weatherObservation: null,
+workSuspension: null,
 errors: []
 };
 
@@ -852,9 +929,12 @@ const datasetJobs = [
 [DATASETS.weatherNow, 60]
 ];
 
+const suspensionJob = fetchWorkSuspension(targetCounty, targetTown);
 const settled = await Promise.allSettled(datasetJobs.map(([datasetId, cacheTtl]) =>
 fetchCwaJson(datasetId, token, { cacheTtl }).catch(error => ({ _error: error.message }))
 ));
+result.workSuspension = await suspensionJob;
+if (result.workSuspension && result.workSuspension.error) result.errors.push(`dgpa: ${result.workSuspension.error}`);
 
 const values = settled.map((job, index) => {
 const datasetId = datasetJobs[index][0];

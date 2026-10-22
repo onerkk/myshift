@@ -1,4 +1,4 @@
-/* Payroll v325. Immutable night calibration, dated rules and slip audits. */
+/* Payroll v348 (disaster leave policy). Immutable night calibration, dated rules and slip audits. */
 (function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -114,7 +114,12 @@
   const fixedKeys=['base','meal','transport','position','union','welfare','laborIns','healthIns','otherDed'];
   const ruleDefaults={night:0,nightMode:'shift',nightWindowStart:1200,nightWindowEnd:480,nightPolicy:'auto',nightRateSource:'unconfirmed',
     otWageBase:0,leaveWageBase:0,otTier1Rate:1.3334,otTier2Rate:1.6667,sickRate:.5,personalRate:1,
-    payRounding:'nearest',dayRuleMode:'roster',weeklyDayKinds:[],laborPensionWage:0,laborPensionSelfRate:0,laborPensionEmployerRate:6};
+    payRounding:'nearest',dayRuleMode:'roster',weeklyDayKinds:[],laborPensionWage:0,laborPensionSelfRate:0,laborPensionEmployerRate:6,
+    // 天災假（颱風停班）：依「天然災害發生事業單位勞工出勤管理及工資給付要點」第 7 點，未出勤宜不扣發工資；
+    // 2026-08 公司薪資條列天災假 12h 且未扣款，故預設 paid。normalOnly＝只給正常 8h、不給排定加班；unpaid＝全不給薪。
+    disasterPolicy:'paid',
+    // 停班日仍出勤者，要點第 7 點「宜加給工資」，倍率由公司決定；0＝尚未確認，不計入。
+    disasterWorkRate:0};
   const ruleKeys=Object.keys(ruleDefaults);
   function ruleSnapshot(source){
     const out={};

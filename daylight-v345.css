@@ -99,3 +99,15 @@ html:not([data-theme=dark]) .nav-active-mark{background:var(--brand)!important}
 /* ---------- small type ---------- */
 html:not([data-theme=dark]) .commute-alert strong,html:not([data-theme=dark]) .commute-alert span{filter:saturate(1.05) brightness(.84)}
 html:not([data-theme=dark]) body[data-fx-quality=subtle]{--glass-a:.96;--surface:rgba(247,251,254,.96);--paper:rgba(247,251,254,.96)}
+
+/* ── v348 · 天災假（停班）面板與薪資摘要 ── */
+.modal-sheet .al-pick.disaster-pick{border-color:#5aa0c7;background:linear-gradient(150deg,color-mix(in srgb,#5aa0c7 14%,var(--surface-2)),var(--surface-2));box-shadow:var(--inset),inset 0 0 0 1px #5aa0c733}
+.modal-sheet .al-pick.disaster-pick>label{color:#2f7eab}
+.disaster-source{margin-top:8px;padding:8px 10px;border-radius:11px;font-size:.72rem;line-height:1.6;color:var(--ink-2);background:var(--surface);border:1px dashed #5aa0c766}
+.modal-sheet .al-pick .disaster-worked{display:flex;align-items:center;gap:11px;width:100%;margin-top:10px;padding:10px 12px;border-radius:14px!important;min-height:52px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--button-shadow);text-align:left;color:var(--ink)}
+.disaster-worked i{flex:none;width:38px;height:22px;border-radius:11px;background:var(--line);position:relative;transition:background .2s}
+.disaster-worked i::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0003;transition:transform .2s}
+.disaster-worked.on i{background:#d9b65c}.disaster-worked.on i::after{transform:translateX(16px)}
+.disaster-worked span{display:flex;flex-direction:column;gap:2px;min-width:0}.disaster-worked b{font-size:.8rem}.disaster-worked small{font-size:.68rem;line-height:1.5;color:var(--ink-2)}
+.salary-leave-meta.salary-disaster-meta{border:1px solid #5aa0c766;background:color-mix(in srgb,#5aa0c7 10%,var(--surface-2));border-radius:14px;padding:10px 12px;margin-top:10px}
+.salary-leave-meta.salary-disaster-meta b{color:#2f7eab}
