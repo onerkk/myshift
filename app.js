@@ -1946,7 +1946,7 @@ function calcSalaryEst(y,m,options={}){
   const hourly=baseSum/240,otHourly=(monthRule.otWageBase>0?monthRule.otWageBase:baseSum)/240;
   const leaveHourly=(monthRule.leaveWageBase>0?monthRule.leaveWageBase:baseSum)/240;
   const sh=rot().h,dailyOT=Math.max(0,sh-8),uid=fbUser&&fbUser.uid,notes=[],days=[];
-  let annualH=0,disasterH=0,legacyLeaveCount=0,disasterWorkedH=0,disasterPayRaw=0,disasterDedRaw=0,disasterOtCut=0,disasterAutoCount=0;
+  let annualH=0,disasterH=0,legacyLeaveCount=0,disasterWorkedH=0,disasterPayRaw=0,disasterDedRaw=0,disasterOtCut=0,disasterAutoCount=0,disasterPaidRaw=0,disasterPaidOtH=0;
   let sickH=0,personalH=0,autoFront=0,autoBack=0,holidayH=0,holidayRaw=0,ordinaryRaw=0,sickRaw=0,personalRaw=0;
   const nightFit=Object.prototype.hasOwnProperty.call(options,'nightFit')?options.nightFit:!options.skipNightFit?automaticNightRule(salPeriodKey(y,m)):null;
   const calibration=Object.prototype.hasOwnProperty.call(options,'nightCalibration')?options.nightCalibration:
@@ -1993,6 +1993,12 @@ function calcSalaryEst(y,m,options={}){
         const cut=Math.min(normalOT,Math.max(0,disasterHours-Math.min(8,sh)));normalOT-=cut;disasterOtCut+=cut;
       }
       if(dayRule.disasterPolicy==='unpaid')disasterDedRaw+=Math.min(8,disasterHours)*dayLeaveHourly;
+      else{
+        // 照給金額（資訊列）：正常工時按固定時薪，排定加班按當日倍率；已包含在本薪與平日加班費內，不重複相加。
+        const regH=Math.min(8,disasterHours),otH=dayRule.disasterPolicy==='paid'?Math.min(normalOT,Math.max(0,disasterHours-8)):0;
+        const front=Math.min(2,otH),back=Math.max(0,otH-2);
+        disasterPaidRaw+=regH*(daySalary.baseSum/240)+front*dayOtHourly*dayRule.otTier1Rate+back*dayOtHourly*dayRule.otTier2Rate;disasterPaidOtH+=otH;
+      }
     }
     const paidHours=isWork?Math.max(0,Math.min(8,sh)-sum.totalHours)+normalOT:0;
     if(tyMeta.worked&&tyHours>0){
@@ -2056,7 +2062,7 @@ function calcSalaryEst(y,m,options={}){
   const pensionWage=n(monthRule.laborPensionWage)||0,pensionSelfRate=n(monthRule.laborPensionSelfRate)||0,pensionEmployerRate=n(monthRule.laborPensionEmployerRate)===null?6:n(monthRule.laborPensionEmployerRate);
   const laborPensionSelf=Math.round(pensionWage*pensionSelfRate/100),laborPensionEmployer=Math.round(pensionWage*pensionEmployerRate/100);
   const fixedDed=monthSalary.fixedDed;
-  const disasterPay=Math.max(0,Payroll.roundPay(disasterPayRaw,monthRule.payRounding)),disasterDed=Math.round(disasterDedRaw+1e-8);
+  const disasterPay=Math.max(0,Payroll.roundPay(disasterPayRaw,monthRule.payRounding)),disasterDed=Math.round(disasterDedRaw+1e-8),disasterPaid=Math.round(disasterPaidRaw+1e-8);
   if(disasterH>0)notes.push(monthRule.disasterPolicy==='unpaid'?'disasterUnpaid':monthRule.disasterPolicy==='normalOnly'?'disasterNormalOnly':'disasterPaid');
   if(disasterAutoCount>0)notes.push('disasterAuto');
   const income=Math.round(baseSum+proposal+otherIncome+otPay+holidayPay+nightPay+disasterPay),deduction=Math.round(fixedDed+leaveDed+laborPensionSelf+disasterDed),net=income-deduction;
@@ -2071,7 +2077,7 @@ function calcSalaryEst(y,m,options={}){
     const months=salaryCalendarMonths(pp.sd,pp.ed);
     if(payrollLeaveState.uid!==uid||payrollLeaveState.loading||payrollLeaveState.error||(!payrollLeaveState.ownHistoryLoaded&&months.some(k=>!payrollLeaveState.months.includes(k))))notes.push('leaveNotReady');
   }
-  const est={annualH,disasterH,disasterWorkedH,disasterPay,disasterDed,disasterOtCut,disasterPolicy:monthRule.disasterPolicy,disasterAutoCount,legacyLeaveCount,hourly,otHourly,leaveHourly,baseSum,proposal,otherIncome,nightCount,sickH,personalH,sickPayH,personalPayH,
+  const est={annualH,disasterH,disasterWorkedH,disasterPay,disasterDed,disasterPaid,disasterPaidOtH,disasterOtCut,disasterPolicy:monthRule.disasterPolicy,disasterAutoCount,legacyLeaveCount,hourly,otHourly,leaveHourly,baseSum,proposal,otherIncome,nightCount,sickH,personalH,sickPayH,personalPayH,
     otH,weekdayH,holidayH,autoOtH,otPay,holidayPay,rawOtPay,otTaxFree,otTaxable,nightPay,nightAutoPay,sickDed,personalDed,leaveDed,
     pensionWage,pensionSelfRate,pensionEmployerRate,laborPensionSelf,laborPensionEmployer,income,deduction,fixedDed,net,totalFront,totalBack,
     nightAutoCount,nightScheduledCount,partialNightCount,nightRate,nightPolicy,nightMode:monthRule.nightMode,nightHours,nightFit,
@@ -5405,8 +5411,9 @@ function uiPayPreviewHtml(y,m){
 }
 function studioMoney(n){return '$'+Math.round(Number(n)||0).toLocaleString()}
 function studioSalaryRows(est){
-  const labels=salaryFieldLabels(),isSlip=!!est.isSlip,keys=isSlip?Payroll.incomeKeys.concat(Payroll.deductionKeys):['baseSum','proposal','otherIncome','otPay','holidayPay','nightPay','disasterPay','fixedDed','leaveDed','disasterDed','laborPensionSelf'];
+  const labels=salaryFieldLabels(),isSlip=!!est.isSlip,keys=isSlip?Payroll.incomeKeys.concat(Payroll.deductionKeys):['baseSum','proposal','otherIncome','otPay','holidayPay','nightPay','disasterPay','disasterPaid','fixedDed','leaveDed','disasterDed','laborPensionSelf'];
   return keys.filter(k=>isSlip||est[k]||k==='baseSum'||k==='fixedDed'||(k==='nightPay'&&est.missingComponents)).map(k=>{
+    if(k==='disasterPaid')return `<div class="salary-detail-row info"><span>${lang==='zh'?`🌀 天災假照給 ${est.disasterH}h（本薪 ${Math.min(8,est.disasterH)}h${est.disasterPaidOtH?`＋加班 ${est.disasterPaidOtH}h`:''}，已含於上列）`:`🌀 Cuti bencana ${est.disasterH}h dibayar (sudah termasuk di atas)`}</span><strong>${lang==='zh'?'含 ':'± '}${studioMoney(est[k])}</strong></div>`;
     const deduction=Payroll.deductionKeys.includes(k)||k==='disasterDed';
     return `<div class="salary-detail-row ${deduction?'deduction':'income'}"><span>${labels[k]}</span><strong>${k==='nightPay'&&est.missingComponents&&!(est[k]>0)?(lang==='zh'?'待計算':'Belum dihitung'):(deduction?'−':'')+studioMoney(est[k])}</strong></div>`;
   }).join('');
