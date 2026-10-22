@@ -1,13 +1,17 @@
-/* v323 · Continuous calendar weeks, drawn directly at 3840 px wide. */
+/* v346 · Editorial poster: continuous calendar weeks, drawn directly at 3840 px wide. */
 'use strict';
 const MyShiftShare=(()=>{
   const themes={
-    jade:{paper:'#ecf0e7',paperEnd:'#dce6db',ink:'#183f35',muted:'#587468',line:'#a7bbaa',panel:'#f6f8f0',panelEnd:'#e7eee3',gold:'#957339',goldSoft:'#f2e5bf',shadow:'#1c483529',highlight:'#ffffffd9',
-      shifts:{早:['#e7f3e9','#d1e6d9','#23614b'],晚:['#f1edf8','#e1daee','#655180'],中:['#fff5df','#efe1ba','#846024'],休:['#edf1e9','#dce5db','#52685c'],unknown:['#f1f3ed','#e4e8df','#596c60']},
-      tones:{holiday:['#f7e5d9','#8e4d3b'], 'own-leave':['#f4e5bd','#7c5721'],meeting:['#e0edf5','#2c5a76'],health:['#f4e0e7','#894660'],pay:['#eef0d5','#5c6b35'],annual:['#e1eede','#3f6d45'],personal:['#e6eee8','#416252'],adjusted:['#ddece8','#3d6b60']}},
-    night:{paper:'#11291f',paperEnd:'#1e3e30',ink:'#edf5e7',muted:'#b5cbbb',line:'#4e6f5c',panel:'#244536',panelEnd:'#1a3528',gold:'#ecd79f',goldSoft:'#554a2d',shadow:'#00000070',highlight:'#e0f5d738',
-      shifts:{早:['#2d5640','#213f31','#c3ecd2'],晚:['#47415d','#342e46','#e5d5ff'],中:['#51472e','#39341f','#f8dfa1'],休:['#34463a','#25382b','#d0decf'],unknown:['#35463a','#26392c','#d0dfcf']},
-      tones:{holiday:['#684333','#ffe0ce'],'own-leave':['#5b4b28','#ffe3a6'],meeting:['#2b5068','#d2ecff'],health:['#643f52','#ffd4e5'],pay:['#45502d','#e5ecbc'],annual:['#385938','#d2f0c5'],personal:['#334d3d','#e3efdf'],adjusted:['#315547','#c8e8dd']}}
+    jade:{paper:'#edefe7',paperEnd:'#dfe6db',ink:'#17352c',muted:'#607668',faint:'#8d9d92',line:'#c9d3c6',lineStrong:'#aebcb0',panel:'#f8f9f3',panelEnd:'#eff3ea',gold:'#8f7236',goldLine:'#c4aa66',goldSoft:'#f1e6c4',shadow:'#1a3f3122',highlight:'#ffffffcc',
+      heroA:'#2d5b46',heroB:'#0c372a',heroInk:'#f6f1dd',heroMuted:'#c9d9c3',heroGold:'#e6d3a0',weekend:'#a6585f',
+      today:['#2f6b52','#164838','#fbf3d9','#d9c98a'],cellLine:'#d6ded3',outside:'#eef0e9',
+      shifts:{早:['#e2efe4','#2f6b50','#1f5740'],晚:['#eae5f3','#6b5692','#51407a'],中:['#f9efd8','#9b6f22','#7c581a'],休:['#f1f3ee','#93a397','#5d6f65'],unknown:['#f1f3ee','#93a397','#5d6f65']},
+      tones:{holiday:['#f6e3d6','#8c4a37'],'own-leave':['#f3e3b8','#765219'],meeting:['#dfebf4','#2a5774'],health:['#f3dfe6','#86445e'],pay:['#edefd4','#596833'],annual:['#e0edda','#3c6a42'],personal:['#e5ede6','#3f6050'],adjusted:['#dcebe6','#3a685d']}},
+    night:{paper:'#0f2019',paperEnd:'#183128',ink:'#eef5e8',muted:'#a9bfae',faint:'#7b9284',line:'#2d483b',lineStrong:'#466555',panel:'#1b3429',panelEnd:'#142a21',gold:'#e3cf98',goldLine:'#c6ab67',goldSoft:'#4a3f24',shadow:'#00000066',highlight:'#dcf0d02a',
+      heroA:'#1f4635',heroB:'#081f16',heroInk:'#f7f1dc',heroMuted:'#b9ccb6',heroGold:'#e8d6a3',weekend:'#efb5bb',
+      today:['#357a5c','#1b4e3c','#fdf6dd','#e2d194'],cellLine:'#2a4336',outside:'#15271f',
+      shifts:{早:['#1d4133','#86d6aa','#c9efd8'],晚:['#342e49','#cdb6ff','#e6d9ff'],中:['#42381e','#f2cd78','#f8e2a6'],休:['#21332a','#8ea697','#c3d2c6'],unknown:['#21332a','#8ea697','#c3d2c6']},
+      tones:{holiday:['#64402f','#ffe1cf'],'own-leave':['#5a4a27','#ffe4a8'],meeting:['#294e66','#d3edff'],health:['#623e50','#ffd6e6'],pay:['#444f2c','#e6edbd'],annual:['#365837','#d4f1c7'],personal:['#324c3c','#e4f0e0'],adjusted:['#305546','#c9e9de']}}
   };
   const monthNames={zh:['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'],id:['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']};
   const englishMonths=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
@@ -51,90 +55,145 @@ const MyShiftShare=(()=>{
     const promise=new Promise(resolve=>{const img=new Image();let settled=false;const done=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value)};const timer=setTimeout(()=>done(null),1200);img.onload=()=>done(img);img.onerror=()=>done(null);img.src=src});
     imageCache.set(src,promise);return promise;
   }
+  // ── drawing primitives ─────────────────────────────────────────
   function round(c,x,y,w,h,r){c.beginPath();c.roundRect(x,y,w,h,r)}
   function gradient(c,x,y,w,h,a,b){const g=c.createLinearGradient(x,y,x+w,y+h);g.addColorStop(0,a);g.addColorStop(1,b);return g}
   function panel(c,x,y,w,h,r,a,b,p,raised=true){
-    c.save();if(raised){c.shadowColor=p.shadow;c.shadowBlur=20*(p.renderScale||1);c.shadowOffsetY=9*(p.renderScale||1);c.fillStyle=p.line;round(c,x,y+4,w,h,r);c.fill();c.shadowColor='transparent'}c.fillStyle=gradient(c,x,y,w,h,a,b);round(c,x,y,w,h,r);c.fill();c.restore();
+    c.save();
+    if(raised){c.shadowColor=p.shadow;c.shadowBlur=26*(p.renderScale||1);c.shadowOffsetY=8*(p.renderScale||1);c.fillStyle=a;round(c,x,y,w,h,r);c.fill();c.shadowColor='transparent'}
+    c.fillStyle=gradient(c,x,y,w,h,a,b);round(c,x,y,w,h,r);c.fill();c.restore();
     c.strokeStyle=p.line;c.lineWidth=1;round(c,x+.5,y+.5,w-1,h-1,r);c.stroke();
-    c.save();round(c,x+1,y+1,w-2,h-2,r);c.clip();c.strokeStyle=p.highlight;c.lineWidth=2;c.beginPath();c.moveTo(x+r,y+2);c.lineTo(x+w-r,y+2);c.stroke();c.restore();
+    c.save();round(c,x+1,y+1,w-2,h-2,r-1);c.clip();c.strokeStyle=p.highlight;c.lineWidth=1.5;c.beginPath();c.moveTo(x+r,y+1.5);c.lineTo(x+w-r,y+1.5);c.stroke();c.restore();
   }
-  function line(c,x,y,w,color){c.strokeStyle=color;c.lineWidth=1;c.beginPath();c.moveTo(x,y);c.lineTo(x+w,y);c.stroke()}
+  function line(c,x,y,w,color){c.strokeStyle=color;c.lineWidth=1;c.beginPath();c.moveTo(x,y+.5);c.lineTo(x+w,y+.5);c.stroke()}
+  function vline(c,x,y,h,color){c.strokeStyle=color;c.lineWidth=1;c.beginPath();c.moveTo(x+.5,y);c.lineTo(x+.5,y+h);c.stroke()}
+  function spaced(c,px){try{c.letterSpacing=px+'px'}catch(e){}}
   function glyph(c,type,x,y,size,color){
-    c.save();c.translate(x,y);c.scale(size/24,size/24);c.strokeStyle=color;c.fillStyle=color;c.lineWidth=1.65;c.lineCap='round';c.lineJoin='round';
+    c.save();c.translate(x,y);c.scale(size/24,size/24);c.strokeStyle=color;c.fillStyle=color;c.lineWidth=1.7;c.lineCap='round';c.lineJoin='round';
     c.beginPath();
     if(type==='晚'){c.arc(12,12,7.3,.45,5.1);c.bezierCurveTo(7,8,8,16,18.6,15.2)}
     else if(type==='休'){c.moveTo(4,19);c.lineTo(12,5);c.lineTo(20,19);c.closePath();c.moveTo(12,5);c.lineTo(12,19);c.moveTo(3,20);c.lineTo(21,20)}
     else if(type==='calendar'){c.roundRect(4,5,16,16,3);c.moveTo(8,3);c.lineTo(8,7);c.moveTo(16,3);c.lineTo(16,7);c.moveTo(4,10);c.lineTo(20,10);c.moveTo(8,15);c.lineTo(11,18);c.lineTo(16,13)}
+    else if(type==='person'){c.arc(12,8,3.6,0,Math.PI*2);c.moveTo(5,20);c.bezierCurveTo(5,13,19,13,19,20)}
+    else if(type==='clock'){c.arc(12,12,8,0,Math.PI*2);c.moveTo(12,7);c.lineTo(12,12);c.lineTo(15.5,14)}
     else{c.arc(12,12,4,0,Math.PI*2);for(let i=0;i<8;i++){const a=i*Math.PI/4;c.moveTo(12+Math.cos(a)*7,12+Math.sin(a)*7);c.lineTo(12+Math.cos(a)*9,12+Math.sin(a)*9)}}
     c.stroke();c.restore();
+  }
+  // Pill with centred text. Returns the width used.
+  function pill(c,x,y,h,text,bg,fg,font,padX=12,stroke=null){
+    c.font=font;const w=Math.ceil(c.measureText(text).width)+padX*2;
+    if(bg){c.fillStyle=bg;round(c,x,y,w,h,h/2);c.fill()}
+    if(stroke){c.strokeStyle=stroke;c.lineWidth=1;round(c,x+.5,y+.5,w-1,h-1,h/2);c.stroke()}
+    c.fillStyle=fg;c.textAlign='center';c.textBaseline='middle';c.fillText(text,x+w/2,y+h/2+1);c.textAlign='left';c.textBaseline='alphabetic';return w;
   }
   async function renderCanvas(model,style='jade'){
     if(document.fonts)await Promise.race([document.fonts.ready,new Promise(resolve=>setTimeout(resolve,1800))]);
     const leafSrc=model.m>=9&&model.m<=11?'./images/fx/maple/maple-01.png':model.m>=3&&model.m<=5?'./images/fx/blossom/blossom-01.png':null;
     const textures=await Promise.all([loadImage('./images/fx/cloud/cloud-02.png'),leafSrc?loadImage(leafSrc):Promise.resolve(null)]);
-    const outputWidth=3840,W=1440,renderScale=outputWidth/W,p={...(themes[style]||themes.jade),renderScale},night=style==='night',{zh}=model,pad=52,inner=W-pad*2,gap=12,cellW=(inner-48-gap*6)/7,cellH=292;
+    const outputWidth=3840,W=1440,renderScale=outputWidth/W,p={...(themes[style]||themes.jade),renderScale},night=style==='night',{zh}=model;
+    const pad=60,inner=W-pad*2,gap=10,gridPad=22,cellW=(inner-gridPad*2-gap*6)/7,cellH=248;
     const cv=document.createElement('canvas'),c=cv.getContext('2d'),font=getComputedStyle(document.body).fontFamily||'system-ui, sans-serif';
     if(!c)throw Error(zh?'瀏覽器無法繪製圖片':'Browser tidak dapat membuat gambar');
-    c.font='500 25px '+font;const contextLines=textLines(c,[model.rotation,model.unit].filter(Boolean).join(' · '),inner-100);
-    const heroH=294+Math.max(0,contextLines.length-1)*32,statsY=pad+heroH+24,calTop=statsY+126,calH=148+model.rows*(cellH+gap)-gap+68;
-    const footerTop=calTop+calH+26;
+    const context=[model.rotation,model.unit].filter(Boolean).join('  ·  ');
+    const heroY=pad,heroH=262,statsY=heroY+heroH+22,statsH=118,calTop=statsY+statsH+22,headH=128,calH=headH+model.rows*(cellH+gap)-gap+64;
+    const footerTop=calTop+calH+24;
     const footers=[zh?'節日與輪班休假分開標示，實際出勤依班表。':'Hari libur nasional dan libur shift terpisah. Ikuti jadwal kerja.',zh?'月曆包含本人假別與事項標示；完整明細請至 App 查看。':'Kalender memuat tanda cuti pribadi & agenda. Rincian ada di aplikasi.'];
-    c.font='500 23px '+font;const footerLines=footers.flatMap(s=>textLines(c,s,inner-40)),H=footerTop+100+footerLines.length*32+pad;
+    c.font='500 20px '+font;const footerLines=footers.flatMap(s=>textLines(c,s,inner-20)),H=footerTop+96+footerLines.length*30+pad;
     if(Math.ceil(H*renderScale)>24000)throw Error(zh?'圖片超出瀏覽器可繪製大小':'Gambar melebihi ukuran yang didukung browser');
-    cv.width=outputWidth;cv.height=Math.ceil(H*renderScale);c.scale(renderScale,renderScale);c.textBaseline='alphabetic';c.fillStyle=gradient(c,0,0,W,H,p.paper,p.paperEnd);c.fillRect(0,0,W,H);
-    const halo=c.createRadialGradient(1210,160,0,1210,160,1050);halo.addColorStop(0,night?'#d9c98218':'#fff8d47c');halo.addColorStop(1,'#fff8d400');c.fillStyle=halo;c.fillRect(0,0,W,H);
-    // Deterministic paper grain, independent of the animation layer and export timing.
-    c.fillStyle=night?'#d7e9b706':'#123b2610';for(let i=0;i<900;i++)c.fillRect((i*137.31)%W,(i*541.73)%H,.8,.8);
-    line(c,pad,26,inner,night?'#a0b08046':'#8ca58550');
-    panel(c,pad,pad,inner,heroH,36,'#315c47','#113f30',{...p,line:'#769076',highlight:'#f4f4d555',shadow:'#102c2559'});
-    c.save();round(c,pad+1,pad+1,inner-2,heroH-2,36);c.clip();
-    const glow=c.createRadialGradient(1215,85,0,1215,85,470);glow.addColorStop(0,'#e7da9348');glow.addColorStop(1,'#dcc78c00');c.fillStyle=glow;c.fillRect(pad,pad,inner,heroH);
-    c.strokeStyle='#dfe7bc16';for(let i=0;i<4;i++){c.beginPath();c.arc(1290,65,175+i*90,0,Math.PI*2);c.stroke()}
-    if(textures[0]){c.globalAlpha=.11;c.drawImage(textures[0],7,78,498,355,920,110,520,230);c.globalAlpha=1}
-    c.fillStyle='#f4efd51a';c.font='700 236px '+font;c.textAlign='right';c.fillText(String(model.m).padStart(2,'0'),1333,pad+235);c.restore();
-    panel(c,pad+30,pad+31,62,64,18,'#ebedc6','#a8be89',{...p,line:'#a8bd91',highlight:'#fffbeebe',shadow:'#061e2452'});glyph(c,'calendar',pad+43,pad+44,36,'#294d34');
-    c.textAlign='left';c.fillStyle='#e9efcf';c.font='650 26px '+font;c.fillText(zh?'我的班表':'Jadwal Saya',pad+110,pad+61);
-    c.font='500 17px '+font;c.fillStyle='#c1d4b7';c.fillText('MY SHIFT  /  MONTHLY PLANNER',pad+110,pad+87);
-    c.fillStyle='#ece1b4';c.font='600 29px '+font;c.fillText(String(model.y)+'  /  '+(zh?englishMonths[model.m-1]:'JADWAL BULANAN'),pad+33,pad+137);
-    c.fillStyle='#fff7e5';c.font=(zh?'750 84px ':'700 70px ')+font;c.fillText(zh?`${model.m} 月`:monthNames.id[model.m-1],pad+29,pad+224);
-    c.font='500 25px '+font;c.fillStyle='#d9e5cf';contextLines.forEach((s,i)=>c.fillText(s,pad+33,pad+270+i*32));
-    const statW=(inner-3*14)/4;
-    for(const [i,shift] of ['早','晚','中','休'].entries()){
-      const x=pad+i*(statW+14),colors=p.shifts[shift];panel(c,x,statsY,statW,102,23,p.panel,p.panelEnd,p);glyph(c,shift,x+20,statsY+21,29,colors[2]);
-      c.fillStyle=p.muted;c.font='600 24px '+font;c.fillText(shiftLabel(shift,model.language),x+61,statsY+41);
-      c.fillStyle=colors[2];c.font='750 40px '+font;c.fillText(String(model.counts[shift]),x+60,statsY+83);c.font='500 20px '+font;c.fillStyle=p.muted;c.fillText(zh?'天':'hari',x+60+c.measureText(String(model.counts[shift])).width+34,statsY+80);
-    }
-    panel(c,pad,calTop,inner,calH,32,p.panel,p.panelEnd,p);
-    c.fillStyle=p.ink;c.font='700 30px '+font;c.fillText(zh?'月份班表':'Kalender bulanan',pad+28,calTop+48);
-    c.font='500 22px '+font;c.fillStyle=p.muted;c.fillText(zh?'日期 · 班別 · 當日請假人數':'Tanggal · Shift · Jumlah cuti',pad+28,calTop+80);
-    if(model.ownHours>0){c.textAlign='right';c.fillStyle=p.gold;c.font='650 22px '+font;c.fillText(zh?`本人請假 ${model.ownHours}h`:`Cuti saya ${model.ownHours}h`,W-pad-28,calTop+48);c.textAlign='left'}
-    line(c,pad+24,calTop+96,inner-48,p.line);
-    c.font='650 23px '+font;c.textAlign='center';model.weekdays.forEach((s,i)=>{c.fillStyle=i===0||i===6?(night?'#eab7bc':'#a76164'):p.muted;c.fillText(s,pad+24+i*(cellW+gap)+cellW/2,calTop+128)});c.textAlign='left';
-    const gridY=calTop+148;
+    cv.width=outputWidth;cv.height=Math.ceil(H*renderScale);c.scale(renderScale,renderScale);c.textBaseline='alphabetic';c.textAlign='left';
+    // ── paper ──
+    c.fillStyle=gradient(c,0,0,W,H,p.paper,p.paperEnd);c.fillRect(0,0,W,H);
+    const halo=c.createRadialGradient(1180,120,0,1180,120,1100);halo.addColorStop(0,night?'#d9c98214':'#fff9dc80');halo.addColorStop(1,'#fff8d400');c.fillStyle=halo;c.fillRect(0,0,W,H);
+    const vignette=c.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,H*.95);vignette.addColorStop(0,'#0000');vignette.addColorStop(1,night?'#00000040':'#1b3a2c12');c.fillStyle=vignette;c.fillRect(0,0,W,H);
+    c.fillStyle=night?'#d7e9b705':'#123b260c';for(let i=0;i<1400;i++)c.fillRect((i*137.31)%W,(i*541.73)%H,.8,.8);
+    // double hairline frame with corner marks
+    c.strokeStyle=p.goldLine+(night?'70':'90');c.lineWidth=1;c.strokeRect(22.5,22.5,W-45,H-45);
+    c.strokeStyle=p.goldLine+(night?'30':'45');c.strokeRect(28.5,28.5,W-57,H-57);
+    c.strokeStyle=p.goldLine+(night?'b0':'c8');c.lineWidth=1.5;for(const [cx,cy,sx,sy] of [[22,22,1,1],[W-22,22,-1,1],[22,H-22,1,-1],[W-22,H-22,-1,-1]]){c.beginPath();c.moveTo(cx,cy+sy*26);c.lineTo(cx,cy);c.lineTo(cx+sx*26,cy);c.stroke()}
+    // ── hero ──
+    panel(c,pad,heroY,inner,heroH,30,p.heroA,p.heroB,{...p,line:'#6f8d73',highlight:'#f4f4d548',shadow:'#0a241c66'});
+    c.save();round(c,pad+1,heroY+1,inner-2,heroH-2,30);c.clip();
+    const glow=c.createRadialGradient(W-pad-180,heroY+40,0,W-pad-180,heroY+40,520);glow.addColorStop(0,'#eadd9d44');glow.addColorStop(1,'#dcc78c00');c.fillStyle=glow;c.fillRect(pad,heroY,inner,heroH);
+    c.strokeStyle='#e5ecc316';c.lineWidth=1;for(let i=0;i<5;i++){c.beginPath();c.arc(W-pad-110,heroY+20,150+i*78,0,Math.PI*2);c.stroke()}
+    if(textures[0]){c.globalAlpha=night?.09:.12;c.drawImage(textures[0],7,78,498,355,W-pad-600,heroY+92,560,250);c.globalAlpha=1}
+    c.font='200 230px '+font;spaced(c,-8);c.textAlign='right';const numeral=String(model.m).padStart(2,'0');
+    c.lineWidth=1.3;c.strokeStyle='#f2e6b43c';c.strokeText(numeral,W-pad-34,heroY+232);c.fillStyle='#f4ecc80e';c.fillText(numeral,W-pad-34,heroY+232);spaced(c,0);c.textAlign='left';
+    // inner gold hairline
+    c.strokeStyle=p.goldLine+'66';c.lineWidth=1;round(c,pad+9.5,heroY+9.5,inner-19,heroH-19,23);c.stroke();
+    c.restore();
+    panel(c,pad+34,heroY+34,56,58,17,'#eef0cc','#aac18d',{...p,line:'#a7bd8e',highlight:'#fffbeec0',shadow:'#061e2452'});glyph(c,'calendar',pad+45,heroY+46,34,'#274b33');
+    c.fillStyle=p.heroInk;c.font='700 26px '+font;c.fillText(zh?'我的班表':'Jadwal Saya',pad+106,heroY+62);
+    c.fillStyle=p.heroMuted;c.font='500 14px '+font;spaced(c,3.5);c.fillText('MY SHIFT  ·  MONTHLY PLANNER',pad+106,heroY+86);spaced(c,0);
+    c.fillStyle=p.heroInk;c.font=(zh?'750 74px ':'700 62px ')+font;const monthText=zh?monthNames.zh[model.m-1]:monthNames.id[model.m-1];c.fillText(monthText,pad+34,heroY+180);
+    const mw=c.measureText(monthText).width;c.fillStyle=p.heroGold;c.font='600 22px '+font;spaced(c,5);c.fillText((zh?englishMonths[model.m-1]:'JADWAL BULANAN')+'  '+model.y,pad+34+mw+22,heroY+176);spaced(c,0);
+    if(context){c.font='500 19px '+font;const ctxLines=clippedLines(c,context,inner-600,1);pill(c,pad+34,heroY+203,36,ctxLines[0],'#ffffff14',p.heroInk,'500 19px '+font,16,'#e8dcab55')}
+    // ── stats strip ──
+    panel(c,pad,statsY,inner,statsH,24,p.panel,p.panelEnd,p);
+    const colW=inner/5,daysInMonth=model.days.length||1;
+    const stats=[...['早','晚','中','休'].map(s=>({key:s,label:shiftLabel(s,model.language),value:model.counts[s],unit:zh?'天':'hari',color:p.shifts[s][1],bar:model.counts[s]/daysInMonth})),
+      {key:'own',label:zh?'本人請假':'Cuti saya',value:model.ownHours,unit:'h',color:p.gold,bar:null}];
+    stats.forEach((st,i)=>{
+      const x=pad+i*colW;if(i)vline(c,x,statsY+26,statsH-52,p.line);
+      if(st.key==='own')glyph(c,'clock',x+26,statsY+24,22,st.color);else{c.fillStyle=st.color;c.beginPath();c.arc(x+37,statsY+35,6,0,Math.PI*2);c.fill()}
+      c.fillStyle=p.muted;c.font='600 19px '+font;c.fillText(st.label,x+54,statsY+42);
+      c.fillStyle=st.color;c.font='750 42px '+font;const v=String(st.value);c.fillText(v,x+28,statsY+90);
+      c.fillStyle=p.faint;c.font='500 17px '+font;c.fillText(st.unit,x+28+c.measureText(v).width*42/17+10,statsY+88);
+      if(st.bar!==null){const bx=x+28,bw=colW-56;c.fillStyle=p.line;round(c,bx,statsY+100,bw,4,2);c.fill();if(st.bar>0){c.fillStyle=st.color;round(c,bx,statsY+100,Math.max(6,bw*Math.min(1,st.bar)),4,2);c.fill()}}
+    });
+    // ── calendar ──
+    panel(c,pad,calTop,inner,calH,28,p.panel,p.panelEnd,p);
+    c.fillStyle=p.ink;c.font='700 27px '+font;c.fillText(zh?'月份班表':'Kalender bulanan',pad+gridPad+6,calTop+46);
+    c.font='500 18px '+font;c.fillStyle=p.muted;c.fillText(zh?'日期 · 班別 · 本人事項 · 當日請假人數':'Tanggal · Shift · Agenda · Jumlah cuti',pad+gridPad+6,calTop+74);
+    // legend (right)
+    let lx=W-pad-gridPad-6;c.font='600 16px '+font;
+    for(const s of ['休','中','晚','早']){const label=shiftLabel(s,model.language);const tw=c.measureText(label).width;lx-=tw;c.fillStyle=p.muted;c.fillText(label,lx,calTop+75);lx-=20;c.fillStyle=p.shifts[s][1];round(c,lx,calTop+64,12,12,3);c.fill();lx-=22}
+    line(c,pad+gridPad,calTop+92,inner-gridPad*2,p.lineStrong);
+    c.font='650 18px '+font;c.textAlign='center';spaced(c,2);model.weekdays.forEach((s,i)=>{c.fillStyle=i===0||i===6?p.weekend:p.muted;c.fillText(s,pad+gridPad+i*(cellW+gap)+cellW/2,calTop+118)});spaced(c,0);c.textAlign='left';
+    const gridY=calTop+headH;
     for(let index=0;index<model.rows*7;index++){
-      const x=pad+24+(index%7)*(cellW+gap),y=gridY+Math.floor(index/7)*(cellH+gap),day=model.cells[index];
-      const colors=day.inMonth?(p.shifts[day.shift]||p.shifts.unknown):p.shifts.unknown;
-      const today=day.today;
-      panel(c,x,y,cellW,cellH,19,today?'#35735a':colors[0],today?'#144631':colors[1],{...p,line:today?'#d6db9d':p.line,highlight:today?'#faf6c775':p.highlight});
-      if(today){c.strokeStyle='#d7df9d';c.lineWidth=3;round(c,x+1,y+1,cellW-2,cellH-2,18);c.stroke();c.lineWidth=1}
-      c.fillStyle=today?'#fffae4':day.inMonth?colors[2]:p.muted;c.font='750 '+(day.inMonth?50:today?32:38)+'px '+font;c.fillText(day.inMonth?String(day.d):`${day.m}/${day.d}`,x+13,y+58);
-      if(today){c.fillStyle='#e9dfad';round(c,x+cellW-63,y+14,51,26,8);c.fill();c.font='700 17px '+font;c.textAlign='center';c.fillStyle='#365038';c.fillText(zh?'今天':'Kini',x+cellW-37.5,y+33);c.textAlign='left'}
-      else if(index%7===0||index%7===6){c.fillStyle=night?'#e9aeb5':'#b66c75';c.beginPath();c.arc(x+cellW-18,y+25,3.5,0,Math.PI*2);c.fill()}
-      c.font='650 25px '+font;c.fillStyle=today?'#e7f2d7':colors[2];c.fillText(shiftLabel(day.shift,model.language),x+13,y+94);
-      const parts=day.parts.slice(0,2);let yy=y+113;
+      const col=index%7,x=pad+gridPad+col*(cellW+gap),y=gridY+Math.floor(index/7)*(cellH+gap),day=model.cells[index];
+      const weekend=col===0||col===6,colors=p.shifts[day.shift]||p.shifts.unknown,today=day.today,inMonth=day.inMonth;
+      // cell body
+      c.save();
+      if(today){c.shadowColor=night?'#00000080':'#15473633';c.shadowBlur=22*renderScale;c.shadowOffsetY=6*renderScale}
+      c.fillStyle=today?gradient(c,x,y,0,cellH,p.today[0],p.today[1]):inMonth?gradient(c,x,y,0,cellH,colors[0],colors[0]):p.outside;
+      round(c,x,y,cellW,cellH,14);c.fill();c.restore();
+      c.strokeStyle=today?p.today[3]:inMonth?p.cellLine:p.line+'99';c.lineWidth=today?2.5:1;round(c,x+.5,y+.5,cellW-1,cellH-1,14);c.stroke();c.lineWidth=1;
+      // top accent
+      if(inMonth&&!today){c.save();round(c,x+1,y+1,cellW-2,cellH-2,13);c.clip();c.fillStyle=colors[1];c.fillRect(x,y,cellW,4);c.restore()}
+      // day number
+      const numColor=today?p.today[2]:!inMonth?p.faint:weekend?p.weekend:p.ink;
+      c.fillStyle=numColor;c.font=(inMonth?'650 36px ':'600 24px ')+font;c.fillText(inMonth?String(day.d):`${day.m}/${day.d}`,x+14,y+48);
+      if(today){pill(c,x+cellW-12-54,y+16,26,zh?'今天':'Kini',p.today[3],'#2d4433','700 15px '+font,0);}
+      // shift label
+      c.font='650 20px '+font;c.fillStyle=today?p.today[2]:inMonth?colors[2]:p.faint;c.fillText(shiftLabel(day.shift,model.language),x+14,y+80);
+      // chips (max 3)
+      const parts=day.parts.slice(0,3);let yy=y+94;
       for(const part of parts){
-        const tone=p.tones[part.tone]||p.tones.personal;c.font='600 22px '+font;const ls=clippedLines(c,part.short,cellW-26,2),h=ls.length===1?34:58;
-        c.fillStyle=tone[0];round(c,x+9,yy,cellW-18,h,8);c.fill();c.fillStyle=tone[1];c.textAlign='center';ls.forEach((s,i)=>c.fillText(s,x+cellW/2,yy+24+i*25));c.textAlign='left';yy+=h+7;
+        const tone=p.tones[part.tone]||p.tones.personal;c.font='600 17px '+font;const text=clippedLines(c,part.short,cellW-40,1)[0];
+        c.fillStyle=inMonth||today?tone[0]:tone[0]+'99';round(c,x+10,yy,cellW-20,28,8);c.fill();
+        c.fillStyle=tone[1];c.beginPath();c.arc(x+22,yy+14,3,0,Math.PI*2);c.fill();
+        c.fillStyle=inMonth||today?tone[1]:p.faint;c.fillText(text,x+31,yy+19);yy+=33;
       }
-      if(day.parts.length>2){c.font='600 18px '+font;c.fillStyle=today?'#fff0bb':p.gold;c.fillText('+'+(day.parts.length-2)+(zh?' 項':' agenda'),x+13,y+cellH-42)}
-      line(c,x+12,y+cellH-33,cellW-24,today?'#d3e5b74f':p.line);
-      c.fillStyle=today?'#fff5db':day.leaveCount>0?p.gold:p.ink;c.font='600 21px '+font;
-      c.fillText(zh?'請假':'Cuti',x+13,y+cellH-11);c.textAlign='right';c.font='750 25px '+font;c.fillText(day.leaveCount===null?'—':String(day.leaveCount),x+cellW-13,y+cellH-11);c.textAlign='left';
+      if(day.parts.length>3){c.font='600 15px '+font;c.fillStyle=today?'#fff0bb':p.gold;c.fillText('+'+(day.parts.length-3)+(zh?' 項':' agenda'),x+14,yy+13)}
+      // leave count (only when known & >0, or unknown)
+      if(inMonth&&(day.leaveCount===null||day.leaveCount>0)){
+        line(c,x+12,y+cellH-36,cellW-24,today?'#d3e5b74a':p.cellLine);
+        const known=day.leaveCount!==null,fg=today?p.today[2]:known?p.gold:p.faint;
+        glyph(c,'person',x+12,y+cellH-30,18,fg);c.fillStyle=fg;c.font='600 16px '+font;c.fillText(zh?'請假':'Cuti',x+34,y+cellH-14);
+        c.textAlign='right';c.font='750 21px '+font;c.fillText(known?String(day.leaveCount):'—',x+cellW-14,y+cellH-13);c.textAlign='left';
+      }
     }
-    c.font='500 21px '+font;c.fillStyle=p.muted;c.fillText(zh?'淡色日期為前後月，不計入本月統計；— 未取得人數；＋N 明細至 App 查看。':'Tanggal redup di luar bulan ini, tidak masuk statistik; — belum tersedia. +N di aplikasi.',pad+28,calTop+calH-28);
-    if(textures[1]){c.save();c.translate(W-35,calTop+20);c.rotate(.45);c.globalAlpha=.67;c.drawImage(textures[1],-52,-52,104,104);c.restore();c.save();c.translate(25,calTop+calH-28);c.rotate(-.55);c.globalAlpha=.57;c.drawImage(textures[1],-36,-36,72,72);c.restore()}
-    line(c,pad,footerTop,inner,p.line);c.fillStyle=p.muted;c.font='500 23px '+font;footerLines.forEach((s,i)=>c.fillText(s,pad+4,footerTop+40+i*32));
-    const stampY=footerTop+66+footerLines.length*32;c.font='600 20px '+font;c.fillStyle=p.gold;c.fillText('MY SHIFT',pad+4,stampY);c.textAlign='right';c.fillStyle=p.muted;c.font='500 20px '+font;c.fillText((zh?'匯出 ':'Dibuat ')+model.stamp,W-pad-4,stampY);c.textAlign='left';
+    c.font='500 17px '+font;c.fillStyle=p.faint;c.fillText(zh?'淡色日期為前後月，不計入本月統計；未標示請假人數即為 0；— 未取得人數；＋N 明細請至 App 查看。':'Tanggal redup di luar bulan ini; tanpa angka cuti = 0; — belum tersedia; +N lihat di aplikasi.',pad+gridPad+6,calTop+calH-26);
+    if(textures[1]){c.save();c.translate(W-pad+2,calTop-2);c.rotate(.5);c.globalAlpha=night?.5:.6;c.drawImage(textures[1],-40,-40,80,80);c.restore();c.save();c.translate(pad+8,calTop+calH+2);c.rotate(-.6);c.globalAlpha=night?.42:.5;c.drawImage(textures[1],-32,-32,64,64);c.restore()}
+    // ── footer ──
+    line(c,pad,footerTop,inner,p.lineStrong);
+    // tone legend
+    let fx=pad+2;const legend=[['holiday',zh?'節日':'Hari libur'],['own-leave',zh?'本人假別':'Cuti saya'],['meeting',zh?'班股事項':'Agenda regu'],['pay',zh?'薪資':'Gaji'],['adjusted',zh?'已調班':'Diubah']];
+    for(const [tone,label] of legend){const t=p.tones[tone];fx+=pill(c,fx,footerTop+20,26,label,t[0],t[1],'600 15px '+font,12)+10}
+    c.fillStyle=p.muted;c.font='500 20px '+font;footerLines.forEach((s,i)=>c.fillText(s,pad+4,footerTop+78+i*30));
+    const stampY=footerTop+96+footerLines.length*30;c.font='700 16px '+font;spaced(c,4);c.fillStyle=p.gold;c.fillText('MY SHIFT',pad+4,stampY);spaced(c,0);
+    c.textAlign='right';c.fillStyle=p.faint;c.font='500 17px '+font;c.fillText((zh?'匯出 ':'Dibuat ')+model.stamp,W-pad-4,stampY);c.textAlign='left';
     cv.setAttribute('data-share-theme',style);return cv;
   }
   async function canvas(y,m,options={}){return renderCanvas(options.model||buildModel(y,m),options.theme||'jade')}
