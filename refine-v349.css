@@ -27,9 +27,9 @@ html .calendar-v314 .cal .day .day-adjusted{font-size:.56rem;padding:1px 5px;bor
 /* 請假人數：只在 >0 或未取得時顯示，縮成右下角小字 */
 html .calendar-v314 .cal .day .day-leave{display:none}
 html .calendar-v314 .cal .day .day-leave.has-leave,html .calendar-v314 .cal .day .day-leave.unknown{display:flex;flex-wrap:nowrap;border:0;background:none;border-radius:0;min-height:0;justify-content:flex-end;align-items:center;gap:3px;margin-top:auto;padding:3px 0 0;border-top:1px dashed color-mix(in srgb,currentColor 22%,transparent);font-size:.6rem;letter-spacing:0;color:var(--ink-2)}
-html .calendar-v314 .cal .day .day-leave>span{display:none}html .calendar-v314 .cal .day .day-leave::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.8}
+html .calendar-v314 .cal .day .day-leave>span{display:inline;font-size:.56rem;font-weight:600;letter-spacing:0;opacity:.85}html .calendar-v314 .cal .day .day-leave::before{content:"";display:inline-block;width:9px;height:9px;flex:none;background:currentColor;opacity:.85;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23000%27 stroke-width=%273%27 stroke-linecap=%27round%27%3E%3Ccircle cx=%2712%27 cy=%277%27 r=%274%27/%3E%3Cpath d=%27M4 21c0-6 16-6 16 0%27/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23000%27 stroke-width=%273%27 stroke-linecap=%27round%27%3E%3Ccircle cx=%2712%27 cy=%277%27 r=%274%27/%3E%3Cpath d=%27M4 21c0-6 16-6 16 0%27/%3E%3C/svg%3E") center/contain no-repeat}
 html .calendar-v314 .cal .day .day-leave.has-leave{color:#9a6f1f}html[data-theme="dark"] .calendar-v314 .cal .day-leave.has-leave{color:#f0cf7e}
-html .calendar-v314 .cal .day .day-leave b{font-size:.78rem;font-weight:750;line-height:1}
+html .calendar-v314 .cal .day .day-leave b{font-size:.74rem;font-weight:750;line-height:1}
 html .calendar-v314 .cal .day .day-leave.unknown b{font-weight:500;opacity:.6}
 /* 連假：底部細帶，不再佔一整行 */
 html .calendar-v314 .break-day-tag{position:absolute;inset:auto 0 0;min-height:0;height:14px;padding:0;display:flex;align-items:center;justify-content:center;gap:3px;font-size:.52rem;line-height:14px;font-weight:700;letter-spacing:0;color:#6a4d12;background:linear-gradient(90deg,#f3d68a,#e9c45f);border-radius:0}
@@ -176,7 +176,7 @@ html .ev-item.on .ev-check{box-shadow:none}
 /* 接下來 7 天：請假 0 不顯示，維持高度一致 */
 html .week-leave-count{min-height:22px;border-top:1px dashed color-mix(in srgb,currentColor 22%,transparent);font-size:.6rem;gap:3px;visibility:hidden}
 html .week-leave-count.has-leave,html .week-leave-count.unknown{visibility:visible}
-html .week-leave-count>span{display:none}html .week-leave-count::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.8}
+html .week-leave-count>span{display:inline;font-size:.56rem;font-weight:600;opacity:.85}
 html .week-leave-count b{font-size:.78rem;font-weight:750}
 html .schedule-day{border-radius:14px}html .schedule-day.current{box-shadow:0 0 0 3px #e2cf8c2e}
 /* 天氣頁：目前天氣卡、7 日條 */
@@ -196,3 +196,7 @@ html .screen-more .settings-group:first-child .settings-row{min-height:0}
 html .quick-control-card{border-radius:16px;min-height:0;padding:12px 13px}
 html .theme-choices>button,html .segmented-language>button{border-radius:11px;min-height:40px;font-size:.8rem}
 html .app-version{margin-top:10px}
+
+/* v351b · 請假人數改為「人形＋請假＋數字」，不再只有一個點 */
+html .calendar-v314 .cal .day .day-leave.has-leave,html .calendar-v314 .cal .day .day-leave.unknown{gap:2px;white-space:nowrap}
+@media(max-width:360px){html .calendar-v314 .cal .day .day-leave>span{display:none}}
