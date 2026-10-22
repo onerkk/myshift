@@ -171,3 +171,28 @@ html .insight-row{min-height:0;padding:15px 14px 13px}
 html .pay-calendar-row>div{border-radius:13px}
 html .ev-item .ev-check{display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:800;color:#fff;line-height:1}
 html .ev-item.on .ev-check{box-shadow:none}
+
+/* ══════════════ v351 · 今天頁／天氣頁／更多頁 收尾 ══════════════ */
+/* 接下來 7 天：請假 0 不顯示，維持高度一致 */
+html .week-leave-count{min-height:22px;border-top:1px dashed color-mix(in srgb,currentColor 22%,transparent);font-size:.6rem;gap:3px;visibility:hidden}
+html .week-leave-count.has-leave,html .week-leave-count.unknown{visibility:visible}
+html .week-leave-count>span{display:none}html .week-leave-count::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.8}
+html .week-leave-count b{font-size:.78rem;font-weight:750}
+html .schedule-day{border-radius:14px}html .schedule-day.current{box-shadow:0 0 0 3px #e2cf8c2e}
+/* 天氣頁：目前天氣卡、7 日條 */
+html .weather-current{border-radius:20px;padding:18px 16px 14px}
+html .weather-current-copy strong{font-weight:300;letter-spacing:-.04em}
+html .weather-current-note,html .weather-source{font-size:.7rem;line-height:1.6}
+html .forecast-strip>*{border-radius:12px;scroll-snap-align:start}
+html .forecast-heading h3{font-size:1rem}html .forecast-heading span{font-size:.7rem;color:var(--ink-3)}
+html .wx-source-credit{font-size:.66rem;line-height:1.7}
+/* 更多頁：群組與列密度 */
+html .settings-group{padding:12px 14px;border-radius:20px}
+html .settings-group-title{font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);padding:6px 4px 4px}
+html .settings-row{min-height:62px;padding:11px 4px;gap:12px}
+html .settings-row-icon{width:38px;height:38px;border-radius:12px;flex-basis:38px}
+html .settings-row-copy strong{font-size:.86rem}html .settings-row-copy small,html .settings-row-copy span{font-size:.7rem;line-height:1.6}
+html .screen-more .settings-group:first-child .settings-row{min-height:0}
+html .quick-control-card{border-radius:16px;min-height:0;padding:12px 13px}
+html .theme-choices>button,html .segmented-language>button{border-radius:11px;min-height:40px;font-size:.8rem}
+html .app-version{margin-top:10px}
