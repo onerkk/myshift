@@ -7,7 +7,7 @@
 <title>即時雷達與雲層預估 · 我的班表</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<link rel="stylesheet" href="./radar-ui.css?v=328-ui">
+<link rel="stylesheet" href="./radar-ui.css?v=352-nowcast">
 </head>
 <body>
 <div id="map"></div>
@@ -42,7 +42,9 @@
       <div class="nowmark" id="nowmark"></div>
       <input type="range" id="slider" min="0" max="0" value="0" step="1" aria-label="雷達時間">
     </div>
-    <div class="rlabels"><span id="lblPast">過去 60 分</span><span></span><span id="lblNow">最新</span></div>
+    <div class="rlabels"><span id="lblPast">過去 60 分</span><span id="lblNow">最新</span><span id="lblFore" class="lbl-fore">推估 +60 分</span></div>
+    <div class="nowcast-strip" id="nowcastStrip" aria-live="polite"><span class="nc-badge" id="ncBadge">推估準備中</span><span class="nc-motion" id="ncMotion"></span></div>
+    <div class="hour-strip" id="hourStrip" aria-label="未來 1–4 小時降雨機率"></div>
     <div class="buttons">
       <button class="step" id="prev" aria-label="上一格">‹</button>
       <button class="play" id="play"><span id="playIcon">▶</span><span id="playTxt">播放</span></button>
@@ -52,7 +54,7 @@
       <span class="txt">弱</span>
       <span class="sw universal" aria-label="RainViewer Universal Blue 強度色階"></span>
       <span class="txt">強</span>
-      <span class="txt" style="margin-left:8px;color:var(--tx2)">時間軸：雷達回波</span>
+      <span class="txt" style="margin-left:8px;color:var(--tx2)">實測＝雷達回波 · 推估＝本機外推</span>
     </div>
   </div>
 </div>
@@ -69,6 +71,7 @@
 
 <script src="./cloud-forecast.js?v=316-satellite"></script>
 <script src="./satellite-cloud.js?v=316-satellite"></script>
+<script src="./radar-nowcast.js?v=352-nowcast"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
@@ -84,7 +87,8 @@ function returnToSchedule(){
       idx=0, playing=false, timer=null, refresh=null, refreshRain=null, cloudMapRefresh=null, me=null, liveIdx=0,
       cloudAbort=null, cloudRevision=0, cloudMapAbort=null, cloudMapRevision=0, cloudMapState=null, cloudMapUpdatedAt=0,
       satelliteRefreshAt=0, satelliteRevision=0, satellitePending=false, satelliteAbort=null, pendingSatelliteLayer=null,
-      cloudVisible=true, radarVisible=true, cloudSummaryState=null;
+      cloudVisible=true, radarVisible=true, cloudSummaryState=null,
+      pastFrames=[], foreLayers=[], nowcastTimer=null, nowcastRev=0, nowcastInfo=null, hourCells=[];
 
   var $=function(id){return document.getElementById(id)};
   function pad(n){return (n<10?"0":"")+n}
@@ -116,6 +120,7 @@ function returnToSchedule(){
     map.attributionControl.addAttribution('Satellite imagery &copy; <a href="https://earthdata.nasa.gov/" target="_blank" rel="noopener">NASA GIBS</a> / <a href="https://www.data.jma.go.jp/mscweb/data/himawari/" target="_blank" rel="noopener">JMA Himawari</a>');
     map.attributionControl.addAttribution('Cloud data &copy; <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>');
     map.on("moveend zoomend", scheduleCloudMapRefresh);
+    map.on("moveend zoomend", function(){ scheduleNowcast(); });
   }
 
   function buildFrames(data){
@@ -127,8 +132,9 @@ function returnToSchedule(){
     var KEEP=7;
     if(past.length>KEEP) past=past.slice(-KEEP);
     if(!past.length) throw new Error("目前沒有可用的雷達影像");
-    frames=past;
+    frames=past;pastFrames=past;
     frames[frames.length-1].kind="live"; // latest archive image; it may lag the wall clock
+    foreLayers.forEach(function(L_){ if(L_) map.removeLayer(L_); }); foreLayers=[];
     // 清掉舊圖層
     layers.forEach(function(L_){ if(L_) map.removeLayer(L_); });
     layers=frames.map(function(f){
@@ -149,6 +155,7 @@ function returnToSchedule(){
     var split = frames.length>1 ? (liveAt/(frames.length-1))*100 : 100;
     document.documentElement.style.setProperty("--split", split.toFixed(1)+"%");
     $("slider").max = String(frames.length-1);
+    scheduleNowcast(data.host);
     // 時間軸左標籤：顯示實際涵蓋分鐘數（不再寫死「2 小時」）
     var spanMin = frames.length>1 ? Math.round((frames[liveAt].time - frames[0].time)/60) : 0;
     var lp=$("lblPast"); if(lp) lp.textContent = spanMin>0 ? ("過去 "+spanMin+" 分") : "過去";
@@ -161,25 +168,67 @@ function returnToSchedule(){
     if(!frames.length) return;
     i=Math.max(0,Math.min(frames.length-1,i)); idx=i;
     layers.forEach(function(L_,k){ if(L_) L_.setOpacity(k===i&&radarVisible?0.72:0); });
+    foreLayers.forEach(function(L_,k){ if(L_) L_.setOpacity((pastFrames.length+k)===i&&radarVisible?0.66:0); });
     var f=frames[i];
     $("ftime").textContent=hhmm(f.time);
     $("slider").value=String(i);
     var tag=$("ftag");
     tag.className="ftag "+(f.kind==="live"?"live":f.kind==="fore"?"fore":"past");
-    tag.textContent=f.kind==="live"?"最新 · 雷達":"過去 · 雷達";
+    tag.textContent=f.kind==="live"?"最新 · 雷達實測":f.kind==="fore"?"推估 · +"+f.minutes+" 分":"過去 · 雷達實測";
     var diffMin=Math.round((f.time - Date.now()/1000)/60);
-    $("fwhen").textContent = f.kind==="live" ? (diffMin<0?Math.abs(diffMin)+" 分前更新":"最新圖資") : (diffMin+" 分");
+    $("fwhen").textContent = f.kind==="live" ? (diffMin<0?Math.abs(diffMin)+" 分前更新":"最新圖資") : f.kind==="fore" ? (nowcastInfo?("可信度 "+({high:"高",mid:"中",low:"低"})[nowcastInfo.confidence]):"推估") : (diffMin+" 分");
+    document.body.classList.toggle("showing-fore",f.kind==="fore");
     updateVerdict();
   }
 
   function updateVerdict(){
     var live=null; for(var k=0;k<frames.length;k++){ if(frames[k].kind==="live") live=frames[k]; }
     var html='<span class="dot" style="background:var(--now)"></span>'
-      +'最新雷達圖資 <b>'+(live?hhmm(live.time):"--:--")+'</b>。按播放檢視最近 60 分鐘回波。';
-    html+='<br><span style="color:var(--tx3)">虛線是風場與雲量模式推估；不代表未來雷達實測。</span>';
+      +'最新雷達圖資 <b>'+(live?hhmm(live.time):"--:--")+'</b>。按播放檢視最近 60 分鐘回波與未來 60 分鐘推估。';
+    if(nowcastInfo)html+='<br><span style="color:var(--tx3)">雨區目前往 <b>'+compass(nowcastInfo.dirDeg)+'</b> 移動，約 <b>'+nowcastInfo.speedKmh+' km/h</b>；推估只延伸現有雨區，不含新生成的對流。</span>';
+    else html+='<br><span style="color:var(--tx3)">未來 60 分為本機外推；1–4 小時請看下方逐時降雨機率。</span>';
     $("verdict").innerHTML=html;
   }
 
+  // ── 本機回波外推（0–60 分）──
+  var lastHost=null;
+  function scheduleNowcast(host){
+    if(host)lastHost=host;if(!lastHost||!map||!window.RadarNowcast)return;
+    clearTimeout(nowcastTimer);nowcastTimer=setTimeout(runNowcast,700);
+  }
+  function setNowcastBadge(kind,text){var b=$("ncBadge");if(!b)return;b.className="nc-badge "+(kind||"");b.textContent=text;}
+  function runNowcast(){
+    if(!pastFrames.length||!map)return;
+    var rev=++nowcastRev,b=map.getBounds(),z=Math.max(5,Math.min(7,Math.round(map.getZoom())));
+    var grid=RadarNowcast.gridForBounds({north:b.getNorth(),south:b.getSouth(),east:b.getEast(),west:b.getWest()},z,4);
+    setNowcastBadge("busy","推估計算中…");
+    RadarNowcast.run({host:lastHost,frames:pastFrames,grid:grid,color:COLOR,smooth:SMOOTH,snow:SNOW,steps:6,latCenter:map.getCenter().lat}).then(function(res){
+      if(rev!==nowcastRev)return;
+      foreLayers.forEach(function(L_){ if(L_) map.removeLayer(L_); });
+      var live=pastFrames[pastFrames.length-1],bounds=L.latLngBounds(grid.bounds);
+      foreLayers=res.frames.map(function(fr){return L.imageOverlay(fr.dataUrl,bounds,{opacity:0,pane:"radar",interactive:false,className:"nowcast-overlay"}).addTo(map)});
+      var fore=res.frames.map(function(fr){return{time:live.time+fr.minutes*60,path:null,kind:"fore",minutes:fr.minutes}});
+      var keepIdx=idx;frames=pastFrames.concat(fore);nowcastInfo=res.motion;
+      var split=frames.length>1?((pastFrames.length-1)/(frames.length-1))*100:100;
+      document.documentElement.style.setProperty("--split",split.toFixed(1)+"%");
+      $("slider").max=String(frames.length-1);$("lblFore").textContent="推估 +"+res.frames[res.frames.length-1].minutes+" 分";
+      var conf=({high:"高",mid:"中",low:"低"})[res.motion.confidence];
+      setNowcastBadge(res.motion.confidence,"推估可信度 "+conf);
+      $("ncMotion").innerHTML=res.motion.speedKmh>2?('雨區往 <b>'+compass(res.motion.dirDeg)+'</b> · '+res.motion.speedKmh+' km/h'):'雨區移動緩慢';
+      show(Math.min(keepIdx,frames.length-1));
+    }).catch(function(e){
+      if(rev!==nowcastRev)return;
+      frames=pastFrames.slice();nowcastInfo=null;$("slider").max=String(frames.length-1);document.documentElement.style.setProperty("--split","100%");
+      var why=e&&e.message==="cors"?"圖磚不允許跨網域讀取，無法外推":e&&e.message==="nosignal"?"目前範圍內沒有回波，無需推估":"推估暫不可用";
+      setNowcastBadge("off",why);$("ncMotion").textContent="";$("lblFore").textContent="";
+      if(idx>=frames.length)show(frames.length-1);else updateVerdict();
+    });
+  }
+  function renderHourStrip(cells){
+    var el=$("hourStrip");if(!el)return;hourCells=cells||[];
+    if(!hourCells.length){el.innerHTML="";return}
+    el.innerHTML='<span class="hs-title">1–4 小時</span>'+hourCells.slice(0,4).map(function(c,i){var cls=c.pop>=60?"hi":c.pop>=30?"mid":"lo";return'<span class="hs-cell '+cls+'"><small>+'+(i+1)+'h</small><b>'+c.pop+'%</b></span>'}).join('')+'<span class="hs-src">模式降雨機率</span>';
+  }
   function play(){ if(!frames.length) return; playing=true; $("playIcon").textContent="❚❚"; $("playTxt").textContent="暫停";
     clearInterval(timer);
     var end=frames.length-1;
@@ -279,12 +328,13 @@ function returnToSchedule(){
        box.className="fcbox";
        box.innerHTML='<div class="fc-head"><span class="fc-title">未來降雨機率</span><span class="fc-src">中央氣象署 · 模型</span></div><div class="fc-grid">'+html+'</div><div class="fc-note">逐時模型機率，非雷達實況；目前仍以最新雷達回波與雨量站觀測為準。</div>';
        box.style.display="";
+       renderHourStrip(cells);
        // 常駐精簡列：未來四小時最高降雨機率
        var mx=0; for(var k=0;k<cells.length;k++){ if(cells[k].pop>mx) mx=cells[k].pop; }
        $("fcMini").innerHTML='未來 <b class="'+(mx>=60?"mwet":"")+'">'+mx+'%</b>';
        $("miniStat").style.display="";
      })
-     .catch(function(){ box.style.display="none"; $("fcMini").textContent="未來 —"; });
+     .catch(function(){ box.style.display="none"; $("fcMini").textContent="未來 —"; renderHourStrip([]); });
   }
 
   var COMPASS=["北","北北東","東北","東北東","東","東南東","東南","南南東","南","南南西","西南","西南西","西","西北西","西北","北北西"];

@@ -61,3 +61,26 @@ body[data-cloud-source="jma"] .leaflet-cloudsat-pane{filter:grayscale(1) contras
 .topcard{max-height:calc(100dvh - var(--ctrl-height) - 24px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
 #cardBody{max-height:max(60px,calc(100dvh - var(--ctrl-height) - 330px))}
 @media(max-width:380px){.cloud-tools button{font-size:11px}.cloud-summary-copy strong{font-size:12px}.cloud-summary-copy small{font-size:10px}}
+
+/* ── v352 · 時間軸：過去（實測）｜最新｜推估（本機外推） ── */
+.rail{background:linear-gradient(90deg,#1d5a3a 0,#4e9b6c var(--split,100%),#8c6d2a var(--split,100%),#3a2f12 100%)}
+.nowmark{left:var(--split,100%);background:#f1dc8f;height:14px;top:11px;width:3px;border-radius:2px;box-shadow:0 0 8px #f1dc8f99}
+.rlabels{position:relative;align-items:center}
+.rlabels #lblNow{position:absolute;left:var(--split,100%);transform:translateX(-50%);color:#f1dc8f;font-weight:700}
+.rlabels .lbl-fore{color:#e5c876}
+.ftag.fore{color:#2f2409;background:linear-gradient(140deg,#f1dc8f,#d1a94f);box-shadow:inset 0 1px 0 #fff4c87d,0 2px 0 #7b5c1e}
+body.showing-fore .rail{filter:saturate(1.1)}
+.nowcast-overlay{mix-blend-mode:normal;filter:saturate(.9)}
+.nowcast-strip{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:10px;color:var(--tx2);min-height:20px}
+.nc-badge{font-size:9px;font-weight:700;padding:3px 8px;border-radius:7px;background:#a2c07922;color:#d5e2c3;white-space:nowrap}
+.nc-badge.busy{background:#a2c07933}
+.nc-badge.high{background:#2f7a4f;color:#e6f5dc}.nc-badge.mid{background:#8c6d2a;color:#fff1c4}.nc-badge.low{background:#6b3b3b;color:#ffe0dc}.nc-badge.off{background:#2a2f28;color:#aab3a0}
+.nc-motion b{color:#f1dc8f}
+.hour-strip{display:flex;align-items:center;gap:5px;margin-top:7px;font-size:9px;color:var(--tx3)}
+.hour-strip:empty{display:none}
+.hs-title{font-weight:700;color:var(--tx2);margin-right:2px;white-space:nowrap}
+.hs-cell{display:flex;flex-direction:column;align-items:center;min-width:38px;padding:4px 6px;border-radius:8px;background:#a2c07918;border:1px solid #a2c07933;line-height:1.2}
+.hs-cell small{font-size:8px;color:var(--tx3)}.hs-cell b{font-size:11px}
+.hs-cell.mid{background:#8c6d2a33;border-color:#c9a04e66}.hs-cell.mid b{color:#f1dc8f}
+.hs-cell.hi{background:#3f6fa833;border-color:#7fb0e6aa}.hs-cell.hi b{color:#bfe0ff}
+.hs-src{margin-left:auto;font-size:8px;white-space:nowrap}
