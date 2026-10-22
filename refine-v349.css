@@ -85,3 +85,89 @@ html:not([data-theme=dark]) .calendar-v314 .cal .day.today .num{color:#fbf6df!im
 html:not([data-theme=dark]) .calendar-v314 .cal .day.today .shift-code{color:#dcebc8!important}
 html:not([data-theme=dark]) .calendar-v314 .cal .day.today .day-event,html:not([data-theme=dark]) .calendar-v314 .cal .day.today .day-holiday{color:#f7eec4!important;background:#ffffff1c!important}
 html:not([data-theme=dark]) .calendar-v314 .cal .day.today .day-leave,html:not([data-theme=dark]) .calendar-v314 .cal .day.today .day-leave b{color:#f3e2a0!important}
+
+/* ══════════════ v350 · 薪資頁層次 ══════════════ */
+html .salary-hero{padding:24px 20px 20px;border-radius:24px}
+html .salary-hero::after{content:"";position:absolute;inset:8px;border-radius:17px;border:1px solid #e6d39f33;pointer-events:none}
+html .salary-hero-label>span:first-child{font-size:.74rem;letter-spacing:.06em;color:#d8e4cf}
+html .salary-net{font-size:clamp(2.6rem,12vw,3.4rem);font-weight:300;letter-spacing:-.045em;line-height:1.15;margin:10px 0 8px;color:#f8f2d8;text-shadow:0 1px 0 #0b2a1f80}
+html .salary-net::first-letter{font-size:.55em;font-weight:500;vertical-align:.28em;margin-right:2px;color:#e3cf98}
+html .salary-hero p{font-size:.72rem;line-height:1.75;color:#c9d8c1;max-width:30ch}
+html .salary-flow{margin-top:14px}html .salary-flow-label span{font-size:.72rem;letter-spacing:.04em;color:var(--ink-2)}html .salary-flow-label b{display:block;font-size:1.2rem;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+html .salary-flow-track{height:5px;margin-top:9px;border-radius:5px;box-shadow:none;background:color-mix(in srgb,var(--line) 60%,transparent)}
+html .salary-flow-track i{background:linear-gradient(90deg,#3f8a63,#8ec89c)}html .salary-flow-track b{background:linear-gradient(90deg,#d79a98,#c47a7a)}
+html .salary-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:16px;padding:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surface-2)}
+html .salary-metrics>div{border:0;border-radius:0;box-shadow:none;padding:13px 6px 11px;background:transparent;text-align:center}
+html .salary-metrics>div+div{border-left:1px solid var(--line)}
+html .salary-metrics strong{display:block;font-size:1.55rem;font-weight:300;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
+html .salary-metrics strong small{font-size:.62rem;font-weight:600;margin-left:2px;color:var(--ink-2)}
+html .salary-metrics span{display:block;margin-top:5px;font-size:.64rem;letter-spacing:.04em;color:var(--ink-2)}
+html .salary-leave-meta{margin:10px 0 0;padding:10px 12px;border-radius:14px;font-size:.74rem;gap:4px 10px;background:color-mix(in srgb,var(--brand-soft) 70%,transparent);border:1px solid var(--line)}
+html .salary-leave-meta b{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+html .pay-calendar-row{margin-top:12px;gap:10px}
+html .salary-breakdown{margin-top:18px;border:1px solid var(--line);border-radius:18px;background:var(--surface-2);overflow:hidden}
+html .salary-breakdown>summary{padding:13px 15px;font-size:.84rem;font-weight:700;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;background:linear-gradient(180deg,#ffffff0a,transparent)}
+html .salary-breakdown>summary::-webkit-details-marker{display:none}
+html .salary-breakdown[open]>summary{border-bottom:1px solid var(--line)}
+html .salary-detail-list{padding:4px 15px 8px}
+html .salary-detail-row{min-height:40px;padding:9px 0;font-size:.8rem;align-items:center}
+html .salary-detail-row+.salary-detail-row{border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+html .salary-detail-row span{color:var(--ink-2);font-weight:500}
+html .salary-detail-row strong{font-weight:500;font-size:.92rem;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+html .salary-detail-row.income strong{color:var(--ink)}
+html .salary-detail-row.deduction strong{color:#c0646a}html[data-theme="dark"] .salary-detail-row.deduction strong{color:#f0a6ab}
+html .payroll-callout{border:1px solid color-mix(in srgb,#d9b65c 45%,var(--line));border-left:3px solid #d9b65c;border-radius:16px;background:color-mix(in srgb,#d9b65c 8%,var(--surface-2));padding:13px 14px;font-size:.78rem}
+html .payroll-callout strong{display:block;margin-bottom:6px;font-size:.8rem}html .payroll-callout li{line-height:1.75;margin-left:1em}
+html .payroll-reconciliation{padding:14px;border-radius:16px}
+html .payroll-reconciliation table{font-size:.8rem}
+html .payroll-reconciliation thead th{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding-bottom:8px;border-bottom:1px solid var(--line-strong)}
+html .payroll-reconciliation th,html .payroll-reconciliation td{padding:9px 3px;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);line-height:1.45}
+html .payroll-reconciliation th:first-child{font-weight:500;color:var(--ink-2)}
+html .payroll-reconciliation td{font-weight:500;font-variant-numeric:tabular-nums}
+html .payroll-reconciliation tr.payroll-total th,html .payroll-reconciliation tr.payroll-total td{font-weight:700;color:var(--ink);background:color-mix(in srgb,var(--brand-soft) 50%,transparent)}
+html .payroll-reconciliation tr.payroll-total:first-of-type th,html .payroll-reconciliation tr.payroll-total:first-of-type td{border-top:2px solid var(--line-strong)}
+html .payroll-net-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 12px}
+html .payroll-net-compare span{padding:10px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--line);font-size:.68rem;color:var(--ink-2)}
+html .payroll-net-compare strong{display:block;margin-top:2px;font-size:1.15rem;font-weight:500;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+html .payroll-audit-row{padding:10px 0;border-bottom:1px dashed var(--line)}html .payroll-audit-row strong{font-size:.8rem}html .payroll-audit-row span{font-size:.72rem;color:var(--ink-2)}html .payroll-audit-row small{font-size:.66rem;line-height:1.7;color:var(--ink-3)}
+html .salary-disclaimer{margin-top:14px;font-size:.66rem;line-height:1.7}
+
+/* ══════════════ v350 · 日期彈窗統一膠囊語言 ══════════════ */
+html .modal-sheet{border-radius:28px 28px 0 0;padding:14px 18px calc(22px + env(safe-area-inset-bottom));box-shadow:inset 0 1px 0 #ffffff33,0 -18px 60px #06231c66}
+html .modal-handle{width:42px;height:5px;margin:0 auto 14px;background:color-mix(in srgb,var(--ink) 22%,transparent)}
+html .modal-title{font-size:1.28rem;font-weight:700;letter-spacing:-.02em;line-height:1.2}
+html .modal-date{font-size:.74rem;letter-spacing:.06em;color:var(--ink-2)}
+html .modal-shift{min-height:58px;padding:12px 14px;border-radius:16px;margin:14px 0;border:1px solid var(--line);box-shadow:inset 0 1px 0 #ffffff22,0 1px 0 color-mix(in srgb,var(--ink) 8%,transparent);position:relative;overflow:hidden}
+html .modal-shift::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:currentColor;opacity:.75}
+html .modal-shift-name{font-size:1rem;font-weight:700}
+html .modal-section{margin:18px 0 9px;font-size:.66rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:8px}
+html .modal-section::after{content:"";flex:1;height:1px;background:var(--line)}
+html .modal-divider{margin:14px 0;border:0;height:1px;background:var(--line)}
+html .ev-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+html .ev-item{border-radius:14px;min-height:50px;padding:10px 12px;gap:9px;border:1px solid var(--line);background:var(--surface-2);box-shadow:inset 0 1px 0 #ffffff22,0 1px 0 color-mix(in srgb,var(--ink) 8%,transparent)}
+html .ev-item .ev-emoji{font-size:1.05rem;width:28px;text-align:center}html .ev-item .ev-name{font-size:.78rem;font-weight:600}
+html .ev-item .ev-check{margin-left:auto;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line-strong)}
+html .ev-item.on,html .ev-item[aria-pressed="true"]{border-color:#9fbf8e;background:color-mix(in srgb,#9fbf8e 16%,var(--surface-2))}
+html .ev-item.on .ev-check,html .ev-item[aria-pressed="true"] .ev-check{background:#4f9b76;border-color:#4f9b76;box-shadow:inset 0 0 0 3px var(--surface-2)}
+html .modal-sheet .al-pick{border-radius:16px;padding:13px 14px;margin-top:10px;border:1px solid var(--line);background:var(--surface-2);box-shadow:inset 0 1px 0 #ffffff1c}
+html .modal-sheet .al-pick>label{font-size:.74rem;letter-spacing:.04em;font-weight:700;color:var(--ink-2)}
+html .modal-sheet .al-pick select,html .leave-entry select,html .leave-entry input{border-radius:11px;min-height:42px;font-size:.84rem;border:1px solid var(--line-strong);background:var(--surface)}
+html .leave-entry{border-radius:18px;padding:15px;border:1px solid var(--line);background:linear-gradient(160deg,var(--surface-2),color-mix(in srgb,var(--brand-soft) 50%,var(--surface-2)));box-shadow:inset 0 1px 0 #ffffff22}
+html .leave-entry-title{font-size:.96rem;font-weight:700}
+html .leave-presets button{border-radius:11px;min-height:36px;font-size:.74rem;font-weight:600;border:1px solid var(--line);background:var(--surface)}
+html .leave-presets button[aria-pressed="true"],html .leave-presets button.active{background:#4f9b76;border-color:#4f9b76;color:#fff}
+html .leave-time-preview{border-radius:14px;padding:12px;font-size:.76rem;line-height:1.8;background:var(--surface);border:1px dashed var(--line-strong)}
+html .leave-submit{border-radius:14px;min-height:46px;font-size:.88rem;font-weight:700;box-shadow:0 6px 16px -8px #1b4a3999}
+html .modal-done{border-radius:15px;min-height:46px;font-size:.88rem;font-weight:700;margin-top:16px;box-shadow:inset 0 1px 0 #ffffff33,0 6px 16px -8px #1b4a3999}
+html .day-brief{border-radius:18px;padding:14px;margin:12px 0 16px;border:1px solid var(--line);background:var(--surface-2)}
+html .day-brief h3{font-size:.9rem;margin-bottom:8px}
+html .day-brief .agenda-chip,html .agenda-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 6px;border-radius:8px;font-size:.72rem;font-weight:600;border-left:3px solid currentColor;background:color-mix(in srgb,currentColor 11%,transparent)}
+html .day-sheet-nav{border-radius:14px;padding:6px}html .day-sheet-nav>button{border-radius:10px;min-height:36px;font-size:.74rem;font-weight:700}
+
+/* ══════════════ v350 · 「更多」與通用卡片：收斂內距與空白 ══════════════ */
+html .screen-more .glass-card,html .screen-more section,html .settings-card{padding-block:16px}
+html .settings-row,html .more-row{min-height:60px;padding:11px 0}
+html .insight-row{min-height:0;padding:15px 14px 13px}
+html .pay-calendar-row>div{border-radius:13px}
+html .ev-item .ev-check{display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:800;color:#fff;line-height:1}
+html .ev-item.on .ev-check{box-shadow:none}
