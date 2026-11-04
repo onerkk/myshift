@@ -112,6 +112,24 @@
     return{weekdayH:h,holidayH:0,front:Math.min(h,2),back:Math.max(0,h-2),
       ordinary:hourly*(Math.min(h,2)*r1+Math.max(0,h-2)*r2),holiday:0};
   }
+  // 班別落在「全日停班」日曆日內的時數。startMinute：班別起點（0–1439）；
+  // suspended(offsetDay) 回傳該日（0＝班別起始日，1＝翌日）是否全日停班。
+  function suspensionHours(startMinute,shiftHours,suspended){
+    const start=Math.max(0,number(startMinute)||0),end=start+Math.max(0,number(shiftHours)||0)*60;let minutes=0;
+    for(let day=0;day*1440<end;day++){
+      if(!suspended(day))continue;
+      minutes+=Math.max(0,Math.min(end,(day+1)*1440)-Math.max(start,day*1440));
+    }
+    return minutes/60;
+  }
+  // 2026-10 薪資條：10/22 晚班（20:00–翌日 08:00）做完，落在 10/23 停班日的 8h 列「假日給薪 8h、2,090」
+  // ＝休息日倍率 2h×1.3334＋6h×1.6667；停班日之外的 4h 為正常工時、無平日加班。
+  function suspensionWorkPay(worked,insideH,ordinaryOT,hourly,r1,r2){
+    insideH=Math.max(0,Math.min(number(worked)||0,number(insideH)||0));
+    const outside=Math.max(0,(number(worked)||0)-insideH),ot=Math.min(Math.max(0,number(ordinaryOT)||0),Math.max(0,outside-8));
+    const w=dailyOT('work',outside,ot,hourly,r1,r2),r=dailyOT('rest',insideH,0,hourly,r1,r2);
+    return{weekdayH:w.weekdayH,holidayH:r.holidayH,front:w.front,back:w.back,ordinary:w.ordinary,holiday:r.holiday,suspendedH:insideH};
+  }
   function nightUnits(worked,shiftHours,policy){
     worked=Math.max(0,Math.min(shiftHours,number(worked)||0));
     if(!worked||!(shiftHours>0))return{units:0,unknown:false};
@@ -340,5 +358,5 @@
     const hourMismatches=Object.keys(hourValues).filter(k=>s[k]!==null&&number(hourValues[k])!==null&&Math.abs(s[k]-hourValues[k])>.001);
     return{...checked,rows,deltas,hourMismatches,matched:checked.valid&&!est.incomplete&&!hourMismatches.length&&rows.every(r=>r.delta===0)&&totalKeys.every(k=>deltas[k]===0)};
   }
-  return{number,money,migrate,period,slip,parseImport,dailyOT,nightUnits,roundPay,salaryAt,monthSalary,ruleAt,ruleSnapshot,ruleKeys,attendanceRanges,nightAllowance,calibrateNight,automaticNightCalibration,attachReference,inferNightRule,validateNightRule,historyAudit,fixedKeys,reconcile,incomeKeys,deductionKeys,totalKeys,hourKeys,optionalKeys};
+  return{number,money,migrate,period,slip,parseImport,dailyOT,suspensionHours,suspensionWorkPay,nightUnits,roundPay,salaryAt,monthSalary,ruleAt,ruleSnapshot,ruleKeys,attendanceRanges,nightAllowance,calibrateNight,automaticNightCalibration,attachReference,inferNightRule,validateNightRule,historyAudit,fixedKeys,reconcile,incomeKeys,deductionKeys,totalKeys,hourKeys,optionalKeys};
 });

@@ -578,3 +578,21 @@ test('saving only a custom period and unchanged bonus does not create a dated ru
   c.fields.sal_periodEnd.value='2026-09-20';assert.equal(c.saveSalaryForm(),true);
   assert.equal(c.SAL.ruleHistory,undefined);assert.equal(c.SAL.monthly['2026-09'].proposal,400);
 });
+test('2026-10 payslip: night shift 10/22 runs into the 10/23 full-day suspension → 8h at rest-day rates, no weekday OT for that shift',()=>{
+  const c=env();Object.assign(c.SAL,{base:35090,meal:3000,transport:1000,position:500});
+  c.shifts={'2026-10-22':'晚','2026-10-23':'晚','2026-10-20':'早'};c.TYD['2026-10-23']=12;c.TYM['2026-10-23']={auto:true,src:'dgpa'};
+  const e=c.calcSalaryEst(2026,10),d=e.days.find(x=>x.key==='2026-10-22'),t=e.days.find(x=>x.key==='2026-10-23');
+  assert.equal(d.normalOT,0);assert.equal(d.holidayH,8);assert.equal(d.suspendedWorkH,8);
+  assert.equal(e.holidayPay,2090);                       // 公司：假日加班費 2,090（假日給薪 8h）
+  assert.equal(e.otPay,990);                             // 10/20 一般班 4h 加班
+  assert.equal(t.worked,0);assert.equal(e.disasterH,8);  // 10/23 晚班停班：天災假 8h、加班不給
+  assert.ok(e.notes.includes('disasterRestRate'));
+});
+test('a shift starting on a suspension day that the worker attends uses rest-day rates for the hours inside that day',()=>{
+  const c=env();c.shifts={'2026-10-23':'早'};c.TYD['2026-10-23']=12;c.TYM['2026-10-23']={auto:true,src:'dgpa',worked:true};
+  const d=c.calcSalaryEst(2026,10).days.find(x=>x.key==='2026-10-23');assert.equal(d.holidayH,12);assert.equal(d.normalOT,0);
+});
+test('partial suspension or a partly attended crossing shift is not guessed',()=>{
+  const c=env();c.shifts={'2026-10-22':'晚','2026-10-23':'晚'};c.TYD['2026-10-23']=6;c.TYM['2026-10-23']={auto:true,src:'dgpa',partial:true};
+  const d=c.calcSalaryEst(2026,10).days.find(x=>x.key==='2026-10-22');assert.equal(d.holidayH,0);assert.equal(d.normalOT,4);
+});

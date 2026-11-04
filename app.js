@@ -2006,7 +2006,7 @@ function calcSalaryEst(y,m,options={}){
     const paidHours=isWork?Math.max(0,Math.min(8,sh)-sum.totalHours)+normalOT:0;
     if(tyMeta.worked&&tyHours>0){
       const attended=Math.min(tyHours,paidHours);disasterWorkedH+=attended;
-      if(dayRule.disasterWorkRate>0)disasterPayRaw+=attended*dayOtHourly*dayRule.disasterWorkRate;else notes.push('disasterWorkRate');
+      if(dayRule.disasterWorkRate>0)disasterPayRaw+=attended*dayOtHourly*dayRule.disasterWorkRate;else if(tyMeta.partial)notes.push('disasterWorkRate');
     }
     // Paid disaster leave is not physical night attendance. Keep its paid OT;
     // do not count an absent night as an attended night shift.
@@ -2016,7 +2016,19 @@ function calcSalaryEst(y,m,options={}){
     // With no special-day clock range, cap it at the remaining scheduled hours.
     const worked=manualWorked===null?autoWorked:Math.max(0,Math.min(12,manualWorked,isWork?autoWorked:12));
     if(isWork&&manualWorked>0&&manualWorked<sh&&autoWorked>0&&autoWorked<sh)notes.push('specialAttendance');
-    const pay=Payroll.dailyOT(kind,worked,normalOT,dayOtHourly,dayRule.otTier1Rate,dayRule.otTier2Rate);
+    // 停班日出勤：班別落在全日停班日的時段按休息日倍率列假日加班（含前一晚跨夜進停班日的晚班）。
+    // 公司明訂加給倍率（disasterWorkRate>0）時沿用該設定；部分停班（時段不明）不猜。
+    let pay=Payroll.dailyOT(kind,worked,normalOT,dayOtHourly,dayRule.otTier1Rate,dayRule.otTier2Rate),suspendedWorkH=0;
+    if(isWork&&kind==='work'&&worked>0&&!(dayRule.disasterWorkRate>0)){
+      const nd=new Date(cy,cm-1,cd+1),nextKey=ek(nd.getFullYear(),nd.getMonth()+1,nd.getDate()),nextMeta=TYM[nextKey]||{};
+      const fullStop=(k,meta)=>(+TYD[k]>0||meta.src==='dgpa')&&!meta.partial;
+      const inside=Payroll.suspensionHours(getShiftWorkRule(cy,cm,cd).startMinute,sh,day=>day===0?!!(tyMeta.worked&&fullStop(key,tyMeta)):day===1?fullStop(nextKey,nextMeta):false);
+      if(inside>0){
+        if(worked>=sh-1e-7&&!sum.totalHours){
+          pay=Payroll.suspensionWorkPay(worked,inside,normalOT,dayOtHourly,dayRule.otTier1Rate,dayRule.otTier2Rate);suspendedWorkH=pay.suspendedH;notes.push('disasterRestRate');
+        }else notes.push('disasterCrossPartial');
+      }
+    }
     autoFront+=pay.front;autoBack+=pay.back;holidayH+=pay.holidayH;holidayRaw+=pay.holiday;ordinaryRaw+=pay.ordinary;
     sickRaw+=daySickH*dayLeaveHourly*dayRule.sickRate;personalRaw+=dayPersonalH*dayLeaveHourly*dayRule.personalRate;
     if(worked>0){workedDays++;workedHours+=worked;}
@@ -2045,7 +2057,7 @@ function calcSalaryEst(y,m,options={}){
     days.push({key,shift,kind,worked,shiftHours:sh,dayOtHourly,dayLeaveHourly,disasterHours,normalOT:pay.weekdayH,holidayH:pay.holidayH,
       nightUnits,nightUnknown,nightHours:night.hours,nightAmount:night.amount,nightRate:nightRule.night,nightBasis:night.basis,
       nightSource:fitted?'history-matched':calibrated?'payslip-calibrated':dayRule.nightRateSource,daySickH,dayPersonalH,legacyWageH,sickOrLeaveH:sum.totalHours,
-      disasterWorked:!!(tyMeta.worked&&tyHours>0),disasterAuto:!!tyMeta.auto,disasterText:tyMeta.text||''});
+      disasterWorked:!!(tyMeta.worked&&tyHours>0)||suspendedWorkH>0,suspendedWorkH,disasterAuto:!!tyMeta.auto,disasterText:tyMeta.text||''});
   }
   const autoOtH=autoFront+autoBack;
   // Always recalculate from daily attendance. Monthly totals / imported hours
@@ -2125,6 +2137,8 @@ function salaryNoteText(code){
     disasterNormalOnly:['天災假依 2026/10 公司薪資條：停班只給正常 8h（列天災假），排定加班不計加班費。','Cuti bencana: hanya jam normal dibayar; lembur terjadwal tidak dihitung.'],
     disasterUnpaid:['天災假依設定不給薪，正常工時已列為天災假扣款；請確認是否符合公司規定。','Cuti bencana diatur tanpa gaji; periksa aturan perusahaan.'],
     disasterAuto:['有天災假是依行政院人事總處停班公告自動建立；若當天實際出勤，請在該日點「停班日仍出勤」。','Cuti bencana dibuat otomatis dari pengumuman DGPA; tandai "tetap masuk" jika Anda bekerja.'],
+    disasterRestRate:['停班日出勤的時段（含前一晚跨夜進停班日的晚班）依 2026/10 薪資條按休息日倍率列假日加班：前 2h×1.3334、之後×1.6667。','Jam kerja pada hari libur bencana dihitung dengan tarif hari istirahat.'],
+    disasterCrossPartial:['有班別落在停班日但當班未全程出勤，停班時段的加給無法確定，暫按平日計。','Shift pada hari libur bencana tidak penuh; dihitung sebagai hari biasa.'],
     disasterWorkRate:['停班日仍出勤的加給倍率尚未設定（要點第 7 點「宜加給工資」，金額由公司決定）；目前未計入加給。','Tarif tambahan kerja saat libur bencana belum diatur; belum dihitung.'],
     leaveNotReady:['正在同步本計薪期的請假資料，完成後會自動重算。若持續未完成，請重新連線。','Menyinkronkan cuti; dihitung ulang setelah selesai. Sambungkan kembali jika belum selesai.']
   };return (labels[code]||[code,code])[lang==='zh'?0:1];
@@ -5730,7 +5744,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiAtmosphereSceneHtml()}${uiShiftWeatherHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v353</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v354</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${uiQuickToolsHtml()}${uiDayFocusHtml()}${uiAtmosphereSceneHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${uiShiftWeatherHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }
