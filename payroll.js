@@ -112,13 +112,13 @@
     return{weekdayH:h,holidayH:0,front:Math.min(h,2),back:Math.max(0,h-2),
       ordinary:hourly*(Math.min(h,2)*r1+Math.max(0,h-2)*r2),holiday:0};
   }
-  // 班別落在「全日停班」日曆日內的時數。startMinute：班別起點（0–1439）；
-  // suspended(offsetDay) 回傳該日（0＝班別起始日，1＝翌日）是否全日停班。
-  function suspensionHours(startMinute,shiftHours,suspended){
+  // 班別落在停班時段內的時數。startMinute：班別起點（0–1439）；
+  // stopFrom(offsetDay)：該日（0＝班別起始日、1＝翌日…）停班自幾分起算（0＝全日），非停班回傳 null。
+  function suspensionHours(startMinute,shiftHours,stopFrom){
     const start=Math.max(0,number(startMinute)||0),end=start+Math.max(0,number(shiftHours)||0)*60;let minutes=0;
     for(let day=0;day*1440<end;day++){
-      if(!suspended(day))continue;
-      minutes+=Math.max(0,Math.min(end,(day+1)*1440)-Math.max(start,day*1440));
+      const from=stopFrom(day);if(from===null||from===undefined||!(number(from)!==null))continue;
+      minutes+=Math.max(0,Math.min(end,(day+1)*1440)-Math.max(start,day*1440+Math.min(1440,number(from))));
     }
     return minutes/60;
   }

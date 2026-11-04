@@ -2006,7 +2006,7 @@ function calcSalaryEst(y,m,options={}){
     const paidHours=isWork?Math.max(0,Math.min(8,sh)-sum.totalHours)+normalOT:0;
     if(tyMeta.worked&&tyHours>0){
       const attended=Math.min(tyHours,paidHours);disasterWorkedH+=attended;
-      if(dayRule.disasterWorkRate>0)disasterPayRaw+=attended*dayOtHourly*dayRule.disasterWorkRate;else if(tyMeta.partial)notes.push('disasterWorkRate');
+      if(dayRule.disasterWorkRate>0)disasterPayRaw+=attended*dayOtHourly*dayRule.disasterWorkRate;
     }
     // Paid disaster leave is not physical night attendance. Keep its paid OT;
     // do not count an absent night as an attended night shift.
@@ -2021,8 +2021,18 @@ function calcSalaryEst(y,m,options={}){
     let pay=Payroll.dailyOT(kind,worked,normalOT,dayOtHourly,dayRule.otTier1Rate,dayRule.otTier2Rate),suspendedWorkH=0;
     if(isWork&&kind==='work'&&worked>0&&!(dayRule.disasterWorkRate>0)){
       const nd=new Date(cy,cm-1,cd+1),nextKey=ek(nd.getFullYear(),nd.getMonth()+1,nd.getDate()),nextMeta=TYM[nextKey]||{};
-      const fullStop=(k,meta)=>(+TYD[k]>0||meta.src==='dgpa')&&!meta.partial;
-      const inside=Payroll.suspensionHours(getShiftWorkRule(cy,cm,cd).startMinute,sh,day=>day===0?!!(tyMeta.worked&&fullStop(key,tyMeta)):day===1?fullStop(nextKey,nextMeta):false);
+      // 停班起點：官方公告（含當日沒排班時只記錄的 stopOnly）用公告的起始時刻；手動標記且時數涵蓋整班視為全日；
+      // 其餘（手動標記部分時數）時段不明，回傳 NaN 交由下方列待確認。
+      const stopFrom=(k,meta)=>{
+        if(meta.dismissed)return null;
+        if(meta.src==='dgpa')return (Number.isFinite(+meta.fromHour)&&meta.fromHour!==null?+meta.fromHour:0)*60;
+        if(+TYD[k]>0)return +TYD[k]>=sh-1e-7?0:NaN;
+        return null;
+      };
+      const from0=tyMeta.worked?stopFrom(key,tyMeta):null,from1=stopFrom(nextKey,nextMeta);
+      const unknownWindow=Number.isNaN(from0)||Number.isNaN(from1);
+      const inside=Payroll.suspensionHours(getShiftWorkRule(cy,cm,cd).startMinute,sh,day=>{const f=day===0?from0:day===1?from1:null;return Number.isNaN(f)?null:f;});
+      if(unknownWindow&&worked>0)notes.push('disasterCrossPartial');
       if(inside>0){
         if(worked>=sh-1e-7&&!sum.totalHours){
           pay=Payroll.suspensionWorkPay(worked,inside,normalOT,dayOtHourly,dayRule.otTier1Rate,dayRule.otTier2Rate);suspendedWorkH=pay.suspendedH;notes.push('disasterRestRate');
@@ -2138,7 +2148,7 @@ function salaryNoteText(code){
     disasterUnpaid:['天災假依設定不給薪，正常工時已列為天災假扣款；請確認是否符合公司規定。','Cuti bencana diatur tanpa gaji; periksa aturan perusahaan.'],
     disasterAuto:['有天災假是依行政院人事總處停班公告自動建立；若當天實際出勤，請在該日點「停班日仍出勤」。','Cuti bencana dibuat otomatis dari pengumuman DGPA; tandai "tetap masuk" jika Anda bekerja.'],
     disasterRestRate:['停班日出勤的時段（含前一晚跨夜進停班日的晚班）依 2026/10 薪資條按休息日倍率列假日加班：前 2h×1.3334、之後×1.6667。','Jam kerja pada hari libur bencana dihitung dengan tarif hari istirahat.'],
-    disasterCrossPartial:['有班別落在停班日但當班未全程出勤，停班時段的加給無法確定，暫按平日計。','Shift pada hari libur bencana tidak penuh; dihitung sebagai hari biasa.'],
+    disasterCrossPartial:['有班別落在停班日，但當班未全程出勤或停班時段不明（手動標記部分時數），停班時段的加給暫按平日計；請確認出勤或把颱風假時數改為整班。','Shift pada hari libur bencana tidak penuh; dihitung sebagai hari biasa.'],
     disasterWorkRate:['停班日仍出勤的加給倍率尚未設定（要點第 7 點「宜加給工資」，金額由公司決定）；目前未計入加給。','Tarif tambahan kerja saat libur bencana belum diatur; belum dihitung.'],
     leaveNotReady:['正在同步本計薪期的請假資料，完成後會自動重算。若持續未完成，請重新連線。','Menyinkronkan cuti; dihitung ulang setelah selesai. Sambungkan kembali jika belum selesai.']
   };return (labels[code]||[code,code])[lang==='zh'?0:1];
@@ -3899,10 +3909,17 @@ function applyWorkSuspension(data){
     const key=entry.date,meta=TYM[key]||{};
     if(entry.stopWork){
       if(meta.manual||meta.dismissed)continue;
-      const hours=_suspensionHoursForShift(key,entry);if(!(hours>0))continue;
+      const hours=_suspensionHoursForShift(key,entry),fromHour=Number.isFinite(entry.fromHour)?entry.fromHour:null;
+      if(!(hours>0)){
+        // 當天沒排班也要記下停班公告：前一晚跨夜的晚班落在停班時段時，薪資需按停班日出勤計算。
+        if(meta.src==='dgpa'&&meta.stopOnly&&meta.fromHour===fromHour&&(meta.text||'')===(entry.text||''))continue;
+        if(+TYD[key]>0)continue;
+        TYM[key]=Object.assign({},meta,{auto:true,src:'dgpa',stopOnly:true,text:entry.text||'',at:Date.now(),partial:!!entry.partial,fromHour});changed=true;continue;
+      }
       const prevH=+TYD[key]||0,prevText=meta.text||'';
-      if(meta.auto&&prevH===hours&&prevText===(entry.text||''))continue;
-      TYD[key]=hours;TYM[key]=Object.assign({},meta,{auto:true,src:'dgpa',text:entry.text||'',at:Date.now(),partial:!!entry.partial});
+      if(meta.auto&&prevH===hours&&prevText===(entry.text||'')&&meta.fromHour===fromHour&&!meta.stopOnly)continue;
+      const next=Object.assign({},meta,{auto:true,src:'dgpa',text:entry.text||'',at:Date.now(),partial:!!entry.partial,fromHour});delete next.stopOnly;
+      TYD[key]=hours;TYM[key]=next;
       if(!EVS[key])EVS[key]=[];if(!EVS[key].includes('typhoon'))EVS[key].push('typhoon');changed=true;
     }else if(meta.auto&&!meta.manual&&key>=todayKey){
       // 公告改為照常上班：撤回自動建立的紀錄
@@ -5442,7 +5459,9 @@ function salaryReconciliationHtml(est){
   const isZh=lang==='zh',labels=salaryFieldLabels(),hasTarget=check.rows.some(r=>r.actual!==null)||Object.values(check.deltas).some(x=>x!==null);
   if(!hasTarget)return '';
   const delta=n=>n===null?'—':n===0?'':(n>0?'+':'−')+studioMoney(Math.abs(n));
-  return `<section class="payroll-reconciliation"><div class="payroll-reconciliation-title"><h3>${isZh?'估算與薪資條核對':'Estimasi vs slip'}</h3><span class="source-badge">${est.nightCalibration?(isZh?'校準估算':'Estimasi terkalibrasi'):check.matched?(isZh?'分項一致':'Cocok'):(isZh?'待核對':'Periksa')}</span></div><p>${isZh?'差額＝估算 − 公司；應扣的負差額表示少扣。':'Selisih = estimasi − slip. Selisih potongan negatif berarti potongan kurang.'}</p><div class="payroll-net-compare"><span>${isZh?'班表估算實領':'Estimasi bersih'}<strong>${studioMoney(est.net)}</strong></span><span>${isZh?'與公司差額':'Selisih bersih'}<strong>${delta(check.deltas.net)}</strong></span></div><table><caption>${isZh?'薪資逐項對照':'Perbandingan komponen'}</caption><thead><tr><th scope="col">${isZh?'項目 / 差額':'Item / selisih'}</th><th scope="col">${isZh?'估算':'Estimasi'}</th><th scope="col">${isZh?'公司':'Slip'}</th></tr></thead><tbody>${check.rows.map(r=>`<tr><th scope="row">${labels[r.key]}<small class="${r.delta?'payroll-difference':''}">${delta(r.delta)}</small></th><td>${r.estimate===null?'—':studioMoney(r.estimate)}</td><td>${r.actual===null?'—':studioMoney(r.actual)}</td></tr>`).join('')}${Payroll.totalKeys.map(k=>`<tr class="payroll-total"><th scope="row">${labels[k]}<small>${delta(check.deltas[k])}</small></th><td>${studioMoney(est[k])}</td><td>${check.data[k]===null?'—':studioMoney(check.data[k])}</td></tr>`).join('')}</tbody></table>${check.hourMismatches&&check.hourMismatches.length?`<p class="payroll-callout">${isZh?'公司與班表時數不符：':'Jam berbeda dari slip: '}${check.hourMismatches.map(k=>labels[k]).join('、')}</p>`:''}${!check.valid?`<p class="payroll-callout">${check.errors.length?esc(check.errors.join('；')):(isZh?'薪資條欄位尚未填齊；不會標示為已核對。':'Slip belum lengkap.')}</p>`:''}</section>`;
+  return `<section class="payroll-reconciliation"><div class="payroll-reconciliation-title"><h3>${isZh?'估算與薪資條核對':'Estimasi vs slip'}</h3><span class="source-badge">${est.nightCalibration?(isZh?'校準估算':'Estimasi terkalibrasi'):check.matched?(isZh?'分項一致':'Cocok'):(isZh?'待核對':'Periksa')}</span></div><p>${isZh?'差額＝估算 − 公司；應扣的負差額表示少扣。':'Selisih = estimasi − slip. Selisih potongan negatif berarti potongan kurang.'}</p>${(()=>{const s=check.data||{},g=Payroll.number(s.generalH),sw=Payroll.number(s.weekdayH),ew=Payroll.number(est.weekdayH);
+      if(!(g>0)||sw===null||ew===null||ew-sw<g-1e-3)return'';
+      return `<p class="payroll-help payroll-action">${isZh?`公司列「一般加班 ${g}h」＝排定加班沒做、不給加班費；App 仍算平日加班 ${ew}h（公司 ${sw}h）。請在沒加班那天的日期彈窗把加班改成實際時數，差額會自動消失。`:`Slip mencatat lembur umum ${g} jam tidak dikerjakan; ubah jam lembur pada hari itu.`}</p>`;})()}<div class="payroll-net-compare"><span>${isZh?'班表估算實領':'Estimasi bersih'}<strong>${studioMoney(est.net)}</strong></span><span>${isZh?'與公司差額':'Selisih bersih'}<strong>${delta(check.deltas.net)}</strong></span></div><table><caption>${isZh?'薪資逐項對照':'Perbandingan komponen'}</caption><thead><tr><th scope="col">${isZh?'項目 / 差額':'Item / selisih'}</th><th scope="col">${isZh?'估算':'Estimasi'}</th><th scope="col">${isZh?'公司':'Slip'}</th></tr></thead><tbody>${check.rows.map(r=>`<tr><th scope="row">${labels[r.key]}<small class="${r.delta?'payroll-difference':''}">${delta(r.delta)}</small></th><td>${r.estimate===null?'—':studioMoney(r.estimate)}</td><td>${r.actual===null?'—':studioMoney(r.actual)}</td></tr>`).join('')}${Payroll.totalKeys.map(k=>`<tr class="payroll-total"><th scope="row">${labels[k]}<small>${delta(check.deltas[k])}</small></th><td>${studioMoney(est[k])}</td><td>${check.data[k]===null?'—':studioMoney(check.data[k])}</td></tr>`).join('')}</tbody></table>${check.hourMismatches&&check.hourMismatches.length?`<p class="payroll-callout">${isZh?'公司與班表時數不符：':'Jam berbeda dari slip: '}${check.hourMismatches.map(k=>labels[k]).join('、')}</p>`:''}${!check.valid?`<p class="payroll-callout">${check.errors.length?esc(check.errors.join('；')):(isZh?'薪資條欄位尚未填齊；不會標示為已核對。':'Slip belum lengkap.')}</p>`:''}</section>`;
 }
 function salaryDailyAuditHtml(est){
   if(!est.days)return'';const isZh=lang==='zh';
@@ -5744,7 +5763,7 @@ function rCal(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(lang==='zh'?'天氣':'Cuaca',lang==='zh'?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${lang==='zh'?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiAtmosphereSceneHtml()}${uiShiftWeatherHtml()}${wxHtml()}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v354</p>`;
+    content=`${uiScreenHeading(lang==='zh'?'更多':'Lainnya',lang==='zh'?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v355</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${uiQuickToolsHtml()}${uiDayFocusHtml()}${uiAtmosphereSceneHtml()}${typeof notifyCtaHtml==='function'?notifyCtaHtml():''}${typeof wxAlertHtml==='function'?wxAlertHtml():''}${rainWarnHtml()}${uiWeekStripHtml()}${uiShiftWeatherHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}`;
   }

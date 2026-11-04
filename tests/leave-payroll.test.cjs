@@ -592,7 +592,30 @@ test('a shift starting on a suspension day that the worker attends uses rest-day
   const c=env();c.shifts={'2026-10-23':'早'};c.TYD['2026-10-23']=12;c.TYM['2026-10-23']={auto:true,src:'dgpa',worked:true};
   const d=c.calcSalaryEst(2026,10).days.find(x=>x.key==='2026-10-23');assert.equal(d.holidayH,12);assert.equal(d.normalOT,0);
 });
-test('partial suspension or a partly attended crossing shift is not guessed',()=>{
-  const c=env();c.shifts={'2026-10-22':'晚','2026-10-23':'晚'};c.TYD['2026-10-23']=6;c.TYM['2026-10-23']={auto:true,src:'dgpa',partial:true};
+test('an announced start time is honoured: 下午3時起 does not cover the night shift that ended at 08:00',()=>{
+  const c=env();c.shifts={'2026-10-22':'晚','2026-10-23':'晚'};c.TYD['2026-10-23']=9;c.TYM['2026-10-23']={auto:true,src:'dgpa',fromHour:15};
   const d=c.calcSalaryEst(2026,10).days.find(x=>x.key==='2026-10-22');assert.equal(d.holidayH,0);assert.equal(d.normalOT,4);
+});
+test('a worked day shift on a 15:00 suspension counts only 15:00–20:00 at rest-day rates',()=>{
+  const c=env();c.shifts={'2026-10-23':'早'};c.TYD['2026-10-23']=5;c.TYM['2026-10-23']={auto:true,src:'dgpa',fromHour:15,worked:true};
+  const d=c.calcSalaryEst(2026,10).days.find(x=>x.key==='2026-10-23');assert.equal(d.holidayH,5);assert.equal(d.normalOT,0);
+});
+test('a suspension recorded on a rest day (stopOnly, no shift) is still found for the previous night shift',()=>{
+  const c=env();c.shifts={'2026-10-22':'晚'};c.TYM['2026-10-23']={auto:true,src:'dgpa',stopOnly:true,fromHour:null};
+  const d=c.calcSalaryEst(2026,10).days.find(x=>x.key==='2026-10-22');assert.equal(d.holidayH,8);assert.equal(d.normalOT,0);
+});
+test('a manual partial typhoon mark has an unknown window: not guessed, flagged',()=>{
+  const c=env();c.shifts={'2026-10-22':'晚','2026-10-23':'晚'};c.TYD['2026-10-23']=6;c.TYM['2026-10-23']={manual:true};
+  const e=c.calcSalaryEst(2026,10),d=e.days.find(x=>x.key==='2026-10-22');assert.equal(d.holidayH,0);assert.equal(d.normalOT,4);assert.ok(e.notes.includes('disasterCrossPartial'));
+});
+test('announcements are recorded even on days without a shift, and keep the start time',()=>{
+  const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'../app.js'),'utf8');
+  const code=src.slice(src.indexOf('function _suspensionHoursForShift('),src.indexOf('// 向後相容 — loadTyphoon'));
+  const c={Date,Math,Number,String,Object,Array,TYD:{},TYM:{},EVS:{},calls:0,rot:()=>({h:12}),
+    gs:(y,m,d)=>d===23?'休':'晚',ek:(y,m,d)=>`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`,
+    getShiftWorkRule:()=>({startMinute:1200}),sTYD(){},sTYM(){c.calls++},sEv(){},render(){}};
+  vm.createContext(c);vm.runInContext(code,c);
+  c.applyWorkSuspension({workSuspension:{days:[{date:'2026-10-23',stopWork:true,text:'停止上班',fromHour:null},{date:'2026-10-24',stopWork:true,text:'下午3時起停止上班',fromHour:15}]}});
+  assert.equal(c.TYM['2026-10-23'].stopOnly,true);assert.equal(c.TYD['2026-10-23'],undefined);assert.equal(c.EVS['2026-10-23'],undefined);
+  assert.equal(c.TYM['2026-10-24'].fromHour,15);assert.ok(c.TYD['2026-10-24']>0);assert.equal(c.calls,1);
 });
