@@ -11,7 +11,7 @@ function between(start,end){const a=source.indexOf(start),b=source.indexOf(end,a
 function env(){
   const c={Date,Math,Number,String,Array,Object,Set,Uint8Array,Promise,console,Payroll:require('../payroll.js'),lang:'zh',
     fbUser:{uid:'me',displayName:'測試',email:'test@example.invalid'},S:{unit:'test',modal:null},
-    leavesCache:{},ALD:{},OTD:{},TYD:{},AL:{},shifts:{'2026-09-10':'早'},shiftHours:12,
+    leavesCache:{},ALD:{},OTD:{},TYD:{},TYM:{},AL:{},shifts:{'2026-09-10':'早'},shiftHours:12,
     fields:{},alerts:[],writes:[],failWrite:false,
     SAL:{dayRuleMode:'roster',payRounding:'nearest',nightPolicy:'unconfirmed',enabled:true,base:24000,meal:0,transport:0,position:0,night:0,nightCountOverride:0,proposal:0,
       union:0,welfare:0,laborIns:0,healthIns:0,otherDed:0,otWageBase:0,leaveWageBase:0,
@@ -129,7 +129,7 @@ test('v3 selected range takes priority over old daily override',()=>{
   const c=env();c.OTD['2026-09-10']=4;c.leavesCache['2026-09-10']=[record('annual',0,720)];assert.equal(c.calcPayPeriod(2026,9).oH,0);
   c.OTD['2026-09-10']=0;c.leavesCache['2026-09-10']=[record('annual',0,480)];assert.equal(c.calcPayPeriod(2026,9).oH,4);
 });
-test('paid disaster marker keeps source policy',()=>{const c=env();c.TYD['2026-09-10']=12;assert.equal(c.calcPayPeriod(2026,9).oH,4);assert.equal(c.calcSalaryEst(2026,9).leaveDed,0)});
+test('paid disaster marker keeps source policy',()=>{const c=env();c.SAL.disasterPolicy='paid';c.TYD['2026-09-10']=12;assert.equal(c.calcPayPeriod(2026,9).oH,4);assert.equal(c.calcSalaryEst(2026,9).leaveDed,0)});
 test('26th through 25th payroll boundary, including new year',()=>{
   for(const [y,m,inside,outside] of [[2026,9,['2026-08-26','2026-09-25'],['2026-08-25','2026-09-26']],[2027,1,['2026-12-26','2027-01-25'],['2026-12-25','2027-01-26']]]){
     const c=env();c.shifts={};for(const date of inside.concat(outside)){c.shifts[date]='早';c.leavesCache[date]=[record('personal',0,720)]}
@@ -395,8 +395,18 @@ test('a raise inside the payroll period uses the applicable daily wage for OT an
   assert.equal(e.days.find(d=>d.key==='2026-06-29').dayOtHourly,100);
   assert.equal(e.days.find(d=>d.key==='2026-07-01').dayOtHourly,125);
 });
+test('default disaster policy follows the 2026-10 payslip: 12h shift lists 8h, scheduled overtime unpaid, no deduction',()=>{
+  const c=env();c.TYD['2026-09-10']=12;const e=c.calcSalaryEst(2026,9);
+  assert.equal(e.disasterPolicy,'normalOnly');assert.equal(e.otPay,0);assert.equal(e.disasterH,8);assert.equal(e.disasterAbsentH,12);assert.equal(e.leaveDed,0);assert.equal(e.workedHours,0);
+});
+test('an unconfirmed legacy paid policy migrates to normalOnly, a user choice is kept',()=>{
+  const P=require('../payroll.js');
+  const a=P.migrate({schemaVersion:8,disasterPolicy:'paid',ruleHistory:[{effectiveFrom:'2026-07-01',disasterPolicy:'paid'}],monthly:{}});
+  assert.equal(a.disasterPolicy,'normalOnly');assert.equal(a.ruleHistory[0].disasterPolicy,'normalOnly');assert.equal(a.schemaVersion,9);
+  const b=P.migrate({schemaVersion:8,disasterPolicy:'paid',disasterPolicySource:'user',monthly:{}});assert.equal(b.disasterPolicy,'paid');
+});
 test('full paid disaster leave keeps paid ordinary overtime but does not create night attendance',()=>{
-  const c=env();c.shifts['2026-09-10']='晚';c.SAL.night=300;c.TYD['2026-09-10']=12;
+  const c=env();c.SAL.disasterPolicy='paid';c.shifts['2026-09-10']='晚';c.SAL.night=300;c.TYD['2026-09-10']=12;
   const e=c.calcSalaryEst(2026,9);assert.equal(e.otPay,600);assert.equal(e.nightPay,0);assert.equal(e.workedDays,0);assert.equal(e.workedHours,0);assert.equal(e.leaveDed,0);
 });
 test('default payroll screen explains automatic rules without requiring confirmation or an import',()=>{

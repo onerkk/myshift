@@ -8,12 +8,14 @@ const Payroll=require('../payroll.js');
 const source=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
 const raw=JSON.parse(fs.readFileSync(path.join(__dirname,'../private-import/2026-08-payroll.json'),'utf8'));
 const september=JSON.parse(fs.readFileSync(path.join(__dirname,'../private-import/2026-09-payroll.json'),'utf8'));
+const october=JSON.parse(fs.readFileSync(path.join(__dirname,'../private-import/2026-10-payroll.json'),'utf8'));
+const pick=url=>url.includes('2026-10')?october:url.includes('2026-09')?september:raw;
 function context(){
   const writes=[],c={Payroll,AbortController,setTimeout,clearTimeout,console,Date,Promise,Set,Math,Array,Object,Number,String,
     fbUser:{uid:'owner-test',email:'onerkk@gmail.com',emailVerified:true},SAL:{monthly:{}},writes,
     getSalPeriod(y,m){return c.SAL.monthly[y+'-'+String(m).padStart(2,'0')]||{}},
     normalizeSal(){c.SAL=Payroll.migrate(c.SAL)},sSAL(){writes.push(JSON.stringify(c.SAL))},
-    fetch:async url=>({ok:true,json:async()=>url.includes('2026-09')?september:raw})};
+    fetch:async url=>({ok:true,json:async()=>pick(url)})};
   vm.createContext(c);
   vm.runInContext(source.slice(source.indexOf("let payrollReferenceState="),source.indexOf('function automaticNightRule(')),c);
   return c;
@@ -27,7 +29,7 @@ test('provided payroll is validated and loaded automatically for its verified ow
   assert.equal(c.SAL.monthly[raw.month].sickHoursOverride,undefined);
   assert.equal(c.SAL.monthly['2026-09'].proposal,400);
   assert.equal(c.SAL.monthly['2026-09'].slip.net,52302);
-  assert.equal(c.SAL.referenceVersion,325);
+  assert.equal(c.SAL.referenceVersion,353);
   assert.equal(c.SAL.monthly['2026-09'].nightCalibration.sourceUnits,7);
 });
 test('cached v324 payroll upgrades night calibration automatically without changing a manual bonus or the saved period',async()=>{
@@ -35,7 +37,7 @@ test('cached v324 payroll upgrades night calibration automatically without chang
   c.SAL=Payroll.attachReference(c.SAL,raw);c.SAL=Payroll.attachReference(c.SAL,oldSeptember);
   c.SAL.referenceVersion=324;c.SAL.referenceOwnerUid='owner-test';
   Object.assign(c.SAL.monthly['2026-09'],{proposal:0,bonusSources:{proposal:'manual'},payPeriodStart:'2026-08-26',payPeriodEnd:'2026-09-20'});
-  await c.loadPayrollReference();assert.equal(c.SAL.referenceVersion,325);
+  await c.loadPayrollReference();assert.equal(c.SAL.referenceVersion,353);
   assert.equal(c.SAL.monthly['2026-09'].nightCalibration.rate,4624/7);
   assert.equal(c.SAL.monthly['2026-09'].proposal,0);assert.equal(c.SAL.monthly['2026-09'].payPeriodEnd,'2026-09-20');
 });
@@ -82,21 +84,21 @@ test('queued payroll saves retain their originating uid and snapshot',async()=>{
 test('a saved v306 reference still upgrades to September and retains the custom attendance period',async()=>{
   const c=context();c.SAL=Payroll.attachReference(c.SAL,raw);c.SAL.referenceVersion=306;c.SAL.referenceOwnerUid='owner-test';
   c.SAL.monthly['2026-09']={proposal:0,payPeriodStart:'2026-08-26',payPeriodEnd:'2026-09-20'};
-  await c.loadPayrollReference();assert.equal(c.SAL.referenceVersion,325);assert.equal(c.SAL.monthly['2026-09'].slip.net,52302);
+  await c.loadPayrollReference();assert.equal(c.SAL.referenceVersion,353);assert.equal(c.SAL.monthly['2026-09'].slip.net,52302);
   assert.equal(c.SAL.monthly['2026-09'].payPeriodEnd,'2026-09-20');assert.equal(c.SAL.monthly['2026-09'].proposal,400);
 });
 test('a missing September file never commits a partial batch and can be retried',async()=>{
-  const c=context();c.fetch=async url=>url.includes('2026-09')?{ok:false}:{ok:true,json:async()=>raw};
+  const c=context();c.fetch=async url=>url.includes('2026-09')?{ok:false}:{ok:true,json:async()=>pick(url)};
   await c.loadPayrollReference();assert.equal(c.writes.length,0);assert.equal(c.SAL.monthly['2026-08'],undefined);
-  c.fetch=async url=>({ok:true,json:async()=>url.includes('2026-09')?september:raw});
+  c.fetch=async url=>({ok:true,json:async()=>pick(url)});
   await c.loadPayrollReference();assert.equal(c.writes.length,1);assert.equal(c.SAL.monthly['2026-09'].slip.net,52302);
 });
 test('manual bonus changes during a reference fetch are preserved, and stale parallel loads cannot save twice',async()=>{
   const c=context(),pending=[];c.fetch=url=>new Promise(resolve=>pending.push({url,resolve}));
   const old=c.loadPayrollReference(),latest=c.loadPayrollReference();
   c.SAL.monthly['2026-09']={proposal:0,bonusSources:{proposal:'manual'}};
-  for(const p of pending.slice(2))p.resolve({ok:true,json:async()=>p.url.includes('2026-09')?september:raw});
+  for(const p of pending.slice(3))p.resolve({ok:true,json:async()=>pick(p.url)});
   await latest;assert.equal(c.writes.length,1);assert.equal(c.SAL.monthly['2026-09'].proposal,0);
-  for(const p of pending.slice(0,2))p.resolve({ok:true,json:async()=>p.url.includes('2026-09')?september:raw});
+  for(const p of pending.slice(0,3))p.resolve({ok:true,json:async()=>pick(p.url)});
   await old;assert.equal(c.writes.length,1);
 });

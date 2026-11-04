@@ -1,0 +1,36 @@
+{
+  "kind": "myshift-payroll",
+  "month": "2026-10",
+  "slip": {
+    "baseSum": 39590,
+    "proposal": 0,
+    "otherIncome": 0,
+    "otTaxFree": 11547,
+    "otTaxable": 4289,
+    "holidayPay": 2090,
+    "nightPay": 6084,
+    "fixedDed": 2540,
+    "leaveDed": 3299,
+    "laborPensionSelf": 0,
+    "income": 63600,
+    "deduction": 5839,
+    "net": 57761,
+    "weekdayH": 64,
+    "holidayH": 8,
+    "sickH": 40,
+    "personalH": null,
+    "annualH": null,
+    "disasterH": 8,
+    "generalH": 4,
+    "payDate": "2026-11-05"
+  },
+  "sourceDetails": {
+    "fixedIncome": {"base": 35090, "meal": 3000, "transport": 1000, "position": 500},
+    "fixedDeduction": {"union": 88, "welfare": 178, "laborIns": 1145, "healthIns": 1129, "otherDed": 0},
+    "fixedPayEffectiveDate": "2026-07-01",
+    "employerPension": 4368,
+    "attendancePeriodConfirmed": false,
+    "nightRuleConfirmed": false
+  },
+  "note": "依2026/10公司薪資條（入帳2026/11/05）轉錄；未列提案獎金與其他加項以分項與總額驗算為0。本月請假資訊：一般加班4h、病假40h、天災假8h。驗算：病假 39,590÷240×40×50%=3,299；平日加班 16班×(2h×1.3334+2h×1.6667)×39,590÷240=15,836＝免稅11,547＋應稅4,289；假日 8h 依休息日 2h×1.3334＋6h×1.6667＝2,090。App 同期估算 58,502（天災假照給含加班 4h、加班 76h 全列平日、夜點 5,945），與實領差 +741。夜點：App 估算當時的出勤與加班時數和本單不一致，不作夜點校準基準。"
+}

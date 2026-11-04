@@ -1,4 +1,4 @@
-/* Payroll v348 (disaster leave policy). Immutable night calibration, dated rules and slip audits. */
+/* Payroll v352 (disaster leave policy calibrated to 2026-10 payslip). Immutable night calibration, dated rules and slip audits. */
 (function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -56,7 +56,17 @@
       if(!s.dayRuleMode||s.dayRuleMode==='unconfirmed')s.dayRuleMode='roster';
       if(!s.nightPolicy||s.nightPolicy==='unconfirmed')s.nightPolicy='auto';
     }
-    s.schemaVersion=8;
+    if(old<9){
+      // 2026-10 公司薪資條：颱風停班的 12h 班只列「天災假 8h」，排定加班 4h 不給（平日＋假日給薪時數
+      // 72h，App 舊預設 'paid' 多算 4h 加班）。'paid' 是 v348 未經證實的推論，非使用者選擇者一律改回 normalOnly。
+      if(s.disasterPolicySource!=='user'){
+        const fix=r=>{if(r&&typeof r==='object'&&(r.disasterPolicy===undefined||r.disasterPolicy==='paid'))r.disasterPolicy='normalOnly';};
+        if(s.disasterPolicy===undefined||s.disasterPolicy==='paid'){s.disasterPolicy='normalOnly';s.disasterPolicySource='payslip-2026-10';}
+        if(s.ruleBaseline&&typeof s.ruleBaseline==='object'){s.ruleBaseline=Object.assign({},s.ruleBaseline);fix(s.ruleBaseline);}
+        if(Array.isArray(s.ruleHistory))s.ruleHistory=s.ruleHistory.map(r=>{const c=Object.assign({},r);if(c.disasterPolicy==='paid')c.disasterPolicy='normalOnly';return c;});
+      }
+    }
+    s.schemaVersion=9;
     return s;
   }
   function period(source){
@@ -116,8 +126,9 @@
     otWageBase:0,leaveWageBase:0,otTier1Rate:1.3334,otTier2Rate:1.6667,sickRate:.5,personalRate:1,
     payRounding:'nearest',dayRuleMode:'roster',weeklyDayKinds:[],laborPensionWage:0,laborPensionSelfRate:0,laborPensionEmployerRate:6,
     // 天災假（颱風停班）：依「天然災害發生事業單位勞工出勤管理及工資給付要點」第 7 點，未出勤宜不扣發工資；
-    // 2026-08 公司薪資條列天災假 12h 且未扣款，故預設 paid。normalOnly＝只給正常 8h、不給排定加班；unpaid＝全不給薪。
-    disasterPolicy:'paid',
+    // 2026-10 公司薪資條：12h 班停班列天災假 8h、未扣款、排定加班 4h 不給 → 預設 normalOnly。
+    // paid＝本薪＋排定加班照給；unpaid＝全不給薪。
+    disasterPolicy:'normalOnly',
     // 停班日仍出勤者，要點第 7 點「宜加給工資」，倍率由公司決定；0＝尚未確認，不計入。
     disasterWorkRate:0};
   const ruleKeys=Object.keys(ruleDefaults);
