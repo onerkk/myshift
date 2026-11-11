@@ -121,9 +121,7 @@ window.rCal=function(){
   const zh=lang==='zh',opt=f=>typeof f==='function'?f():'';let content='';
   if(UI_TAB==='calendar')content=uiCalendarPageHtml();
   else if(UI_TAB==='pay'){
-    const al=getAL(),label=al.total>0?t('alRem'):(zh?'設定年度特休':'Atur cuti tahunan');
-    const annual=`<button class="al-bar" data-a="alEdit"><span class="insight-icon leave">${studioIcon('leave',22)}</span><span class="al-bar-copy"><strong>${label}</strong><small>${alYRange(curALY())}</small></span><b>${al.total>0?alRem()+' '+t('hr'):uiIcon('chevron',18)}</b></button>`;
-    content=`${uiScreenHeading(zh?'薪資':'Gaji',zh?'工時、加班與每一筆明細':'Jam kerja, lembur dan rincian',`<button class="icon-action" data-a="salOpen" aria-label="${zh?'薪資設定':'Pengaturan gaji'}">${uiIcon('settings',20)}</button>`)}${uiSalaryDashboardHtml(PAY_VIEW.y,PAY_VIEW.m)}${annual}`;
+    content=`${uiScreenHeading(zh?'薪資':'Gaji',zh?'工時、加班與每一筆明細':'Jam kerja, lembur dan rincian',`<button class="icon-action" data-a="salOpen" aria-label="${zh?'薪資設定':'Pengaturan gaji'}">${uiIcon('settings',20)}</button>`)}${uiSalaryDashboardHtml(PAY_VIEW.y,PAY_VIEW.m)}${MyShiftV4.annualBar()}`;
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(zh?'天氣':'Cuaca',zh?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${zh?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${opt(window.wxAlertHtml)}${rainWarnHtml()}${wxHtml()}${uiAtmosphereSceneHtml()}${opt(window.notifyCtaHtml)}`;
   }else if(UI_TAB==='more'){

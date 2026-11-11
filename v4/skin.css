@@ -664,3 +664,150 @@ body.v4 .v4-install img{flex:none;width:46px;height:46px;border-radius:14px}
 body.v4 .v4-install>span{flex:1;min-width:0;display:grid;gap:2px}body.v4 .v4-install b{font-size:.9rem;color:#fff}body.v4 .v4-install small{font-size:.72rem;color:var(--v4-ink2)}
 
 body.v4 .v4-hr>small .day{position:absolute;top:5px;left:50%;transform:translateX(-50%);padding:2px 6px;border-radius:6px;font:800 .54rem/1.1 var(--v4-num);color:#06121f;background:#ffd27a;white-space:nowrap}
+
+/* ══ 薪資頁 ══ */
+html body.v4 .app-main>.v4-pay{display:block;background:none!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  --surface:rgba(255,255,255,.07);--surface-2:rgba(255,255,255,.1);--surface-3:rgba(255,255,255,.15);--card:rgba(255,255,255,.07);--tx:#f4f7fc;--ink:#f4f7fc;--tx2:rgba(236,242,252,.76);--tx3:rgba(226,234,248,.58);--line:rgba(255,255,255,.11);--line-strong:rgba(255,255,255,.22);--pri:#8fd3ff;--brand:#8fd3ff;--on-brand:#06121f;--red:#ff8d7e;--green:#61ebad;--amber:#ffd27a;--amber-soft:rgba(255,210,122,.14);color:var(--v4-ink)}
+html body.v4 .app-main>.v4-pay::before,html body.v4 .app-main>.v4-pay::after{display:none!important}
+html body.v4 .v4-pay>.v4-root{margin:0 0 16px!important}
+html body.v4 .v4-pay>.v4-slab{background:var(--v4-glass)!important;border:1px solid var(--v4-line)!important;border-radius:var(--v4-r-slab)!important;-webkit-backdrop-filter:var(--v4-blur)!important;backdrop-filter:var(--v4-blur)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 20px 46px rgba(2,7,16,.32)!important;padding:16px!important;color:var(--v4-ink)}
+body.v4 .v4-payhead-nav{display:flex;align-items:center;gap:10px}
+body.v4 .v4-payhead-nav>div{flex:1;text-align:center;text-shadow:0 2px 16px rgba(3,8,18,.6)}
+html body.v4 .v4-payhead-nav h2{margin:0!important;font:800 1.5rem/1.1 var(--v4-num)!important;color:#fff!important}
+body.v4 .v4-payhead-nav p{margin:4px 0 0;font:600 .76rem/1 var(--v4-num);color:var(--v4-ink2)}
+body.v4 .v4-payhead-nav .prev svg{transform:rotate(180deg)}
+body.v4 .v4-payhead-jump{display:flex;gap:8px;margin-top:12px}
+body.v4 .v4-payhead-jump .v4-pill{font-size:.78rem;white-space:nowrap}
+body.v4 .v4-payhead-jump .grow{flex:1;min-width:0;justify-content:space-between}
+body.v4 .v4-payhead-jump .grow span{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis}
+html body.v4 .v4-pay>.v4-paynet{padding:18px 16px 16px!important;background:radial-gradient(120% 80% at 0% 0%,rgba(97,235,173,.2),transparent 58%),var(--v4-glass)!important}
+html body.v4 .v4-pay>.v4-paynet.slip{background:radial-gradient(120% 80% at 0% 0%,rgba(143,211,255,.22),transparent 58%),var(--v4-glass)!important}
+html body.v4 .v4-pay>.v4-paynet.incomplete{background:radial-gradient(120% 80% at 0% 0%,rgba(255,210,122,.2),transparent 58%),var(--v4-glass)!important}
+body.v4 .v4-paynet-top{display:flex;justify-content:space-between;align-items:center}
+body.v4 .v4-paynet-seal{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#06121f;background:#61ebad}
+body.v4 .v4-paynet.slip .v4-paynet-seal{background:#8fd3ff}body.v4 .v4-paynet.incomplete .v4-paynet-seal{background:#ffd27a}
+body.v4 .v4-paynet-seal svg{color:#06121f!important}
+body.v4 .v4-paynet .t{margin:14px 0 0;font-size:.84rem;font-weight:700;letter-spacing:.06em;color:var(--v4-ink2)}
+body.v4 .v4-paynet-num{display:block;margin:6px 0 4px;font:800 3.6rem/1 var(--v4-num);letter-spacing:-.04em;color:#fff;font-variant-numeric:tabular-nums}
+body.v4 .v4-paynet .m{margin:0;font-size:.76rem;line-height:1.55;color:var(--v4-ink3)}
+body.v4 .v4-paynet.pending .v4-btn{margin-top:12px}
+body.v4 .v4-flow{margin-top:16px}
+body.v4 .v4-flow-track{display:flex;gap:3px;height:12px}
+body.v4 .v4-flow-track i{border-radius:7px;background:linear-gradient(90deg,#3fcf92,#61ebad);box-shadow:0 0 14px rgba(97,235,173,.4)}
+body.v4 .v4-flow-track b{border-radius:7px;background:#ff8d7e;min-width:4px}
+body.v4 .v4-flow-label{display:flex;justify-content:space-between;margin-top:9px;font-size:.76rem;color:var(--v4-ink2)}
+body.v4 .v4-flow-label span{display:inline-flex;align-items:center;gap:6px}
+body.v4 .v4-flow-label i{width:8px;height:8px;border-radius:3px}body.v4 .v4-flow-label i.in{background:#61ebad}body.v4 .v4-flow-label i.out{background:#ff8d7e}
+body.v4 .v4-flow-label b{font:800 .95rem/1 var(--v4-num);color:#fff;margin-left:2px}
+body.v4 .v4-comp{margin-top:16px;padding-top:14px;border-top:1px solid var(--v4-line2)}
+body.v4 .v4-comp-head{font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--v4-ink3)}
+body.v4 .v4-comp-bar{display:flex;gap:2px;height:8px;margin:9px 0}
+body.v4 .v4-comp-bar i{min-width:3px;border-radius:5px}
+body.v4 .v4-comp-legend{display:flex;flex-wrap:wrap;gap:6px 14px}
+body.v4 .v4-comp-legend span{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;color:var(--v4-ink2)}
+body.v4 .v4-comp-legend i{width:8px;height:8px;border-radius:3px}
+body.v4 .v4-comp-legend b{font:800 .74rem/1 var(--v4-num);color:var(--v4-ink)}
+body.v4 .v4-paymetrics{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:16px}
+body.v4 .v4-paymetrics div{display:grid;gap:5px;padding:12px 4px 10px;text-align:center;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid var(--v4-line2)}
+body.v4 .v4-paymetrics strong{font:800 1.4rem/1 var(--v4-num);color:#fff}
+body.v4 .v4-paymetrics strong small{margin-left:2px;font-size:.5em;color:var(--v4-ink3)}
+body.v4 .v4-paymetrics span{font-size:.66rem;font-weight:700;color:var(--v4-ink3)}
+body.v4 .v4-paytags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px;font-size:.74rem}
+body.v4 .v4-paytags b{font-weight:800;color:var(--v4-ink);margin-right:2px}
+body.v4 .v4-paytags span{padding:5px 10px;border-radius:99px;background:var(--v4-glass2);border:1px solid var(--v4-line2);color:var(--v4-ink2)}
+html body.v4 .v4-pay>.v4-paydates{display:grid!important;grid-template-columns:1fr 1fr;gap:10px}
+body.v4 .v4-slab-lite{display:flex;align-items:center;gap:12px;padding:14px;border-radius:24px;background:var(--v4-glass);border:1px solid var(--v4-line);-webkit-backdrop-filter:var(--v4-blur);backdrop-filter:var(--v4-blur);color:#ffd27a}
+body.v4 .v4-slab-lite span{display:grid;gap:3px}body.v4 .v4-slab-lite small{font-size:.7rem;font-weight:600;color:var(--v4-ink2)}body.v4 .v4-slab-lite strong{font:800 1.3rem/1 var(--v4-num);color:#fff}
+html body.v4 .v4-pay>.v4-payempty{display:grid!important;justify-items:center;gap:8px;padding:34px 20px!important;text-align:center}
+body.v4 .v4-payempty-ic{width:72px;height:72px;border-radius:24px;display:grid;place-items:center;color:#ffd27a;background:rgba(255,210,122,.12);border:1px solid rgba(255,210,122,.3)}
+html body.v4 .v4-payempty h3{margin:8px 0 0!important;font-size:1.15rem!important;color:#fff!important}
+body.v4 .v4-payempty p{margin:0 0 10px;font-size:.84rem;line-height:1.6;color:var(--v4-ink2)}
+/* 可收合區塊 */
+html body.v4 .v4-fold>summary{display:flex!important;align-items:center;justify-content:space-between;gap:10px;min-height:28px;list-style:none;cursor:pointer;font-size:.98rem!important;font-weight:800!important;color:var(--v4-ink)!important;background:none!important;border:0!important;padding:0!important}
+html body.v4 .v4-fold>summary::-webkit-details-marker{display:none}
+body.v4 .v4-fold>summary>span{display:inline-flex;align-items:center;gap:8px}
+body.v4 .v4-fold>summary svg{color:var(--v4-ink2)!important;transition:transform .2s}
+body.v4 .v4-fold>summary>svg:last-child{transform:rotate(90deg)}body.v4 .v4-fold[open]>summary>svg:last-child{transform:rotate(-90deg)}
+body.v4 .v4-fold[open]>summary{margin-bottom:12px}
+/* 沿用原輸出的明細／對帳／逐日／歷月：在 .v4-pay 內重新上樣式 */
+html body.v4 .v4-pay .salary-detail-list{display:grid!important;gap:0!important;background:none!important;border:0!important;padding:0!important}
+html body.v4 .v4-pay .salary-detail-row{display:flex!important;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 2px!important;border:0!important;border-bottom:1px solid var(--v4-line2)!important;background:none!important;border-radius:0!important;font-size:.88rem!important;color:var(--v4-ink)!important}
+html body.v4 .v4-pay .salary-detail-row:last-child{border-bottom:0!important}
+html body.v4 .v4-pay .salary-detail-row span{color:var(--v4-ink2)!important}
+html body.v4 .v4-pay .salary-detail-row strong{font:800 .98rem/1 var(--v4-num)!important;color:#fff!important;white-space:nowrap}
+html body.v4 .v4-pay .salary-detail-row.deduction strong{color:#ffb3a8!important}
+html body.v4 .v4-pay .salary-detail-row.info{font-size:.76rem!important}html body.v4 .v4-pay .salary-detail-row.info strong{color:var(--v4-ink2)!important;font-size:.82rem!important}
+html body.v4 .v4-pay .salary-detail-meta{display:flex!important;flex-wrap:wrap;gap:6px!important;margin:0 0 10px!important}
+html body.v4 .v4-pay .salary-detail-meta span{padding:6px 11px!important;border-radius:99px!important;background:var(--v4-glass2)!important;border:1px solid var(--v4-line2)!important;font:700 .74rem/1 var(--v4-num)!important;color:var(--v4-ink)!important}
+html body.v4 .v4-pay .payroll-help,html body.v4 .v4-pay .payroll-reconciliation>p{margin:8px 0!important;font-size:.76rem!important;line-height:1.65!important;color:var(--v4-ink2)!important;background:none!important;border:0!important;padding:0!important}
+html body.v4 .v4-pay .payroll-help.payroll-action,html body.v4 .v4-pay .payroll-callout{margin:10px 0!important;padding:11px 13px!important;border-radius:16px!important;background:rgba(255,210,122,.1)!important;border:1px solid rgba(255,210,122,.3)!important;color:#ffe2ae!important;font-size:.78rem!important;line-height:1.6!important}
+html body.v4 .v4-pay .payroll-reconciliation{background:none!important;border:0!important;padding:0!important;margin:0!important;box-shadow:none!important}
+html body.v4 .v4-pay .payroll-reconciliation-title{display:flex;justify-content:space-between;align-items:center;gap:8px}
+html body.v4 .v4-pay .payroll-reconciliation-title h3{margin:0!important;font-size:.9rem!important;color:var(--v4-ink)!important}
+html body.v4 .v4-pay .source-badge{padding:4px 10px!important;border-radius:99px!important;font-size:.66rem!important;font-weight:800!important;color:var(--v4-ink2)!important;background:var(--v4-glass2)!important;border:1px solid var(--v4-line)!important}
+html body.v4 .v4-pay .payroll-net-compare{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important;margin:10px 0!important}
+html body.v4 .v4-pay .payroll-net-compare span{display:grid!important;gap:5px;padding:12px!important;border-radius:16px!important;background:rgba(255,255,255,.06)!important;border:1px solid var(--v4-line2)!important;font-size:.72rem!important;color:var(--v4-ink2)!important}
+html body.v4 .v4-pay .payroll-net-compare strong{font:800 1.2rem/1 var(--v4-num)!important;color:#fff!important}
+html body.v4 .v4-pay table{width:100%!important;border-collapse:collapse!important;background:none!important;font-size:.8rem!important;color:var(--v4-ink)!important}
+html body.v4 .v4-pay table caption{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+html body.v4 .v4-pay table th,html body.v4 .v4-pay table td{padding:9px 4px!important;border:0!important;border-bottom:1px solid var(--v4-line2)!important;background:none!important;color:var(--v4-ink)!important;text-align:right;font-family:var(--v4-num);font-variant-numeric:tabular-nums}
+html body.v4 .v4-pay table th:first-child{text-align:left;font-weight:600;color:var(--v4-ink2)!important}
+html body.v4 .v4-pay table thead th{font-size:.68rem!important;font-weight:700!important;color:var(--v4-ink3)!important}
+html body.v4 .v4-pay table th small{display:block;margin-top:2px;font-size:.7rem;color:var(--v4-ink3)!important}
+html body.v4 .v4-pay table th small.payroll-difference{color:#ffd27a!important;font-weight:800}
+html body.v4 .v4-pay table tr.payroll-total th,html body.v4 .v4-pay table tr.payroll-total td{font-weight:800!important;color:#fff!important;border-bottom-color:var(--v4-line)!important}
+html body.v4 .v4-pay .v4-paylegacy>details,html body.v4 .v4-pay .v4-paylegacy>section{background:none!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;border-radius:0!important}
+html body.v4 .v4-pay .v4-paylegacy summary{display:flex!important;align-items:center;justify-content:space-between;gap:10px;list-style:none;cursor:pointer;font-size:.98rem!important;font-weight:800!important;color:var(--v4-ink)!important;background:none!important;border:0!important;padding:0!important;min-height:28px}
+html body.v4 .v4-pay .v4-paylegacy summary::-webkit-details-marker{display:none}
+html body.v4 .v4-pay .v4-paylegacy summary small{display:block;margin-top:3px;font-size:.7rem;font-weight:600;color:var(--v4-ink3)!important}
+html body.v4 .v4-pay .v4-paylegacy summary svg{color:var(--v4-ink2)!important;transform:rotate(90deg)}html body.v4 .v4-pay .v4-paylegacy details[open]>summary svg{transform:rotate(-90deg)}
+html body.v4 .v4-pay .v4-paylegacy h3{margin:0 0 8px!important;font-size:.98rem!important;color:var(--v4-ink)!important}
+html body.v4 .v4-pay .v4-paylegacy p,html body.v4 .v4-pay .v4-paylegacy small{font-size:.76rem!important;line-height:1.65!important;color:var(--v4-ink2)!important}
+html body.v4 .v4-pay .payroll-audit-row{display:grid!important;gap:3px;padding:10px 0!important;border:0!important;border-top:1px solid var(--v4-line2)!important;background:none!important;border-radius:0!important}
+html body.v4 .v4-pay .payroll-audit-row strong{font:800 .86rem/1.2 var(--v4-num)!important;color:#fff!important}
+html body.v4 .v4-pay .payroll-audit-row span{font-size:.76rem!important;color:var(--v4-ink)!important}
+html body.v4 .v4-pay .payroll-audit-row small{font:500 .7rem/1.6 var(--v4-num)!important;color:var(--v4-ink3)!important}
+html body.v4 .v4-pay .payroll-history-body{padding-top:10px}
+html body.v4 .v4-pay .history-month{margin-top:8px!important;padding:12px!important;border-radius:16px!important;background:rgba(255,255,255,.05)!important;border:1px solid var(--v4-line2)!important}
+html body.v4 .v4-pay .history-month header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+html body.v4 .v4-pay .history-month header b{font:800 .95rem/1 var(--v4-num);color:#fff}
+html body.v4 .v4-pay .history-month header span{font-size:.7rem;font-weight:700;color:var(--v4-ink2)}
+html body.v4 .v4-pay .history-amounts{display:flex;gap:16px;margin-top:8px;font-size:.76rem;color:var(--v4-ink2)}
+html body.v4 .v4-pay .history-amounts b{font:800 .9rem/1 var(--v4-num);color:#fff}
+html body.v4 .v4-pay .history-month ul{margin:8px 0 0;padding-left:18px;font-size:.76rem;color:var(--v4-ink2)}
+html body.v4 .v4-pay .history-month li b{color:#ffd27a}
+html body.v4 .v4-pay>.v4-paycall{border-color:rgba(255,210,122,.4)!important;background:linear-gradient(160deg,rgba(255,210,122,.14),var(--v4-glass))!important}
+body.v4 .v4-paycall strong{font-size:.95rem;color:#ffe2ae}
+body.v4 .v4-paycall ul{margin:8px 0 12px;padding-left:18px;font-size:.8rem;line-height:1.7;color:var(--v4-ink2)}
+html body.v4 .v4-pay>.v4-paydisc{display:flex!important;gap:8px;align-items:flex-start;padding:0 8px!important;font-size:.72rem;line-height:1.6;color:var(--v4-ink2)!important;text-shadow:0 1px 10px rgba(3,8,18,.7)}
+body.v4 .v4-paydisc svg{flex:none;margin-top:2px}
+/* 特休列 */
+html body.v4 .app-main>.v4-al{display:flex!important;align-items:center;gap:12px;width:100%;padding:14px!important;text-align:left;font:inherit;color:var(--v4-ink)!important}
+body.v4 .v4-al .v4-sec-ic{--s:#61ebad}
+body.v4 .v4-al-copy{flex:1;min-width:0;display:grid;gap:4px}
+body.v4 .v4-al-copy strong{font-size:.95rem;font-weight:800;color:#fff}body.v4 .v4-al-copy small{font-size:.7rem;color:var(--v4-ink3)}
+body.v4 .v4-al-bar{display:block;height:6px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:3px}
+body.v4 .v4-al-bar u{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#61ebad,#ffd27a)}
+body.v4 .v4-al>b{flex:none;font:800 1.5rem/1 var(--v4-num);color:#61ebad}body.v4 .v4-al>b small{margin-left:3px;font-size:.45em;color:var(--v4-ink2)}
+/* 薪資設定表單（沿用原表單與所有欄位 id，重新上樣式） */
+html body.v4 #mr .payroll-form-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 2px 4px}
+html body.v4 #mr .payroll-form-heading h2{margin:0!important;font:800 1.5rem/1.1 var(--v4-num)!important;color:#fff!important}
+html body.v4 #mr .payroll-form-heading .icon-action{width:44px;height:44px;border-radius:50%!important;background:var(--v4-glass2)!important;border:1px solid var(--v4-line)!important;color:var(--v4-ink)!important;font-size:1.2rem}
+html body.v4 #mr .payroll-form>p{font-size:.82rem;line-height:1.6;color:var(--v4-ink2)!important}
+html body.v4 #mr .payroll-form-section{margin:12px 0!important;padding:14px!important;border-radius:22px!important;background:rgba(255,255,255,.055)!important;border:1px solid var(--v4-line2)!important;box-shadow:none!important;color:var(--v4-ink)!important}
+html body.v4 #mr .payroll-form-section .payroll-form-section{background:rgba(255,255,255,.04)!important}
+html body.v4 #mr .payroll-form-section::before,html body.v4 #mr .payroll-form-section::after{display:none!important}
+html body.v4 #mr .payroll-form-section h3{margin:0 0 8px!important;font-size:.98rem!important;font-weight:800!important;color:#fff!important}
+html body.v4 #mr .payroll-form-section p,html body.v4 #mr .payroll-form-section small{font-size:.76rem!important;line-height:1.6!important;color:var(--v4-ink2)!important}
+html body.v4 #mr .payroll-form-section>summary{min-height:30px;display:flex;align-items:center;font-size:.95rem!important;font-weight:800!important;color:var(--v4-ink)!important;cursor:pointer}
+html body.v4 #mr .payroll-form-grid{display:grid!important;grid-template-columns:1fr 1fr;gap:10px!important;margin-top:10px}
+html body.v4 #mr .payroll-field{display:grid!important;gap:5px;min-width:0;margin:8px 0 0}
+html body.v4 #mr .payroll-field>span{font-size:.72rem!important;font-weight:700!important;color:var(--v4-ink2)!important}
+html body.v4 #mr .payroll-field input,html body.v4 #mr .payroll-field select{width:100%!important;min-width:0}
+html body.v4 #mr .payroll-basis dl{display:grid;gap:0;margin:8px 0}
+html body.v4 #mr .payroll-basis dl>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--v4-line2)}
+html body.v4 #mr .payroll-basis dt{font-size:.8rem;color:var(--v4-ink2)}html body.v4 #mr .payroll-basis dd{margin:0;font:800 .86rem/1.3 var(--v4-num);color:#fff;text-align:right}
+html body.v4 #mr .payroll-form-actions{position:sticky!important;bottom:0!important;z-index:6;display:grid!important;grid-template-columns:auto 1fr;gap:10px!important;margin:16px -16px 0!important;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))!important;background:#0c1322!important;border-top:1px solid var(--v4-line)!important}
+html body.v4 #mr .payroll-form-actions button{min-height:52px!important;padding:0 20px!important;border-radius:20px!important;font-size:.95rem!important;font-weight:800!important;border:1px solid var(--v4-line)!important;background:var(--v4-glass2)!important;color:var(--v4-ink)!important;box-shadow:none!important}
+html body.v4 #mr .payroll-form-actions .salary-primary-action{background:#61ebad!important;border-color:transparent!important;color:#06121f!important}
+html body.v4 #mr .payroll-form-actions{box-shadow:0 60px 0 #0c1322,0 -14px 24px rgba(3,8,18,.5)!important}
