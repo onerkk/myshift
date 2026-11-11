@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#e7edea">
+  <meta name="theme-color" content="#0b1322">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="./icons/icon-apple.png">
   <title>我的班表｜My Shift</title>
@@ -47,6 +47,7 @@
   <link rel="stylesheet" href="./immersive-v341.css?v=345b-rain" data-shell-style media="print" onload="myshiftStyleLoaded(this)" onerror="myshiftStyleFailed()">
   <link rel="stylesheet" href="./daylight-v345.css?v=348-disaster" data-shell-style media="print" onload="myshiftStyleLoaded(this)" onerror="myshiftStyleFailed()">
   <link rel="stylesheet" href="./refine-v349.css?v=351c-disaster-row" data-shell-style media="print" onload="myshiftStyleLoaded(this)" onerror="myshiftStyleFailed()">
+  <link rel="stylesheet" href="./v4/skin.css?v=400" data-shell-style media="print" onload="myshiftStyleLoaded(this)" onerror="myshiftStyleFailed()">
   <!-- Same official Firebase SDK bytes; available with the site and offline. -->
   <script defer src="./vendor/firebase/10.12.0/firebase-app-compat.js"></script>
   <script defer src="./vendor/firebase/10.12.0/firebase-auth-compat.js"></script>
@@ -64,8 +65,15 @@
   <script defer src="./navigation-ui.js?v=340-actors"></script>
   <script defer src="./app.js?v=355-suspension-window"></script>
   <script defer src="./ui-effects.js?v=325-night-auto"></script>
+  <script defer src="./v4/orrery.js?v=400"></script>
+  <script defer src="./v4/view.js?v=400"></script>
+  <script defer src="./v4/calendar.js?v=400"></script>
+  <script defer src="./v4/sheet.js?v=400"></script>
+  <script defer src="./v4/pay.js?v=400"></script>
+  <script defer src="./v4/more.js?v=400"></script>
+  <script defer src="./v4/weather.js?v=400"></script>
 </head>
-<body class="myshift-ui depth-v337">
+<body class="myshift-ui depth-v337 v4">
   <div id="splash"><img src="./icons/icon-192x192.png" alt=""><h1>我的班表</h1><p>My Shift</p></div>
   <div id="app"></div>
   <div id="mr"></div>

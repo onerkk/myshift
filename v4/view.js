@@ -85,7 +85,7 @@ window.uiTodayHeroHtml=function(){
   var rest=experienceRestRun(TY,TM,TD),nextOff=rest&&rest.offset>0?(zh?rest.offset+' 天後休假':'Libur dalam '+rest.offset+' hari'):s==='休'?(zh?'好好休息':'Selamat beristirahat'):(zh?'依目前輪班設定':'Sesuai pengaturan shift');
   var y=row?row.y:TY,m=row?row.m:TM,d=row?row.d:TD,day=calendarDayInfo(y,m,d),own=day.events.filter(function(e){return e.own||e.id==='annualL'||e.id==='typhoon'});
   var taskText=day.events.length?(zh?day.events.length+' 項事項':day.events.length+' agenda'):day.leaveCount>0?(zh?day.leaveCount+' 人請假':day.leaveCount+' cuti'):(zh?'今日行程':'Agenda hari ini');
-  var count=esc(value).replace(/(\d+)\s*(小時|分|jam|mnt|menit|j|m)(?![a-z])/gi,'$1<small>$2</small>');
+  var count=esc(value).replace(/(\d+)\s*(小時|分鐘|分|jam|mnt|menit|j|m)(?![a-z])/gi,'$1<small>$2</small>');
   var regMin=rule.regularMinutes!=null?rule.regularMinutes:Math.min(8,rule.shiftHours)*60,otMin=rule.overtimeMinutes!=null?rule.overtimeMinutes:Math.max(0,rule.shiftHours-8)*60,regular=regMin/60,ot=otMin/60;
   var core=rule.isWork?Math.round(progress)+'<small>%</small>':s==='休'?'OFF':'—';
   var tag=s==='休'?(zh?'輪班休假':'Libur shift'):studioShiftLabel(s);
