@@ -37,3 +37,19 @@ input[type=range]::-webkit-slider-thumb{background:#fff!important;border:0!impor
 .overlay .retry{min-height:50px;border-radius:99px!important;background:#61ebad!important;border:0!important;color:#06121f!important;font-weight:800!important}
 .overlay-back{color:#9fd0ff!important}
 .spinner{border-color:rgba(255,255,255,.18)!important;border-top-color:#61ebad!important}
+
+/* ── 大地圖模式（預設）：上下面板只留必要控制，地圖佔滿畫面；右側按鈕可切回完整控制 ── */
+.fab-max{position:fixed;z-index:1001;right:12px;bottom:calc(var(--ctrl-height) + 66px);width:46px!important;height:46px!important;border-radius:50%!important;display:grid!important;place-items:center;background:rgba(9,15,27,.86)!important;border:1px solid rgba(255,255,255,.16)!important;color:#fff!important;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 12px 30px rgba(1,5,12,.5)!important}
+body.map-max{--ctrl-height:150px}
+body.map-max .topcard{padding:8px 10px!important;border-radius:26px!important;max-width:520px}
+body.map-max .topcard>*:not(.radar-topbar){display:none!important}
+body.map-max .radar-title span{display:none}
+body.map-max .radar-title h1{font-size:1rem!important;margin:0!important}
+body.map-max .backchip{width:40px!important;height:40px!important}
+body.map-max .ctrlcard{padding:10px 12px 12px!important;border-radius:26px!important}
+body.map-max .ctrlcard>.cloud-map-caption,body.map-max .ctrlcard>.rlabels,body.map-max .ctrlcard>.nowcast-strip,body.map-max .ctrlcard>.hour-strip,body.map-max .ctrlcard>.legend{display:none!important}
+body.map-max .ctrlcard .buttons{margin-top:8px!important}
+body.map-max .play{min-height:46px!important}
+body.map-max .step{width:42px!important;height:42px!important}
+body.map-max{--ctrl-height:176px}
+.fab-max{bottom:calc(var(--ctrl-height) + 80px)}

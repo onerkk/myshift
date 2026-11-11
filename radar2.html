@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <link rel="stylesheet" href="./radar-ui.css?v=352-nowcast">
-<link rel="stylesheet" href="./v4/radar.css?v=403">
+<link rel="stylesheet" href="./v4/radar.css?v=404">
 </head>
 <body>
 <div id="map"></div>
@@ -28,6 +28,8 @@
     </div>
   </section>
 </div>
+<button class="fab-max" id="mapMax" type="button" aria-pressed="true" aria-label="切換大地圖／完整控制" title="切換大地圖／完整控制"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+<script>(function(){var k="_radarMapMax",on=true;try{on=localStorage.getItem(k)!=="0"}catch(e){}function apply(){document.body.classList.toggle("map-max",on);var b=document.getElementById("mapMax");if(b)b.setAttribute("aria-pressed",on);setTimeout(function(){window.dispatchEvent(new Event("resize"))},60)}document.getElementById("mapMax").addEventListener("click",function(){on=!on;try{localStorage.setItem(k,on?"1":"0")}catch(e){}apply()});apply()})();</script>
 <button class="fab" id="recenter" aria-label="回到我的位置" title="回到我的位置"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg></button>
 
 <div class="ctrl">
