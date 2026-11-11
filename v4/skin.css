@@ -1094,41 +1094,23 @@ html body.v4 .wx-location-sheet .wx-source-credit a{color:var(--c-sky)!important
 body.v4 .v4-count.text{font-size:2.3rem;letter-spacing:-.01em;line-height:1.15;margin:8px 0 6px}
 
 /* ══════════ 日間外觀（更多 → 介面外觀 → 日間；或自動模式的白天）══════════
-   做法：面板內的顏色全部走變數，日間只換變數 —— 面板變成淺色霧面玻璃＋深色字。
-   維持深色的部分（刻意）：今日主視覺（天球儀是一扇看向夜空的窗）、所有彈窗與對話框、光景卡；
-   直接壓在天空上的文字（日期、頁面標題、區塊標題）不跟外觀走，因為天空明暗是跟實際時間，不是跟這個設定。 */
-html:not([data-theme=dark]) body.v4 :is(.v4-slab,.v4-week-row,.v4-slab-lite,.v4-insight,.v4-hl-tile,.v4-feature-grid>button,.v4-anchor,.v4-setup-card,.v4-opt,.v4-nav,.v4-round,.v4-pill,.v4-back,.v4-dock>button>span,.v4-setup-lang,.v4-rot){
-  --v4-ink:#14283a;--v4-ink2:rgba(20,40,58,.78);--v4-ink3:rgba(20,40,58,.58);--v4-strong:#0a1a2a;--v4-w:18,38,60;
-  --v4-glass:rgba(247,250,255,.8);--v4-glass2:rgba(18,38,60,.06);--v4-line:rgba(18,38,60,.16);--v4-line2:rgba(18,38,60,.09);
-  --v4-bar:rgba(247,250,255,.86);--v4-sticky:rgba(236,242,250,.96);
-  --v4-early:#0b9a66;--v4-mid:#b56a00;--v4-night:#6552de;--v4-off:#3877ad;--v4-none:#5d6b7e;
-  --c-mint:#0a7d54;--c-gold:#8f5b00;--c-sky:#1767aa;--c-coral:#b93a2c;--c-sand:#7a5200;--c-ice:#1d5f96;--c-rose:#c4402f;--c-violet:#5a45c8;
-  --surface:rgba(18,38,60,.05);--surface-2:rgba(18,38,60,.07);--surface-3:rgba(18,38,60,.11);--card:rgba(18,38,60,.05);--tx:#14283a;--ink:#14283a;--tx2:rgba(20,40,58,.78);--tx3:rgba(20,40,58,.58);--line:rgba(18,38,60,.12);--line-strong:rgba(18,38,60,.24);--pri:#1767aa;--brand:#1767aa;--on-brand:#fff;--red:#c2392b;--green:#0a7d54;--amber:#8f5b00;--amber-soft:rgba(143,91,0,.12);
-  color:var(--v4-ink);color-scheme:light}
-html:not([data-theme=dark]) body.v4 :is(.v4-slab,.v4-week-row,.v4-slab-lite,.v4-insight,.v4-hl-tile,.v4-feature-grid>button,.v4-anchor,.v4-setup-card,.v4-opt){box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 18px 40px rgba(20,40,70,.18)!important}
-html:not([data-theme=dark]) body.v4 :is(.v4-slab,.v4-insight,.v4-anchor){background-color:var(--v4-glass)}
-html:not([data-theme=dark]) body.v4 .v4-chip.tone-meeting,html:not([data-theme=dark]) body.v4 .tone-meeting{--t:#5a45c8}html:not([data-theme=dark]) body.v4 .v4-chip.tone-health,html:not([data-theme=dark]) body.v4 .tone-health{--t:#0d8674}html:not([data-theme=dark]) body.v4 .v4-chip.tone-pay,html:not([data-theme=dark]) body.v4 .tone-pay{--t:#8f5b00}
-html:not([data-theme=dark]) body.v4 .v4-chip.tone-annual,html:not([data-theme=dark]) body.v4 .tone-annual,html:not([data-theme=dark]) body.v4 .v4-chip.tone-own,html:not([data-theme=dark]) body.v4 .tone-own{--t:#1767aa}html:not([data-theme=dark]) body.v4 .v4-chip.tone-personal,html:not([data-theme=dark]) body.v4 .tone-personal{--t:#a35400}html:not([data-theme=dark]) body.v4 .tone-holiday{--t:#c2392b}html:not([data-theme=dark]) body.v4 .tone-adjusted{--t:#4a5a70}
-html:not([data-theme=dark]) body.v4 .v4-slab .v4-sec-ic:not([style]){--s:var(--c-coral)}
-html:not([data-theme=dark]) body.v4 .v4-cell{background:linear-gradient(180deg,color-mix(in srgb,var(--s) 20%,#fff),color-mix(in srgb,var(--s) 6%,#fff) 60%,rgba(255,255,255,.7))}
-html:not([data-theme=dark]) body.v4 .v4-cell.v4-s-off{background:rgba(255,255,255,.55)}
-html:not([data-theme=dark]) body.v4 .v4-cell.today{background:linear-gradient(180deg,color-mix(in srgb,var(--s) 34%,#fff),color-mix(in srgb,var(--s) 12%,#fff))}
-html:not([data-theme=dark]) body.v4 .v4-switch,html:not([data-theme=dark]) body.v4 .v4-seg{background:rgba(18,38,60,.08)}
-html:not([data-theme=dark]) body.v4 .v4-switch button[aria-pressed=true],html:not([data-theme=dark]) body.v4 .v4-seg button[aria-pressed=true]{background:#fff;border-color:rgba(18,38,60,.14);box-shadow:0 2px 8px rgba(20,40,70,.16)}
-html:not([data-theme=dark]) body.v4 .v4-filters button[aria-pressed=true]{background:#14283a;border-color:#14283a;color:#fff!important}
-html:not([data-theme=dark]) body.v4 .v4-nav-item.on{color:#0a1a2a!important}
-html:not([data-theme=dark]) body.v4 :is(.v4-tide-status,.v4-tile,.v4-point.wet){background-color:rgba(255,255,255,.5)}
-html:not([data-theme=dark]) body.v4 .v4-tide .tide-point circle{fill:#fff}
-html:not([data-theme=dark]) body.v4 .v4-tide .tide-line{stroke:#1767aa}html:not([data-theme=dark]) body.v4 .v4-tide{color:#1767aa}
-html:not([data-theme=dark]) body.v4 .v4-precip .pb rect.bg{fill:rgba(18,38,60,.07)}
-html:not([data-theme=dark]) body.v4 .v4-precip text{fill:rgba(20,40,58,.62)}html:not([data-theme=dark]) body.v4 .v4-precip text.top{fill:#0a1a2a}
-html:not([data-theme=dark]) body.v4 .v4-tide .tide-curve text{fill:rgba(20,40,58,.62)}
-html:not([data-theme=dark]) body.v4 .v4-hl-tile{background:linear-gradient(160deg,color-mix(in srgb,var(--t) 14%,#fff),rgba(247,250,255,.8) 70%)}
-html:not([data-theme=dark]) body.v4 .v4-legacy{--surface:rgba(18,38,60,.05);--surface-2:rgba(18,38,60,.07);--surface-3:rgba(18,38,60,.11);--card:rgba(18,38,60,.05);--tx:#14283a;--ink:#14283a;--tx2:rgba(20,40,58,.78);--tx3:rgba(20,40,58,.58);--line:rgba(18,38,60,.12);--line-strong:rgba(18,38,60,.24);--pri:#1767aa;--brand:#1767aa;color-scheme:light}
-html:not([data-theme=dark]) body.v4 .v4-legacy a,html:not([data-theme=dark]) body.v4 .v4-credit a{color:#1767aa!important}
-html:not([data-theme=dark]) body.v4 .v4-pay{--surface:rgba(18,38,60,.05);--surface-2:rgba(18,38,60,.07);--card:rgba(18,38,60,.05);--tx:#14283a;--ink:#14283a;--tx2:rgba(20,40,58,.78);--tx3:rgba(20,40,58,.58);--line:rgba(18,38,60,.12)}
-/* 維持深色的範圍：把變數設回深色值 */
-html:not([data-theme=dark]) body.v4 :is(.atmosphere-view,.v4-avatar){--v4-ink:#f4f7fc;--v4-ink2:rgba(236,242,252,.74);--v4-strong:#fff;--v4-w:255,255,255;--v4-line:rgba(255,255,255,.14)}
+   v405 重做：使用者回饋「白天配色沒有夜間清楚直觀」。v404 的淺色霧面＋深字版本整段移除。
+   現在日間與夜間是同一套語言（深色玻璃＋亮字＋發光班別色），只換玻璃：
+   夜間＝近黑、較透，柔和；日間＝鋼藍、較實，字更白、線更亮，大太陽下也看得清楚。 */
+html:not([data-theme=dark]) body.v4{
+  --v4-glass:rgba(20,48,96,.82);--v4-glass2:rgba(255,255,255,.11);--v4-line:rgba(255,255,255,.26);--v4-line2:rgba(255,255,255,.14);
+  --v4-ink:#ffffff;--v4-ink2:rgba(240,246,255,.86);--v4-ink3:rgba(228,238,252,.68);
+  --v4-bar:rgba(16,42,88,.9);--v4-sticky:rgba(12,34,74,.96);--v4-blur:blur(22px) saturate(1.5);
+  --v4-early:#5df2b0;--v4-mid:#ffc65c;--v4-night:#b7abff;--v4-off:#a3d0f5}
+html:not([data-theme=dark]) body.v4 .app-main>.v4-hero::before{background:radial-gradient(120% 60% at 50% 0%,color-mix(in srgb,var(--s) 18%,transparent),transparent 62%),linear-gradient(180deg,rgba(22,54,108,.66),rgba(12,34,78,.88))!important;border-color:rgba(255,255,255,.26)!important}
+html:not([data-theme=dark]) body.v4 .v4-hl-tile{background:linear-gradient(160deg,color-mix(in srgb,var(--t) 24%,rgba(20,48,96,.82)),rgba(20,48,96,.82) 70%)}
+html:not([data-theme=dark]) body.v4 .v4-round,html:not([data-theme=dark]) body.v4 .v4-pill,html:not([data-theme=dark]) body.v4 .v4-back{box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 8px 22px rgba(6,20,48,.34)}
+html:not([data-theme=dark]) body.v4 #mr .modal-sheet,html:not([data-theme=dark]) body.v4 .wx-detail-sheet{background:linear-gradient(180deg,rgba(20,46,92,.985),rgba(11,28,62,.99))!important;border-color:rgba(255,255,255,.24)!important}
+html:not([data-theme=dark]) body.v4 #mr .modal-sheet>.sheet-returnbar,html:not([data-theme=dark]) body.v4 .wx-detail-sheet>.sheet-returnbar,html:not([data-theme=dark]) body.v4 .sheet-returnbar,html:not([data-theme=dark]) body.v4 #mr .v4-sheet>.v4-sheet-nav,html:not([data-theme=dark]) body.v4 .v4-sheet-nav{background:#14305f!important}
+html:not([data-theme=dark]) body.v4 .v4-hrow.head{background:#14305f}
+html:not([data-theme=dark]) body.v4 #mr .payroll-form-actions{background:#102750!important;box-shadow:0 60px 0 #102750,0 -14px 24px rgba(6,20,48,.5)!important}
+html:not([data-theme=dark]) body.v4 .v4-dlg{background:linear-gradient(180deg,rgba(22,50,98,.99),rgba(12,30,66,.995))}
+html:not([data-theme=dark]) body.v4 .v4-dlg-scrim,html:not([data-theme=dark]) body.v4 #mr .modal-bg,html:not([data-theme=dark]) body.v4 .wx-detail{background:rgba(6,18,44,.56)!important}
 
 /* ══ 窄螢幕（360px）修正 ══ */
 body.v4 .v4-top.has-back .v4-date{min-width:0;flex:1}
