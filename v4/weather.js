@@ -33,7 +33,7 @@ function hourlyStripHtml(d){
     const ms=new Date(d.hTime[i]).getTime();if(!Number.isFinite(ms))continue;
     const temp=num(d.hTemp&&d.hTemp[i]),pop=d.hPrec?_normalPop(d.hPrec[i]):null,code=num(d.hCode&&d.hCode[i]),on=onShift(ms),dt=new Date(ms),dk=dt.getDate();
     if(on)any=true;
-    const dayMark=lastDate!==''&&dk!==lastDate?`<span class="day">${dt.getMonth()+1}/${dk}</span>`:'';lastDate=dk;
+    const dayMark=lastDate!==''&&dk!==lastDate?`<span class="v4-dmark">${dt.getMonth()+1}/${dk}</span>`:'';lastDate=dk;
     items.push(`<div class="v4-hr${on?' on':''}${items.length===0?' now':''}${pop!==null&&pop>=70?' wet2':pop!==null&&pop>=40?' wet':''}" role="listitem" aria-label="${two(dt.getHours())}:00 ${temp!==null?Math.round(temp)+'°C':''} ${pop!==null?(zh?'降雨 ':'Hujan ')+pop+'%':''}${on?(zh?' 上班時段':' jam kerja'):''}"><small>${items.length===0?(zh?'現在':'Kini'):two(dt.getHours())}${dayMark}</small><i>${code!==null?studioWeatherIcon(code,20):'·'}</i><b>${temp!==null?Math.round(temp)+'°':'—'}</b><span class="pop"><u style="height:${pop===null?0:Math.max(4,pop)}%"></u></span><em>${pop===null?'—':pop+'%'}</em></div>`);
   }
   if(items.length<3)return'';
@@ -125,7 +125,7 @@ window.rCal=function(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(zh?'天氣':'Cuaca',zh?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${zh?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${opt(window.wxAlertHtml)}${rainWarnHtml()}${wxHtml()}${uiAtmosphereSceneHtml()}${opt(window.notifyCtaHtml)}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(zh?'更多':'Lainnya',zh?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v402</p>`;
+    content=`${uiScreenHeading(zh?'更多':'Lainnya',zh?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v403</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${opt(window.wxAlertHtml)}${rainWarnHtml()}${uiQuickToolsHtml()}${uiDayFocusHtml()}${uiWeekStripHtml()}${uiShiftWeatherHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}${uiAtmosphereSceneHtml()}${opt(window.notifyCtaHtml)}`;
   }

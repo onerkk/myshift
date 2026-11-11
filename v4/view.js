@@ -97,7 +97,7 @@ window.uiTodayHeroHtml=function(){
      +'<div class="v4-orbit-readout" role="status"></div>'
      +'<p class="v4-orbit-hint"><i>‹</i>'+(zh?'拖曳太陽，預看每個小時':'Geser matahari untuk melihat tiap jam')+'<i>›</i></p>'
    +'</div>'
-   +'<div class="v4-hero-copy"><p class="v4-lead">'+lead+'</p><h1 class="v4-count">'+count+'</h1><p class="v4-ctx">'+m+'/'+d+' '+(zh?'班表歸屬日':'Tanggal jadwal')+'</p></div>'
+   +'<div class="v4-hero-copy"><p class="v4-lead">'+lead+'</p><h1 class="v4-count'+(/\d/.test(value)?'':' text')+'">'+count+'</h1><p class="v4-ctx">'+m+'/'+d+' '+(zh?'班表歸屬日':'Tanggal jadwal')+'</p></div>'
    +(rule.isWork?'<div class="v4-line"><div class="v4-line-labels"><span>'+time.start+'</span><span>'+(zh?'班次進度':'Progres')+' '+Math.round(progress)+'%</span><span>'+time.end+'</span></div>'
      +'<div class="v4-track" style="--reg:'+(regular/rule.shiftHours*100)+'%;--p:'+progress.toFixed(1)+'%" role="progressbar" aria-label="'+(zh?'排定班次進度':'Progres jadwal')+'" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+Math.round(progress)+'"><span></span><i></i></div>'
      +'<div class="v4-segs"><span><i class="reg"></i>'+(zh?'正常班制':'Jam normal')+' '+regular+'h</span>'+(ot?'<span><i class="ot"></i>'+(zh?'排定加班':'Lembur terjadwal')+' '+ot+'h</span>':'')+'</div></div>'
