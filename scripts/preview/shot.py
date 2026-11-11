@@ -23,7 +23,7 @@ async def main():
                 if r is not None: print("step",i,"=>",str(r)[:1500])
             except Exception as e: print("step",i,"ERR",str(e)[:300])
             await pg.wait_for_timeout(1800)
-            await pg.screenshot(path=f"{out}-{i}.png")
+            await pg.screenshot(path=f"{out}-{i}.png",full_page=bool(__import__("os").environ.get("FULL")))
         print("\n".join(errs[:12]))
         await b.close()
 asyncio.run(main())

@@ -8,7 +8,7 @@ var VS='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
 var FS=[
 'precision highp float;',
 'uniform vec2 uRes;uniform float uT,uHour,uNow,uMoon,uSway,uWork;uniform vec3 uShift,uCol;',
-'const float PI=3.14159265;const float R=1.4;',
+'const float PI=3.14159265;const float R=1.4;float PXS;',
 'vec3 U=vec3(1.,0.,0.);vec3 V=vec3(0.,.588,.809);vec3 N=vec3(0.,-.809,.588);',
 'float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}',
 'float vn(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);',
@@ -16,16 +16,17 @@ var FS=[
 '  mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}',
 'float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*vn(p);p=p*2.03+7.1;a*=.5;}return s;}',
 'vec3 onRing(float h){float a=(h-6.)/24.*2.*PI;return R*(-cos(a)*U+sin(a)*V);}',
-'float sph(vec3 ro,vec3 rd,vec3 c,float r){vec3 oc=ro-c;float b=dot(oc,rd);float h=b*b-(dot(oc,oc)-r*r);if(h<0.)return -1.;return -b-sqrt(h);}',
+// 回傳 (t, 邊緣覆蓋率)：輪廓做解析式抗鋸齒
+'vec2 sph(vec3 ro,vec3 rd,vec3 c,float r){vec3 oc=ro-c;float b=dot(oc,rd);if(b>0.)return vec2(-1.,0.);float d2=dot(oc,oc)-b*b;float d=sqrt(max(d2,0.));float px=-b*PXS;float cov=smoothstep(r+px,r-px,d);if(cov<=0.)return vec2(-1.,0.);return vec2(-b-sqrt(max(r*r-d2,0.)),cov);}',
 'mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}',
 'void main(){',
-' vec2 uv=(gl_FragCoord.xy-.5*uRes)/uRes.y;float asp=uRes.x/uRes.y;uv/=min(1.,asp/1.34);',
+' vec2 uv=(gl_FragCoord.xy-.5*uRes)/uRes.y;float asp=uRes.x/uRes.y;float fit=min(1.,asp/1.34);uv/=fit;PXS=.47/uRes.y/fit;',
 ' vec3 ro=vec3(0.,.1,5.2);vec3 rd=normalize(vec3(uv*.47,-1.));',
 ' mat2 sw=rot(uSway*.09);ro.xz=sw*ro.xz;rd.xz=sw*rd.xz;',
 ' vec3 sunP=onRing(uHour);vec3 moonP=onRing(uHour-uMoon*24.);vec3 L=normalize(sunP);',
 ' float t[4];vec4 c[4];',
 // planet
-' t[0]=sph(ro,rd,vec3(0.),.6);c[0]=vec4(0.);',
+' vec2 s0=sph(ro,rd,vec3(0.),.6);t[0]=s0.x;c[0]=vec4(0.);',
 ' if(t[0]>0.){vec3 p=ro+rd*t[0];vec3 n=normalize(p);float df=dot(n,L);float day=smoothstep(-.18,.3,df);',
 '  vec3 q=n;q.xz=rot(uT*.05+uHour*.2618)*q.xz;q.xy=rot(.4)*q.xy;',
 '  float land=smoothstep(.5,.56,fbm(q*2.3+3.));float cl=smoothstep(.52,.72,fbm(q*3.4+vec3(uT*.02,0.,9.)));',
@@ -35,30 +36,31 @@ var FS=[
 '  dayc=dayc*(.25+1.05*max(df,0.))+spec*vec3(1.,.9,.7)*.7;',
 '  float city=land*step(.82,vn(q*38.))*(1.-cl);vec3 night=vec3(.012,.022,.05)+city*vec3(1.,.72,.36)*.9;',
 '  vec3 col=mix(night,dayc,day);float fr=pow(1.-max(dot(n,-rd),0.),2.6);',
-'  col+=fr*mix(vec3(.3,.6,1.),uCol,.45)*(.18+.9*day);c[0]=vec4(col,1.);}',
+'  col+=fr*mix(vec3(.3,.6,1.),uCol,.45)*(.18+.9*day);c[0]=vec4(col,s0.y);}',
 // sun
-' t[1]=sph(ro,rd,sunP,.135);c[1]=vec4(0.);',
+' vec2 s1=sph(ro,rd,sunP,.135);t[1]=s1.x;c[1]=vec4(0.);',
 ' if(t[1]>0.){vec3 n=normalize(ro+rd*t[1]-sunP);float mu=max(dot(n,-rd),0.);float g=fbm(n*6.+uT*.15);',
-'  c[1]=vec4(mix(vec3(1.,.55,.16),vec3(1.,.97,.86),pow(mu,.55))*(.92+.25*g),1.);}',
+'  c[1]=vec4(mix(vec3(1.,.55,.16),vec3(1.,.97,.86),pow(mu,.55))*(.92+.25*g),s1.y);}',
 // moon
-' t[2]=sph(ro,rd,moonP,.085);c[2]=vec4(0.);',
+' vec2 s2=sph(ro,rd,moonP,.085);t[2]=s2.x;c[2]=vec4(0.);',
 ' if(t[2]>0.){vec3 n=normalize(ro+rd*t[2]-moonP);float df=max(dot(n,normalize(sunP-moonP)),0.);',
-'  float cr=fbm(n*7.+4.);c[2]=vec4(vec3(.8,.83,.9)*(.55+.6*cr)*(.05+1.05*df)+vec3(.02,.03,.05),1.);}',
+'  float cr=fbm(n*7.+4.);c[2]=vec4(vec3(.8,.83,.9)*(.55+.6*cr)*(.05+1.05*df)+vec3(.02,.03,.05),s2.y);}',
 // ring plane
 ' t[3]=-1.;c[3]=vec4(0.);float dn=dot(rd,N);',
 ' if(abs(dn)>1e-4){float tr=-dot(ro,N)/dn;if(tr>0.){vec3 p=ro+rd*tr;float x=dot(p,U),y=dot(p,V);float r=length(vec2(x,y));',
-'  float px=tr*.9/uRes.y;float h=mod(atan(y,-x)/(2.*PI)*24.+6.,24.);float dr=abs(r-R);',
+'  float px=tr*PXS*1.5;float h=mod(atan(y,-x)/(2.*PI)*24.+6.,24.);float dr=abs(r-R);',
 '  vec3 col=vec3(0.);float al=0.;',
 '  float base=smoothstep(.011+px,.011-px,dr)*.34;col+=vec3(.85,.9,1.)*base;al+=base;',
 '  float fh=abs(fract(h+.5)-.5)*(2.*PI*R/24.);float major=step(abs(fract(h/6.+.5)-.5)*6.,.5);',
 '  float tl=mix(.05,.11,major);float tk=smoothstep(.009+px,.009-px,fh)*step(R-.035-tl,r)*step(r,R-.035)*mix(.3,.75,major);',
 '  col=mix(col,vec3(.9,.94,1.),tk);al=max(al,tk);',
-'  if(uWork>.5){float dh=mod(h-uShift.x,24.);float tot=uShift.y+uShift.z;float de=mod(uNow-uShift.x,24.);',
-'   float ins=step(dh,tot);float done=step(dh,de)*step(de,tot);float isOt=step(uShift.y,dh);',
-'   float band=smoothstep(.05+px,.05-px,dr)*ins;float lum=mix(.42,1.,done);',
-'   vec3 sc=mix(uCol,mix(uCol,vec3(1.),.5),isOt);float dash=mix(1.,.55+.45*step(.5,fract(dh*4.)),isOt);',
-'   col=mix(col,sc*lum*dash,band);al=max(al,band*.96);',
-'   float gl=exp(-dr*16.)*ins*(.12+.3*done);col+=uCol*gl;al=max(al,gl*.8);}',
+'  if(uWork>.5){float hu=2.*PI*R/24.;float eh=px/hu;float dh=mod(h-uShift.x,24.);float tot=uShift.y+uShift.z;float de=mod(uNow-uShift.x,24.);float prog=de<=tot?de:-1.;',
+'   float so=dh>tot?min(dh-tot,24.-dh)*hu:0.;float dist=length(vec2(dr,so));float dhc=dh>tot?((dh-tot)<(24.-dh)?tot:0.):dh;',
+'   float done=prog<0.?0.:smoothstep(prog+eh,prog-eh,dhc);float isOt=smoothstep(uShift.y-eh,uShift.y+eh,dhc)*step(.01,uShift.z);',
+'   float hw=mix(.024,.05,done);float band=smoothstep(hw+px,hw-px,dist);',
+'   float dd=abs(fract(dhc*2.)-.5);float gap=smoothstep(.07-eh*2.,.07+eh*2.,dd);float dash=mix(1.,mix(.18,1.,gap),isOt);',
+'   vec3 sc=mix(uCol,mix(uCol,vec3(1.),.4),isOt)*mix(.66,1.,done);col=mix(col,sc,band*dash);al=max(al,band*dash*.97);',
+'   float gl=exp(-dist*15.)*(.08+.34*done);col+=uCol*gl;al=max(al,gl*.8);}',
 '  float dnw=length(p-onRing(uNow));float pip=smoothstep(.05+px,.05-px,dnw);float pr=smoothstep(.085+px,.085-px,dnw)-smoothstep(.066+px,.066-px,dnw);',
 '  col=mix(col,vec3(1.),pip);al=max(al,pip);col+=vec3(1.)*pr*.8;al=max(al,pr*.8);',
 '  if(al>.002){t[3]=tr;c[3]=vec4(col,min(al,1.));}}}',
@@ -67,7 +69,7 @@ var FS=[
 ' for(int k=0;k<4;k++){float best=1e9;int bi=-1;for(int i=0;i<4;i++){if(t[i]>0.&&t[i]<best){best=t[i];bi=i;}}',
 '  if(bi<0)break;for(int i=0;i<4;i++){if(i==bi){acc+=(1.-A)*c[i].rgb*(i==3?1.:c[i].a);A+=(1.-A)*c[i].a;t[i]=-1.;}}}',
 // glows
-' float tc=dot(sunP-ro,rd);float ds=length(ro+rd*tc-sunP);float occ=1.;float tp=sph(ro,rd,vec3(0.),.6);if(tp>0.&&tp<tc)occ=.08;',
+' float tc=dot(sunP-ro,rd);float ds=length(ro+rd*tc-sunP);float occ=1.;float tp=s0.x;if(tp>0.&&tp<tc)occ=.08;',
 ' float g=(exp(-ds*4.2)*.5+exp(-ds*13.)*.75)*occ;acc+=vec3(1.,.78,.42)*g;A=min(1.,A+g*.7);',
 ' float tm=dot(moonP-ro,rd);float dm=length(ro+rd*tm-moonP);float gm=exp(-dm*11.)*.22*(tp>0.&&tp<tm?.1:1.);acc+=vec3(.7,.8,1.)*gm;A=min(1.,A+gm*.6);',
 ' float t0=dot(-ro,rd);float d0=length(ro+rd*t0);if(d0>.6){float ha=exp(-(d0-.6)*8.)*.34;acc+=mix(vec3(.3,.6,1.),uCol,.5)*ha*(1.-A);A=min(1.,A+ha*.55*(1.-A));}',
@@ -96,7 +98,7 @@ function init(){
 function moonPhase(d){var syn=29.530588853,ref=Date.UTC(2000,0,6,18,14);var p=((d-ref)/864e5)%syn;if(p<0)p+=syn;return p/syn}
 function nowHour(){var d=new Date();return d.getHours()+d.getMinutes()/60+d.getSeconds()/3600}
 function size(){
-  var r=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(2,Math.round(r.width*dpr)),h=Math.max(2,Math.round(r.height*dpr));
+  var r=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,3);if(r.width*r.height*dpr*dpr>1.7e6)dpr=Math.sqrt(1.7e6/(r.width*r.height));var w=Math.max(2,Math.round(r.width*dpr)),h=Math.max(2,Math.round(r.height*dpr));
   if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
 }
 function draw(ts){
