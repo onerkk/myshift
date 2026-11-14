@@ -215,7 +215,9 @@
         // birds and butterflies must keep flying in front of the panels at full strength.
         if(!glMask){glMask=document.createElement('canvas');glMaskCtx=glMask.getContext('2d')}
         if(glMask.width!==mask.width||glMask.height!==mask.height){glMask.width=mask.width;glMask.height=mask.height}
-        const g=glMaskCtx;g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,glMask.width,glMask.height);g.fillStyle='#000';g.globalAlpha=.5;
+        const g=glMaskCtx;g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,glMask.width,glMask.height);g.fillStyle='#000';g.globalAlpha=.5;const theatre=document.body.classList.contains('scene-theatre');
+        // Theatre hides the app, so nothing needs protecting except the preview HUD.
+        if(theatre){g.globalAlpha=1;const hudEl=document.getElementById('nature-preview-hud');if(hudEl){const r=hudEl.getBoundingClientRect();if(r.width>0)g.fillRect((r.left-6)*m,(r.top-6)*m,(r.width+12)*m,(r.height+12)*m)}root.SkyGL.setMask(glMask);return}
         for(const r of pageRects){if(!r.panel)continue;const top=r.t-sy,left=r.l-sx;if(top+r.h<0||top>h)continue;g.fillRect(left*m,top*m,r.w*m,r.h*m)}
         g.globalAlpha=1;g.drawImage(mask,0,0);root.SkyGL.setMask(glMask);
       }
@@ -537,7 +539,7 @@
         const lighting=document.createElement('select');lighting.className='scene-lighting';lighting.setAttribute('aria-label','預覽光線');lighting.innerHTML='<option value="auto">目前光線</option><option value="day">白天</option><option value="night">夜晚</option>';lighting.onchange=e=>{sceneLighting=e.target.value;gradeKey='';syncSound();resume()};hud.insertBefore(lighting,hud.lastChild);document.body.appendChild(hud);
         sceneCaption=document.createElement('div');sceneCaption.className='theatre-caption';sceneCaption.setAttribute('aria-hidden','true');document.body.appendChild(sceneCaption)}
       hud.hidden=!active;const pure=active&&theatre&&!seasonPreview;
-      document.body.classList.toggle('scene-theatre',pure);
+      document.body.classList.toggle('scene-theatre',pure);scrollDirty=true;
       const app=document.getElementById('app');if(app)app.inert=pure;
       if(sceneCaption)sceneCaption.hidden=!pure;
       if(!active)return;
