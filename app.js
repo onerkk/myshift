@@ -3812,7 +3812,10 @@ async function _refreshWxExtras(wx,pos,revision){
       if(Date.now()-_wxTideAt<3600000)return;
       _wxTideAt=Date.now();
       try{
-        const {data:td}=await WeatherData.json('https://cwa-tide.onerkk.workers.dev',{timeout:10000});
+        // v409：帶座標（取到小數 2 位，約 1 公里，利於快取）。新版 worker 只回最近的一個地點（幾 KB）；
+        // 舊版 worker 會忽略參數、照舊回整份 5 MB 資料，所以逾時放寬到 20 秒，兩種都能用。
+        const tideUrl='https://cwa-tide.onerkk.workers.dev/?lat='+Number(pos.lat).toFixed(2)+'&lon='+Number(pos.lon).toFixed(2);
+        const {data:td}=await WeatherData.json(tideUrl,{timeout:20000,cache:'default'});
         const forecasts=td.records?.TideForecasts||[];
         const ordered=forecasts.filter(f=>WeatherData.validPosition({lat:f.Location?.Latitude,lon:f.Location?.Longitude})).sort((a,b)=>_geoDistKm(pos.lat,pos.lon,a.Location.Latitude,a.Location.Longitude)-_geoDistKm(pos.lat,pos.lon,b.Location.Latitude,b.Location.Longitude));
         const loc=ordered[0]?.Location,tides=[];

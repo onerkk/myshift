@@ -88,6 +88,14 @@
 - 我沒有授權碼，**沒對真的氣象署 API 跑過**；只有用模擬資料的 5 項測試（tests/cwa-forecast-worker.test.cjs）。資料集編號表是依記憶填的提示，程式會用回應裡的縣市名稱驗證，不符就自動掃描並記住。
 - 部署後驗證網址：`https://cwa-forecast.onerkk.workers.dev/?county=臺南市&town=鹽水區&debug=1`，預期 `scope:"town"`、`town:"鹽水區"`。失敗時請使用者貼回整段 JSON。
 
+## v409（2026-11-14）潮汐與警報資料來源核對
+- **潮汐**：`cwa-tide` worker 把整份 F-A0021-001（266 地點 × 1 個月，5.4 MB、gzip 約 420 KB、實測 5.6 秒）原樣傳給手機，手機自己挑最近地點；10 秒逾時，慢網路下潮汐就不顯示。
+  - App（v409）：請求改帶 `?lat=&lon=`（小數 2 位），逾時放寬 20 秒。舊 worker 忽略參數照舊能用（已實測）。
+  - 新 worker `backend/cwa-tide-worker.mjs`：帶座標時先抓地點索引（一天、只要 TideRange），再抓最近那一個地點的昨天～8 天後；回應外形與氣象署原始格式相同，App 解析不必改。不帶座標＝舊行為。參數依官方 API 規格（https://opendata.cwa.gov.tw/apidoc/v1：LocationId／WeatherElement／Date／timeFrom／timeTo）。3 項模擬測試。**使用者尚未部署，也沒對真 API 跑過；舊 tide worker 的原始碼我沒看過，環境變數名稱假設與 forecast 相同（CWA_KEY）。**
+- **警報／雨量站／測站觀測**（`cwa-data` worker，原始碼在 backend/cwa-worker-v5.mjs）：實測回應正常 —— 8 個官方資料集、雨量站國一N288K 2.7 km、測站觀測「陰有雨」、無警報、errors 為空。沒發現問題，未改動。
+- 官方規格也確認了 forecast worker 的 `LocationName` 篩選參數正確。
+- 順手修：index.html 的 `app.js?v=` 從 v355 起沒變過（v406 改了 app.js 卻沒換），改為 `?v=409`；之後改 app.js 要一起換。
+
 ## v408（2026-11-14）14 種天氣情境逐一檢查
 - 用「體驗氣象劇場」逐一截圖：晴空、雲層、細雨、降雨、豪雨、雷雨、颱風、冰雹、飄雪、強風、濃霧、熱浪、寒流、地震情境。
 - 找到並修掉 v407 帶進來的問題：劇場模式會把介面藏起來，但玻璃遮罩還留著文字與面板的矩形 → 閃電被灰色方塊切斷、雨珠出現一塊塊深色斑。現在劇場模式下遮罩只保留預覽控制列（nature-effects.js `buildMask`；切換劇場時重建遮罩）。
