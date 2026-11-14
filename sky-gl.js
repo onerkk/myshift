@@ -191,9 +191,10 @@ vec2 DropLayer(vec2 uv,float t){
  return vec2(m,trail);
 }
 float StaticDrops(vec2 uv,float t){
- uv*=70.;vec2 id=floor(uv);uv=fract(uv)-.5;
- vec3 n=N13(id.x*107.45+id.y*3543.654);vec2 p=(n.xy-.5)*.7;float d=length(uv-p);
- float fade=Saw(.025,fract(t+n.z));return smoothstep(.3,0.,d)*fract(n.z*10.)*fade;}
+ uv*=30.;vec2 id=floor(uv);uv=fract(uv)-.5;
+ vec3 n=N13(id.x*107.45+id.y*3543.654);vec2 p=(n.xy-.5)*.6;float d=length(uv-p);
+ float sz=mix(.12,.34,fract(n.x*7.3));   // v407: bead radius varies; most cells stay empty
+ float fade=Saw(.025,fract(t*.6+n.z));return smoothstep(sz,sz*.25,d)*step(.45,fract(n.z*10.))*fade;}
 vec2 Drops(vec2 uv,float t,float l0,float l1,float l2){
  float s=StaticDrops(uv,t)*l0;vec2 m1=DropLayer(uv,t)*l1;vec2 m2=DropLayer(uv*1.85,t)*l2;
  float c=s+m1.x+m2.x;c=smoothstep(.3,1.,c);return vec2(c,max(m1.y*l0,m2.y*l1));}
@@ -209,6 +210,10 @@ void main(){
  vec2 nrm=uRain>0.&&c.x>.001?vec2(Drops(duv+e,t,l0,l1,l2).x-c.x,Drops(duv+e.yx,t,l0,l1,l2).x-c.x):vec2(0.);
  float m=c.x;vec2 off=nrm*1.2;
  vec3 col=vec3(0.);float alpha=0.;
+ // v407: mask alpha 1 = text (nothing drawn over it); ~.5 = a UI glass panel. The scene behind a drop
+ // that sits on a dark panel is that panel, not the bright sky, so there the drop is a clear lens:
+ // a highlight and a thin rim only. Painting sky through it made white specks all over the panels.
+ float cover=texture2D(uMask,uv).a;float hide=smoothstep(.62,.85,cover);float panel=smoothstep(.18,.38,cover)*(1.-hide);
  // 1. heat shimmer: a wavering copy of the scene low in the frame (hot air rising off the ground)
  if(uHeat>0.){
   float band=smoothstep(.0,.35,uv.y)*smoothstep(.62,.3,uv.y);
@@ -223,7 +228,7 @@ void main(){
   r=sat(r*(.5+.7*uRain));
   float bands=abs(uSlant)>1.?smoothstep(.45,.75,fbm(vec2(uv.x*1.6+uv.y*uSlant*.5-t*.9,uv.y*.6+t*.15),3.))*.35*uRain:0.;
   vec3 rainCol=mix(vec3(.55,.6,.68),vec3(.9,.93,.96),uDay)+uFlash*.5;
-  float ra=r*.85;col=col*(1.-ra)+rainCol*ra;alpha=alpha*(1.-ra)+ra;
+  float ra=r*mix(.3,.46,uRain)*(1.-.45*panel);col=col*(1.-ra)+rainCol*ra;alpha=alpha*(1.-ra)+ra;
   vec3 bandCol=mix(vec3(.3,.34,.38),vec3(.8,.84,.88),uDay);col=col*(1.-bands)+bandCol*bands;alpha=alpha*(1.-bands)+bands;
  }
  // 3. drops on the glass: each one a small lens showing the scene behind, inverted and shrunk, with a
@@ -233,7 +238,12 @@ void main(){
   // a drop is only the scene bent through it: no grey fill, a thin rim and one small highlight
   vec3 dc=bg*(1.04+uDay*.08)+vec3(.9,.95,1.)*pow(sat(dot(normalize(vec3(nrm*10.,.5)),normalize(vec3(-.4,.55,.7)))),18.)*(.35+.25*uDay)+uFlash*.25;
   dc+=smoothstep(.012,.03,length(off))*(.06+.08*uDay);
-  float da=smoothstep(.05,.5,m)*(.6+.3*uRain);col=col*(1.-da)+dc*da;alpha=alpha*(1.-da)+da;
+  float da=smoothstep(.05,.5,m)*(.6+.3*uRain);
+  float sp=pow(sat(dot(normalize(vec3(nrm*10.,.5)),normalize(vec3(-.4,.55,.7)))),18.);
+  float rim=smoothstep(.012,.03,length(off));
+  vec3 dcP=mix(vec3(.05,.08,.12),vec3(.9,.95,1.),sat(sp*1.4));float daP=smoothstep(.05,.5,m)*sat(sp*.85+rim*.16);
+  dc=mix(dc,dcP,panel);da=mix(da,daP,panel);
+  col=col*(1.-da)+dc*da;alpha=alpha*(1.-da)+da;
  }
  if(uRain>0.&&c.y>.01){float ta=c.y*.08;col=col*(1.-ta)+vec3(.55,.6,.68)*ta;alpha=alpha*(1.-ta)+ta;}
  // 4. fog: drifting mist banks between the viewer and the scene
@@ -246,8 +256,7 @@ void main(){
  vec2 bl=bolt(uv,asp);
  col+=vec3(.92,.95,1.)*bl.x*1.4+vec3(.6,.7,1.)*bl.y;alpha=sat(alpha+bl.x+bl.y*.6);
  if(alpha<.003){gl_FragColor=vec4(0.);return;}
- float cover=texture2D(uMask,uv).a;
- alpha*=(1.-cover);
+ alpha*=(1.-hide);
  gl_FragColor=vec4(col*alpha,alpha);
 }`;
   let canvas=null,gl=null,prog=null,U={},w=1,h=1,scale=.66,lost=false,failed=false;
@@ -299,7 +308,7 @@ void main(){
     canvas.style.width=w+'px';canvas.style.height=h+'px';
     canvas.width=Math.max(2,Math.round(w*scale));canvas.height=Math.max(2,Math.round(h*scale));
     if(gl)gl.viewport(0,0,canvas.width,canvas.height);
-    if(gcanvas){gcanvas.style.width=w+'px';gcanvas.style.height=h+'px';const gs=level==='subtle'?.6:.75;gcanvas.width=Math.max(2,Math.round(w*gs));gcanvas.height=Math.max(2,Math.round(h*gs));if(ggl)ggl.viewport(0,0,gcanvas.width,gcanvas.height)}
+    if(gcanvas){gcanvas.style.width=w+'px';gcanvas.style.height=h+'px';const gs=level==='subtle'?.75:level==='balanced'?1:Math.min(1.35,root.devicePixelRatio||1);gcanvas.width=Math.max(2,Math.round(w*gs));gcanvas.height=Math.max(2,Math.round(h*gs));if(ggl)ggl.viewport(0,0,gcanvas.width,gcanvas.height)}
   }
   function setMask(cv){maskSrc=cv;maskDirty=true}
   function show(on){if(canvas)canvas.style.display=on?'':'none';if(!on&&gcanvas){gcanvas.style.display='none';glassOn=false}}

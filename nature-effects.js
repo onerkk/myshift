@@ -79,7 +79,7 @@
   root.NatureEffects={classify,solarPosition,moonPhase,visualState,actorPose,create:function(){
     let canvas,sky,ctx,bg,w=0,h=0,raf=0,last=0,time=0,frameCount=0,accum=0,dprFx=1,dprSky=1;
     let details={},weatherState=visualState(null),solar=null;
-    let code=null,temp=0,wind=0,mode='none',preview=null,previewUntil=0,quiet=[],layoutDirty=true,scrollDirty=true,maskTick=-1,maskScale=.25;
+    let code=null,temp=0,wind=0,mode='none',preview=null,previewUntil=0,quiet=[],glMask=null,glMaskCtx=null,layoutDirty=true,scrollDirty=true,maskTick=-1,maskScale=.25;
     let signatureMode='',signatureStart=0,theatre=true,sceneCaption=null,returnFocus=null,hud=null,previewStarted=0,hudTimer=0,sceneLighting='auto';
     let previewTimer=0,previewToken=0,seasonPreview=null,thunderTimer=0,lastIceStrike=-1;
     let viewTick=-1,gust=0,cloudBlend=.3,lightning=0,boltIndex=0,boltX=.5,nextLightning=25,interactionWind=0,lastLightUpdate=-1,failures=0;
@@ -188,11 +188,13 @@
     }
 
     // ---- text protection mask (quarter resolution, rebuilt only when layout changes) ----
-    const fullSelector='.bottom-nav,.wk-row,.calendar-month-grid,.calendar-view-switch,.screen-heading,.page-returnbar,.modal-sheet,.wx-detail-sheet,.nature-preview-hud,input,select,textarea';
-    const stickySelector='.bottom-nav,.wk-row,.nature-preview-hud,.page-returnbar,.modal-sheet,.wx-detail-sheet';
+    const panelSelector='.v4-slab,.v4-hero,.v4-week-row,.v4-insight,.v4-slab-lite,.v4-hl-tile,.v4-anchor,.v4-feature-grid>button,.v4-round,.v4-pill,.v4-back,.v4-dock>button>span,.v4-setup-card,.v4-opt,.v4-rot';
+    const fullSelector='.v4-nav,.v4-dlg,.bottom-nav,.wk-row,.calendar-month-grid,.calendar-view-switch,.screen-heading,.page-returnbar,.modal-sheet,.wx-detail-sheet,.nature-preview-hud,input,select,textarea';
+    const stickySelector='.v4-nav,.v4-dlg,.bottom-nav,.wk-row,.nature-preview-hud,.page-returnbar,.modal-sheet,.wx-detail-sheet';
     function scanLayout(){
       pageRects=[];const sy=scrollY||0,sx=scrollX||0;
-      const push=(r,solid)=>{if(r.width<=0||r.height<=0)return;pageRects.push({l:r.left+sx,t:r.top+sy,w:r.width,h:r.height,solid})};
+      const push=(r,solid,panel)=>{if(r.width<=0||r.height<=0)return;pageRects.push({l:r.left+sx,t:r.top+sy,w:r.width,h:r.height,solid,panel:!!panel})};
+      document.querySelectorAll(panelSelector).forEach(e=>push(e.getBoundingClientRect(),false,true));
       document.querySelectorAll(fullSelector).forEach(e=>{if(!e.matches(stickySelector))push(e.getBoundingClientRect(),true)});
       document.querySelectorAll('.status-switch,.pref-switch,.header-actions,.brand-mark,.account-avatar,#app button svg,#app [role="button"] svg,.dial-face svg').forEach(e=>push(e.getBoundingClientRect(),false));
       for(const scope of document.querySelectorAll('#app,#mr')){
@@ -204,9 +206,19 @@
     }
     function buildMask(){
       const sy=scrollY||0,sx=scrollX||0,m=maskScale,c=maskCtx;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,mask.width,mask.height);c.fillStyle='#000';quiet=[];
-      for(const r of pageRects){const top=r.t-sy,left=r.l-sx;if(top+r.h<0||top>h)continue;const pad=r.solid?5:4;c.fillRect((left-pad)*m,(top-pad)*m,(r.w+pad*2)*m,(r.h+pad*2)*m);quiet.push(r)}
+            for(const r of pageRects){if(r.panel)continue;const top=r.t-sy,left=r.l-sx;if(top+r.h<0||top>h)continue;const pad=r.solid?5:4;c.fillRect((left-pad)*m,(top-pad)*m,(r.w+pad*2)*m,(r.h+pad*2)*m);quiet.push(r)}
       for(const el of stickyEls){const r=el.getBoundingClientRect();if(r.width<=0||r.height<=0||r.bottom<0||r.top>h)continue;c.fillRect((r.left-6)*m,(r.top-6)*m,(r.width+12)*m,(r.height+12)*m);quiet.push(r)}
-      scrollDirty=false;maskTick=time;if(root.SkyGL&&root.SkyGL.ok)root.SkyGL.setMask(mask);
+      scrollDirty=false;maskTick=time;
+      if(root.SkyGL&&root.SkyGL.ok){
+        // v407: the glass shader gets its own mask — UI panels at half alpha (drops there are drawn as clear
+        // lenses), text at full alpha. `mask` itself stays text-only: it also erases the 2D layer, and petals,
+        // birds and butterflies must keep flying in front of the panels at full strength.
+        if(!glMask){glMask=document.createElement('canvas');glMaskCtx=glMask.getContext('2d')}
+        if(glMask.width!==mask.width||glMask.height!==mask.height){glMask.width=mask.width;glMask.height=mask.height}
+        const g=glMaskCtx;g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,glMask.width,glMask.height);g.fillStyle='#000';g.globalAlpha=.5;
+        for(const r of pageRects){if(!r.panel)continue;const top=r.t-sy,left=r.l-sx;if(top+r.h<0||top>h)continue;g.fillRect(left*m,top*m,r.w*m,r.h*m)}
+        g.globalAlpha=1;g.drawImage(mask,0,0);root.SkyGL.setMask(glMask);
+      }
     }
 
     // ---- scene state helpers ----
