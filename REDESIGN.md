@@ -82,6 +82,8 @@
 ## 鄉鎮預報 worker（2026-11-14，程式已寫好，等使用者部署）
 - `backend/cwa-forecast-worker.mjs`：取代線上 `cwa-forecast` worker。依 county＋town 名稱查各縣市 3 天鄉鎮資料集（F-D0047-0xx），找不到才退回縣市（F-D0047-089，依名稱選、不再用最近座標）。回應格式與舊版相容，App 不用改：鄉鎮相符 → 標示「鄉鎮預報」。
 - 使用者貼來舊 worker 原始碼後補齊（2026-11-14 17:xx）：舊版的授權碼在環境變數 `CWA_KEY`（新版優先讀它，不必新增 Secret）；舊版還有 **`?rain=1` 雨量站端點，radar2.html 在用** —— 已原樣移植（第一版漏了，照貼會讓雷達頁雨量壞掉）；天氣文字→圖示碼對照改成與舊版完全相同；保留 `?auth=` 與 `?town=縣市名` 的舊用法。
+- **2026-11-14 17:09 使用者已部署，實測成功**：`/?county=臺南市&town=鹽水區&debug=1` 回 `scope:"town"`、`source:"CWA F-D0047-077"`（資料集編號表對臺南市正確，LocationName 篩選有效）；`?rain=1` 回國一N288K 雨量站。App 端對端確認標示為「中央氣象署鄉鎮預報」。
+- 實測發現：鄉鎮資料從下一個 3 小時區間開始，當下這個小時沒有值，App 會退回 Open-Meteo（當時顯示 100%）。worker 已加「用縣市預報補這段空檔」（逐時標 `fill:'county'`、回應多 `countyFilledHours`）。**這一版使用者尚未重新部署**；不部署也能用，只是每天四次換報前後約 1 小時內「現在」那格是模式機率。
 - 授權碼讀環境變數 `CWA_KEY`（也接受 CWA_API_KEY／CWA_TOKEN／API_KEY）。`&debug=1` 回傳診斷資訊（不含授權碼）。
 - 我沒有授權碼，**沒對真的氣象署 API 跑過**；只有用模擬資料的 5 項測試（tests/cwa-forecast-worker.test.cjs）。資料集編號表是依記憶填的提示，程式會用回應裡的縣市名稱驗證，不符就自動掃描並記住。
 - 部署後驗證網址：`https://cwa-forecast.onerkk.workers.dev/?county=臺南市&town=鹽水區&debug=1`，預期 `scope:"town"`、`town:"鹽水區"`。失敗時請使用者貼回整段 JSON。

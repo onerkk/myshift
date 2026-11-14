@@ -184,12 +184,23 @@ export async function forecast(query, token) {
   if (!found) return { ok: false, error: 'forecast not found', county: county || null, town: town || null, ...(debug ? { debug } : {}) };
   const { hourly, popWindowHours } = hourlyFromLocation(found.location);
   const name = locationName(found.location);
+  // 鄉鎮資料在新一報發布後會從「下一個 3 小時區間」開始，目前這個區間（最多約 1 小時）沒有值。
+  // 這段空檔用同一縣市的官方縣市預報補上，並逐時標記 fill:'county'，不讓 App 退回容易高估的模式機率。
+  let filled = 0;
+  if (scope === 'town') {
+    const first = Object.keys(hourly).filter(k => hourly[k].pop !== null).sort()[0];
+    const nowKey = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 13);
+    if (first && nowKey < first) {
+      const c = await countyLocation(county, lat, lon, token, debug);
+      if (c) { const ch = hourlyFromLocation(c.location).hourly; for (const k of Object.keys(ch)) if (k >= nowKey && k < first && ch[k].pop !== null) { const own = hourly[k] || {}; hourly[k] = { pop: ch[k].pop, wx: own.wx || ch[k].wx, wmo: own.wmo != null ? own.wmo : ch[k].wmo, t: own.t != null ? own.t : ch[k].t, fill: 'county' }; filled++; } }
+    }
+  }
   if (!Object.keys(hourly).length) return { ok: false, error: 'forecast has no usable elements', source: 'CWA ' + found.dataset, ...(debug ? { debug, elements: list(pick(found.location, ['WeatherElement', 'weatherElement'])).map(e => pick(e, ['ElementName', 'elementName'])) } : {}) };
   return {
     ok: true, source: 'CWA ' + found.dataset, scope,
     county: scope === 'town' ? county : name,
     town: name, // 縣市預報時這裡是縣市名稱（舊版相容）
-    popWindowHours: popWindowHours || 3, hourly, ts: Date.now(),
+    popWindowHours: popWindowHours || 3, hourly, ts: Date.now(), ...(filled ? { countyFilledHours: filled } : {}),
     ...(debug ? { debug, elements: list(pick(found.location, ['WeatherElement', 'weatherElement'])).map(e => pick(e, ['ElementName', 'elementName'])) } : {})
   };
 }

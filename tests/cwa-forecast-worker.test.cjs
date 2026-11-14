@@ -92,3 +92,15 @@ test('rain-station endpoint keeps the previous response shape and value rules (r
     assert.equal(res.status,200);assert.equal((await res.json()).station,'鹽水');assert.equal(res.headers.get('access-control-allow-origin'),'*');
   }finally{globalThis.fetch=original}
 });
+
+test('the hour before the first township window is filled from the county forecast and marked as such',async()=>{
+  const W=await load(),RealDate=Date,fixed=RealDate.parse('2026-11-14T17:10:00+08:00');
+  const later=[['2026-11-14T18:00:00+08:00','2026-11-14T21:00:00+08:00','70']];
+  const m=mock({'F-D0047-077':dataset('臺南市',[town('鹽水區',later)]),'F-D0047-089':dataset('臺灣',[town('臺南市',[['2026-11-14T15:00:00+08:00','2026-11-14T18:00:00+08:00','90'],['2026-11-14T18:00:00+08:00','2026-11-14T21:00:00+08:00','60']])])});
+  globalThis.Date=class extends RealDate{constructor(...a){super(...(a.length?a:[fixed]))}static now(){return fixed}};
+  try{
+    const r=await W.forecast({county:'臺南市',town:'鹽水區'},'KEY');
+    assert.equal(r.scope,'town');assert.equal(r.hourly['2026-11-14T17'].pop,90);assert.equal(r.hourly['2026-11-14T17'].fill,'county');assert.equal(r.countyFilledHours,1);
+    assert.equal(r.hourly['2026-11-14T18'].pop,70);assert.equal(r.hourly['2026-11-14T18'].fill,undefined);assert.equal(r.hourly['2026-11-14T16'].pop,null);assert.equal(r.hourly['2026-11-14T16'].fill,undefined);
+  }finally{globalThis.Date=RealDate;m.restore()}
+});
