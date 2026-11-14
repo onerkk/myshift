@@ -92,6 +92,7 @@
 - **潮汐**：`cwa-tide` worker 把整份 F-A0021-001（266 地點 × 1 個月，5.4 MB、gzip 約 420 KB、實測 5.6 秒）原樣傳給手機，手機自己挑最近地點；10 秒逾時，慢網路下潮汐就不顯示。
   - App（v409）：請求改帶 `?lat=&lon=`（小數 2 位），逾時放寬 20 秒。舊 worker 忽略參數照舊能用（已實測）。
   - 新 worker `backend/cwa-tide-worker.mjs`：帶座標時先抓地點索引（一天、只要 TideRange），再抓最近那一個地點的昨天～8 天後；回應外形與氣象署原始格式相同，App 解析不必改。不帶座標＝舊行為。參數依官方 API 規格（https://opendata.cwa.gov.tw/apidoc/v1：LocationId／WeatherElement／Date／timeFrom／timeTo）。3 項模擬測試。**使用者尚未部署，也沒對真 API 跑過；舊 tide worker 的原始碼我沒看過，環境變數名稱假設與 forecast 相同（CWA_KEY）。**
+  - **2026-11-14 18:03 使用者已部署新 tide worker，實測成功**：`?lat=23.33&lon=120.27` 回 `scope:"nearest"`、漁港布袋、9 天、5.4 KB（原 5.4 MB）。App 端對端確認拿到 30 筆潮汐。舊 worker 是一行程式、授權碼寫死在原始碼；使用者要求照舊寫死，所以線上部署的是「貼上版」（含授權碼，不在 repo）；repo 裡的 `backend/cwa-tide-worker.mjs` 不含授權碼、讀環境變數。之後若改 tide worker，要另外產生含授權碼的貼上版給使用者。
 - **警報／雨量站／測站觀測**（`cwa-data` worker，原始碼在 backend/cwa-worker-v5.mjs）：實測回應正常 —— 8 個官方資料集、雨量站國一N288K 2.7 km、測站觀測「陰有雨」、無警報、errors 為空。沒發現問題，未改動。
 - 官方規格也確認了 forecast worker 的 `LocationName` 篩選參數正確。
 - 順手修：index.html 的 `app.js?v=` 從 v355 起沒變過（v406 改了 app.js 卻沒換），改為 `?v=409`；之後改 app.js 要一起換。
