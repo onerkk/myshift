@@ -31,13 +31,14 @@ function hourlyStripHtml(d){
   const items=[];let any=false,lastDate='';
   for(let i=start;i<d.hTime.length&&items.length<24;i++){
     const ms=new Date(d.hTime[i]).getTime();if(!Number.isFinite(ms))continue;
-    const temp=num(d.hTemp&&d.hTemp[i]),pop=d.hPrec?_normalPop(d.hPrec[i]):null,code=num(d.hCode&&d.hCode[i]),on=onShift(ms),dt=new Date(ms),dk=dt.getDate();
+    const temp=num(d.hTemp&&d.hTemp[i]),pop=d.hPrec?_normalPop(d.hPrec[i]):null,mm=num(d.hRain&&d.hRain[i]),code=num(d.hCode&&d.hCode[i]),on=onShift(ms),dt=new Date(ms),dk=dt.getDate();
     if(on)any=true;
     const dayMark=lastDate!==''&&dk!==lastDate?`<span class="v4-dmark">${dt.getMonth()+1}/${dk}</span>`:'';lastDate=dk;
-    items.push(`<div class="v4-hr${on?' on':''}${items.length===0?' now':''}${pop!==null&&pop>=70?' wet2':pop!==null&&pop>=40?' wet':''}" role="listitem" aria-label="${two(dt.getHours())}:00 ${temp!==null?Math.round(temp)+'°C':''} ${pop!==null?(zh?'降雨 ':'Hujan ')+pop+'%':''}${on?(zh?' 上班時段':' jam kerja'):''}"><small>${items.length===0?(zh?'現在':'Kini'):two(dt.getHours())}${dayMark}</small><i>${code!==null?studioWeatherIcon(code,20):'·'}</i><b>${temp!==null?Math.round(temp)+'°':'—'}</b><span class="pop"><u style="height:${pop===null?0:Math.max(4,pop)}%"></u></span><em>${pop===null?'—':pop+'%'}</em></div>`);
+    items.push(`<div class="v4-hr${on?' on':''}${items.length===0?' now':''}${pop!==null&&pop>=70?' wet2':pop!==null&&pop>=40?' wet':''}" role="listitem" aria-label="${two(dt.getHours())}:00 ${temp!==null?Math.round(temp)+'°C':''} ${pop!==null?(zh?'降雨 ':'Hujan ')+pop+'%':''}${on?(zh?' 上班時段':' jam kerja'):''}"><small>${items.length===0?(zh?'現在':'Kini'):two(dt.getHours())}${dayMark}</small><i>${code!==null?studioWeatherIcon(code,20):'·'}</i><b>${temp!==null?Math.round(temp)+'°':'—'}</b><span class="pop"><u style="height:${pop===null?0:Math.max(4,pop)}%"></u></span><em${pop===null&&mm!==null?' class="mm"':''}>${pop===null?(mm!==null?(mm>=10?Math.round(mm):mm.toFixed(1))+'mm':'—'):pop+'%'}</em></div>`);
   }
   if(items.length<3)return'';
-  return `<div class="v4-root v4-slab v4-hourly"><div class="v4-sec-head tight"><div><h2>${zh?'未來 24 小時':'24 jam ke depan'}</h2><p>${zh?'氣溫・天氣・降雨機率':'Suhu · cuaca · peluang hujan'}</p></div>${any?`<span class="v4-key"><i></i>${zh?'你的上班時段':'Jam kerja Anda'}</span>`:''}</div><div class="v4-hrs" role="list">${items.join('')}</div></div>`;
+  let si=_wxHourIndex();if(si<0)si=0;const noPop=!(d.hPrec||[]).slice(si,si+24).some(v=>_normalPop(v)!==null),popSrc=noPop?'':_popSourceLabel(_popSourceAt(d,si),zh);
+  return `<div class="v4-root v4-slab v4-hourly"><div class="v4-sec-head tight"><div><h2>${zh?'未來 24 小時':'24 jam ke depan'}</h2><p>${noPop?(zh?'氣溫・天氣・預估雨量（降雨機率暫時取不到）':'Suhu · cuaca · perkiraan curah hujan'):(zh?'氣溫・天氣・降雨機率':'Suhu · cuaca · peluang hujan')+(popSrc?' · '+popSrc:'')}</p></div>${any?`<span class="v4-key"><i></i>${zh?'你的上班時段':'Jam kerja Anda'}</span>`:''}</div><div class="v4-hrs" role="list">${items.join('')}</div></div>`;
 }
 
 window.uiPrecipChartHtml=function(d){
@@ -125,7 +126,7 @@ window.rCal=function(){
   }else if(UI_TAB==='weather'){
     content=`${uiScreenHeading(zh?'天氣':'Cuaca',zh?'預報、雨量與災防資訊':'Prakiraan, hujan dan peringatan',`<button class="icon-action" data-a="prefs" aria-label="${zh?'天氣與警報設定':'Pengaturan cuaca'}">${uiIcon('settings',20)}</button>`)}${opt(window.wxAlertHtml)}${rainWarnHtml()}${wxHtml()}${uiAtmosphereSceneHtml()}${opt(window.notifyCtaHtml)}`;
   }else if(UI_TAB==='more'){
-    content=`${uiScreenHeading(zh?'更多':'Lainnya',zh?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v405</p>`;
+    content=`${uiScreenHeading(zh?'更多':'Lainnya',zh?'常用工具與個人設定':'Alat dan pengaturan pribadi')}${fbBarHtml()}${uiMoreHtml(S.yr,S.mo)}<p class="app-version">${t('app')} · v406</p>`;
   }else{
     content=`${uiTodayHeroHtml()}${opt(window.wxAlertHtml)}${rainWarnHtml()}${uiQuickToolsHtml()}${uiDayFocusHtml()}${uiWeekStripHtml()}${uiShiftWeatherHtml()}<div class="today-insights">${uiWeatherPreviewHtml()}${uiPayPreviewHtml(TY,TM)}</div>${uiUpcomingEventsHtml(TY,TM)}${uiAtmosphereSceneHtml()}${opt(window.notifyCtaHtml)}`;
   }

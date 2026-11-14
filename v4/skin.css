@@ -1132,3 +1132,7 @@ body.v4 .c-top .c-tag:not(.official){padding:0}
 /* 對話框：鍵盤彈出時靠上、可捲動，不被切掉 */
 body.v4 .v4-dlg-scrim{align-items:start;padding-top:max(20px,calc((100dvh - 520px)/2));overflow:auto;height:100dvh}
 body.v4 .v4-dlg{max-height:none}
+
+/* 降雨機率取不到時改顯示預估雨量 */
+body.v4 .v4-hr>em.mm{font-size:.58rem;color:var(--c-sky)}
+body.v4 .v4-hrow .p em.mm{font-style:normal;font-weight:700;color:var(--c-sky)}

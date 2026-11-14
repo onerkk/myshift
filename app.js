@@ -3577,9 +3577,29 @@ async function _fetchCwaForecast(lat,lon,place,force){
     if(place&&place.town)u.searchParams.set('town',place.town);
     if(force)u.searchParams.set('_',String(Date.now()));
     const {data:d}=await WeatherData.json(u.toString(),{timeout:7000});
-    if(d&&d.ok&&d.hourly&&typeof d.hourly==='object'&&_cwaForecastMatchesPlace(d,place))return d;
+    const usable=x=>x&&x.ok&&x.hourly&&typeof x.hourly==='object';
+    if(usable(d)&&_cwaForecastMatchesPlace(d,place)){d._scope='town';return d}
+    // v406 治本：worker 目前回的是「縣市」預報（F-D0047-089），而且只用經緯度挑最近的縣市，
+    // 不看 county 參數 —— 鹽水區會被配到嘉義縣。舊邏輯要求鄉鎮名完全相符，所以官方機率永遠被丟掉。
+    // 現在：縣市相符就採用並標示為「縣市預報」；配錯縣市就改用該縣市的定位點重抓一次，仍不符才放棄。
+    if(usable(d)&&_cwaForecastCountyOf(d)===_cwaCleanName(place&&place.county)){d._scope='county';return d}
+    const anchor=CWA_COUNTY_ANCHOR[_cwaCleanName(place&&place.county)];
+    if(!anchor)return null;
+    const u2=new URL(CWA_FCST_URL);
+    u2.searchParams.set('lat',anchor[0]);u2.searchParams.set('lon',anchor[1]);
+    if(force)u2.searchParams.set('_',String(Date.now()));
+    const {data:d2}=await WeatherData.json(u2.toString(),{timeout:7000});
+    if(usable(d2)&&_cwaForecastCountyOf(d2)===_cwaCleanName(place.county)){d2._scope='county';return d2}
     return null;
   }catch(e){return null}
+}
+// 各縣市定位點（縣市政府所在地）。已逐一實測：以這些座標查詢，worker 回傳的就是該縣市。
+const CWA_COUNTY_ANCHOR={'基隆市':[25.1283,121.7419],'臺北市':[25.0375,121.5637],'新北市':[25.0120,121.4657],'桃園市':[24.9937,121.3010],'新竹市':[24.8066,120.9686],'新竹縣':[24.8270,121.0129],'苗栗縣':[24.5648,120.8208],'臺中市':[24.1618,120.6469],'彰化縣':[24.0756,120.5445],'南投縣':[23.9026,120.6906],'雲林縣':[23.6993,120.5263],'嘉義市':[23.4812,120.4536],'嘉義縣':[23.4588,120.2930],'臺南市':[22.9920,120.1850],'高雄市':[22.6209,120.3120],'屏東縣':[22.6830,120.4880],'宜蘭縣':[24.7307,121.7631],'花蓮縣':[23.9913,121.6198],'臺東縣':[22.7554,121.1503],'澎湖縣':[23.5700,119.5664],'金門縣':[24.4368,118.3186],'連江縣':[26.1579,119.9517]};
+function _cwaCleanName(s){return String(s||'').replace(/台/g,'臺').replace(/\s/g,'')}
+function _cwaForecastCountyOf(data){
+  const p=(data&&(data.place||data.location))||{};
+  for(const v of [data&&data.county,data&&data.city,p.county,p.city,data&&data.town,p.town]){const c=_cwaCleanName(v);if(CWA_COUNTY_ANCHOR[c])return c}
+  return '';
 }
 
 // ═══ v220：降雨機率資料分層（官方預報與即時觀測完全分離）═══
@@ -3619,7 +3639,7 @@ function _popSourceAt(wx,i){
   return wx&&wx._popSource&&String(wx._popSource).startsWith('cwa')?'cwa':'open-meteo';
 }
 function _popSourceLabel(src,isZh){
-  if(src==='cwa')return isZh?'中央氣象署鄉鎮預報':'CWA township forecast';
+  if(src==='cwa'){const county=typeof wxData!=='undefined'&&wxData&&wxData._cwaScope==='county';return isZh?(county?'中央氣象署縣市預報':'中央氣象署鄉鎮預報'):(county?'CWA county forecast':'CWA township forecast')}
   if(src==='open-meteo')return isZh?'Open-Meteo 模式預報':'Open-Meteo model forecast';
   if(src==='met-no')return isZh?'MET Norway 模式備援':'MET Norway model fallback';
   return isZh?'無資料':'No data';
@@ -3657,6 +3677,7 @@ function _mergeCwaForecast(wx,fc){
     }
   }
   wx._popWindowH=Number(fc.popWindowHours)||null;
+  wx._cwaScope=fc._scope==='county'?'county':'town';
   wx._cwaForecastReceivedAt=Date.now();
   wx._cwaForecastUpdatedAt=fc.updatedAt||fc.updateTime||fc.generatedAt||fc.issueTime||null;
   wx._cwaForecastPlace=fc.place||fc.location||null;

@@ -143,10 +143,11 @@ window.uiShiftWeatherHtml=function(){
   var now=Date.now(),stale=!wxData||_wxStale();
   var cards=points.map(function(pt){
     var data=experienceWeatherAt(pt.time),isPast=pt.time.getTime()<now,hasPop=data&&data.pop!==null,wet=hasPop&&data.pop>=40;
-    var detail=data?((data.wind!==null?(zh?'風速 ':'Angin ')+Math.round(data.wind)+' km/h · ':'')+(hasPop?_popSourceLabel(data.source,zh):(zh?'降雨機率未提供':'Peluang hujan belum tersedia'))):(zh?'此時段預報尚未提供':'Prakiraan jam ini belum tersedia');
+    var mm=null;if(data&&!hasPop&&wxData&&wxData.hRain){var rv=wxData.hRain[data.index];if(rv!==null&&rv!==undefined&&rv!==''&&isFinite(Number(rv)))mm=Number(rv)}
+    var detail=data?((data.wind!==null?(zh?'風速 ':'Angin ')+Math.round(data.wind)+' km/h · ':'')+(hasPop?_popSourceLabel(data.source,zh):mm!==null?(zh?'降雨機率暫時取不到，改顯示模式預估雨量':'Peluang hujan belum tersedia; menampilkan perkiraan curah hujan'):(zh?'降雨機率未提供':'Peluang hujan belum tersedia'))):(zh?'此時段預報尚未提供':'Prakiraan jam ini belum tersedia');
     return '<button class="v4-point'+(wet?' wet':'')+(isPast?' past':'')+'" data-a="tabWeather"><span class="v4-point-top">'+studioIcon(wet?'rain':'clock',16)+'<b>'+pt.label+'</b></span>'
      +'<strong><small>'+(pt.time.getMonth()+1)+'/'+pt.time.getDate()+'</small>'+two(pt.time.getHours())+':00</strong>'
-     +'<span class="v4-point-metrics"><b>'+(data&&data.temp!==null?Math.round(data.temp)+'°C':'—°C')+'</b><span>'+(zh?'降雨':'Hujan')+' '+(hasPop?Math.round(data.pop)+'%':'—')+'</span></span>'
+     +'<span class="v4-point-metrics"><b>'+(data&&data.temp!==null?Math.round(data.temp)+'°C':'—°C')+'</b><span>'+(hasPop?(zh?'降雨 ':'Hujan ')+Math.round(data.pop)+'%':mm!==null?(zh?'預估 ':'Perkiraan ')+(mm>=10?Math.round(mm):mm.toFixed(1))+' mm':(zh?'降雨 —':'Hujan —'))+'</span></span>'
      +'<i class="v4-pop" style="--pop:'+(hasPop?Math.max(0,Math.min(100,Math.round(data.pop))):0)+'%" aria-hidden="true"></i>'
      +'<small>'+detail+'</small>'+(wet?'<em class="v4-point-tip">'+(zh?'準備雨具':'Siapkan payung')+'</em>':'')+(isPast?'<small class="past">'+(zh?'此時段已過':'Waktu sudah berlalu')+'</small>':'')+'</button>';
   }).join('');
