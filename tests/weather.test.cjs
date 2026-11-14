@@ -32,6 +32,9 @@ function appEnv(){
   let calls=0;const pending=deferred();
   c.WeatherData.createClient=()=>({get(){calls++;return pending.promise}});
   vm.createContext(c);
+  // _syncWeatherFx resolves the scene through these modules; load the real ones.
+  c.globalThis=c;for(const f of ['nature-context.js','nature-effects.js']){try{vm.runInContext(fs.readFileSync(path.join(__dirname,'..',f),'utf8'),c)}catch(_){}}
+  for(const k of ['NatureContext','NatureEffects'])if(!c[k]&&c.window[k])c[k]=c.window[k];
   vm.runInContext(source.slice(source.indexOf('const WXI='),source.indexOf('// ═══════════════════════════════════════════════════════════════\n// CWA 資料載入')),c);
   vm.runInContext(source.slice(source.indexOf('function _numRain('),source.indexOf('function _rainObservationAlert')),c);
   vm.runInContext(source.slice(source.lastIndexOf('function _wxTimeLabel('),source.lastIndexOf('function uiTideCurveHtml(')),c);
@@ -191,7 +194,9 @@ test('service worker preserves asset versions and never returns HTML for missing
   const e=swEnv();await e.request('https://myshift.example/app/app.js?v=302');assert.deepEqual(e.puts,['https://myshift.example/app/app.js?v=302']);
   e.store.set('https://myshift.example/app/index.html',new Response('<html>shell</html>'));e.c.fetch=async()=>{throw Error('offline')};
   assert.equal((await e.request('https://myshift.example/app/weather-data.js?v=302')).type,'error');
-  assert.equal(await (await e.request('https://myshift.example/app/deep','navigate')).text(),'<html>shell</html>');
+  // Offline home navigation serves the installed shell; an unknown secondary page is never replaced by index.html.
+  assert.equal(await (await e.request('https://myshift.example/app/','navigate')).text(),'<html>shell</html>');
+  assert.equal((await e.request('https://myshift.example/app/deep','navigate')).type,'error');
 });
 
 test('wrong-county official forecast is rejected and matching township is accepted',()=>{
@@ -222,5 +227,32 @@ test('future rain probability and forecast reminders cannot manufacture current 
  c.evaluateWxAlerts=()=>[{id:'rain'},{id:'heavyRainModel'}];c.window.WxFx={update:(...args)=>values.push(args)};
  c._syncWeatherFx();assert.equal(values.at(-1)[0],2);
  wx.currentPrecip=1;c._syncWeatherFx();assert.equal(values.at(-1)[0],61);
- c.evaluateWxAlerts=()=>[{id:'storm'}];c._syncWeatherFx();assert.equal(values.at(-1)[0],95);
+ // v341 rule: thunder is drawn only when the current condition code says so, never from an alert.
+ c.evaluateWxAlerts=()=>[{id:'storm'}];c._syncWeatherFx();assert.equal(values.at(-1)[0],61);
+ wx.hCode=wx.hTime.map(()=>95);wx.code=95;c._syncWeatherFx();assert.equal(values.at(-1)[0],95);
+});
+
+// v406: the forecast worker answers with a county forecast chosen by nearest coordinates.
+test('CWA county forecast is used only for the matching county and re-fetched by county anchor when mismatched',async()=>{
+  const {c}=appEnv(),urls=[],hourly={'2026-11-14T16':{pop:70,wmo:61}};
+  const answer=name=>({data:{ok:true,source:'CWA F-D0047-089',town:name,popWindowHours:3,hourly}});
+  // Yanshui (Tainan) is nearest to Chiayi County: the first answer is the wrong county.
+  c.WeatherData.json=async url=>{urls.push(url);return answer(urls.length===1?'嘉義縣':'臺南市')};
+  const fc=await c._fetchCwaForecast(23.3256,120.2735,{county:'臺南市',town:'鹽水區'},false);
+  assert.equal(fc.town,'臺南市');assert.equal(fc._scope,'county');assert.equal(urls.length,2);
+  assert.match(urls[1],/lat=22\.992/);assert.match(urls[1],/lon=120\.185/);
+  // Matching county on the first answer: no second request. 台/臺 spellings are the same place.
+  urls.length=0;c.WeatherData.json=async url=>{urls.push(url);return answer('臺南市')};
+  assert.equal((await c._fetchCwaForecast(23,120.2,{county:'台南市',town:'永康區'},false))._scope,'county');assert.equal(urls.length,1);
+  // A township answer for the same township keeps township scope.
+  c.WeatherData.json=async()=>({data:{ok:true,county:'臺南市',town:'鹽水區',hourly}});
+  assert.equal((await c._fetchCwaForecast(23.3,120.27,{county:'臺南市',town:'鹽水區'},false))._scope,'town');
+  // Still the wrong county after the anchor request: rejected, never shown as local.
+  c.WeatherData.json=async()=>answer('嘉義縣');
+  assert.equal(await c._fetchCwaForecast(23.3256,120.2735,{county:'臺南市',town:'鹽水區'},false),null);
+  // Outside the 22 counties there is no anchor and nothing is accepted.
+  assert.equal(await c._fetchCwaForecast(35.6,139.7,{county:'東京都',town:''},false),null);
+  // Scope decides the label.
+  c.wxData={_cwaScope:'county'};assert.equal(c._popSourceLabel('cwa',true),'中央氣象署縣市預報');
+  c.wxData={_cwaScope:'town'};assert.equal(c._popSourceLabel('cwa',true),'中央氣象署鄉鎮預報');
 });

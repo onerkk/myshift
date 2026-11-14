@@ -65,5 +65,5 @@ test('admin UI updates retire only admin caches and preserve the main app and no
  const events={},deleted=[],names=['myshift-v328-ui','myshift-admin-v6-unified-leave','myshift-admin-v328-ui','wx-notify-state-v2','unrelated'];
  const c={self:{addEventListener:(name,fn)=>events[name]=fn,clients:{claim:async()=>{}}},caches:{keys:async()=>names,delete:async name=>deleted.push(name)}};
  vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../admin/sw.js'),'utf8'),c);
- let result;events.activate({waitUntil:p=>result=p});await result;assert.deepEqual(deleted,['myshift-admin-v6-unified-leave']);
+ let result;events.activate({waitUntil:p=>result=p});await result;assert.deepEqual(deleted,['myshift-admin-v6-unified-leave','myshift-admin-v328-ui']);/* every older admin cache is retired; main app and notification caches stay */assert.ok(!deleted.includes('myshift-v328-ui')&&!deleted.includes('wx-notify-state-v2')&&!deleted.includes('unrelated'));
 });

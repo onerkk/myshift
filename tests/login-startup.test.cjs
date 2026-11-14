@@ -18,7 +18,7 @@ function authEnv(){
     fbUser:null,fbAuthReady:false,_authInitUid:'',_authInitRequest:0,_cloudLoadRequest:0,_cloudLoading:false,_loading:false,
     _fsQueue:[],_fsRunning:false,payrollLeaveRequest:0,leavesCache:{},payrollLeaveState:{},payrollReferenceRequest:0,payrollReferenceState:'idle',
     SAL:{},SAL_DEFAULT:{},S:{step:'type',rt:'4on2off',pos:null,unit:''},R:{'4on2off':{}},
-    EVS:{},AL:{},ALD:{},TYD:{},OTD:{},AL_RESET_TS:{},NOTES:{},SHIFT_OV:{},lang:'zh',_cloudSaveTimer:null,
+    EVS:{},AL:{},ALD:{},TYD:{},TYM:{},OTD:{},AL_RESET_TS:{},NOTES:{},SHIFT_OV:{},lang:'zh',_cloudSaveTimer:null,
     localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},sCk(){},cloudLoadSal(){},_handleFatalFsError(){throw Error('fatal')},
     loads:{config:0,leaves:0,events:0,reference:0,locate:0},
     render(){renders.push({loading:c._cloudLoading,pos:c.S.pos})},
@@ -331,7 +331,8 @@ test('upgrade reuses exact cached effect images and recordings from the previous
 
 const shellEntries=()=>JSON.parse(swSource.match(/const CORE_SHELL = (\[[\s\S]*?\]);/)[1]);
 test('release integrity includes every stylesheet, effect module and local official login SDK',()=>{
-  const assets=shellEntries();assert.equal(assets.length,24);
+  const assets=shellEntries();assert.ok(assets.length>=24);
+  for(const f of fs.readdirSync(path.join(__dirname,'../v4')).filter(f=>/\.(?:js|css)$/.test(f)&&f!=='radar.css'))assert.ok(assets.some(x=>x.path.split('?')[0]==='v4/'+f),'v4/'+f+' missing from release');
   for(const asset of assets){
     const bytes=fs.readFileSync(path.join(__dirname,'..',asset.path.split('?')[0]));
     assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'),asset.sha256,asset.path);
@@ -351,7 +352,7 @@ test('a complete upgrade reuses verified styles and activates only after all req
   for(const item of e.network.slice(0,-1))item.d.resolve(new Response(fs.readFileSync(path.join(__dirname,'..',new URL(item.request).pathname.replace('/app/','')))));
   await new Promise(r=>setImmediate(r));assert.deepEqual(e.lifecycle,[]);
   last.d.resolve(new Response(fs.readFileSync(path.join(__dirname,'..',new URL(last.request).pathname.replace('/app/','')))));
-  await install;assert.deepEqual(e.lifecycle,['skipWaiting']);assert.equal(e.store.size,25);assert.equal(old.size,1);
+  await install;assert.deepEqual(e.lifecycle,['skipWaiting']);assert.equal(e.store.size,assets.length+1);assert.equal(old.size,1);
 });
 
 test('a missing or mismatched release cannot activate or remove the previous working cache',async()=>{
@@ -397,13 +398,15 @@ test('an existing worker replacement still activates the release with one reload
 
 test('all effect and dependency scripts download in parallel with their original execution order',()=>{
   const scripts=[...html.matchAll(/<script\s+([^>]*src="([^"]+)"[^>]*)>/g)];
-  assert.equal(scripts.length,13);scripts.forEach(s=>assert.match(s[1],/\bdefer\b/));
+  assert.equal(scripts.length,26);scripts.forEach(s=>assert.match(s[1],/\bdefer\b/));
   assert.deepEqual(scripts.map(s=>s[2].split('/').at(-1).split('?')[0]),[
     'firebase-app-compat.js','firebase-auth-compat.js','firebase-firestore-compat.js','weather-data.js','payroll.js',
-    'nature-effects.js','nature-audio.js','config-sync.js','schedule-experience.js','share-calendar.js','navigation-ui.js','app.js','ui-effects.js'
+    'nature-context.js','nature-taiwan.js','sky-gl.js','nature-effects.js','nature-audio.js','config-sync.js','schedule-experience.js','share-calendar.js','navigation-ui.js','app.js','ui-effects.js',
+    // v4 view layer: must load after app.js (it overrides the view functions) and weather.js last (it owns rCal).
+    'orrery.js','view.js','calendar.js','sheet.js','pay.js','more.js','setup.js','dialog.js','wxsheets.js','weather.js'
   ]);
   scripts.forEach(s=>assert.ok(html.indexOf(s[0])<html.indexOf('</head>')));
-  assert.equal([...html.matchAll(/<link rel="stylesheet"/g)].length,6);
+  assert.equal([...html.matchAll(/<link rel="stylesheet"/g)].length,12);
 });
 
 test('the full opening lasts 2.6 seconds from first paint without adding stylesheet delay again',()=>{
@@ -420,5 +423,5 @@ test('no unstyled application render or splash dismissal occurs before all full 
   vm.runInContext(slice('function _doRender(){','function rType(){'),c);c._doRender();assert.equal(c._renderRAF,null);
   assert.ok(html.indexOf('myshiftShellStartedAt=')<html.indexOf('<link rel="stylesheet"'));
   const links=[...html.matchAll(/<link rel="stylesheet"[^>]+>/g)];
-  assert.equal(links.length,6);links.forEach(l=>{assert.match(l[0],/media="print"/);assert.match(l[0],/onload="myshiftStyleLoaded\(this\)"/)});
+  assert.equal(links.length,12);links.forEach(l=>{assert.match(l[0],/media="print"/);assert.match(l[0],/onload="myshiftStyleLoaded\(this\)"/)});
 });
