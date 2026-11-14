@@ -1136,3 +1136,40 @@ body.v4 .v4-dlg{max-height:none}
 /* 降雨機率取不到時改顯示預估雨量 */
 body.v4 .v4-hr>em.mm{font-size:.58rem;color:var(--c-sky)}
 body.v4 .v4-hrow .p em.mm{font-style:normal;font-weight:700;color:var(--c-sky)}
+
+/* ══ v410：更多頁細修 ══ */
+body.v4 .v4-setrow.static .v4-setrow-copy strong{white-space:nowrap}
+body.v4 .v4-setrow.static .v4-seg.small button{padding:0 9px;font-size:.74rem}
+/* 請假中心 */
+body.v4 .v4-leavec .v4-sec-ic{--s:var(--v4-early)}
+body.v4 .v4-leavec .v4-pill{flex:none;min-height:38px;padding:0 10px 0 13px;font-size:.78rem;background:var(--v4-glass2);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+body.v4 .v4-leavec-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+body.v4 .v4-leavec-metrics>*{display:grid;gap:6px;justify-items:center;align-content:center;min-height:78px;padding:10px 4px;border-radius:18px;background:rgba(var(--v4-w),.06);border:1px solid var(--v4-line2);color:var(--v4-ink)!important;font:inherit}
+body.v4 .v4-leavec-metrics strong{font:800 1.5rem/1 var(--v4-num);color:var(--v4-strong);white-space:nowrap}
+body.v4 .v4-leavec-metrics strong small{margin-left:2px;font-size:.48em;font-weight:700;color:var(--v4-ink3)}
+body.v4 .v4-leavec-metrics span{font-size:.68rem;font-weight:700;color:var(--v4-ink3)}
+body.v4 .v4-leavec-metrics .unset{border-style:dashed;border-color:var(--v4-line)}
+body.v4 .v4-leavec-metrics .unset strong{font-size:.95rem;color:var(--c-gold)}
+body.v4 .v4-leavec-bar{display:flex;gap:2px;height:8px;margin:14px 0 0}
+body.v4 .v4-leavec-bar i{min-width:4px;border-radius:5px}
+body.v4 .v4-leavec-types{display:flex;flex-wrap:wrap;gap:6px 14px;margin:12px 2px 0}
+body.v4 .v4-leavec-type{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--v4-ink2)}
+body.v4 .v4-leavec-type i{width:9px;height:9px;border-radius:3px}
+body.v4 .v4-leavec-type b{font:800 .8rem/1 var(--v4-num);color:var(--v4-ink)}
+body.v4 .v4-leavec-next{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--v4-line2);font-size:.78rem;color:var(--v4-ink2)}
+body.v4 .v4-leavec-next strong{font:800 .9rem/1.2 var(--v4-num);color:var(--v4-strong);text-align:right}
+/* 氣象劇場情境按鈕：圖示與文字分上下兩列，長說明不再擠到圖示 */
+html body.v4 .v4-legacy .nature-previews{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important}
+html body.v4 .v4-legacy .nature-previews>span{grid-column:1/-1}
+html body.v4 .v4-legacy .nature-previews>button{position:relative;display:grid!important;grid-template-columns:1fr;gap:10px!important;align-content:start;justify-items:start;min-height:104px!important;padding:12px!important;text-align:left;border-radius:20px!important}
+html body.v4 .v4-legacy .nature-previews .effect-tile-icon{position:static!important;width:38px!important;height:38px!important;display:grid!important;place-items:center;margin:0!important}
+html body.v4 .v4-legacy .nature-previews .effect-copy{display:grid!important;gap:3px;position:static!important;margin:0!important;padding:0!important;text-align:left}
+html body.v4 .v4-legacy .nature-previews .effect-copy b{font-size:.95rem!important;line-height:1.2!important}
+html body.v4 .v4-legacy .nature-previews .effect-copy small{font-size:.68rem!important;line-height:1.35!important;color:var(--v4-ink3)!important}
+html body.v4 .v4-legacy .nature-previews .effect-play{position:absolute!important;right:12px;top:12px;color:var(--v4-ink3)!important;font-size:.8rem}
+html body.v4 .v4-legacy .nature-previews>button.is-preview{border-color:var(--v4-early)!important;box-shadow:0 0 0 1px var(--v4-early),0 0 18px rgba(97,235,173,.3)!important}
+/* 情境預覽控制列 */
+html body.v4 .nature-preview-hud{background:rgba(8,13,24,.86)!important;border:1px solid rgba(255,255,255,.16)!important;border-radius:24px!important;color:#f4f7fc!important;-webkit-backdrop-filter:blur(22px) saturate(1.3);backdrop-filter:blur(22px) saturate(1.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 16px 40px rgba(1,5,12,.5)!important}
+html body.v4 .nature-preview-hud>span,html body.v4 .nature-preview-hud em{color:rgba(236,242,252,.8)!important}
+html body.v4 .nature-preview-hud>button{min-height:42px!important;padding:0 16px!important;border-radius:99px!important;border:0!important;background:#61ebad!important;color:#06121f!important;font-weight:800!important;box-shadow:none!important;outline-offset:2px}
+html body.v4 .nature-preview-hud select{min-height:40px;border-radius:99px!important;border:1px solid rgba(255,255,255,.18)!important;background:rgba(255,255,255,.08)!important;color:#fff!important;padding:0 10px!important;color-scheme:dark}
