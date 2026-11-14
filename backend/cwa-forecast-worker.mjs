@@ -1,7 +1,11 @@
 /* cwa-forecast worker — 鄉鎮級天氣預報（中央氣象署 F-D0047 系列，逐 3 小時）
  *
  * 部署：Cloudflare Workers，名稱 cwa-forecast（網址 https://cwa-forecast.<帳號>.workers.dev）
- * 必要設定：Settings → Variables and Secrets → 新增 Secret，名稱 CWA_API_KEY，值為氣象署授權碼（CWA-開頭）
+ * 授權碼：沿用舊版的環境變數 CWA_KEY（也接受 CWA_API_KEY／CWA_TOKEN／API_KEY，或網址參數 ?auth=）
+ *
+ * 兩個端點（都與舊版相容）：
+ *   1. 預報   /?county=臺南市&town=鹽水區&lat=..&lon=..
+ *   2. 雨量站 /?rain=1&lat=..&lon=..   → 最近的自動雨量站實測（雷達頁使用），邏輯與舊版相同
  *
  * 查詢：/?county=臺南市&town=鹽水區&lat=23.32&lon=120.27
  * 回應：{ ok, source, scope:'town'|'county', county, town, popWindowHours, hourly:{ 'YYYY-MM-DDTHH': {pop,wx,wmo,t} }, updatedAt, ts }
@@ -38,7 +42,7 @@ const list = v => Array.isArray(v) ? v : (v ? [v] : []);
 
 export function tokenOf(env) {
   env = env || {};
-  return env.CWA_API_KEY || env.CWA_TOKEN || env.CWA_KEY || env.API_KEY || env.Authorization || '';
+  return env.CWA_KEY || env.CWA_API_KEY || env.CWA_TOKEN || env.API_KEY || env.Authorization || '';
 }
 
 /* 把一個地點（鄉鎮或縣市）的 WeatherElement 轉成逐時表。新舊欄位名稱都接受。 */
@@ -81,16 +85,16 @@ export function hourlyFromLocation(location) {
 
 /* 氣象署天氣現象文字 → WMO 天氣碼（App 的圖示與動畫用） */
 export function wmoFromText(wx) {
+  // 與舊版 worker 相同的對照，圖示與動畫不會因為換版而改變
+  wx = String(wx || ''); if (!wx) return null;
   if (/雷/.test(wx)) return 95;
-  if (/雪|冰/.test(wx)) return 73;
-  if (/豪雨|大雨/.test(wx)) return 65;
-  if (/陣雨/.test(wx)) return 80;
-  if (/雨/.test(wx)) return 61;
-  if (/霧/.test(wx)) return 45;
+  if (/雨/.test(wx)) return /(豪|大雨|大豪|超大豪)/.test(wx) ? 65 : /(短暫|陣雨)/.test(wx) ? 80 : 63;
+  if (/雪/.test(wx)) return 71;
+  if (/(霧|靄)/.test(wx)) return 45;
   if (/陰/.test(wx)) return 3;
-  if (/多雲/.test(wx)) return /晴/.test(wx) ? 1 : 2;
-  if (/晴/.test(wx)) return 0;
-  return null;
+  if (/多雲/.test(wx)) return 2;
+  if (/晴/.test(wx)) return /雲/.test(wx) ? 1 : 0;
+  return 3;
 }
 
 function groupsOf(json) {
@@ -170,9 +174,10 @@ async function countyLocation(county, lat, lon, token, debug) {
 
 export async function forecast(query, token) {
   const debug = query.debug ? [] : null;
-  const county = clean(query.county), town = clean(query.town);
+  let county = clean(query.county), town = clean(query.town);
+  if (!county && COUNTY_CENTER[town]) { county = town; town = ''; }
   const lat = Number(query.lat), lon = Number(query.lon);
-  if (!token) return { ok: false, error: 'missing CWA_API_KEY secret' };
+  if (!token) return { ok: false, error: 'missing CWA_KEY env' };
   let found = null, scope = 'town';
   if (county && town) found = await townLocation(county, town, token, debug);
   if (!found) { scope = 'county'; found = await countyLocation(county, lat, lon, token, debug); }
@@ -189,14 +194,76 @@ export async function forecast(query, token) {
   };
 }
 
-const HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS' };
+/* ── 雨量站端點（?rain=1）：最近的自動雨量站實測。自舊版原樣移植，回應欄位不變。 ── */
+const RAIN_DATASET = 'O-A0002-001';
+function stationLatLon(station) {
+  const geo = pick(station, ['GeoInfo', 'geoInfo']) || {};
+  let fallback = null;
+  for (const c of list(pick(geo, ['Coordinates', 'coordinates']))) {
+    const la = parseFloat(pick(c, ['StationLatitude', 'stationLatitude'])), lo = parseFloat(pick(c, ['StationLongitude', 'stationLongitude']));
+    if (!isFinite(la) || !isFinite(lo)) continue;
+    if (pick(c, ['CoordinateName', 'coordinateName']) === 'WGS84') return { lat: la, lon: lo };
+    fallback = { lat: la, lon: lo };
+  }
+  return fallback || { lat: NaN, lon: NaN };
+}
+export function rainValue(element, key) {
+  const node = element[key] || element[key.toLowerCase()] || null;
+  const raw = node ? (node.Precipitation !== undefined ? node.Precipitation : node.precipitation) : null;
+  if (raw == null) return { mm: null, note: 'no-data' };
+  const text = String(raw).trim();
+  if (text === 'T') return { mm: .05, note: 'trace' };
+  if (text === 'X') return { mm: null, note: 'broken' };
+  if (text === '-99') return { mm: null, note: 'no-data' };
+  if (text === '-98') return { mm: 0, note: 'dry6h' };
+  const mm = parseFloat(text);
+  return !isFinite(mm) || mm < 0 ? { mm: null, note: 'no-data' } : { mm, note: 'ok' };
+}
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const k = Math.PI / 180, a = (lat2 - lat1) * k, b = (lon2 - lon1) * k;
+  const h = Math.sin(a / 2) ** 2 + Math.cos(lat1 * k) * Math.cos(lat2 * k) * Math.sin(b / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+export async function rain(query, token) {
+  const lat = parseFloat(query.lat), lon = parseFloat(query.lon);
+  if (!token) return { status: 500, body: { ok: false, error: 'missing CWA_KEY env' } };
+  if (!(isFinite(lat) && isFinite(lon))) return { status: 400, body: { ok: false, error: 'need ?lat=&lon=' } };
+  const url = new URL(API + RAIN_DATASET); url.searchParams.set('Authorization', token); url.searchParams.set('format', 'JSON');
+  let stations;
+  try {
+    const response = await fetch(url.toString(), { cf: { cacheTtl: 120, cacheEverything: true } });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const json = await response.json(), records = json && json.records;
+    stations = list(records && pick(records, ['Station', 'station']));
+  } catch (e) { return { status: 502, body: { ok: false, error: 'rain fetch failed: ' + String(e && e.message || e).slice(0, 80) } }; }
+  if (!stations.length) return { status: 502, body: { ok: false, error: 'no Station in CWA response' } };
+  let best = null, bestLL = null, bestD = Infinity;
+  for (const st of stations) { const ll = stationLatLon(st); if (!isFinite(ll.lat) || !isFinite(ll.lon)) continue; const d = (ll.lat - lat) ** 2 + (ll.lon - lon) ** 2; if (d < bestD) { bestD = d; best = st; bestLL = ll; } }
+  if (!best) return { status: 502, body: { ok: false, error: 'no station with coordinates' } };
+  const geo = pick(best, ['GeoInfo', 'geoInfo']) || {}, el = pick(best, ['RainfallElement', 'rainfallElement']) || {}, obs = pick(best, ['ObsTime', 'obsTime']) || {};
+  return { status: 200, body: {
+    ok: true, station: pick(best, ['StationName', 'stationName']) || '', id: pick(best, ['StationId', 'stationId']) || '',
+    county: pick(geo, ['CountyName', 'countyName']) || '', town: pick(geo, ['TownName', 'townName']) || '',
+    distanceKm: Math.round(haversineKm(lat, lon, bestLL.lat, bestLL.lon) * 10) / 10,
+    obsTime: pick(obs, ['DateTime', 'dateTime']) || null,
+    rain: { min10: rainValue(el, 'Past10Min'), hr1: rainValue(el, 'Past1hr'), hr3: rainValue(el, 'Past3hr'), hr24: rainValue(el, 'Past24hr'), today: rainValue(el, 'Now') },
+    ts: Date.now()
+  } };
+}
+
+const HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,OPTIONS', 'Access-Control-Allow-Headers': '*' };
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS });
     if (request.method !== 'GET') return new Response(JSON.stringify({ ok: false, error: 'GET only' }), { status: 405, headers: HEADERS });
     const url = new URL(request.url), q = Object.fromEntries(url.searchParams);
+    const token = q.auth || tokenOf(env);
+    if (q.rain === '1') {
+      let r; try { r = await rain(q, token); } catch (e) { r = { status: 502, body: { ok: false, error: 'worker error: ' + String(e && e.message || e).slice(0, 120) } }; }
+      return new Response(JSON.stringify(r.body), { status: r.status, headers: { ...HEADERS, 'Cache-Control': 'no-store' } });
+    }
     let body;
-    try { body = await forecast(q, tokenOf(env)); }
+    try { body = await forecast(q, token); }
     catch (e) { body = { ok: false, error: 'worker error: ' + String(e && e.message || e).slice(0, 120) }; }
     return new Response(JSON.stringify(body), { status: 200, headers: { ...HEADERS, 'Cache-Control': body.ok ? 'public, max-age=600' : 'no-store' } });
   }

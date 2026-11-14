@@ -34,7 +34,7 @@ test('township forecast: probability fills every hour of its 3-hour window in Ta
     assert.deepEqual(['12','13','14'].map(h=>r.hourly['2026-11-14T'+h].pop),[30,30,30]);
     assert.deepEqual(['15','16','17'].map(h=>r.hourly['2026-11-14T'+h].pop),[90,90,90]);
     assert.equal(r.hourly['2026-11-14T18'],undefined);
-    assert.equal(r.hourly['2026-11-14T12'].wmo,95);assert.equal(r.hourly['2026-11-14T16'].wmo,1);
+    assert.equal(r.hourly['2026-11-14T12'].wmo,95);assert.equal(r.hourly['2026-11-14T16'].wmo,2);
     assert.equal(r.hourly['2026-11-14T12'].t,26);assert.equal(r.hourly['2026-11-14T13'].t,27);assert.equal(r.hourly['2026-11-14T14'].t,27);
     assert.equal(m.calls.length,1);assert.equal(m.calls[0].auth,'KEY');assert.ok(!JSON.stringify(r).includes('KEY'));
   }finally{m.restore()}
@@ -72,5 +72,23 @@ test('errors are reported without leaking the key; older lowercase field names s
   const old={locationName:'鹽水區',weatherElement:[{elementName:'PoP6h',time:[{startTime:'2026-11-14 12:00:00+08:00',endTime:'2026-11-14 18:00:00+08:00',elementValue:[{value:'40',measures:'百分比'}]}]}]};
   const r=W.hourlyFromLocation(old);assert.equal(r.popWindowHours,6);assert.equal(r.hourly['2026-11-14T17'].pop,40);
   assert.equal(W.tokenOf({CWA_API_KEY:'a'}),'a');assert.equal(W.tokenOf({CWA_TOKEN:'b'}),'b');
-  for(const [text,code] of [['晴',0],['多雲',2],['陰',3],['有霧',45],['短暫雨',61],['午後短暫陣雨',80],['大雨',65],['陣雨或雷雨',95]])assert.equal(W.wmoFromText(text),code,text);
+  assert.equal(W.tokenOf({CWA_KEY:'old'}),'old');
+  for(const [text,code] of [['晴',0],['晴時多雲',2],['多雲',2],['陰',3],['有霧',45],['雨',63],['短暫雨',80],['午後短暫陣雨',80],['大雨',65],['陣雨或雷雨',95]])assert.equal(W.wmoFromText(text),code,text);
+});
+
+test('rain-station endpoint keeps the previous response shape and value rules (radar page depends on it)',async()=>{
+  const W=await load(),original=globalThis.fetch;
+  const st=(name,lat,lon,p10)=>({StationName:name,StationId:'C1'+name,ObsTime:{DateTime:'2026-11-14T16:50:00+08:00'},
+    GeoInfo:{CountyName:'臺南市',TownName:'鹽水區',Coordinates:[{CoordinateName:'TWD67',StationLatitude:'0',StationLongitude:'0'},{CoordinateName:'WGS84',StationLatitude:String(lat),StationLongitude:String(lon)}]},
+    RainfallElement:{Past10Min:{Precipitation:p10},Past1hr:{Precipitation:'3.5'},Past3hr:{Precipitation:'T'},Past24hr:{Precipitation:'-98'},Now:{Precipitation:'X'}}});
+  globalThis.fetch=async url=>{assert.match(String(url),/O-A0002-001/);return new Response(JSON.stringify({records:{Station:[st('遠',25,121.5,'9'),st('鹽水',23.32,120.27,'1.5')]}}),{status:200})};
+  try{
+    const r=await W.rain({lat:'23.3256',lon:'120.2735'},'KEY');
+    assert.equal(r.status,200);assert.equal(r.body.station,'鹽水');assert.equal(r.body.county,'臺南市');assert.ok(r.body.distanceKm<2);assert.equal(r.body.obsTime,'2026-11-14T16:50:00+08:00');
+    assert.deepEqual(r.body.rain,{min10:{mm:1.5,note:'ok'},hr1:{mm:3.5,note:'ok'},hr3:{mm:.05,note:'trace'},hr24:{mm:0,note:'dry6h'},today:{mm:null,note:'broken'}});
+    assert.equal((await W.rain({lat:'x'},'KEY')).status,400);assert.equal((await W.rain({lat:'1',lon:'2'},'')).status,500);
+    // through the fetch handler, with the old env name
+    const res=await W.default.fetch(new Request('https://w.example/?rain=1&lat=23.3256&lon=120.2735'),{CWA_KEY:'KEY'});
+    assert.equal(res.status,200);assert.equal((await res.json()).station,'鹽水');assert.equal(res.headers.get('access-control-allow-origin'),'*');
+  }finally{globalThis.fetch=original}
 });
