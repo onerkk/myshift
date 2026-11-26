@@ -49,8 +49,8 @@ window.rHelp=function(){
   <section class="v4-card"><h3>${zh?'日曆標記說明':'Tanda Kalender'}</h3><div class="v4-help-grid marks">
     ${mark(cell('today','<b>28</b>'),zh?'今天（亮色外框）':'Hari ini')}
     ${mark(cell('hol','<b>10</b>'),zh?'國定假日 / 週末（紅色日期）':'Libur nasional / akhir pekan')}
-    ${mark(cell('ev','<b>11</b><i class="note-dot"></i>'),zh?'日期圓點代表該週下方有事項':'Titik menandai agenda di bawah pekan')}
-    ${mark(cell('lv','<s>'+uiIcon('user',14)+' 2</s>'),zh?'請假人數（格子底部）':'Jumlah cuti')}
+    ${mark(cell('ev','<b>11</b><i class="note-dot"></i>'),zh?'日期圓點代表當天有事項，點日期查看':'Ketuk tanggal bertitik untuk melihat agenda')}
+    ${mark(cell('lv','<s>'+uiIcon('user',14)+' 2</s>'),zh?'切換「請假人數」查看當日人數':'Jumlah cuti')}
     ${mark(cell('al','<u class="al">特休</u>'),zh?'已排特休':'Pakai cuti')}
     ${mark(cell('pay','<u class="pay">發薪</u>'),zh?'發薪日（每月5日，遇假日提前）':'Gaji (tgl 5, maju jika libur)')}
     ${mark(cell('pay','<u class="pay">績效</u>'),zh?'績效獎金（每月20日，遇假日提前）':'Bonus (tgl 20, maju jika libur)')}

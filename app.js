@@ -3227,7 +3227,7 @@ function handle(e){
     case "tabMore":setUiTab("more");break;
     case "prefs":openUserPrefs();return;
     case "openDate":S.yr=+el.dataset.y;S.mo=+el.dataset.m;S.modal={y:+el.dataset.y,m:+el.dataset.m,d:+el.dataset.d};loadLeaves();loadAdminEv();break;
-    case "calendarView":if(['month','agenda'].includes(el.dataset.view)){UI_CAL_VIEW=el.dataset.view;UI_CAL_FILTER='all'}break;
+    case "calendarView":if(['month','people','agenda'].includes(el.dataset.view)){UI_CAL_VIEW=el.dataset.view;UI_CAL_FILTER='all'}break;
     case "calendarFilter":if(['all','meeting','health','leave','mine','holiday','rest','adjusted','personal'].includes(el.dataset.filter)){UI_CAL_VIEW='agenda';UI_CAL_FILTER=el.dataset.filter}break;
     case "calendarReload":loadLeaves();loadAdminEv();break;
     case "prev":if(S.mo===1){S.yr--;S.mo=12}else S.mo--;loadLeaves();loadAdminEv();break;

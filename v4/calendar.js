@@ -27,8 +27,7 @@ window.uiCalendarTodayAnchorHtml=function(){
 };
 window.uiMonthSummaryHtml=function(st,workDays){
   const zh=lang==='zh',defs=[{key:'早',tone:'early',label:zh?'早班':'Pagi'},{key:'晚',tone:'night',label:zh?'晚班':'Malam'},...(Number(st['中']||0)>0?[{key:'中',tone:'mid',label:zh?'中班':'Siang'}]:[]),{key:'休',tone:'off',label:zh?'休假':'Libur'}];
-  const total=defs.reduce((n,x)=>n+Number(st[x.key]||0),0)||1;
-  return `<div class="v4-msum"><div class="v4-msum-head"><h2>${zh?'本月概覽':'Ringkasan bulan'}</h2><span>${zh?'出勤':'Kerja'} <strong>${workDays}</strong> ${zh?'天':'hari'}</span></div><div class="v4-msum-bar" aria-hidden="true">${defs.map(x=>`<i class="v4-s-${x.tone}" style="flex:${Number(st[x.key]||0)/total}"></i>`).join('')}</div><div class="v4-msum-grid">${defs.map(x=>`<div class="v4-s-${x.tone}"><span><i></i>${x.label}</span><strong>${Number(st[x.key]||0)}</strong></div>`).join('')}</div></div>`;
+  return `<div class="v4-msum"><div class="v4-msum-head"><h2>${zh?'本月出勤':'Hari kerja'}</h2><span><strong>${workDays}</strong> ${zh?'天':'hari'}</span></div><div class="v4-msum-grid">${defs.map(x=>`<div class="v4-s-${x.tone}"><span><i></i>${x.label}</span><strong>${Number(st[x.key]||0)}</strong></div>`).join('')}</div></div>`;
 };
 window.uiCalendarBreakStripHtml=function(y,m){
   const runs=calendarHolidayRuns(y,m);if(!runs.length)return'';const wk=t('wk'),zh=lang==='zh';
@@ -57,7 +56,8 @@ window.calendarHighlightsHtml=function(days){
 window.calendarDataNoticeHtml=function(y,m){
   const zh=lang==='zh',status=calendarLeaveStatus(y,m),ym=ek(y,m,1).slice(0,7);
   const adminKnown=adminEvState.months.includes(ym),adminPending=adminEvState.loading||!adminKnown;
-  const messages=[calendarLeaveStatusText(status)];
+  if(status.state==='ready'&&!adminPending&&!adminEvState.error)return '';
+  const messages=status.state==='ready'?[]:[calendarLeaveStatusText(status)];
   if(adminEvState.error)messages.push(zh?'會議／體檢更新失敗':'Gagal memperbarui rapat/medis');
   else if(adminPending)messages.push(zh?'單位事項同步中':'Memuat agenda unit');
   const retry=status.state==='error'||adminEvState.error,busy=!retry&&(adminPending||status.state==='loading'||status.state==='pending');
@@ -83,12 +83,12 @@ function monthDateAction(day){
 }
 
 function calendarWeekHtml(week){
-  const zh=lang==='zh',wk=t('wk'),cells=[],notes=[];
+  const zh=lang==='zh',wk=t('wk'),cells=[],people=UI_CAL_VIEW==='people';
   for(const day of week){
     const {y,m,d,shift,today,inMonth}=day;
     const weekday=new Date(y,m-1,d).getDay(),weekend=weekday===0||weekday===6;
     const weekdayLabel=(zh?'週':'')+wk[weekday];
-    const action=monthDateAction(day),chips=chipsHtml(day);
+    const action=monthDateAction(day),hasNotes=day.events.length||day.adjusted||day.holiday||day.publicOff||day.breakLabel;
     const lunar=S.showLunar?lunarCellText(y,m,d):'';
     const monthLabel=zh?`${m}月`:['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][m-1];
     const fullShift=shift==='休'?(zh?'輪班休假':'Libur shift'):studioShiftLabel(shift);
@@ -96,33 +96,24 @@ function calendarWeekHtml(week){
     const aria=[`${y}/${m}/${d}`,weekdayLabel,today?(zh?'今天':'Hari ini'):'',fullShift,
       day.publicOff?(zh?'國定假日':'Libur nasional'):'',day.holiday,...day.events.map(e=>e.label),
       day.adjusted?(zh?'已調班':'Shift diubah'):'',calendarLeaveLabel(day),day.breakLabel].filter(Boolean).join(', ');
-    const classes=['v4-cell','v4-s-'+sk(shift),inMonth?'':'adj',today?'today':'',weekend?'we':'',day.publicOff?'hol':'',day.breakLabel?'brk':'',chips?'has-notes':''].filter(Boolean).join(' ');
-    const tags=[today?(zh?'今天':'Hari ini'):'',!inMonth?monthLabel:'',day.publicOff?(zh?'國假':'Libur'):''].filter(Boolean);
+    const classes=['v4-cell','v4-s-'+sk(shift),inMonth?'':'adj',today?'today':'',weekend?'we':'',day.publicOff?'hol':'',day.breakLabel?'brk':'',hasNotes?'has-notes':''].filter(Boolean).join(' ');
+    const tag=!inMonth&&(d===1||weekday===0)?monthLabel:'';
     cells.push(`<button type="button" class="${classes}" ${action} aria-current="${today?'date':'false'}" aria-label="${esc(aria)}"${lunar?` aria-describedby="cal-lunar-${day.key}"`:''} data-date="${day.key}" data-month-offset="${day.monthOffset}">
-      <b class="c-num">${d}</b><span class="c-shift">${esc(shortShift)}</span>
+      <b class="c-num">${d}</b>${people?`<span class="c-leave${day.leaveCount>0?' has':''}"><b>${day.leaveCount??'—'}</b></span>`:`<span class="c-shift">${esc(shortShift)}</span>`}
       ${lunar?`<span class="c-lunar" id="cal-lunar-${day.key}">${lunar}</span>`:''}
-      <span class="c-leave${day.leaveCount>0?' has':''}">${uiIcon('user',14)}<b>${day.leaveCount??'—'}</b></span>
-      ${tags.length?`<span class="c-tags">${tags.map(tag=>`<span>${tag}</span>`).join('')}</span>`:''}
+      ${tag?`<span class="c-tags">${tag}</span>`:''}
     </button>`);
-    if(chips){
-      notes.push(`<li><button type="button" class="v4-week-note" ${action}>
-        <span class="v4-note-date"><b>${m}/${d}</b><small>${weekdayLabel}</small></span>
-        <span class="v4-chips">${chips}</span>${uiIcon('chevron',15)}
-      </button></li>`);
-    }
   }
   const first=week[0],last=week[week.length-1],range=`${first.m}/${first.d} – ${last.m}/${last.d}`;
-  return `<div class="v4-cal-week" role="group" aria-label="${range}"><div class="v4-week-dates">${cells.join('')}</div>
-    ${notes.length?`<ul class="v4-week-notes" aria-label="${range} ${zh?'本週事項':'Agenda pekan ini'}">${notes.join('')}</ul>`:''}</div>`;
+  return `<div class="v4-cal-week" role="group" aria-label="${range}"><div class="v4-week-dates">${cells.join('')}</div></div>`;
 }
 
 function monthGridHtml(days){
   const zh=lang==='zh',weeks=[];
   for(let i=0;i<days.length;i+=7)weeks.push(calendarWeekHtml(days.slice(i,i+7)));
-  return `<div class="v4-cal-key"><span>${uiIcon('user',16)}${zh?'請假人數':'Jumlah cuti'}</span><span><i></i>${zh?'當日有事項':'Ada agenda'}</span></div>
-    <div class="v4-grid"><div class="v4-wk" aria-label="${zh?'星期':'Hari'}">${t('wk').map((w,i)=>`<div class="${i===0||i===6?'we':''}">${w}</div>`).join('')}</div>
+  return `<div class="v4-grid"><div class="v4-wk" aria-label="${zh?'星期':'Hari'}">${t('wk').map((w,i)=>`<div class="${i===0||i===6?'we':''}">${w}</div>`).join('')}</div>
     <div class="v4-cells">${weeks.join('')}</div></div>
-    <p class="v4-note">${zh?'附月份的日期屬於前後月。請假人數顯示「—」代表尚未取得。點日期或事項可看明細，左右滑動可換月。':'Label bulan menandai tanggal di luar bulan ini. Tanda — berarti jumlah cuti belum tersedia. Ketuk tanggal atau agenda untuk detail. Geser untuk ganti bulan.'}</p>${studioCalendarLegendHtml()}`;
+    <div class="v4-cal-key"><span><i></i>${zh?'有事項，點日期查看':'Ada agenda · ketuk tanggal'}</span>${UI_CAL_VIEW==='people'?`<span>${zh?'— 人數待確認':'— Data belum tersedia'}</span>`:''}</div>`;
 }
 
 window.uiCalendarPageHtml=function(){
@@ -140,8 +131,8 @@ window.uiCalendarPageHtml=function(){
   const ml=zh?`${y} 年 ${m} 月`:`${String(m).padStart(2,'0')} / ${y}`;
   const context=[(RN[lang]&&RN[lang][S.rt])||S.rt||'',S.unit&&S.unit!=='__all'?S.unit:S.unit==='__all'?(zh?'全部單位':'Semua unit'):''].filter(Boolean).join(' · ');
   const isNow=y===TY&&m===TM;
-  return `<div class="v4-root v4-calhead"><div class="v4-calhead-title"><h1 aria-label="${ml}">${zh?`${m}<small>月</small>`:`${String(m).padStart(2,'0')}`}</h1><p><b>${y}</b>${context?' · '+esc(context):''}<span>${zh?'班別・事項・當日人力':'Shift · Agenda · Cuti'}</span></p></div><div class="v4-calhead-nav"><button class="v4-round prev" data-a="prev" aria-label="${zh?'上個月':'Bulan sebelumnya'}">${uiIcon('chevron',18)}</button><button class="v4-pill${isNow?' on':''}" data-a="today">${studioIcon('event',15)}${zh?'今天':'Hari ini'}</button><button class="v4-round next" data-a="next" aria-label="${zh?'下個月':'Bulan berikutnya'}">${uiIcon('chevron',18)}</button></div></div>`
-   +`<div class="v4-root v4-slab v4-month" aria-label="${ml}">${uiMonthSummaryHtml(st,workDays)}<div class="v4-switch" role="group" aria-label="${zh?'班表顯示方式':'Tampilan jadwal'}"><button id="calendar-view-month" data-a="calendarView" data-view="month" aria-pressed="${UI_CAL_VIEW==='month'}">${studioIcon('calendar',16)}${zh?'月曆總覽':'Kalender'}</button><button id="calendar-view-agenda" data-a="calendarView" data-view="agenda" aria-pressed="${UI_CAL_VIEW==='agenda'}">${studioIcon('event',16)}${zh?'每日清單':'Agenda harian'}</button></div>${calendarDataNoticeHtml(y,m)}${S.showLunar?lunarTodayStrip():''}${UI_CAL_VIEW==='agenda'?calendarAgendaHtml(days):monthGridHtml(gridDays)}</div>`
+  return `<section class="v4-root v4-slab v4-month" aria-label="${ml}"><div class="v4-calhead"><div class="v4-calhead-title"><h1 aria-label="${ml}">${zh?`${m}<small>月</small>`:`${String(m).padStart(2,'0')}`}</h1><p><b>${y}</b>${context?' · '+esc(context):''}</p></div><div class="v4-calhead-nav"><button class="v4-round prev" data-a="prev" aria-label="${zh?'上個月':'Bulan sebelumnya'}">${uiIcon('chevron',18)}</button><button class="v4-pill${isNow?' on':''}" data-a="today">${studioIcon('event',15)}${zh?'今天':'Hari ini'}</button><button class="v4-round next" data-a="next" aria-label="${zh?'下個月':'Bulan berikutnya'}">${uiIcon('chevron',18)}</button></div></div>`
+   +`<div class="v4-switch" role="group" aria-label="${zh?'班表顯示方式':'Tampilan jadwal'}">${[['month',zh?'班別':'Shift'],['people',zh?'請假人數':'Jumlah cuti'],['agenda',zh?'每日清單':'Agenda']].map(([id,label])=>`<button id="calendar-view-${id}" data-a="calendarView" data-view="${id}" aria-pressed="${UI_CAL_VIEW===id}">${label}</button>`).join('')}</div>${S.showLunar?lunarTodayStrip():''}${UI_CAL_VIEW==='agenda'?calendarAgendaHtml(days):monthGridHtml(gridDays)}${calendarDataNoticeHtml(y,m)}${uiMonthSummaryHtml(st,workDays)}</section>`
    +uiCalendarTodayAnchorHtml()+uiCalendarRestPlanHtml(y,m)+uiCalendarBreakStripHtml(y,m)+calendarHighlightsHtml(days)+uiQuickToolsHtml()+uiCalendarHolidaysHtml(days)+uiCalendarNoticesHtml(days)+uiUpcomingEventsHtml(y,m);
 };
 

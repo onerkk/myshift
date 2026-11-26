@@ -113,12 +113,10 @@ test('month and agenda show every item on a busy day, including leave hours and 
   });
   const h=c.screen('calendar');
   const week=h.split('class="v4-cal-week"').find(part=>part.includes('aria-label="9/6 – 9/12"'));
-  const row=week.match(/class="v4-week-note" data-a="open" data-d="12">([\s\S]*?)<\/button>/)[1];
+  const button=week.match(/<button[^>]*data-date="2026-09-12"[^>]*>[\s\S]*?<\/button>/)[0];
   const expected=[c.esc(note),'本人 病假 6h','本人 未加班 4h','meeting','health','class','已調班','節日名稱','連假第 2 天，共 3 天'];
-  for(const label of expected)assert.ok(row.includes('>'+label+'<'),label);
-  const cell=week.match(/<button[^>]*data-date="2026-09-12"[^>]*>([\s\S]*?)<\/button>/)[1];
-  assert.match(cell,/class="c-leave has"[\s\S]*?<b>1<\/b>/);
-  assert.ok(!cell.includes('v4-chip'),'full labels live below the week');
+  for(const label of expected)assert.ok(button.includes(label),label);
+  assert.ok(!button.includes('c-leave')&&!week.includes('v4-week-note'));
   c.UI_CAL_VIEW='agenda';
   const agenda=c.screen('calendar').match(/class="v4-aday [^"]*" data-a="open" data-d="12"[^>]*>([\s\S]*?)<\/button>/)[1];
   for(const label of expected)assert.ok(agenda.includes('>'+label+'<'),label);
@@ -128,9 +126,11 @@ test('adjacent-month notes open the actual date and distinguish unknown from zer
   const c=v4env('id',c=>{
     c.fbUser={uid:'me'};c.EVS['2026-10-01']=['custom'];c.NOTES['2026-10-01']='Serah terima';
   });
+  c.UI_CAL_VIEW='people';
   const h=c.screen('calendar');
   const week=h.split('class="v4-cal-week"').find(part=>part.includes('aria-label="9/27 – 10/3"'));
-  assert.match(week,/class="v4-week-note" data-a="openDate" data-y="2026" data-m="10" data-d="1">[\s\S]*?>Serah terima<\/span>/);
+  assert.match(week,/data-a="openDate" data-y="2026" data-m="10" data-d="1"[^>]*Serah terima/);
+  assert.ok(!week.includes('c-shift'));
   for(const [date,count] of [['2026-09-30','0'],['2026-10-01','—']]){
     const cell=week.split('data-date="'+date+'"')[1].split('</button>')[0];
     assert.ok(cell.includes('<b>'+count+'</b>'),date);

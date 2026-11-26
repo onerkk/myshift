@@ -17,7 +17,10 @@ window.uiDaySheetDateControlHtml=function(y,m,d){
 };
 window.calendarDaySummaryHtml=function(y,m,d){
   const day=calendarDayInfo(y,m,d),zh=lang==='zh';
-  const chips=day.events.map(e=>`<span class="v4-chip tone-${tone(e.tone)}">${esc(e.label)}</span>`).join('')+(day.adjusted?`<span class="v4-chip tone-adjusted">${zh?'已調班':'Shift diubah'}</span>`:'')+(day.holiday?`<span class="v4-chip tone-holiday">${esc(day.holiday)}</span>`:'');
+  const run=calendarHolidayRuns(y,m).find(r=>r.dates.includes(day.key));
+  const holiday=[isTWOff(y,m,d)?(zh?'國定假日':'Libur nasional'):'',day.holiday].filter(Boolean).join(' · ');
+  const breakLabel=run?(zh?`連假第 ${run.dates.indexOf(day.key)+1} 天，共 ${run.length} 天`:`Libur panjang hari ${run.dates.indexOf(day.key)+1} dari ${run.length}`):'';
+  const chips=day.events.map(e=>`<span class="v4-chip tone-${tone(e.tone)}">${esc(e.label)}</span>`).join('')+(day.adjusted?`<span class="v4-chip tone-adjusted">${zh?'已調班':'Shift diubah'}</span>`:'')+[holiday,breakLabel].filter(Boolean).map(label=>`<span class="v4-chip tone-holiday">${esc(label)}</span>`).join('');
   return `<section class="day-brief v4-card" aria-label="${zh?'當日事項':'Agenda hari ini'}"><header><h3>${zh?'當日事項':'Agenda hari ini'}</h3><span class="v4-count-pill${day.leaveCount>0?' has':''}">${esc(calendarLeaveLabel(day))}</span></header><div class="v4-chips">${chips||`<span class="v4-none">${zh?'目前沒有其他事項':'Belum ada agenda lain'}</span>`}</div><small>${esc(S.unit==='__all'?(zh?'全部單位':'Semua unit'):S.unit||(zh?'目前範圍':'Lingkup saat ini'))} · ${esc(calendarLeaveStatusText(day.status))}</small></section>`;
 };
 window.shiftAdjHtml=function(y,m,d){
@@ -90,9 +93,8 @@ window.rMod=function(){
   let leaveHtml;try{leaveHtml=modalLeaveHtml(y,m,d)}catch(e){leaveHtml='<p class="v4-card v4-err">Leave error: '+esc(e.message)+'</p>'}
   return `<div class="modal-bg" data-a="close"><div class="modal-sheet v4-sheet v4-s-${sk(s)}" role="dialog" aria-modal="true" aria-labelledby="day-dialog-title" onclick="event.stopPropagation()"><div class="modal-handle"></div>`
    +`<header class="v4-sheet-head"><div><p>${isToday?(zh?'今天':'Hari ini'):y}</p><h2 class="modal-title" id="day-dialog-title">${ds}</h2></div>${hol?`<span class="v4-chip tone-holiday">🎌 ${esc(hol)}</span>`:''}</header>`
-   +uiDaySheetNavigationHtml()+uiDaySheetDateControlHtml(y,m,d)
    +`<div class="modal-shift v4-shiftband"><span class="v4-shiftband-dot"></span><div><b class="modal-shift-name">${sf(s)}</b><small>${rule.isWork?`${time.range} · ${zh?'正常':'Normal'} ${rule.regularMinutes/60}h${rule.overtimeMinutes?(zh?'＋加班 ':' + lembur ')+rule.overtimeMinutes/60+'h':''}`:s==='休'?(zh?'不需出勤':'Tidak perlu bekerja'):(zh?'尚未排班':'Belum ada shift')}</small></div>${SHIFT_OV[key]?`<span class="v4-chip tone-adjusted">${zh?'已調班':'Shift diubah'}</span>`:''}</div>`
-   +calendarDaySummaryHtml(y,m,d)+shiftAdjHtml(y,m,d)+leaveHtml+adminEvModalHtml(y,m,d)
+   +calendarDaySummaryHtml(y,m,d)+uiDaySheetNavigationHtml()+uiDaySheetDateControlHtml(y,m,d)+shiftAdjHtml(y,m,d)+leaveHtml+adminEvModalHtml(y,m,d)
    +`<h3 class="modal-section v4-sheet-sec" id="day-event-section">${t('mark')}</h3><div class="ev-list v4-evs">${evR}</div>${alP}${tyP}${custP}${S.showLunar?`<div class="v4-lunar">${lunarModalBlock(y,m,d)}</div>`:''}`
    +`<button class="modal-done v4-btn primary wide" data-a="close">${t('done')}</button></div></div>`;
 };

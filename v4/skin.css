@@ -1192,3 +1192,71 @@ html body.v4 .nature-preview-hud{background:rgba(8,13,24,.86)!important;border:1
 html body.v4 .nature-preview-hud>span,html body.v4 .nature-preview-hud em{color:rgba(236,242,252,.8)!important}
 html body.v4 .nature-preview-hud>button{min-height:42px!important;padding:0 16px!important;border-radius:99px!important;border:0!important;background:#61ebad!important;color:#06121f!important;font-weight:800!important;box-shadow:none!important;outline-offset:2px}
 html body.v4 .nature-preview-hud select{min-height:40px;border-radius:99px!important;border:1px solid rgba(255,255,255,.18)!important;background:rgba(255,255,255,.08)!important;color:#fff!important;padding:0 10px!important;color-scheme:dark}
+
+/* 班表：同一張月曆，日期位置在兩種檢視間保持一致。 */
+html body.v4 .app-main>.v4-month,
+html:not([data-theme=dark]) body.v4 .app-main>.v4-month {
+  --cal-paper:#162523;
+  --cal-rule:#354642;
+  --cal-muted:#bbcac3;
+  --cal-accent:#c5e9ad;
+  --v4-strong:#f5f5e9;
+  --v4-ink:#eaf0e9;
+  --v4-ink2:var(--cal-muted);
+  --v4-early:#9ee4bc;
+  --v4-night:#d6c5fd;
+  --v4-mid:#f0c68a;
+  --v4-off:#b7c6c2;
+  background:var(--cal-paper)!important;
+  border:1px solid var(--cal-rule)!important;
+  border-radius:18px!important;
+  padding:18px clamp(5px,2vw,16px) 14px!important;
+}
+body.v4 .v4-month .v4-calhead {
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+  padding:3px 7px 14px;gap:4px 8px;
+}
+body.v4 .v4-month .v4-calhead h1 { font-size:clamp(2.2rem,9vw,3.3rem);line-height:1;letter-spacing:-.045em }
+body.v4 .v4-month .v4-calhead p { text-shadow:none;margin-top:4px;font-size:.875rem }
+body.v4 .v4-month .v4-calhead-nav { gap:1px }
+body.v4 .v4-month .v4-calhead-nav button {
+  background:transparent!important;color:var(--v4-ink)!important;box-shadow:none;border:0;min-height:44px;
+}
+body.v4 .v4-month .v4-calhead-nav .v4-pill {border:1px solid var(--cal-rule);min-height:38px}
+body.v4 .v4-month .v4-switch {
+  grid-template-columns:repeat(3,minmax(0,1fr));gap:0;
+  margin:0 3px 9px;padding:0;border:0;border-bottom:1px solid var(--cal-rule);border-radius:0;background:none;
+}
+body.v4 .v4-month .v4-switch button {
+  font-weight:600;border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;box-shadow:none;
+}
+body.v4 .v4-month .v4-switch button[aria-pressed=true] {border-bottom-color:var(--cal-accent);color:var(--cal-accent)!important}
+body.v4 .v4-month .v4-wk {position:static;background:none;border-radius:0;box-shadow:none;padding-block:5px}
+body.v4 .v4-month .v4-wk .we {color:#ecc2ab}
+body.v4 .v4-month .v4-cells {gap:0}
+body.v4 .v4-month .v4-cal-week {border-radius:0;background:none;box-shadow:none;border-top:1px solid var(--cal-rule)}
+body.v4 .v4-month .v4-week-dates {padding:0;gap:0}
+body.v4 .v4-month .v4-cell {
+  min-height:64px;padding:6px 0;gap:1px;justify-content:flex-start;
+  background:none;border:0;box-shadow:none;
+}
+body.v4 .v4-month .c-num {
+  display:grid;place-content:center;min-width:1.45em;height:1.45em;
+  font-size:clamp(1.32rem,5.65vw,1.65rem);font-weight:650;letter-spacing:-.04em;color:var(--v4-strong);
+}
+body.v4 .v4-month .v4-cell.today .c-num {border-radius:50%;color:#172820;background:var(--cal-accent)}
+body.v4 .v4-month .v4-cell.adj .c-num {color:#a1b0a9}
+body.v4 .v4-month .has-notes .c-num::after {left:auto;right:-2px;top:3px;width:4px;height:4px;background:#efbf81}
+body.v4 .v4-month .c-shift {font-weight:550;font-size:1rem}
+body.v4 .v4-month .c-leave b {font-size:1rem}
+body.v4 .v4-month .c-leave.has {color:var(--cal-accent)}
+body.v4 .v4-month .v4-cal-key {margin:8px 6px 12px}
+body.v4 .v4-month .v4-cal-key i {background:#efbf81}
+body.v4 .v4-month .v4-msum {padding:12px 6px 0;border-top:1px solid var(--cal-rule)}
+body.v4 .v4-msum-grid {margin-top:8px}
+body.v4 .v4-month .v4-adays {gap:0}
+body.v4 .v4-month .v4-aday {border:0;border-top:1px solid var(--cal-rule);border-radius:0;background:none;box-shadow:none}
+body.v4 :is(.v4-aday-body,.day-brief.v4-card) .v4-chips {display:grid;justify-items:start;gap:3px}
+body.v4 :is(.v4-aday-body,.day-brief.v4-card) .v4-chip {
+  display:block;padding:0;border:0;background:none;color:var(--v4-ink);font-size:1rem;line-height:1.5;overflow-wrap:anywhere;
+}
