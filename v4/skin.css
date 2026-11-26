@@ -1260,3 +1260,20 @@ body.v4 :is(.v4-aday-body,.day-brief.v4-card) .v4-chips {display:grid;justify-it
 body.v4 :is(.v4-aday-body,.day-brief.v4-card) .v4-chip {
   display:block;padding:0;border:0;background:none;color:var(--v4-ink);font-size:1rem;line-height:1.5;overflow-wrap:anywhere;
 }
+
+body.v4 .v4-cell { -webkit-touch-callout:none;-webkit-user-select:none;user-select:none }
+body.v4 .v4-date-peek {
+  position:fixed;z-index:2147483646;box-sizing:border-box;
+  width:min(20rem,calc(100vw - 16px));padding:14px 16px;
+  overflow:auto;overscroll-behavior:contain;pointer-events:none;
+  border:1px solid #b7cbb8;border-radius:14px;
+  background:#f4f6ed;color:#20332b;box-shadow:0 6px 24px #07151055;
+  text-align:start;line-height:1.45;
+}
+body.v4 .v4-date-peek strong {display:block;font-size:1.05rem;color:#264736}
+body.v4 .v4-date-peek .peek-items {display:grid;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #cdd7c9}
+body.v4 .v4-date-peek .peek-items span {
+  display:block;font:inherit;font-size:1.0625rem;color:inherit;background:none;border:0;padding:0;
+  white-space:pre-wrap;overflow-wrap:anywhere;
+}
+body.v4 .v4-date-peek small {display:block;margin-top:8px;color:#455e50}

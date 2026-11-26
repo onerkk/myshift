@@ -102,6 +102,7 @@ function calendarWeekHtml(week){
       <b class="c-num">${d}</b>${people?`<span class="c-leave${day.leaveCount>0?' has':''}"><b>${day.leaveCount??'—'}</b></span>`:`<span class="c-shift">${esc(shortShift)}</span>`}
       ${lunar?`<span class="c-lunar" id="cal-lunar-${day.key}">${lunar}</span>`:''}
       ${tag?`<span class="c-tags">${tag}</span>`:''}
+      <template class="v4-day-preview"><strong>${m}/${d} ${esc(weekdayLabel)} · ${esc(fullShift)}</strong><div class="peek-items">${chipsHtml(day)||`<span>${zh?'當天沒有標記事項':'Tidak ada agenda hari ini'}</span>`}</div>${day.leaveCount>0?`<small>${esc(calendarLeaveLabel(day))}</small>`:''}</template>
     </button>`);
   }
   const first=week[0],last=week[week.length-1],range=`${first.m}/${first.d} – ${last.m}/${last.d}`;
@@ -113,7 +114,7 @@ function monthGridHtml(days){
   for(let i=0;i<days.length;i+=7)weeks.push(calendarWeekHtml(days.slice(i,i+7)));
   return `<div class="v4-grid"><div class="v4-wk" aria-label="${zh?'星期':'Hari'}">${t('wk').map((w,i)=>`<div class="${i===0||i===6?'we':''}">${w}</div>`).join('')}</div>
     <div class="v4-cells">${weeks.join('')}</div></div>
-    <div class="v4-cal-key"><span><i></i>${zh?'有事項，點日期查看':'Ada agenda · ketuk tanggal'}</span>${UI_CAL_VIEW==='people'?`<span>${zh?'— 人數待確認':'— Data belum tersedia'}</span>`:''}</div>`;
+    <div class="v4-cal-key"><span><i></i>${zh?'有事項，長按日期預覽，放開收起':'Ada agenda · tahan tanggal untuk melihat, lepas untuk menutup'}</span>${UI_CAL_VIEW==='people'?`<span>${zh?'— 人數待確認':'— Data belum tersedia'}</span>`:''}</div>`;
 }
 
 window.uiCalendarPageHtml=function(){
@@ -138,6 +139,65 @@ window.uiCalendarPageHtml=function(){
 
 /* 左右滑動月曆換月（新增）。垂直捲動不受影響；換月後月曆從滑動方向滑入。 */
 let sx=0,sy=0,tracking=false;
+// Keep the preview outside the grid so it can float above the finger and the bottom navigation.
+let press=null, consumed=false;
+function endPreview(){
+  if(!press)return;
+  clearTimeout(press.timer);
+  press.card?.remove();
+  press=null;
+}
+function showPreview(){
+  if(!press)return;
+  // Background sync may replace the button while the finger is still down.
+  if(!press.cell.isConnected){
+    const current=document.elementFromPoint(press.x,press.y)?.closest('.v4-cell');
+    if(!current||current.dataset.date!==press.cell.dataset.date){endPreview();return}
+    press.cell=current;
+  }
+  const card=document.createElement('aside');
+  card.className='v4-date-peek';
+  card.setAttribute('role','status');
+  card.append(press.cell.querySelector('template').content.cloneNode(true));
+  document.body.append(card);
+  press.card=card;
+  tracking=false;
+  consumed=true;
+  const rect=press.cell.getBoundingClientRect(),margin=8;
+  const above=rect.top-2*margin,below=window.innerHeight-rect.bottom-2*margin;
+  const onTop=card.offsetHeight<=above||above>=below;
+  card.style.maxHeight=Math.max(48,onTop?above:below)+'px';
+  card.style.left=Math.max(margin,Math.min(rect.left+(rect.width-card.offsetWidth)/2,window.innerWidth-card.offsetWidth-margin))+'px';
+  card.style.top=(onTop?rect.top-margin-card.offsetHeight:rect.bottom+margin)+'px';
+}
+document.addEventListener('pointerdown',e=>{
+  endPreview();
+  consumed=false;
+  const cell=e.target.closest?.('.v4-cell[data-date]');
+  if(!cell||!e.isPrimary||e.button!==0)return;
+  press={cell,id:e.pointerId,x:e.clientX,y:e.clientY,timer:setTimeout(showPreview,420)};
+});
+document.addEventListener('pointermove',e=>{
+  if(!press||press.id!==e.pointerId)return;
+  if(!press.card){
+    if(Math.hypot(e.clientX-press.x,e.clientY-press.y)>10)endPreview();
+  }else{
+    press.card.scrollTop+=press.y-e.clientY;
+    press.y=e.clientY;
+  }
+},{passive:true});
+for(const type of ['pointerup','pointercancel','lostpointercapture']){
+  window.addEventListener(type,e=>{if(press?.id===e.pointerId)endPreview()},true);
+}
+// Only claim touch movement after a hold has succeeded. A normal drag still scrolls or changes month.
+document.addEventListener('touchmove',e=>{if(press?.card&&e.cancelable)e.preventDefault()},{passive:false});
+document.addEventListener('contextmenu',e=>{if(e.target.closest?.('.v4-cell[data-date]')&&(press||consumed))e.preventDefault()});
+window.addEventListener('click',e=>{
+  if(consumed&&e.detail!==0){consumed=false;e.preventDefault();e.stopImmediatePropagation()}
+},true);
+window.addEventListener('blur',endPreview);
+window.addEventListener('resize',endPreview);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)endPreview()});
 document.addEventListener('touchstart',e=>{const g=e.target.closest&&e.target.closest('.v4-grid');tracking=!!g&&e.touches.length===1;if(tracking){sx=e.touches[0].clientX;sy=e.touches[0].clientY}},{passive:true});
 document.addEventListener('touchcancel',()=>{tracking=false},{passive:true});
 document.addEventListener('touchend',e=>{
