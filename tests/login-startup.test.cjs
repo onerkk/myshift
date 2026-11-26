@@ -398,12 +398,12 @@ test('an existing worker replacement still activates the release with one reload
 
 test('all effect and dependency scripts download in parallel with their original execution order',()=>{
   const scripts=[...html.matchAll(/<script\s+([^>]*src="([^"]+)"[^>]*)>/g)];
-  assert.equal(scripts.length,26);scripts.forEach(s=>assert.match(s[1],/\bdefer\b/));
+  assert.equal(scripts.length,27);scripts.forEach(s=>assert.match(s[1],/\bdefer\b/));
   assert.deepEqual(scripts.map(s=>s[2].split('/').at(-1).split('?')[0]),[
     'firebase-app-compat.js','firebase-auth-compat.js','firebase-firestore-compat.js','weather-data.js','payroll.js',
     'nature-context.js','nature-taiwan.js','sky-gl.js','nature-effects.js','nature-audio.js','config-sync.js','schedule-experience.js','share-calendar.js','navigation-ui.js','app.js','ui-effects.js',
     // v4 view layer: must load after app.js (it overrides the view functions) and weather.js last (it owns rCal).
-    'orrery.js','view.js','calendar.js','sheet.js','pay.js','more.js','setup.js','dialog.js','wxsheets.js','weather.js'
+    'orrery.js','view.js','calendar.js','sheet.js','pay.js','more.js','setup.js','tour.js','dialog.js','wxsheets.js','weather.js'
   ]);
   scripts.forEach(s=>assert.ok(html.indexOf(s[0])<html.indexOf('</head>')));
   assert.equal([...html.matchAll(/<link rel="stylesheet"/g)].length,12);

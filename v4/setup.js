@@ -47,14 +47,14 @@ window.rHelp=function(){
   <header class="v4-sheet-head"><div><p>${zh?'華新麗華 輪班管理系統':'Sistem Manajemen Shift'}</p><h2 class="modal-title">${zh?'我的班表 使用說明':'My Shift Panduan'}</h2></div><img class="v4-help-icon" src="${IMG.icon}" alt=""></header>
   <section class="v4-card"><h3>${zh?'班表顏色說明':'Warna Jadwal'}</h3><div class="v4-help-grid">${sw('early',zh?'早班':'Pagi')}${sw('night',zh?'晚班':'Malam')}${sw('mid',zh?'中班':'Siang')}${sw('off',zh?'休假':'Libur')}</div></section>
   <section class="v4-card"><h3>${zh?'日曆標記說明':'Tanda Kalender'}</h3><div class="v4-help-grid marks">
-    ${mark(cell('today','<b>28</b>'),zh?'今天（亮色外框）':'Hari ini')}
+    ${mark(cell('today','<b>28</b>'),zh?'今天（實心底色）':'Hari ini')}
     ${mark(cell('hol','<b>10</b>'),zh?'國定假日 / 週末（紅色日期）':'Libur nasional / akhir pekan')}
     ${mark(cell('ev','<b>11</b><i class="note-dot"></i>'),zh?'有圓點的日期有事項，長按預覽，放開收起':'Tahan tanggal bertitik untuk melihat agenda')}
     ${mark(cell('lv','<s>'+uiIcon('user',14)+' 2</s>'),zh?'切換「請假人數」查看當日人數':'Jumlah cuti')}
-    ${mark(cell('al','<u class="al">特休</u>'),zh?'已排特休':'Pakai cuti')}
-    ${mark(cell('pay','<u class="pay">發薪</u>'),zh?'發薪日（每月5日，遇假日提前）':'Gaji (tgl 5, maju jika libur)')}
-    ${mark(cell('pay','<u class="pay">績效</u>'),zh?'績效獎金（每月20日，遇假日提前）':'Bonus (tgl 20, maju jika libur)')}
-    ${mark(cell('brk','<em>連假</em>'),zh?'連假（底部紅帶）':'Libur panjang')}
+    ${mark(cell('al',zh?'特休':'Cuti'),zh?'已排特休':'Pakai cuti')}
+    ${mark(cell('pay',zh?'發薪':'Gaji'),zh?'發薪日（每月5日，遇假日提前）':'Gaji (tgl 5, maju jika libur)')}
+    ${mark(cell('pay',zh?'績效':'Bonus'),zh?'績效獎金（每月20日，遇假日提前）':'Bonus (tgl 20, maju jika libur)')}
+    ${mark(cell('brk',zh?'連假':'Libur'),zh?'連假（長按看天數）':'Libur panjang')}
   </div></section>
   <section class="v4-card"><h3>${zh?'薪資計算說明':'Perhitungan Gaji'}</h3>${step('$',zh?'薪資計算週期':'Periode Perhitungan',zh?'每月預設計薪區間為上月 26 日至當月 25 日（例如 3 月為 2/26～3/25）。公司某月結算日若有變動，可在「薪資」設定中的「本月計薪區間」單獨調整，起日與迄日都會計入。':'Periode default adalah tanggal 26 bulan lalu sampai tanggal 25 bulan ini. Jika tanggal perusahaan berubah pada bulan tertentu, atur masing-masing di pengaturan gaji; tanggal awal dan akhir ikut dihitung.','pay')}${step('💰',zh?'發薪日與獎金日':'Gaji & Bonus',zh?'每月 5 日發放薪資，每月 20 日發放績效獎金。遇國定假日或週末則提前至前一個工作日。日曆上以「發薪」和「績效」標示實際發放日。':'Gaji tanggal 5, bonus tanggal 20. Jika jatuh di hari libur/weekend, dimajukan ke hari kerja sebelumnya.','pay')}</section>
   <section class="v4-card"><h3>${zh?'功能說明':'Panduan Fitur'}</h3>${steps.map((s,i)=>{const [title,desc]=s.split('|');return step(i+1,title,desc)}).join('')}</section>
