@@ -100,6 +100,43 @@ test('calendar grid has one button per real day, opens the right date and offers
   assert.ok(!agenda.includes('class="v4-cells"'));
 });
 
+test('month and agenda show every item on a busy day, including leave hours and long notes',()=>{
+  const key='2026-09-12',note='需要確認 <交接> & 班別 '.repeat(4).trim();
+  const c=v4env('zh',c=>{
+    c.fbUser={uid:'me'};
+    c.EVS[key]=['custom','class'];c.NOTES[key]=note;c.SHIFT_OV[key]='晚';
+    c.getAdminEv=k=>k===key?['meeting','health']:[];
+    c.myLeave=k=>k===key?[{uid:'me',leaveType:'sick',hours:6}]:[];
+    c.getLeaves=c.myLeave;c.leaveHoursDetail=l=>({regularHours:l.hours,overtimeHours:4});
+    c.gh=(y,m,d)=>m===9&&d===12?'節日名稱':'';
+    c.isTWOff=(y,m,d)=>m===9&&d===11;
+  });
+  const h=c.screen('calendar');
+  const week=h.split('class="v4-cal-week"').find(part=>part.includes('aria-label="9/6 – 9/12"'));
+  const row=week.match(/class="v4-week-note" data-a="open" data-d="12">([\s\S]*?)<\/button>/)[1];
+  const expected=[c.esc(note),'本人 病假 6h','本人 未加班 4h','meeting','health','class','已調班','節日名稱','連假第 2 天，共 3 天'];
+  for(const label of expected)assert.ok(row.includes('>'+label+'<'),label);
+  const cell=week.match(/<button[^>]*data-date="2026-09-12"[^>]*>([\s\S]*?)<\/button>/)[1];
+  assert.match(cell,/class="c-leave has"[\s\S]*?<b>1<\/b>/);
+  assert.ok(!cell.includes('v4-chip'),'full labels live below the week');
+  c.UI_CAL_VIEW='agenda';
+  const agenda=c.screen('calendar').match(/class="v4-aday [^"]*" data-a="open" data-d="12"[^>]*>([\s\S]*?)<\/button>/)[1];
+  for(const label of expected)assert.ok(agenda.includes('>'+label+'<'),label);
+});
+
+test('adjacent-month notes open the actual date and distinguish unknown from zero people on leave',()=>{
+  const c=v4env('id',c=>{
+    c.fbUser={uid:'me'};c.EVS['2026-10-01']=['custom'];c.NOTES['2026-10-01']='Serah terima';
+  });
+  const h=c.screen('calendar');
+  const week=h.split('class="v4-cal-week"').find(part=>part.includes('aria-label="9/27 – 10/3"'));
+  assert.match(week,/class="v4-week-note" data-a="openDate" data-y="2026" data-m="10" data-d="1">[\s\S]*?>Serah terima<\/span>/);
+  for(const [date,count] of [['2026-09-30','0'],['2026-10-01','—']]){
+    const cell=week.split('data-date="'+date+'"')[1].split('</button>')[0];
+    assert.ok(cell.includes('<b>'+count+'</b>'),date);
+  }
+});
+
 test('date sheet keeps the form fields and anchors the leave, shift and event code depends on',()=>{
   const c=v4env('zh',c=>{c.fbUser={uid:'me'};c.S.modal={y:2026,m:9,d:10};c.S.showLunar=true;c.EVS['2026-09-10']=['custom','annualL','typhoon'];c.NOTES['2026-09-10']='備忘';c.TYD['2026-09-10']=4;c.ALD['2026-09-10']=4});
   const h=c.rMod();

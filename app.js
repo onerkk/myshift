@@ -3307,6 +3307,8 @@ let wxData=null,wxErr=false;
 try{render();}catch(e){document.getElementById("app").innerHTML="<div style='padding:20px;color:red;font-size:14px;word-break:break-all'><b>ERROR:</b><br>"+e.message+"</div>";}
 // ═══ SWIPE GESTURE ═══
 (function(){
+  // The redesigned month grid owns its swipe. Leave horizontal agenda filters to the browser.
+  if(document.body.classList.contains("v4"))return;
   let sx=0,sy=0,swiping=false;
   document.addEventListener("touchstart",e=>{
     try{

@@ -47,10 +47,10 @@ window.rHelp=function(){
   <header class="v4-sheet-head"><div><p>${zh?'華新麗華 輪班管理系統':'Sistem Manajemen Shift'}</p><h2 class="modal-title">${zh?'我的班表 使用說明':'My Shift Panduan'}</h2></div><img class="v4-help-icon" src="${IMG.icon}" alt=""></header>
   <section class="v4-card"><h3>${zh?'班表顏色說明':'Warna Jadwal'}</h3><div class="v4-help-grid">${sw('early',zh?'早班':'Pagi')}${sw('night',zh?'晚班':'Malam')}${sw('mid',zh?'中班':'Siang')}${sw('off',zh?'休假':'Libur')}</div></section>
   <section class="v4-card"><h3>${zh?'日曆標記說明':'Tanda Kalender'}</h3><div class="v4-help-grid marks">
-    ${mark(cell('today','<b>28</b>'),zh?'今天（發光外框）':'Hari ini')}
+    ${mark(cell('today','<b>28</b>'),zh?'今天（亮色外框）':'Hari ini')}
     ${mark(cell('hol','<b>10</b>'),zh?'國定假日 / 週末（紅色日期）':'Libur nasional / akhir pekan')}
-    ${mark(cell('ev','<u>備註</u>'),zh?'有標記事項（格內標籤）':'Ada catatan')}
-    ${mark(cell('lv','<s>請假 2</s>'),zh?'請假人數（格子底部）':'Jumlah cuti')}
+    ${mark(cell('ev','<b>11</b><i class="note-dot"></i>'),zh?'日期圓點代表該週下方有事項':'Titik menandai agenda di bawah pekan')}
+    ${mark(cell('lv','<s>'+uiIcon('user',14)+' 2</s>'),zh?'請假人數（格子底部）':'Jumlah cuti')}
     ${mark(cell('al','<u class="al">特休</u>'),zh?'已排特休':'Pakai cuti')}
     ${mark(cell('pay','<u class="pay">發薪</u>'),zh?'發薪日（每月5日，遇假日提前）':'Gaji (tgl 5, maju jika libur)')}
     ${mark(cell('pay','<u class="pay">績效</u>'),zh?'績效獎金（每月20日，遇假日提前）':'Bonus (tgl 20, maju jika libur)')}

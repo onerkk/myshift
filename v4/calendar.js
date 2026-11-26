@@ -9,9 +9,11 @@ const TONES=['meeting','health','pay','annual','personal','holiday','adjusted'];
 const tone=x=>TONES.includes(x)?x:'own';
 function chipsHtml(day){
   const zh=lang==='zh';
+  const holiday=[day.publicOff?(zh?'國定假日':'Libur nasional'):'',day.holiday].filter(Boolean).join(' · ');
   return day.events.map(e=>`<span class="v4-chip tone-${tone(e.tone)}">${esc(e.label)}</span>`).join('')
     +(day.adjusted?`<span class="v4-chip tone-adjusted">${zh?'已調班':'Shift diubah'}</span>`:'')
-    +(day.holiday?`<span class="v4-chip tone-holiday">${esc(day.holiday)}</span>`:'');
+    +(holiday?`<span class="v4-chip tone-holiday">${esc(holiday)}</span>`:'')
+    +(day.breakLabel?`<span class="v4-chip tone-holiday">${esc(day.breakLabel)}</span>`:'');
 }
 const head=(icon,title,sub,right)=>`<div class="v4-sec-head"><span class="v4-sec-ic">${icon}</span><div><h2>${title}</h2>${sub?`<p>${sub}</p>`:''}</div>${right||''}</div>`;
 
@@ -72,47 +74,81 @@ window.calendarAgendaHtml=function(days){
   const shown=days.filter(matches),wk=t('wk'),unavailable=(filter==='leave'&&!days[0].status.known)||(['meeting','health'].includes(filter)&&!adminEvState.months.includes(days[0].key.slice(0,7)));
   return `<div class="v4-filters" role="group" aria-label="${zh?'篩選每日事項':'Filter agenda'}">${filters.map(([v,label])=>`<button id="agenda-filter-${v}" data-a="calendarFilter" data-filter="${v}" aria-pressed="${filter===v}">${label}</button>`).join('')}</div><div class="v4-agenda-head"><h3>${zh?'每日事項':'Agenda harian'}</h3><span>${zh?`${shown.length} 天`:`${shown.length} hari`}</span></div><div class="v4-adays">${shown.map(day=>{
     const chips=chipsHtml(day),weekday=wk[new Date(day.y,day.m-1,day.d).getDay()];
-    return `<button class="v4-aday v4-s-${sk(day.shift)}${day.today?' today':''}" data-a="open" data-d="${day.d}" aria-current="${day.today?'date':'false'}" aria-label="${esc(`${day.today?(zh?'今天 ':'Hari ini '):''}${day.m}/${day.d} ${studioShiftLabel(day.shift)}, ${day.events.map(e=>e.label).join('、')}, ${calendarLeaveLabel(day)}`)}"><span class="v4-aday-date"><strong>${day.d}</strong><small>${day.today?(zh?'今天':'Hari ini'):(zh?'週':'')+weekday}</small></span><span class="v4-aday-body"><span class="v4-aday-head"><b>${studioShiftLabel(day.shift)}</b><span class="${day.leaveCount>0?'has':''}">${day.leaveCount===null?(zh?'請假 —':'Cuti —'):esc(calendarLeaveLabel(day))}</span></span><span class="v4-chips tight">${chips||`<span class="v4-none">${zh?'無其他事項':'Tidak ada agenda lain'}</span>`}</span></span>${uiIcon('chevron',14)}</button>`;
+    return `<button class="v4-aday v4-s-${sk(day.shift)}${day.today?' today':''}" data-a="open" data-d="${day.d}" aria-current="${day.today?'date':'false'}"><span class="v4-aday-date"><strong>${day.d}</strong><small>${day.today?(zh?'今天':'Hari ini'):(zh?'週':'')+weekday}</small></span><span class="v4-aday-body"><span class="v4-aday-head"><b>${studioShiftLabel(day.shift)}</b><span class="${day.leaveCount>0?'has':''}">${day.leaveCount===null?(zh?'請假 —':'Cuti —'):esc(calendarLeaveLabel(day))}</span></span>${S.showLunar?lunarCellText(day.y,day.m,day.d):''}<span class="v4-chips">${chips||`<span class="v4-none">${zh?'無其他事項':'Tidak ada agenda lain'}</span>`}</span></span>${uiIcon('chevron',14)}</button>`;
   }).join('')||`<div class="v4-empty box"><strong>${unavailable?(zh?'資料尚未取得':'Data belum tersedia'):(zh?'目前沒有符合的日期':'Belum ada tanggal yang sesuai')}</strong><p>${filter==='leave'&&!days[0].status.known?esc(calendarLeaveStatusText(days[0].status)):(zh?'可切換「全部」查看完整班表。':'Pilih Semua untuk jadwal lengkap.')}</p></div>`}</div>`;
 };
 
+function monthDateAction(day){
+  return day.inMonth?`data-a="open" data-d="${day.d}"`:`data-a="openDate" data-y="${day.y}" data-m="${day.m}" data-d="${day.d}"`;
+}
+
+function calendarWeekHtml(week){
+  const zh=lang==='zh',wk=t('wk'),cells=[],notes=[];
+  for(const day of week){
+    const {y,m,d,shift,today,inMonth}=day;
+    const weekday=new Date(y,m-1,d).getDay(),weekend=weekday===0||weekday===6;
+    const weekdayLabel=(zh?'週':'')+wk[weekday];
+    const action=monthDateAction(day),chips=chipsHtml(day);
+    const lunar=S.showLunar?lunarCellText(y,m,d):'';
+    const monthLabel=zh?`${m}月`:['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][m-1];
+    const fullShift=shift==='休'?(zh?'輪班休假':'Libur shift'):studioShiftLabel(shift);
+    const shortShift=shift==='休'?(zh?'輪休':'Libur'):shift?uiShiftShort(shift):(zh?'未排':'—');
+    const aria=[`${y}/${m}/${d}`,weekdayLabel,today?(zh?'今天':'Hari ini'):'',fullShift,
+      day.publicOff?(zh?'國定假日':'Libur nasional'):'',day.holiday,...day.events.map(e=>e.label),
+      day.adjusted?(zh?'已調班':'Shift diubah'):'',calendarLeaveLabel(day),day.breakLabel].filter(Boolean).join(', ');
+    const classes=['v4-cell','v4-s-'+sk(shift),inMonth?'':'adj',today?'today':'',weekend?'we':'',day.publicOff?'hol':'',day.breakLabel?'brk':'',chips?'has-notes':''].filter(Boolean).join(' ');
+    const tags=[today?(zh?'今天':'Hari ini'):'',!inMonth?monthLabel:'',day.publicOff?(zh?'國假':'Libur'):''].filter(Boolean);
+    cells.push(`<button type="button" class="${classes}" ${action} aria-current="${today?'date':'false'}" aria-label="${esc(aria)}"${lunar?` aria-describedby="cal-lunar-${day.key}"`:''} data-date="${day.key}" data-month-offset="${day.monthOffset}">
+      <b class="c-num">${d}</b><span class="c-shift">${esc(shortShift)}</span>
+      ${lunar?`<span class="c-lunar" id="cal-lunar-${day.key}">${lunar}</span>`:''}
+      <span class="c-leave${day.leaveCount>0?' has':''}">${uiIcon('user',14)}<b>${day.leaveCount??'—'}</b></span>
+      ${tags.length?`<span class="c-tags">${tags.map(tag=>`<span>${tag}</span>`).join('')}</span>`:''}
+    </button>`);
+    if(chips){
+      notes.push(`<li><button type="button" class="v4-week-note" ${action}>
+        <span class="v4-note-date"><b>${m}/${d}</b><small>${weekdayLabel}</small></span>
+        <span class="v4-chips">${chips}</span>${uiIcon('chevron',15)}
+      </button></li>`);
+    }
+  }
+  const first=week[0],last=week[week.length-1],range=`${first.m}/${first.d} – ${last.m}/${last.d}`;
+  return `<div class="v4-cal-week" role="group" aria-label="${range}"><div class="v4-week-dates">${cells.join('')}</div>
+    ${notes.length?`<ul class="v4-week-notes" aria-label="${range} ${zh?'本週事項':'Agenda pekan ini'}">${notes.join('')}</ul>`:''}</div>`;
+}
+
+function monthGridHtml(days){
+  const zh=lang==='zh',weeks=[];
+  for(let i=0;i<days.length;i+=7)weeks.push(calendarWeekHtml(days.slice(i,i+7)));
+  return `<div class="v4-cal-key"><span>${uiIcon('user',16)}${zh?'請假人數':'Jumlah cuti'}</span><span><i></i>${zh?'當日有事項':'Ada agenda'}</span></div>
+    <div class="v4-grid"><div class="v4-wk" aria-label="${zh?'星期':'Hari'}">${t('wk').map((w,i)=>`<div class="${i===0||i===6?'we':''}">${w}</div>`).join('')}</div>
+    <div class="v4-cells">${weeks.join('')}</div></div>
+    <p class="v4-note">${zh?'附月份的日期屬於前後月。請假人數顯示「—」代表尚未取得。點日期或事項可看明細，左右滑動可換月。':'Label bulan menandai tanggal di luar bulan ini. Tanda — berarti jumlah cuti belum tersedia. Ketuk tanggal atau agenda untuk detail. Geser untuk ganti bulan.'}</p>${studioCalendarLegendHtml()}`;
+}
+
 window.uiCalendarPageHtml=function(){
-  const zh=lang==='zh',y=S.yr,m=S.mo,WK=t('wk');
-  const gridDays=experienceMonthDates(y,m).map(date=>({...calendarDayInfo(date.y,date.m,date.d),inMonth:date.inMonth,monthOffset:date.monthOffset}));
+  const zh=lang==='zh',y=S.yr,m=S.mo;
+  const breaks=new Map();
+  for(const run of calendarHolidayRuns(y,m)){
+    run.dates.forEach((key,i)=>breaks.set(key,zh?`連假第 ${i+1} 天，共 ${run.length} 天`:`Libur panjang hari ${i+1} dari ${run.length}`));
+  }
+  const gridDays=experienceMonthDates(y,m).map(date=>{
+    const day=calendarDayInfo(date.y,date.m,date.d);
+    return {...day,...date,publicOff:isTWOff(day.y,day.m,day.d),breakLabel:breaks.get(day.key)||''};
+  });
   const days=gridDays.filter(day=>day.inMonth),st={};days.forEach(day=>{if(day.shift)st[day.shift]=(st[day.shift]||0)+1});
   const workDays=Object.entries(st).filter(([s])=>s!=='休').reduce((n,[,v])=>n+v,0);
-  const breakByDate=new Map();calendarHolidayRuns(y,m).forEach(run=>run.dates.forEach((key,index)=>breakByDate.set(key,{run,index})));
-  let cells='';
-  gridDays.forEach(day=>{
-    const {y:dy,m:dm,d,key,shift:s,today:td,holiday:hol,inMonth}=day,dw=new Date(dy,dm-1,d).getDay(),isWeekend=dw===0||dw===6,isPublicOff=isTWOff(dy,dm,d),breakInfo=breakByDate.get(key);
-    const dateTag=isPublicOff?(zh?'假':'L'):isWeekend?(zh?(dw===0?'日':'六'):(dw===0?'M':'S')):'';
-    const dateTitle=isPublicOff?(hol||(zh?'國定假日':'Libur nasional')):isWeekend?(zh?'星期'+WK[dw]:WK[dw]):'';
-    const ariaRun=breakInfo?(zh?`連假第 ${breakInfo.index+1} 天，共 ${breakInfo.run.length} 天`:`Libur panjang hari ${breakInfo.index+1} dari ${breakInfo.run.length}`):'';
-    const aria=[`${td?(zh?'今天 ':'Hari ini '):''}${inMonth?d:`${dy}/${dm}/${d}`} ${studioShiftLabel(s)}`,!inMonth?(zh?(day.monthOffset<0?'上個月':'下個月'):(day.monthOffset<0?'Bulan sebelumnya':'Bulan berikutnya')):'',dateTitle,hol,...day.events.map(e=>e.label),day.adjusted?(zh?'已調班':'Shift diubah'):'',calendarLeaveLabel(day),ariaRun].filter(Boolean).join(', ');
-    const labels=day.events.slice(0,2).map(e=>`<span class="c-ev tone-${tone(e.tone)}" title="${esc(e.label)}">${esc(e.short)}</span>`).join('');
-    const more=day.events.length>2?`<span class="c-more">+${day.events.length-2}</span>`:'';
-    const monthLabel=zh?`${dm}月`:['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][dm-1];
-    const action=inMonth?`data-a="open" data-d="${d}"`:`data-a="openDate" data-y="${dy}" data-m="${dm}" data-d="${d}"`;
-    cells+=`<button type="button" class="v4-cell v4-s-${sk(s)}${!inMonth?' adj':''}${td?' today':''}${day.events.length?' has-ev':''}${isWeekend?' we':''}${isPublicOff?' hol':''}${breakInfo?' brk':''}${breakInfo&&breakInfo.index===0?' brk-s':''}${breakInfo&&breakInfo.index===breakInfo.run.length-1?' brk-e':''}" ${action} aria-current="${td?'date':'false'}" aria-label="${esc(aria)}" data-date="${key}" data-month-offset="${day.monthOffset}">`
-      +`<span class="c-top"><b class="c-num">${d}</b>${td?`<i class="c-now">${zh?'今天':'Kini'}</i>`:!inMonth?`<i class="c-mon" title="${dy}/${dm}">${monthLabel}</i>`:dateTag?`<i class="c-tag${isPublicOff?' official':''}" title="${esc(dateTitle)}">${dateTag}</i>`:''}</span>`
-      +`<span class="c-shift">${s==='休'?(zh?'輪班休':'Libur'):uiShiftShort(s)}</span>`
-      +(hol?`<span class="c-hol" title="${esc(hol)}">${esc(hol)}</span>`:'')+(S.showLunar?lunarCellText(dy,dm,d):'')
-      +`<span class="c-evs">${labels}${more}${day.adjusted?`<span class="c-adj">${zh?'調班':'Ubah'}</span>`:''}</span>`
-      +`<span class="c-leave${day.leaveCount>0?' has':''}${day.leaveCount===null?' unknown':''}"><span>${zh?'請假':'Cuti'}</span><b>${day.leaveCount===null?'—':day.leaveCount}</b></span>`
-      +(breakInfo?`<span class="c-brk" title="${esc(ariaRun)}"><span>${zh?'連假':'Libur'}</span><b>${breakInfo.index+1}/${breakInfo.run.length}</b></span>`:'')+`</button>`;
-  });
   const ml=zh?`${y} 年 ${m} 月`:`${String(m).padStart(2,'0')} / ${y}`;
   const context=[(RN[lang]&&RN[lang][S.rt])||S.rt||'',S.unit&&S.unit!=='__all'?S.unit:S.unit==='__all'?(zh?'全部單位':'Semua unit'):''].filter(Boolean).join(' · ');
   const isNow=y===TY&&m===TM;
-  const grid=`<div class="v4-grid"><div class="v4-wk" aria-label="${zh?'星期':'Hari'}">${WK.map((w,i)=>`<div class="${i===0||i===6?'we':''}">${w}</div>`).join('')}</div><div class="v4-cells">${cells}</div></div><p class="v4-note">${zh?'月份標籤為前後月，不計入本月統計。請假數字＝當日人數；—＝尚未取得。點日期看全部事項；左右滑動可換月。':'Label bulan = tanggal di luar bulan ini, tidak masuk statistik. Cuti = orang; — = belum tersedia. Ketuk tanggal untuk detail; geser untuk ganti bulan.'}</p>${studioCalendarLegendHtml()}`;
   return `<div class="v4-root v4-calhead"><div class="v4-calhead-title"><h1 aria-label="${ml}">${zh?`${m}<small>月</small>`:`${String(m).padStart(2,'0')}`}</h1><p><b>${y}</b>${context?' · '+esc(context):''}<span>${zh?'班別・事項・當日人力':'Shift · Agenda · Cuti'}</span></p></div><div class="v4-calhead-nav"><button class="v4-round prev" data-a="prev" aria-label="${zh?'上個月':'Bulan sebelumnya'}">${uiIcon('chevron',18)}</button><button class="v4-pill${isNow?' on':''}" data-a="today">${studioIcon('event',15)}${zh?'今天':'Hari ini'}</button><button class="v4-round next" data-a="next" aria-label="${zh?'下個月':'Bulan berikutnya'}">${uiIcon('chevron',18)}</button></div></div>`
-   +`<div class="v4-root v4-slab v4-month" aria-label="${ml}">${uiMonthSummaryHtml(st,workDays)}<div class="v4-switch" role="group" aria-label="${zh?'班表顯示方式':'Tampilan jadwal'}"><button id="calendar-view-month" data-a="calendarView" data-view="month" aria-pressed="${UI_CAL_VIEW==='month'}">${studioIcon('calendar',16)}${zh?'月曆總覽':'Kalender'}</button><button id="calendar-view-agenda" data-a="calendarView" data-view="agenda" aria-pressed="${UI_CAL_VIEW==='agenda'}">${studioIcon('event',16)}${zh?'每日清單':'Agenda harian'}</button></div>${calendarDataNoticeHtml(y,m)}${S.showLunar?lunarTodayStrip():''}${UI_CAL_VIEW==='agenda'?calendarAgendaHtml(days):grid}</div>`
+   +`<div class="v4-root v4-slab v4-month" aria-label="${ml}">${uiMonthSummaryHtml(st,workDays)}<div class="v4-switch" role="group" aria-label="${zh?'班表顯示方式':'Tampilan jadwal'}"><button id="calendar-view-month" data-a="calendarView" data-view="month" aria-pressed="${UI_CAL_VIEW==='month'}">${studioIcon('calendar',16)}${zh?'月曆總覽':'Kalender'}</button><button id="calendar-view-agenda" data-a="calendarView" data-view="agenda" aria-pressed="${UI_CAL_VIEW==='agenda'}">${studioIcon('event',16)}${zh?'每日清單':'Agenda harian'}</button></div>${calendarDataNoticeHtml(y,m)}${S.showLunar?lunarTodayStrip():''}${UI_CAL_VIEW==='agenda'?calendarAgendaHtml(days):monthGridHtml(gridDays)}</div>`
    +uiCalendarTodayAnchorHtml()+uiCalendarRestPlanHtml(y,m)+uiCalendarBreakStripHtml(y,m)+calendarHighlightsHtml(days)+uiQuickToolsHtml()+uiCalendarHolidaysHtml(days)+uiCalendarNoticesHtml(days)+uiUpcomingEventsHtml(y,m);
 };
 
 /* 左右滑動月曆換月（新增）。垂直捲動不受影響；換月後月曆從滑動方向滑入。 */
 let sx=0,sy=0,tracking=false;
 document.addEventListener('touchstart',e=>{const g=e.target.closest&&e.target.closest('.v4-grid');tracking=!!g&&e.touches.length===1;if(tracking){sx=e.touches[0].clientX;sy=e.touches[0].clientY}},{passive:true});
+document.addEventListener('touchcancel',()=>{tracking=false},{passive:true});
 document.addEventListener('touchend',e=>{
   if(!tracking)return;tracking=false;const c=e.changedTouches[0],dx=c.clientX-sx,dy=c.clientY-sy;
   if(Math.abs(dx)<64||Math.abs(dx)<Math.abs(dy)*1.6)return;
