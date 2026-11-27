@@ -1,8 +1,7 @@
 /* Daily information, readable at phone width. Today emphasis updated in v317. */
 :root{--agenda-meeting:#215b8b;--agenda-meeting-bg:#e5f0fa;--agenda-health:#a34352;--agenda-health-bg:#fbe9ec;--agenda-personal:#68518b;--agenda-personal-bg:#f0eaf8}
 html[data-theme="dark"]{--agenda-meeting:#bbdcff;--agenda-meeting-bg:#243e54;--agenda-health:#ffc0c8;--agenda-health-bg:#50303b;--agenda-personal:#decbfb;--agenda-personal-bg:#40344f}
-/* The calendar is a reading surface. Keep the existing atmosphere behind it. */
-body:has(.screen-calendar) #nature-sky,body:has(.screen-calendar) #wxfx{z-index:0}
+/* Scenery and foreground particles use the shared atmosphere layers on every tab. */
 .app-shell:has(.screen-calendar) .app-header{padding-top:calc(14px + env(safe-area-inset-top));padding-bottom:14px;min-height:78px}
 .screen-calendar{gap:20px;padding-left:12px;padding-right:12px}
 .screen-calendar .screen-heading{min-height:58px;padding:0 7px;gap:8px}

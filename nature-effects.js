@@ -46,11 +46,24 @@
     return {cloud,intensity,rain,mode};
   }
   function actorPose(kind,index,t,W,H,wind=0){
-    const bird=kind==='bird',period=bird?31+index*7:43+index*11;
-    const progress=((t+index*13)%period)/period,travel=bird?progress:progress+.055*Math.sin(t*.8+index);
-    const x=travel*(W+100)-50,y=H*(bird?.17+index*.13:.30+index*.16)+Math.sin(t*(bird?.35:.65)+index)*(bird?16:31);
-    const fold=bird?.38+.62*Math.abs(Math.sin(t*5.2+index)):.16+.84*Math.abs(Math.sin(t*9.4+index));
-    return {x,y,fold,bank:Math.sin(t*.55+index)*(bird?.10:.3),size:bird?32+index*6:30+index*9};
+    if(kind==='bird'){
+      const progress=((t+index*13)%(31+index*7))/(31+index*7);
+      return {x:progress*(W+100)-50,y:H*(.17+index*.13)+Math.sin(t*.35+index)*16,
+        fold:.38+.62*Math.abs(Math.sin(t*5.2+index)),bank:.10*Math.sin(t*.55+index),size:32+index*6};
+    }
+    const period=36+index*9,progress=((t+index*17)%period)/period;
+    const heading=index%2?-1:1,phase=t*(.72+index*.09)+index*2.3;
+    const depth=.5+.5*Math.sin(t*.24+index*2.1);
+    const drift=Math.sin(phase)*Math.min(30,W*.06)+Math.sin(phase*.43)*clamp(wind*.32,0,12);
+    const x=(heading>0?progress:1-progress)*(W+128)-64+drift;
+    const y=H*(.30+index*.19)+Math.sin(phase*.68)*H*.052+Math.sin(phase*2.1)*5;
+    const climb=Math.cos(phase*.68)*H*.052*.68+Math.cos(phase*2.1)*10.5;
+    const bank=heading*clamp(climb*.012,-.46,.46);
+    const beat=t*(3.6+index*.41)+.65*Math.sin(phase*1.15);
+    const glide=Math.max(0,Math.sin(phase*.53))**5;
+    const fold=(.5-.5*Math.cos(beat*TAU))*(1-.8*glide);
+    return {x,y,bank,fold,heading,size:24+15*depth,alpha:.70+.24*depth};
+
   }
 
   // ---- sprite store: every bitmap is decoded once and shrunk to a small canvas ----
@@ -392,6 +405,10 @@
     // Season particles: spring petals and autumn leaves drift even in calm air; winter dry leaves and
     // generic debris need measured wind. Spin and sway follow gust strength.
     // v343: Taiwan lowland seasons. Spring 油桐/木棉, summer 鳳凰木, autumn 欒樹/芒草, winter 落羽松 + north-east monsoon.
+    // A passing gust reaches nearby petals and the two planted edges at different times.
+    function breeze(x){
+      return .52+.30*Math.sin(time*.78-x*2.7)+.18*Math.sin(time*1.61-x*4.2);
+    }
     function drawSeasonDrift(dt,m,season,phase){
       if(!allowed('seasonal')||reduced.matches)return;
       const windy=['wind','typhoon'].includes(m),speedW=preview?(windy?60:m==='cold'?26:8):Math.max(0,Number(details.context?.wind)||0);
@@ -400,7 +417,7 @@
       if(!calmDrift&&speedW<8&&!windy&&!monsoon)return;
       const l=effLevel(),q=l==='subtle'?.35:l==='balanced'?.65:1;
       const base=Math.round((season==='spring'?18:season==='summer'?9:season==='autumn'?16:monsoon?14:5)*q);
-      const count=Math.min(petals.length,windy?base+10:base),dir=windDir()||1,f=dprFx,g=Math.min(1,speedW/40),wet=rainMode();
+      const count=Math.min(petals.length,windy?base+10:base),dir=windDir(),f=dprFx,g=Math.min(1,speedW/40),wet=rainMode();
       for(let i=0;i<count;i++){
         const p=petals[i];let key,size,fall,spin=1,heavy=false,float=false;
         if(season==='spring'){if(p.kind<4){key='tung';size=9}else{key='kapok';size=14;heavy=true}}
@@ -410,11 +427,15 @@
         const cv=tw(key);
         fall=(heavy?.07:float?.012:.03)*(wet?1.5:1);
         const sway=float?Math.sin(time*p.swing*.6+p.phase)*2:Math.sin(time*p.swing+p.phase);
-        const gust=monsoon?.18+g*.2:g*.11;
-        p.y+=dt*(fall+(float?-.004*(1-g):.03*g))*(.5+p.z);p.x+=dt*(sway*.03*(heavy?.4:1)+dir*(.01+gust)*(.4+p.z));p.rot+=dt*(p.spin*spin*(1+g*3)*(heavy?.5:1));
+        const pulse=breeze(p.x),gust=(monsoon?.18+g*.2:g*.11)*pulse;
+        const flutter=Math.sin(time*p.swing*(heavy?1.3:2.1)+p.phase);
+        const settling=fall*(1+flutter*(heavy?.06:.22));
+        p.y+=dt*(settling+(float?-.004*(1-g):.03*g))*(.5+p.z);
+        p.x+=dt*(sway*.03*(heavy?.4:1)+dir*(.01+gust)*(.4+p.z));
+        p.rot+=dt*(p.spin*spin*(1+g*pulse*3)*(heavy?.5:1)+flutter*.22);
         if(p.y>1.08){p.y=rand(-.3,-.05);p.x=Math.random()}if(p.y<-.3)p.y=1.05;if(p.x>1.1)p.x=-.1;if(p.x<-.1)p.x=1.1;
         if(!cv)continue;const x=p.x*w,y=p.y*h,sz=size*(.6+p.z*.7),c=Math.cos(p.rot),sn=Math.sin(p.rot),tumble=heavy?.75+.25*Math.abs(Math.cos(time+p.phase)):.45+.55*Math.abs(Math.cos(time*1.3+p.phase));
-        ctx.globalAlpha=(phase==='night'?.45:.85)*vignette(x,y);ctx.setTransform(c*f*tumble,sn*f*tumble,-sn*f,c*f,x*f,y*f);ctx.drawImage(cv,-sz,-sz*cv.height/cv.width,sz*2,sz*2*cv.height/cv.width);
+        ctx.globalAlpha=(phase==='night'?.45:.88)*(.68+.32*p.z)*vignette(x,y);ctx.setTransform(c*f*tumble,sn*f*tumble,-sn*f,c*f,x*f,y*f);ctx.drawImage(cv,-sz,-sz*cv.height/cv.width,sz*2,sz*2*cv.height/cv.width);
       }ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
       // wind made visible: faint streaks when it blows hard (typhoon, strong wind, NE monsoon)
       if(windy||monsoon){const n=monsoon?7:9,night=phase==='night';ctx.lineWidth=1;for(let i=0;i<n;i++){const x=((time*(260+i*40)+i*131)%(w+260))-130,y=(i*97+Math.sin(time*.7+i)*12)%h,len=70+i%3*40;ctx.strokeStyle=night?`rgba(190,205,215,${.12+i%2*.06})`:`rgba(255,255,255,${.18+i%2*.08})`;ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+len*.5*dir,y-4,x+len*dir,y+2);ctx.stroke()}}
@@ -422,13 +443,13 @@
     // Rooted foreground botany on both lower sides; sway follows measured wind only.
     function drawBotany(m,season,phase){
       if(!allowed('seasonal'))return;
-      const speed=preview?(['wind','typhoon'].includes(m)?70:8):Math.max(0,Number(details.context?.wind)||0),dir=windDir()||1,night=phase==='night',f=dprFx;
+      const speed=preview?(['wind','typhoon'].includes(m)?70:8):Math.max(0,Number(details.context?.wind)||0),dir=windDir(),night=phase==='night',f=dprFx;
       const bottom=h-96,sw=Math.min(.6,speed*.014),set=season==='spring'?[['tung-branch',150]]:season==='summer'?[['flame-branch',160]]:season==='autumn'?[['miscanthus',70],['rain-tree-branch',130]]:[['cypress-branch',150]];
       for(let side=0;side<2;side++)for(let i=0;i<set.length;i++){
-        const [key,size]=set[i],cv=tw(key)||sprite(key);if(!cv)continue;
-        const rootX=side?w+6:-6,rootY=bottom-i*30+(key==='miscanthus'?70:0),motion=reduced.matches?0:Math.sin(time*(.6+speed*.02)+i*1.1+side*2)*sw;
+        const [key,baseSize]=set[i],size=baseSize*(side?.86:1),cv=tw(key)||sprite(key);if(!cv)continue;
+        const rootX=side?w+6:-6,rootY=bottom+side*14-i*30+(key==='miscanthus'?70:0),motion=reduced.matches?0:(dir*breeze(side)*.65+Math.sin(time*(.85+i*.24)+side*1.6)*.22)*sw;
         const rot=(side?1:-1)*(key==='miscanthus'?.05:-.1+i*.1)+motion+dir*Math.min(.3,speed*.006),c=Math.cos(rot),s=Math.sin(rot),sx=side?-1:1;
-        ctx.globalAlpha=(night?.4:.86)*(season==='winter'?.75:1);ctx.setTransform(c*f*sx,s*f,-s*f*sx,c*f,rootX*f,rootY*f);
+        ctx.globalAlpha=(night?.4:.86)*(season==='winter'?.75:1);ctx.setTransform(c*f*sx,s*f*sx,-s*f,c*f,rootX*f,rootY*f);
         ctx.drawImage(cv,key==='miscanthus'?-size*.4:0,key==='miscanthus'?-size*1.6*cv.height/cv.width:-size*1.3*cv.height/cv.width,size*1.3,size*1.3*cv.height/cv.width);
       }
       ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
@@ -461,9 +482,12 @@
       const eco=sceneContext(m,season,phase==='night');if(!eco.animals.length)return;
       const f=dprFx,l=effLevel(),species=season==='spring'?'swallowtail':season==='autumn'?'monarch':'purple',nb=l==='subtle'?1:2;
       for(let i=0;i<nb;i++){
-        const pose=actorPose('butterfly',i,time,w,h,wind),frame=[0,1,2,3,2,1][Math.floor((time*9+i*2)%6)],cv=sprite(species+'-'+frame);if(!cv)continue;
-        const size=28+i*8,c=Math.cos(pose.bank),s=Math.sin(pose.bank),dir=Math.cos(time*.03+i)>0?1:-1;
-        ctx.globalAlpha=.92;ctx.setTransform(c*f*dir,s*f,-s*f*dir,c*f,pose.x*f,pose.y*f);ctx.drawImage(cv,-size/2,-size/2,size,size);
+        const pose=actorPose('butterfly',i,time,w,h,wind);
+        const frame=Math.round(pose.fold*3),cv=sprite(species+'-'+frame);if(!cv)continue;
+        const c=Math.cos(pose.bank),s=Math.sin(pose.bank),scale=f*pose.heading;
+        ctx.globalAlpha=pose.alpha;
+        ctx.setTransform(c*scale,s*scale,-s*f,c*f,pose.x*f,pose.y*f);
+        ctx.drawImage(cv,-pose.size/2,-pose.size/2,pose.size,pose.size);
       }
       ctx.setTransform(f,0,0,f,0,0);ctx.globalAlpha=1;
     }

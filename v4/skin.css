@@ -253,8 +253,7 @@ body.v4 .v4-calhead-nav .prev svg{transform:rotate(180deg)}
 body.v4 .v4-pill{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:99px;background:var(--v4-glass);border:1px solid var(--v4-line);-webkit-backdrop-filter:var(--v4-blur);backdrop-filter:var(--v4-blur);font-size:.82rem;font-weight:800;color:var(--v4-ink)!important;box-shadow:inset 0 1px 0 rgba(var(--v4-w),.14),0 8px 22px rgba(3,8,18,.28)}
 body.v4 .v4-pill.on{color:var(--v4-ink3)!important}
 
-/* Keep moving weather and petals behind the calendar text. */
-html body.v4:not(.scene-theatre):has(.screen-calendar) :is(#wxfx,#nature-glass-gl){z-index:0}
+
 
 /* ── 月曆面板 ── */
 html body.v4 .app-main>.v4-month{--cal-paper:#14243a;--cal-muted:#c5d2e4;--cal-rule:rgba(199,218,242,.18);
